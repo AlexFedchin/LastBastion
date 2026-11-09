@@ -1,0 +1,37 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Prepare game",
+      "detail": "Install dependencies on first run, then bundle src/ into app/build",
+      "type": "shell",
+      "command": "node scripts/prelaunch.mjs",
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Play Last Bastion",
+      "detail": "Build and launch the game",
+      "type": "shell",
+      "command": "node scripts/prelaunch.mjs && npx electron .",
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Watch (rebuild on save)",
+      "type": "shell",
+      "command": "npm run watch",
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    },
+    {
+      "label": "Package Windows .exe (local)",
+      "type": "shell",
+      "command": "npm run dist:win",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated" }
+    }
+  ]
+}

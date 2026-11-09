@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:;">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Last Bastion</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="icon" href="icon.png">
+</head>
+<body>
+  <canvas id="game"></canvas>
+
+  <!-- ─────────────────────────── HUD ─────────────────────────── -->
+  <div id="hud" class="hidden">
+    <div class="hud-tl">
+      <div class="night-label">NIGHT <span id="h-night">01</span></div>
+      <div class="dawn-row"><span class="lbl" id="h-dawn-lbl">DAWN IN</span> <span id="h-dawn">--:--</span></div>
+      <div class="bar"><div id="h-dawn-bar"></div></div>
+      <div id="h-alive" class="small">CONTACTS 0</div>
+    </div>
+
+    <div class="hud-tc">
+      <div id="h-kills" class="kills">0</div>
+      <div class="small center">CONFIRMED KILLS</div>
+      <div id="h-carnage" class="carnage"></div>
+    </div>
+
+    <div class="hud-tr">
+      <div class="surv"><span class="lbl">SURVIVORS</span> <span id="h-surv">30</span></div>
+      <div id="h-surv-icons"></div>
+      <div class="supplies"><span class="lbl">SUPPLIES</span> <span id="h-supplies">0</span></div>
+    </div>
+
+    <div class="hud-bl">
+      <div id="h-radio" class="radio">
+        <div class="radio-head"><span class="dot"></span> RADIO — <span id="h-radio-who"></span></div>
+        <div id="h-radio-text"></div>
+      </div>
+      <div class="wallmap">
+        <svg id="h-wall" viewBox="0 0 300 110" preserveAspectRatio="xMidYMid meet"></svg>
+        <div class="small">WALL PRESSURE <span id="h-wire" class="muted"></span></div>
+      </div>
+    </div>
+
+    <div class="hud-bc">
+      <div class="weapon-name">M2HB <b>.50 CAL</b></div>
+      <div class="heat"><div id="h-heat"></div></div>
+      <div id="h-gunstate" class="small">READY</div>
+    </div>
+
+    <div class="hud-br" id="h-abilities"></div>
+
+    <div id="crosshair">
+      <i class="t"></i><i class="b"></i><i class="l"></i><i class="r"></i><i class="c"></i>
+      <div id="hitmarker"></div>
+    </div>
+    <div id="scope"></div>
+
+    <div id="edge-l" class="edge l"><span>◀</span><b></b></div>
+    <div id="edge-r" class="edge r"><b></b><span>▶</span></div>
+    <div id="announce"><div id="announce-big"></div><div id="announce-small"></div></div>
+    <div id="alerts"></div>
+    <div id="hint"></div>
+  </div>
+  <div id="fps"></div>
+
+  <!-- ─────────────────────────── SCREENS ─────────────────────────── -->
+  <div id="screens">
+    <section id="s-menu" class="screen">
+      <div class="title-block">
+        <div class="pre">BASTION-7 · NORTHERN VALLEY LINE</div>
+        <h1>LAST BASTION</h1>
+        <div class="tagline">Seventy-two hours. One gun. No relief.</div>
+      </div>
+      <nav class="menu">
+        <button data-act="continue" id="btn-continue">CONTINUE <small id="continue-info"></small></button>
+        <button data-act="new">NEW CAMPAIGN</button>
+        <button data-act="howto">FIELD MANUAL</button>
+        <button data-act="settings">SETTINGS</button>
+        <button data-act="quit" id="btn-quit">QUIT</button>
+      </nav>
+      <div class="footer">v1.0 · hold the line</div>
+    </section>
+
+    <section id="s-new" class="screen panel-screen">
+      <div class="panel">
+        <h2>CHOOSE YOUR WAR</h2>
+        <div class="diff-list" id="diff-list"></div>
+        <div class="row"><button data-act="back">BACK</button></div>
+      </div>
+    </section>
+
+    <section id="s-howto" class="screen panel-screen">
+      <div class="panel wide">
+        <h2>FIELD MANUAL</h2>
+        <div class="cols">
+          <div>
+            <h3>CONTROLS</h3>
+            <table class="keys">
+              <tr><td>MOUSE</td><td>Traverse the gun</td></tr>
+              <tr><td>LMB</td><td>Fire the M2HB</td></tr>
+              <tr><td>RMB</td><td>Optics (zoom, tighter spread)</td></tr>
+              <tr><td>R</td><td>Swap barrel (resets heat)</td></tr>
+              <tr><td>Q</td><td>105mm fire mission on the crosshair</td></tr>
+              <tr><td>E</td><td>Ignite the napalm trench</td></tr>
+              <tr><td>F</td><td>Illumination flare</td></tr>
+              <tr><td>G</td><td>Grenade bundle (close range)</td></tr>
+              <tr><td>B</td><td>DANGER CLOSE — costs 3 survivors</td></tr>
+              <tr><td>ESC</td><td>Pause</td></tr>
+              <tr><td>F11</td><td>Toggle fullscreen</td></tr>
+            </table>
+          </div>
+          <div>
+            <h3>HOW YOU LOSE</h3>
+            <p>The dead pile up against the wall. Every body pressed against a section raises the pile. When a pile reaches the top of the wall, they climb over — and each one that makes it costs a survivor. When the survivors are gone, so is Bastion-7.</p>
+            <p>Watch the <b>WALL PRESSURE</b> map. Look left and right along the wall faces and cut the piles down. Napalm and grenades are made for the wall base.</p>
+            <h3>HOW YOU LAST</h3>
+            <p>Survive until dawn. Every kill earns supplies; spend them at dawn on the gun, the battery, the wall and the men on it. Ten nights. Then we'll see.</p>
+            <p><b>Bloaters</b> burst and take their neighbours with them — but if one reaches the wall, its acid melts a ramp the rest can climb. <b>Brutes</b> weigh three men on a pile. <b>Runners</b> are exactly what they sound like. Flares light targets up: lit zombies take +25% damage.</p>
+          </div>
+        </div>
+        <p class="small muted credits">MUSIC: “Night Vigil”, “Echoes of Time v2”, “Ossuary 6 - Air”, “Satiate”, “Steel Rods”, “Stormfront”, “Peaceful Desolation”, “Thunder Dreams”, “Lost Time”, “Long Road Ahead” — Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 (creativecommons.org/licenses/by/4.0). SOUND: field recordings from Freesound contributors, CC0 — full list in audio/CREDITS.md.</p>
+        <div class="row"><button data-act="back">BACK</button></div>
+      </div>
+    </section>
+
+    <section id="s-settings" class="screen panel-screen">
+      <div class="panel">
+        <h2>SETTINGS</h2>
+        <div class="settings" id="settings-form"></div>
+        <div class="note" id="settings-note"></div>
+        <div class="row"><button data-act="settings-back">BACK</button></div>
+      </div>
+    </section>
+
+    <section id="s-pause" class="screen panel-screen">
+      <div class="panel narrow">
+        <h2>PAUSED</h2>
+        <nav class="menu small">
+          <button data-act="resume">RESUME</button>
+          <button data-act="settings">SETTINGS</button>
+          <button data-act="howto">FIELD MANUAL</button>
+          <button data-act="abandon">ABANDON NIGHT</button>
+        </nav>
+      </div>
+    </section>
+
+    <section id="s-shop" class="screen shop-screen">
+      <header class="shop-head">
+        <div>
+          <div class="pre" id="shop-pre">DAWN · DAY 1</div>
+          <h2 id="shop-title">RESUPPLY</h2>
+        </div>
+        <div class="shop-res">
+          <div><span class="lbl">SURVIVORS</span> <b id="shop-surv">30</b></div>
+          <div><span class="lbl">SUPPLIES</span> <b id="shop-supplies">0</b></div>
+        </div>
+      </header>
+      <div class="shop-body">
+        <aside class="report" id="shop-report"></aside>
+        <div class="upgrades" id="shop-upgrades"></div>
+      </div>
+      <footer class="shop-foot">
+        <button data-act="shop-menu" class="ghost">SAVE &amp; EXIT</button>
+        <button data-act="begin" class="primary" id="btn-begin">BEGIN NIGHT 2 ▸</button>
+      </footer>
+    </section>
+
+    <section id="s-over" class="screen panel-screen end-screen">
+      <div class="panel">
+        <div class="pre">BASTION-7 · FINAL TRANSMISSION</div>
+        <h1 class="red">THE WALL HAS FALLEN</h1>
+        <p class="epitaph" id="over-text"></p>
+        <div class="stats" id="over-stats"></div>
+        <nav class="menu small">
+          <button data-act="retry" id="btn-retry">RETRY FROM DAWN</button>
+          <button data-act="menu">MAIN MENU</button>
+        </nav>
+      </div>
+    </section>
+
+    <section id="s-victory" class="screen panel-screen end-screen">
+      <div class="panel">
+        <div class="pre" id="victory-pre">0614 HOURS</div>
+        <h1>DAWN</h1>
+        <p class="epitaph" id="victory-text"></p>
+        <div class="stats" id="victory-stats"></div>
+        <nav class="menu small">
+          <button data-act="endless">KEEP HOLDING (ENDLESS)</button>
+          <button data-act="menu">MAIN MENU</button>
+        </nav>
+      </div>
+    </section>
+
+    <section id="s-click" class="screen click-screen">
+      <div class="click-box">CLICK TO TAKE THE GUN</div>
+    </section>
+  </div>
+
+  <div id="loading"><div class="ld-title">LAST BASTION</div><div class="ld-sub" id="ld-sub">painting the valley…</div></div>
+  <div id="fade"></div>
+
+  <script src="build/game.js"></script>
+</body>
+</html>

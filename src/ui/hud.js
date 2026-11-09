@@ -1,0 +1,241 @@
+// In-game HUD. Plain DOM, updated only when values change.
+import { WORLD, wallZ, sectionCenterX } from '../config.js';
+import { formatInt, formatTime } from '../core/util.js';
+
+const $ = (id) => document.getElementById(id);
+const LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
+
+export class HUD {
+  constructor() {
+    this.root = $('hud');
+    this.el = {
+      night: $('h-night'), dawn: $('h-dawn'), dawnLbl: $('h-dawn-lbl'), dawnBar: $('h-dawn-bar'), contacts: $('h-alive'),
+      kills: $('h-kills'), carnage: $('h-carnage'),
+      surv: $('h-surv'), survIcons: $('h-surv-icons'), supplies: $('h-supplies'),
+      radio: $('h-radio'), radioWho: $('h-radio-who'), radioText: $('h-radio-text'),
+      heat: $('h-heat'), gunState: $('h-gunstate'),
+      abilities: $('h-abilities'),
+      hit: $('hitmarker'), cross: $('crosshair'),
+      announce: $('announce'), annBig: $('announce-big'), annSmall: $('announce-small'),
+      alerts: $('alerts'), fps: $('fps'), hint: $('hint'), wire: $('h-wire'),
+      edgeL: $('edge-l'), edgeR: $('edge-r'),
+    };
+    this.cache = {};
+    this.buildWallMap();
+    this.radioQueue = [];
+    this.radioT = 0;
+    this.announceT = 0;
+    this.carnageT = 0;
+    this.hitT = 0;
+    this.killPulse = 0;
+  }
+
+  show(v) { this.root.classList.toggle('hidden', !v); }
+
+  set(key, el, value, prop = 'textContent') {
+    if (this.cache[key] === value) return;
+    this.cache[key] = value;
+    if (prop === 'class') el.setAttribute('class', value);
+    else el[prop] = value;
+  }
+
+  buildWallMap() {
+    const svg = $('h-wall');
+    const mapX = (x) => 150 + x * 1.85;
+    const mapZ = (z) => 92 + z * 2.0;
+    let html = '';
+    // valley lines
+    html += `<polyline points="${mapX(-150)},${mapZ(wallZ(-150))} ${mapX(-72)},${mapZ(wallZ(-72))}" class="wm-cliff"/>`;
+    html += `<polyline points="${mapX(72)},${mapZ(wallZ(72))} ${mapX(150)},${mapZ(wallZ(150))}" class="wm-cliff"/>`;
+    for (let s = 0; s < 10; s++) {
+      const x0 = s < 5 ? -72 + s * 12.8 : 8 + (s - 5) * 12.8;
+      const x1 = x0 + 12.8;
+      html += `<line id="wm-${s}" x1="${mapX(x0) + 1}" y1="${mapZ(wallZ(x0))}" x2="${mapX(x1) - 1}" y2="${mapZ(wallZ(x1))}" class="wm-sec"/>`;
+      const cx = (x0 + x1) / 2;
+      html += `<text x="${mapX(cx)}" y="${mapZ(wallZ(cx)) + 13}" class="wm-lbl">${LABELS[s]}</text>`;
+    }
+    html += `<rect x="${mapX(-8)}" y="${mapZ(-1.5) - 3}" width="${16 * 1.85}" height="7" class="wm-tower"/>`;
+    html += `<path id="wm-view" class="wm-view" d=""/>`;
+    svg.innerHTML = html;
+    this.secEls = [];
+    for (let s = 0; s < 10; s++) this.secEls.push(document.getElementById('wm-' + s));
+    this.viewEl = document.getElementById('wm-view');
+    this.mapX = mapX; this.mapZ = mapZ;
+  }
+
+  radio(who, text, prio = false) {
+    if (prio) this.radioQueue.unshift([who, text]); else this.radioQueue.push([who, text]);
+    if (this.radioQueue.length > 4) this.radioQueue.length = 4;
+  }
+
+  announce(big, small = '', dur = 3.2, cls = '') {
+    this.el.annBig.textContent = big;
+    this.el.annSmall.textContent = small;
+    this.el.announce.className = 'show ' + cls;
+    this.announceT = dur;
+  }
+
+  alert(text, cls = '') {
+    const d = document.createElement('div');
+    d.className = 'alert ' + cls;
+    d.textContent = text;
+    this.el.alerts.prepend(d);
+    while (this.el.alerts.children.length > 4) this.el.alerts.lastChild.remove();
+    setTimeout(() => d.classList.add('fade'), 2600);
+    setTimeout(() => d.remove(), 3400);
+  }
+
+  carnage(text, cls = '') {
+    this.el.carnage.textContent = text;
+    this.el.carnage.className = 'carnage show ' + cls;
+    this.carnageT = 1.6;
+  }
+
+  hitmarker(killed, head) {
+    this.el.hit.className = killed ? (head ? 'kill head' : 'kill') : 'hit';
+    this.hitT = killed ? 0.22 : 0.09;
+  }
+
+  kill() { this.killPulse = 1; }
+
+  hint(text) { this.el.hint.textContent = text; this.el.hint.classList.toggle('show', !!text); }
+
+  update(dt, g) {
+    const { run, director, player, arsenal, horde, stats } = g;
+    const el = this.el;
+    const isDawn = g.state === 'dawn';
+    this.set('night', el.night, String(isDawn ? run.night - 1 : run.night).padStart(2, '0'));
+    const rem = director.plan ? director.remaining : 0;
+    this.set('dawnl', el.dawnLbl, isDawn ? 'DAWN' : rem > 0 ? 'DAWN IN' : 'CLEAR THE FIELD');
+    this.set('dawn', el.dawn, isDawn ? '' : rem > 0 ? formatTime(rem) : '');
+    this.set('dawnbar', el.dawnBar.style, `${(director.plan ? director.progress : 0) * 100}%`, 'width');
+    const contacts = horde.alive + director.queue.length;
+    this.set('contacts', el.contacts, `CONTACTS ${formatInt(contacts)}`);
+    this.set('kills', el.kills, formatInt(run.kills));
+    this.set('surv', el.surv, String(run.survivors));
+    this.set('supplies', el.supplies, formatInt(run.supplies));
+    // survivor ticks
+    const sv = Math.min(run.survivors, 60);
+    if (this.cache.survIcons !== sv) {
+      this.cache.survIcons = sv;
+      el.survIcons.innerHTML = '<i></i>'.repeat(sv);
+    }
+    this.killPulse = Math.max(0, this.killPulse - dt * 6);
+    el.kills.style.transform = `scale(${1 + this.killPulse * 0.08})`;
+
+    // gun
+    const heat = player.heat;
+    this.set('heat', el.heat.style, `${heat * 100}%`, 'width');
+    const hot = player.overheatT > 0;
+    let state = 'READY';
+    let cls = '';
+    if (player.swapT > 0) { state = 'CHANGING BARREL'; cls = 'warn'; }
+    else if (hot) { state = `OVERHEATED ${player.overheatT.toFixed(1)}s — [R] SWAP BARREL`; cls = 'danger'; }
+    else if (heat > 0.75) { state = 'BARREL HOT'; cls = 'warn'; }
+    else if (player.zoom > 0.5) state = 'OPTICS';
+    this.set('gs', el.gunState, state);
+    this.set('gsc', el.gunState, 'small ' + cls, 'className');
+    this.set('heatc', el.heat, heat > 0.75 || hot ? 'hot' : '', 'className');
+
+    // abilities
+    const a = arsenal;
+    const rows = [
+      ['Q', 'ARTILLERY', a.artyCd > 0 ? `${Math.ceil(a.artyCd)}s` : `READY ×${stats.artyShells}`, a.artyCd > 0 ? 1 - a.artyCd / stats.artyCooldown : 1, a.artyCd <= 0],
+      ['E', 'NAPALM', a.napalmT > 0 ? 'BURNING' : (a.napalmCd > 0 ? `${Math.ceil(a.napalmCd)}s` : 'READY'), a.napalmT > 0 ? a.napalmT / stats.napalmDuration : (a.napalmCd > 0 ? 1 - a.napalmCd / stats.napalmCooldown : 1), a.napalmCd <= 0 && a.napalmT <= 0],
+      ['F', 'FLARE', `×${a.flaresLeft}`, a.flaresLeft > 0 ? 1 : 0, a.flaresLeft > 0],
+      ['G', 'GRENADES', `×${a.grenadesLeft}`, a.grenadesLeft > 0 ? 1 : 0, a.grenadesLeft > 0],
+      ['B', 'DANGER CLOSE', a.dangerUsed ? 'SPENT' : `−3 LIVES`, a.dangerUsed ? 0 : 1, !a.dangerUsed && run.survivors > 3],
+    ];
+    if (!this.abRows) {
+      el.abilities.innerHTML = rows.map((r, i) => `<div class="ab" id="ab-${i}"><span class="key">${r[0]}</span><span class="nm">${r[1]}</span><span class="st"></span><div class="cd"><div></div></div></div>`).join('');
+      this.abRows = rows.map((_, i) => {
+        const row = document.getElementById('ab-' + i);
+        return { row, st: row.querySelector('.st'), cd: row.querySelector('.cd > div') };
+      });
+    }
+    rows.forEach((r, i) => {
+      const ar = this.abRows[i];
+      this.set('abst' + i, ar.st, r[2]);
+      this.set('abcd' + i, ar.cd.style, `${Math.max(0, Math.min(1, r[3])) * 100}%`, 'width');
+      this.set('abrd' + i, ar.row, 'ab' + (r[4] ? ' ready' : ''), 'className');
+    });
+
+    const support = [];
+    if (stats.gunners) support.push(`GUNNERS ${stats.gunners}`);
+    if (stats.mortar) support.push(`MORTAR`);
+    if (arsenal.mines.length) support.push(`CLAYMORES ${arsenal.mines.length}`);
+    const wi = arsenal.wireIntegrity();
+    if (wi >= 0) support.push(`WIRE ${Math.round(wi * 100)}%`);
+    this.set('wire', el.wire, support.join('  ·  '));
+
+    // wall pressure map
+    for (let s = 0; s < 10; s++) {
+      const p = horde.pressure(s);
+      const c = p > 0.85 ? 'crit' : p > 0.55 ? 'high' : p > 0.25 ? 'mid' : 'low';
+      this.set('wm' + s, this.secEls[s], 'wm-sec ' + c, 'class');
+      this.set('wmw' + s, this.secEls[s].style, String(2.5 + p * 5), 'strokeWidth');
+    }
+    // off-screen threat indicators
+    const halfFov = Math.atan(Math.tan((g.camera.fov * Math.PI) / 360) * g.camera.aspect) * 0.92;
+    let left = '', right = '';
+    for (let s = 0; s < 10; s++) {
+      if (horde.pressure(s) < 0.5) continue;
+      const x = sectionCenterX(s), z = wallZ(x) - 1;
+      const yawTo = Math.atan2(-(x - WORLD.CAM.x), -(z - WORLD.CAM.z));
+      const rel = yawTo - player.yaw;
+      if (rel > halfFov && !left) left = LABELS[s];
+      if (rel < -halfFov && !right) right = LABELS[s];
+    }
+    this.set('edl', el.edgeL, left ? 'edge l on' : 'edge l', 'className');
+    this.set('edr', el.edgeR, right ? 'edge r on' : 'edge r', 'className');
+    this.set('edlt', el.edgeL.querySelector('b'), left);
+    this.set('edrt', el.edgeR.querySelector('b'), right);
+
+    // view cone on the map
+    const yaw = player.yaw, fov = Math.atan(Math.tan((g.camera.fov * Math.PI) / 360) * g.camera.aspect);
+    const cx = this.mapX(WORLD.CAM.x), cy = this.mapZ(WORLD.CAM.z);
+    const r = 42;
+    const a1 = yaw - fov, a2 = yaw + fov;
+    const d = `M${cx},${cy} L${cx - Math.sin(a1) * r},${cy - Math.cos(a1) * r} L${cx - Math.sin(a2) * r},${cy - Math.cos(a2) * r} Z`;
+    if (this.cache.view !== d) { this.cache.view = d; this.viewEl.setAttribute('d', d); }
+
+    // radio ticker
+    if (this.radioT > 0) {
+      this.radioT -= dt;
+      const full = this.radioFull;
+      const shown = Math.min(full.length, Math.floor((this.radioDur - this.radioT) * 55));
+      this.set('rtext', el.radioText, full.slice(0, shown));
+      if (this.radioT <= 0) el.radio.classList.remove('show');
+    } else if (this.radioQueue.length) {
+      const [who, text] = this.radioQueue.shift();
+      this.radioFull = text;
+      this.radioDur = this.radioT = Math.max(4.5, text.length * 0.065 + 2.5);
+      el.radioWho.textContent = who;
+      el.radioText.textContent = '';
+      this.cache.rtext = '';
+      el.radio.classList.add('show');
+      if (g.audio) g.audio.radioStatic(this.radioDur);
+    }
+
+    if (this.announceT > 0) {
+      this.announceT -= dt;
+      if (this.announceT <= 0) el.announce.className = '';
+    }
+    if (this.carnageT > 0) {
+      this.carnageT -= dt;
+      if (this.carnageT <= 0) el.carnage.className = 'carnage';
+    }
+    if (this.hitT > 0) {
+      this.hitT -= dt;
+      if (this.hitT <= 0) el.hit.className = '';
+    }
+    // crosshair spread
+    const spread = (stats.hmgSpread + player.bloom) * (1 - player.zoom * 0.6);
+    const px = 6 + spread * 900;
+    const gap = `${px.toFixed(1)}px`;
+    if (this.cache.gap !== gap) { this.cache.gap = gap; el.cross.style.setProperty('--gap', gap); }
+    el.cross.classList.toggle('zoom', player.zoom > 0.5);
+  }
+
+  fps(v) { this.el.fps.textContent = v; }
+}

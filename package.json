@@ -1,0 +1,57 @@
+{
+  "name": "last-bastion",
+  "productName": "Last Bastion",
+  "version": "1.0.0",
+  "description": "Last Bastion - a brutal last-stand zombie siege defense game.",
+  "author": "Alex",
+  "license": "MIT",
+  "private": true,
+  "main": "electron/main.js",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "watch": "node scripts/build.mjs --watch",
+    "start": "node scripts/build.mjs && electron .",
+    "play": "electron .",
+    "dist:win": "node scripts/build.mjs && electron-builder --win portable nsis --x64 --publish never",
+    "dist:linux": "node scripts/build.mjs && electron-builder --linux AppImage --x64 --publish never"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^45.2.3",
+    "electron-builder": "^26.0.12",
+    "esbuild": "^0.28.2",
+    "three": "^0.187.0"
+  },
+  "build": {
+    "appId": "com.lastbastion.game",
+    "productName": "Last Bastion",
+    "copyright": "Copyright (c) 2026",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "app/**/*",
+      "!app/build/*.map",
+      "package.json"
+    ],
+    "asar": true,
+    "win": {
+      "icon": "build/icon.ico",
+      "artifactName": "LastBastion-${version}-${arch}-${target}.${ext}"
+    },
+    "portable": {
+      "artifactName": "LastBastion-${version}-portable.exe"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "LastBastion-${version}-setup.exe"
+    },
+    "linux": {
+      "icon": "build/icon.png",
+      "category": "Game"
+    }
+  }
+}
