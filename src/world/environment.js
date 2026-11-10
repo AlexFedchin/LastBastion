@@ -10,7 +10,7 @@ import {
   makePlankTextures, makeCorrugatedTextures, makeRockTextures,
 } from './textures2.js';
 import { lerp } from '../core/util.js';
-import { patchFogChunks, fogUniforms, createSceneFog } from '../render/atmosphere.js';
+import { patchFogChunks, patchLightChunks, fogUniforms, createSceneFog } from '../render/atmosphere.js';
 import { Terrain, groundH } from './terrain.js';
 import { FireSystem } from '../fx/fire.js';
 import { makeMaterials, weather } from './kit.js';
@@ -21,6 +21,7 @@ import { buildSky, buildEnvMap, buildRain, buildSplashes, Bolts, BEAM_VERT, BEAM
 import { PF } from './textures.js';
 
 patchFogChunks();
+patchLightChunks();
 
 const R = Math.random;
 const _dir = new THREE.Vector3();
@@ -123,6 +124,9 @@ export class Environment {
       spot.intensity = 2200;
       const shadow = q.spotShadows > k;
       spot.castShadow = shadow;
+      // shadow maps are refreshed on alternate frames (see update): half the shadow passes
+      spot.shadow.autoUpdate = false;
+      spot.shadow.needsUpdate = true;
       if (shadow) {
         spot.shadow.mapSize.set(q.shadowMap, q.shadowMap);
         spot.shadow.camera.near = 4;
@@ -256,6 +260,10 @@ export class Environment {
     this.fire.update(dt, time, fx);
 
     // searchlights sweep, then hunt the thickest crowd
+    // shadow maps refresh together on alternate frames: most of a shadow pass's cost is the
+    // fixed render-target switch, so batching both lights into one frame halves it
+    this._shadowFrame = (this._shadowFrame || 0) + 1;
+    const shadowNow = (this._shadowFrame & 1) === 0;
     for (let k = 0; k < this.searchlights.length; k++) {
       const sl = this.searchlights[k];
       sl.t += dt;
@@ -277,6 +285,7 @@ export class Environment {
       sl.beam.material.uniforms.uTime.value = time;
       sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d) * this.power;
       sl.spot.intensity = 2200 * (1 - d * 0.85) * this.power;
+      if (sl.spot.castShadow && shadowNow) sl.spot.shadow.needsUpdate = true;
       const hs = this.towerHousings[k];
       if (hs) hs.lookAt(sl.aim);
     }

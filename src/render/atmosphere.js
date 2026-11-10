@@ -108,6 +108,31 @@ export function patchFogChunks() {
 #endif`;
 }
 
+/**
+ * Skip the BRDF for lights that contribute nothing at this pixel. three.js
+ * already works out directLight.visible (zero colour, out of range, outside a
+ * spot cone) but evaluates the full GGX term anyway. The game keeps a fixed pool
+ * of point lights (so shaders never recompile) and most of them sit dark, so
+ * this is a large, pixel-identical saving on every lit surface.
+ */
+let lightsPatched = false;
+export function patchLightChunks() {
+  if (lightsPatched) return;
+  lightsPatched = true;
+  const C = THREE.ShaderChunk;
+  const call = 'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );';
+  if (C.lights_fragment_begin.includes(call)) {
+    C.lights_fragment_begin = C.lights_fragment_begin.split(call).join('if ( directLight.visible ) ' + call);
+  }
+  // a dark pool light (colour uniform == 0) is skipped before any per-pixel work;
+  // the branch is uniform across the draw, so it costs nothing
+  const info = 'getPointLightInfo( pointLight, geometryPosition, directLight );';
+  if (C.lights_fragment_begin.includes(info)) {
+    C.lights_fragment_begin = C.lights_fragment_begin.replace(info,
+      'directLight.visible = false; if ( any( notEqual( pointLight.color, vec3( 0.0 ) ) ) ) ' + info);
+  }
+}
+
 /** The scene fog object: color = base fog colour, near = time, far = dawn. */
 export function createSceneFog(color) {
   const fog = new THREE.Fog(color.clone(), 0, 0);

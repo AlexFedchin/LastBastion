@@ -5,12 +5,46 @@
 // vignette, film grain, damage tint, impact radial blur and letterboxing.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
+import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
 import { makeLensDirtTexture } from '../world/textures2.js';
 
 const MAX_HEAT = 12, MAX_SHOCK = 4;
+
+/**
+ * The scene, drawn into its own multisampled HDR target, then resolved through
+ * the HDR clamp into the composer's (single-sample) buffer. Only the 3D render
+ * pays for MSAA; the fullscreen post passes after it don't.
+ */
+class ScenePass extends Pass {
+  constructor(scene, camera, w, h, samples) {
+    super();
+    this.scene = scene;
+    this.camera = camera;
+    this.needsSwap = false;
+    this.rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples });
+    // clamp extreme HDR before bloom: stacked fires must glow, not white out the frame.
+    // Also scrub NaN/Inf — bloom would blur a single bad pixel into a black screen.
+    this.mat = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: this.rt.texture }, uMax: { value: 4.0 } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: 'uniform sampler2D tDiffuse; uniform float uMax; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0); c = max(c, vec3(0.0)); float m = max(c.r, max(c.g, c.b)); c *= m > uMax ? uMax / m : 1.0; gl_FragColor = vec4(c, 1.0); }',
+      depthTest: false, depthWrite: false,
+    });
+    this.quad = new FullScreenQuad(this.mat);
+  }
+
+  setSize(w, h) { this.rt.setSize(w, h); }
+
+  render(renderer, writeBuffer, readBuffer) {
+    renderer.setRenderTarget(this.rt);
+    renderer.clear();
+    renderer.render(this.scene, this.camera);
+    renderer.setRenderTarget(this.renderToScreen ? null : readBuffer);
+    this.quad.render(renderer);
+  }
+}
 
 const FinalShader = {
   uniforms: {
@@ -185,21 +219,11 @@ export class Post {
     this.quality = quality;
     this.camera = camera;
     const size = renderer.getDrawingBufferSize(new THREE.Vector2());
-    const rt = new THREE.WebGLRenderTarget(size.x, size.y, {
-      type: THREE.HalfFloatType,
-      samples: quality.msaa,
-    });
+    // post buffers are single-sample and need no depth; the scene pass owns the MSAA target
+    const rt = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, depthBuffer: false });
     this.composer = new EffectComposer(renderer, rt);
-    this.renderPass = new RenderPass(scene, camera);
-    this.composer.addPass(this.renderPass);
-    // clamp extreme HDR before bloom: stacked fires must glow, not white out the frame.
-    // Also scrub NaN/Inf — bloom would blur a single bad pixel into a black screen.
-    this.clampPass = new ShaderPass({
-      uniforms: { tDiffuse: { value: null }, uMax: { value: 4.0 } },
-      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform sampler2D tDiffuse; uniform float uMax; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0); c = max(c, vec3(0.0)); float m = max(c.r, max(c.g, c.b)); c *= m > uMax ? uMax / m : 1.0; gl_FragColor = vec4(c, 1.0); }',
-    });
-    this.composer.addPass(this.clampPass);
+    this.scenePass = new ScenePass(scene, camera, size.x, size.y, quality.msaa);
+    this.composer.addPass(this.scenePass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x * quality.bloomScale, size.y * quality.bloomScale), 0.85, 0.38, 1.0);
     this.composer.addPass(this.bloom);
     this.final = new ShaderPass(FinalShader);

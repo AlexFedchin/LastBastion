@@ -327,7 +327,8 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
           vec3 objectTangent = vec3( tangent.xyz );
         #endif`)
       .replace('#include <begin_vertex>', `
-        vec3 transformed = position; vec3 zNN = normal; zPose(transformed, zNN);
+        // posed once above (with the normal); reuse it instead of skinning the vertex twice
+        vec3 transformed = zPP;
         vZMat = aMat; vZTint = aTint; vZState = aState; vZType = aAnim.z; vZSeed = fract(aAnim.x * 0.15915); vZL = position; vZPart = aPart;`);
 
     shader.fragmentShader = `

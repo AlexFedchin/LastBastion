@@ -275,6 +275,18 @@ float roadXg(float z){ return -52.0 * tS(-110.0, -470.0, z) + 96.0 * tS(-540.0, 
 // noise picks between eight randomly offset copies of the texture and blends
 // neighbouring copies, so no two patches of ground repeat.
 struct NT { vec2 a; vec2 b; float f; vec2 dx; vec2 dy; };
+// explicit gradients: safe to call inside branches (derivatives aren't, in divergent flow)
+NT ntSetupD(vec2 uv, vec2 dx, vec2 dy){
+  float k = tNoise(uv * 0.33 + 11.3) * 0.65 + tNoise(uv * 1.1 - 4.7) * 0.35;
+  float idx = k * 8.0;
+  float i = floor(idx);
+  NT n;
+  n.f = smoothstep(0.25, 0.75, fract(idx));
+  n.a = uv + sin(vec2(3.0, 7.0) * i) * 4.1;
+  n.b = uv + sin(vec2(3.0, 7.0) * (i + 1.0)) * 4.1;
+  n.dx = dx; n.dy = dy;
+  return n;
+}
 NT ntSetup(vec2 uv){
   float k = tNoise(uv * 0.33 + 11.3) * 0.65 + tNoise(uv * 1.1 - 4.7) * 0.35;
   float idx = k * 8.0;
@@ -426,22 +438,38 @@ ${T_COMMON}
   float tRoad = tS(4.4 + tNoise(tw.xz * 0.35) * 1.4, 3.0, rdx) * step(tw.z, -2.5);
   float tRock = tS(0.2, 0.42, slope + (macro - 0.5) * 0.18) + tS(30.0, 70.0, tw.y) * 0.55;
   tRock = clamp(tRock, 0.0, 1.0) * (1.0 - tRoad);
-  // anti-tiling mud
+  // anti-tiling mud everywhere; the other layers only where they actually show
+  // (weights are zero over most of the field, and a zero-weight mix changes nothing)
+  vec3 gX3 = dFdx(tw), gY3 = dFdy(tw);
+  vec2 gX = gX3.xz, gY = gY3.xz;
+  bool hasTurf = tGrass > 0.002, hasRoad = tRoad > 0.002, hasRock = tRock > 0.002;
   NT ntMud = ntSetup(tw.xz / 9.0);
-  NT ntTurf = ntSetup(tw.xz / 5.5 + 31.0);
-  NT ntAsph = ntSetup(tw.xz / 7.0 - 17.0);
-  NT ntRock = ntSetup(tw.xz / 13.0 + 5.0);
+  NT ntTurf, ntAsph, ntRock;
   vec3 mudC = ntSample(tMudA, ntMud).rgb * 0.7 + texture2D(tMudA, tw.xz / 41.0 + 0.37).rgb * 0.3;
   // large-scale tonal drift so the field never reads as one flat material
   mudC *= 0.8 + 0.4 * tNoise(tw.xz * 0.013 + 7.0);
-  vec3 turfC = ntSample(tTurfA, ntTurf).rgb * mix(0.36, 0.6, tNoise(tw.xz * 0.11));
-  vec3 bw = pow(abs(tn), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
-  vec3 rockC = texture2D(tRockA, tw.zy / 13.0).rgb * bw.x + ntSample(tRockA, ntRock).rgb * bw.y + texture2D(tRockA, tw.xy / 13.0).rgb * bw.z;
-  vec3 asphC = ntSample(tAsphA, ntAsph).rgb;
-  // faded centre line on the road
-  float along = tw.z;
-  float paint = (1.0 - tS(0.07, 0.12, abs(tw.x - roadXg(tw.z)))) * step(0.45, fract(along / 7.0)) * tS(0.35, 0.6, tNoise(tw.xz * 0.9));
-  asphC = mix(asphC, vec3(0.32, 0.29, 0.2), paint * 0.7);
+  vec3 turfC = vec3(0.0);
+  if (hasTurf) {
+    ntTurf = ntSetupD(tw.xz / 5.5 + 31.0, gX / 5.5, gY / 5.5);
+    turfC = ntSample(tTurfA, ntTurf).rgb * mix(0.36, 0.6, tNoise(tw.xz * 0.11));
+  }
+  vec3 rockC = vec3(0.0);
+  if (hasRock) {
+    ntRock = ntSetupD(tw.xz / 13.0 + 5.0, gX / 13.0, gY / 13.0);
+    vec3 bw = pow(abs(tn), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
+    rockC = textureGrad(tRockA, tw.zy / 13.0, gX3.zy / 13.0, gY3.zy / 13.0).rgb * bw.x
+          + ntSample(tRockA, ntRock).rgb * bw.y
+          + textureGrad(tRockA, tw.xy / 13.0, gX3.xy / 13.0, gY3.xy / 13.0).rgb * bw.z;
+  }
+  vec3 asphC = vec3(0.0);
+  if (hasRoad) {
+    ntAsph = ntSetupD(tw.xz / 7.0 - 17.0, gX / 7.0, gY / 7.0);
+    asphC = ntSample(tAsphA, ntAsph).rgb;
+    // faded centre line on the road
+    float along = tw.z;
+    float paint = (1.0 - tS(0.07, 0.12, abs(tw.x - roadXg(tw.z)))) * step(0.45, fract(along / 7.0)) * tS(0.35, 0.6, tNoise(tw.xz * 0.9));
+    asphC = mix(asphC, vec3(0.32, 0.29, 0.2), paint * 0.7);
+  }
   vec3 tcol = mudC;
   tcol = mix(tcol, turfC, tGrass);
   tcol = mix(tcol, asphC, tRoad);
@@ -465,13 +493,10 @@ ${T_COMMON}
 `)
         .replace('vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;', /* glsl */`
   vec3 nMud = ntSample(normalMap, ntMud).xyz * 2.0 - 1.0;
-  vec3 nTurf = ntSample(tTurfN, ntTurf).xyz * 2.0 - 1.0;
-  vec3 nRock = ntSample(tRockN, ntRock).xyz * 2.0 - 1.0;
-  vec3 nAsph = ntSample(tAsphN, ntAsph).xyz * 2.0 - 1.0;
   vec3 mapN = nMud;
-  mapN = mix(mapN, nTurf, tGrass);
-  mapN = mix(mapN, nAsph, tRoad);
-  mapN = mix(mapN, nRock * vec3(1.6, 1.6, 1.0), tRock);
+  if (hasTurf) mapN = mix(mapN, ntSample(tTurfN, ntTurf).xyz * 2.0 - 1.0, tGrass);
+  if (hasRoad) mapN = mix(mapN, ntSample(tAsphN, ntAsph).xyz * 2.0 - 1.0, tRoad);
+  if (hasRock) mapN = mix(mapN, (ntSample(tRockN, ntRock).xyz * 2.0 - 1.0) * vec3(1.6, 1.6, 1.0), tRock);
   mapN.xy *= (1.0 - puddle) * (1.0 - 0.35 * tWet);
   if (puddle > 0.01 && distC < 90.0) mapN.xy += rippleN(tw.xz * 1.6, uTime) * puddle * 0.9 * uRain;
 `);
@@ -538,7 +563,10 @@ ${T_COMMON}
     };
     mat.customProgramCacheKey = () => 'lb-grass';
 
-    const mesh = new THREE.InstancedMesh(geo, mat, count);
+    // blades are bucketed into angular sectors around the gun, each its own instanced
+    // mesh with a real bounding sphere, so the ones behind / beside the view are culled
+    const SECTORS = 12, A0 = -Math.PI * 0.625, AW = Math.PI * 1.25;
+    const buckets = Array.from({ length: SECTORS }, () => ({ m: [], c: [] }));
     const rng = makeRng(5150);
     const m = new THREE.Matrix4(), qt = new THREE.Quaternion(), sc = new THREE.Vector3(), ps = new THREE.Vector3();
     const col = new THREE.Color();
@@ -558,20 +586,28 @@ ${T_COMMON}
       qt.setFromAxisAngle(up, rng() * Math.PI * 2);
       sc.set(s * (0.8 + rng() * 0.6), s * (0.7 + rng() * 0.7), s * (0.8 + rng() * 0.6));
       m.compose(ps, qt, sc);
-      mesh.setMatrixAt(n, m);
       const t = rng();
       col.setRGB(0.75 + t * 0.35, 0.72 + t * 0.25, 0.6 + t * 0.15);
-      mesh.setColorAt(n, col);
+      const b = buckets[Math.min(SECTORS - 1, Math.max(0, Math.floor((a - A0) / AW * SECTORS)))];
+      b.m.push(m.clone()); b.c.push(col.clone());
       n++;
     }
-    mesh.count = n;
-    mesh.instanceMatrix.needsUpdate = true;
-    if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
-    mesh.frustumCulled = false;
-    mesh.castShadow = false;
-    mesh.receiveShadow = false;
-    this.scene.add(mesh);
-    this.grass = mesh;
+    const group = new THREE.Group();
+    for (const b of buckets) {
+      if (!b.m.length) continue;
+      const mesh = new THREE.InstancedMesh(geo, mat, b.m.length);
+      b.m.forEach((mm, i) => { mesh.setMatrixAt(i, mm); mesh.setColorAt(i, b.c[i]); });
+      mesh.instanceMatrix.needsUpdate = true;
+      if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      mesh.boundingSphere.radius += 1.5; // wind sway
+      mesh.frustumCulled = true;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      group.add(mesh);
+    }
+    this.scene.add(group);
+    this.grass = group;
   }
 
   update(time) {
