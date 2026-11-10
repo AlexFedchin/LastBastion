@@ -23,6 +23,7 @@ import { Post } from './render/post.js';
 import { AudioEngine } from './audio/audio.js';
 import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
+import { Loader } from './ui/loader.js';
 
 const SECTION_LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
 const params = new URLSearchParams(location.search);
@@ -53,8 +54,10 @@ class Game {
   }
 
   async boot() {
-    const sub = document.getElementById('ld-sub');
-    const step = async (t) => { sub.textContent = t; await nextFrame(); };
+    this.loader = new Loader();
+    const BOOT_STEPS = 9;
+    let stepN = 0;
+    const step = async (t) => { this.loader.step(t, stepN++ / BOOT_STEPS); await nextFrame(); };
     await step('warming the generators…');
     const canvas = document.getElementById('game');
     this.canvas = canvas;
@@ -124,7 +127,8 @@ class Game {
     await step('tuning the radio…');
     await Promise.race([soundLoaded, new Promise((r) => setTimeout(r, 6000))]);
 
-    document.getElementById('loading').classList.add('done');
+    this.loader.step('the wall is manned', 1);
+    this.loader.hide();
     if (window.bastion) this.audio.init(); // Electron allows audio without a gesture
     this.enterMenu();
     this.last = performance.now();
@@ -214,6 +218,64 @@ class Game {
     return times[Math.floor(times.length / 2)];
   }
 
+  /** Cover the screen, then reload (graphics presets size buffers at startup). */
+  async reloadWithLoader() {
+    await this.loader.show({ kicker: 'BASTION-7 · SIGNALS', title: 'LAST <b>BASTION</b>', tag: 'Repainting the valley.', sub: '' });
+    this.loader.step('repainting the valley…', 0.3);
+    await nextFrame();
+    location.reload();
+  }
+
+  /**
+   * The deployment card between the menu and a night: what night it is, what's
+   * new, and — behind it — every shader the night may need compiled up front, so
+   * the first giant, aircraft or rescue party doesn't hitch.
+   */
+  async deploy(save, begin) {
+    if (this.deploying) return;
+    this.deploying = true;
+    try {
+      const n = save.night || 1;
+      const diff = DIFFICULTY[save.difficulty] || DIFFICULTY.veteran;
+      const shop = !!save.atShop;
+      const hours = Math.max(0, 72 - (n - 1) * 8);
+      const fresh = Object.keys(UNLOCKS).filter((k) => UNLOCKS[k] === n).map((k) => UNLOCK_INFO[k]);
+      this.screens.show(null);
+      await this.loader.show({
+        kicker: `BASTION-7 · ${diff.label}${save.survivors ? ` · ${save.survivors} ON THE WALL` : ''}`,
+        title: shop ? 'DAWN <b>RESUPPLY</b>' : `NIGHT <b>${String(n).padStart(2, '0')}</b>`,
+        tag: shop ? 'Count the living. Spend what you scavenged.'
+          : n > FINAL_NIGHT ? 'No relief is coming.'
+            : fresh.length ? `New tonight: ${fresh.map((f) => f.replace(/ /g, '\u00a0')).join(' · ')}` : `${hours} hours until relief.`,
+        sub: '',
+      });
+      const t0 = performance.now();
+      this.loader.step('issuing ammunition…', 0.2);
+      await nextFrame();
+      this.loader.step('briefing the crews…', 0.45);
+      await this.precompile();
+      this.loader.step('manning the wall…', 0.8);
+      while (performance.now() - t0 < 1500) await nextFrame();
+      begin();
+      this.loader.step('stand to', 1);
+      await nextFrame();
+      this.loader.hide();
+    } finally {
+      this.deploying = false;
+    }
+  }
+
+  /** Compile the shaders of everything not on screen yet (giants, aircraft, people, props). */
+  async precompile() {
+    const hidden = [];
+    this.scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    try {
+      if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera);
+      else this.renderer.compile(this.scene, this.camera);
+    } catch (err) { console.warn('[precompile]', err); }
+    for (const o of hidden) o.visible = false;
+  }
+
   applyPlayerSettings() {
     this.player.sens = 0.0022 * this.settings.sensitivity;
     this.player.invertY = !!this.settings.invertY;
@@ -300,11 +362,11 @@ class Game {
     switch (act) {
       case 'continue': {
         const s = loadSave();
-        if (s) this.startRun(s);
+        if (s) this.deploy(s, () => this.startRun(s));
         break;
       }
       case 'new': this.screens.show('new'); break;
-      case 'start': this.newCampaign(el.dataset.diff); break;
+      case 'start': this.deploy({ night: 1, difficulty: el.dataset.diff }, () => this.newCampaign(el.dataset.diff)); break;
       case 'howto': this.prevScreen = this.screens.current; this.screens.show('howto'); break;
       case 'settings':
         this.prevScreen = this.screens.current;
@@ -312,7 +374,7 @@ class Game {
         this.screens.show('settings');
         break;
       case 'settings-back':
-        if (this.state === 'menu' && (QUALITY[this.settings.quality] !== this.quality || !this.settings.benchmarked)) { location.reload(); return; }
+        if (this.state === 'menu' && (QUALITY[this.settings.quality] !== this.quality || !this.settings.benchmarked)) { this.reloadWithLoader(); return; }
         this.screens.show(this.prevScreen || 'menu');
         break;
       case 'back': this.screens.show(this.state === 'paused' ? 'pause' : (this.prevScreen && this.prevScreen !== 'howto' && this.prevScreen !== 'settings' ? this.prevScreen : 'menu')); break;
@@ -324,7 +386,7 @@ class Game {
       case 'buy-mines': this.buyMines(); break;
       case 'begin': this.beginNightFromShop(); break;
       case 'shop-menu': writeSave(this.run); this.enterMenu(); break;
-      case 'retry': { const s = loadSave(); if (s) this.startRun(s); break; }
+      case 'retry': { const s = loadSave(); if (s) this.deploy(s, () => this.startRun(s)); break; }
       case 'menu': this.enterMenu(); break;
       case 'endless': this.run.endless = true; writeSave(this.run); this.openShop(); break;
       default: break;
