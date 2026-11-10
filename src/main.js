@@ -105,7 +105,7 @@ class Game {
     // compile shaders before the first visible frame
     await step('checking the wire…');
     this.menuStats = { ...baseStats(), gunners: 4, mortar: 2, mortarInterval: 5, mortarShells: 1, wireBands: 1 };
-    this.arsenal.startNight(this.menuStats);
+    this.arsenal.startNight(this.menuStats, true);
     for (let i = 0; i < 220; i++) this.spawnMenuZombie(rand(-170, -30));
     this.horde.update(0.016, 0);
     this.horde.syncRender();
@@ -149,6 +149,7 @@ class Game {
     this.player.onHit = (killed, head) => { this.hud.hitmarker(killed, head); };
     this.player.onOverheat = () => { this.bark('overheat', 0.5); };
     this.arsenal.onExplosionKills = (kills, x, z, cause) => this.onExplosionKills(kills, x, z, cause);
+    this.arsenal.air.onRadio = (who, text) => { if (this.inPlay()) this.hud.radio(who, text, true); };
     this.arsenal.onShake = (scale, x, z) => {
       const d = Math.hypot(x - WORLD.CAM.x, z - WORLD.CAM.z);
       this.player.addTrauma(clamp(scale * 22 / (d + 8), 0, 0.9));
@@ -198,7 +199,7 @@ class Game {
     this.audio.setMusicMode('menu');
     this.audio.pressure = 0; this.audio.intensity = 0; this.audio.lowLife = false; this.audio.tide = false;
     this.letterboxTarget = 0;
-    this.arsenal.startNight(this.menuStats);
+    this.arsenal.startNight(this.menuStats, true);
     this.menuArtyT = 6;
     this.horde.pileMul = 0.6;
     this.horde.globalSpeed = 1;
@@ -461,6 +462,7 @@ class Game {
 
   openShop() {
     this.state = 'shop';
+    this.arsenal.air.hide();
     this.hud.show(false);
     this.screens.buildShop(this.run, this.report);
     this.screens.show('shop');
@@ -548,7 +550,7 @@ class Game {
       this.env.update(dt, this.time, this.horde, this.fx, this.audio);
       this.fx.update(dt);
     }
-    this.audio.setListener(this.camera.position.x, this.camera.position.z, this.camera.rotation.y);
+    this.audio.setListener(this.camera.position.x, this.camera.position.z, this.camera.rotation.y, this.camera.position.y);
     this.audio.dawn = this.env.dawn;
     this.audio.hordeAlive = this.horde.alive;
     this.audio.update(rdt);
@@ -654,7 +656,7 @@ class Game {
       this.camera.rotation.setFromQuaternion(this.camera.quaternion, 'YXZ');
       this.letterboxTarget = 0;
       if (!this.input.locked && !TEST) this.screens.show('click');
-      this.hud.hint('LMB FIRE · RMB OPTICS · Q ARTILLERY · E NAPALM · F FLARE · G GRENADES · R SWAP BARREL');
+      this.hud.hint('LMB FIRE · RMB OPTICS · Q ARTILLERY · E NAPALM · F FLARE · T BOMBER MARKER · G GRENADES · R SWAP BARREL');
       setTimeout(() => this.hud.hint(''), 9000);
     }
   }
@@ -679,6 +681,13 @@ class Game {
       }
       if (input.hit('KeyF')) {
         if (!this.arsenal.launchFlare(this.player.aimPoint(240))) this.hud.alert('NO FLARES LEFT');
+      }
+      if (input.hit('KeyT')) {
+        const air = this.arsenal.air;
+        if (air.throwMarker(this.player.aimPoint(ABILITY.bomber.maxRange))) {
+          this.hud.alert('MARKER OUT — BOMBER INBOUND');
+          this.hud.radio('SGT. KOVAC', 'Red smoke out! Get your heads down!', true);
+        } else this.hud.alert(air.bomberBusy ? 'BOMBER ALREADY ON ITS RUN' : `BOMBER RE-ARMING — ${Math.ceil(air.bomberCd)}s`);
       }
       if (input.hit('KeyG')) {
         if (!this.arsenal.throwGrenades(this.player.aimPoint(ABILITY.grenade.maxRange))) this.hud.alert('NO GRENADES LEFT');

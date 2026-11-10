@@ -21,7 +21,7 @@ const SHIRTS = [
   [0.2, 0.19, 0.12], [0.14, 0.1, 0.12],
 ];
 
-const EXPLOSIVE = { arty: 1, mortar: 1, grenade: 1, mine: 1, bloater: 1, danger: 1, he: 1 };
+const EXPLOSIVE = { arty: 1, mortar: 1, grenade: 1, mine: 1, bloater: 1, danger: 1, he: 1, bomb: 1, gunship: 1 };
 
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler(0, 0, 0, 'YXZ');

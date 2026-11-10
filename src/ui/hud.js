@@ -1,5 +1,5 @@
 // In-game HUD. Plain DOM, updated only when values change.
-import { WORLD, wallZ, sectionCenterX } from '../config.js';
+import { WORLD, wallZ, sectionCenterX, ABILITY } from '../config.js';
 import { formatInt, formatTime } from '../core/util.js';
 
 const $ = (id) => document.getElementById(id);
@@ -143,6 +143,7 @@ export class HUD {
       ['Q', 'ARTILLERY', a.artyCd > 0 ? `${Math.ceil(a.artyCd)}s` : `READY ×${stats.artyShells}`, a.artyCd > 0 ? 1 - a.artyCd / stats.artyCooldown : 1, a.artyCd <= 0],
       ['E', 'NAPALM', a.napalmT > 0 ? 'BURNING' : (a.napalmCd > 0 ? `${Math.ceil(a.napalmCd)}s` : 'READY'), a.napalmT > 0 ? a.napalmT / stats.napalmDuration : (a.napalmCd > 0 ? 1 - a.napalmCd / stats.napalmCooldown : 1), a.napalmCd <= 0 && a.napalmT <= 0],
       ['F', 'FLARE', `×${a.flaresLeft}`, a.flaresLeft > 0 ? 1 : 0, a.flaresLeft > 0],
+      ['T', 'BOMBER', a.air.bomberBusy ? 'INBOUND' : (a.air.bomberCd > 0 ? `${Math.ceil(a.air.bomberCd)}s` : 'READY'), a.air.bomberBusy ? 1 : (a.air.bomberCd > 0 ? 1 - a.air.bomberCd / ABILITY.bomber.cooldown : 1), a.air.bomberCd <= 0 && !a.air.bomberBusy],
       ['G', 'GRENADES', `×${a.grenadesLeft}`, a.grenadesLeft > 0 ? 1 : 0, a.grenadesLeft > 0],
       ['B', 'DANGER CLOSE', a.dangerUsed ? 'SPENT' : `−3 LIVES`, a.dangerUsed ? 0 : 1, !a.dangerUsed && run.survivors > 3],
     ];
@@ -161,6 +162,7 @@ export class HUD {
     });
 
     const support = [];
+    if (arsenal.air.gs.active && !arsenal.air.gs.leaving) support.push('SPECTRE OVERHEAD');
     if (stats.gunners) support.push(`GUNNERS ${stats.gunners}`);
     if (stats.mortar) support.push(`MORTAR`);
     if (arsenal.mines.length) support.push(`CLAYMORES ${arsenal.mines.length}`);

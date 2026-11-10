@@ -13,6 +13,7 @@
 //  rises with the pressure on the wall and the tide brings in the drums.
 // ─────────────────────────────────────────────────────────────────────────────
 import { clamp, rand } from '../core/util.js';
+import { makePunch, makeSizzle, makeTick, makeBlastSub, makeProp, makeJet } from './synth.js';
 
 // name -> [variants (0 = single file), decode rate]
 const SFX = {
@@ -152,9 +153,9 @@ export class AudioEngine {
     this.ctx = null;
     this.ready = false;
     this.voices = 0;
-    this.maxVoices = 72;
+    this.maxVoices = 96;
     this.listenerYaw = 0;
-    this.listenerX = 0; this.listenerZ = 0;
+    this.listenerX = 0; this.listenerZ = 0; this.listenerY = 13.2;
     this.settings = { master: 0.8, music: 0.55, sfx: 0.9 };
     this.B = {};       // one-shots: name -> AudioBuffer[]
     for (const k of Object.keys(SFX)) this.B[k] = [];
@@ -184,6 +185,8 @@ export class AudioEngine {
     this._nextBeat = 0;
     this._crowT = 6; this._dogT = 40; this._bellDone = false; this._bellT = 0;
     this._earT = 0;
+    this._cool = [];      // barrel cool-down voices (cut when firing resumes)
+    this._loops = new Set();
   }
 
   // ── loading ────────────────────────────────────────────────────────────────
@@ -269,6 +272,35 @@ export class AudioEngine {
     this.tracks = {};
     for (const [name, loop] of Object.entries(SCORE)) this.tracks[name] = new Track(this, name, loop);
 
+    // the M2: its own heavy chain — low-end shelf, chest and bite EQ, tape-style
+    // saturation and a fast compressor that keeps every round hitting hard
+    this.hmgIn = ctx.createGain(); this.hmgIn.gain.value = 1;
+    const shelf = ctx.createBiquadFilter(); shelf.type = 'lowshelf'; shelf.frequency.value = 120; shelf.gain.value = 7;
+    const chest = ctx.createBiquadFilter(); chest.type = 'peaking'; chest.frequency.value = 230; chest.Q.value = 0.9; chest.gain.value = 3;
+    const mud = ctx.createBiquadFilter(); mud.type = 'peaking'; mud.frequency.value = 600; mud.Q.value = 1.2; mud.gain.value = -2.5;
+    const bite = ctx.createBiquadFilter(); bite.type = 'peaking'; bite.frequency.value = 3200; bite.Q.value = 0.8; bite.gain.value = 3;
+    const drive = ctx.createGain(); drive.gain.value = 1.15;
+    const shaper = ctx.createWaveShaper();
+    const curve = new Float32Array(2048);
+    for (let i = 0; i < curve.length; i++) { const x = i / (curve.length - 1) * 2 - 1; curve[i] = Math.tanh(x * 2.4) / Math.tanh(2.4); }
+    shaper.curve = curve; shaper.oversample = '4x';
+    const hcomp = ctx.createDynamicsCompressor();
+    hcomp.threshold.value = -16; hcomp.knee.value = 6; hcomp.ratio.value = 4; hcomp.attack.value = 0.003; hcomp.release.value = 0.08;
+    const hout = ctx.createGain(); hout.gain.value = 0.6;
+    this.hmgIn.connect(shelf); shelf.connect(chest); chest.connect(mud); mud.connect(bite); bite.connect(drive);
+    drive.connect(shaper); shaper.connect(hcomp); hcomp.connect(hout); hout.connect(this.sfx);
+    const hrev = ctx.createGain(); hrev.gain.value = 0.3; hout.connect(hrev); hrev.connect(this.reverbSend);
+
+    // synthesized layers
+    try {
+      this.B.punch = [1, 2, 3, 4].map((k) => makePunch(ctx, k));
+      this.B.sizzle = [makeSizzle(ctx)];
+      this.B.tick = [1, 2, 3, 4, 5, 6].map((k) => makeTick(ctx, k));
+      this.B.blast_sub = [makeBlastSub(ctx)];
+      this.B.prop = [makeProp(ctx)];
+      this.B.jet = [makeJet(ctx)];
+    } catch (err) { console.warn('[audio] synth', err); }
+
     this.ready = true;
     this.setMusicMode(this.musicMode, true);
   }
@@ -348,7 +380,8 @@ export class AudioEngine {
     let lpf = o.lowpass ?? 0;
     if (o.x !== undefined) {
       const dx = o.x - this.listenerX, dz = o.z - this.listenerZ;
-      const dist = Math.sqrt(dx * dx + dz * dz);
+      const dy = o.y !== undefined ? o.y - this.listenerY : 0;
+      const dist = Math.sqrt(dx * dx + dz * dz + dy * dy);
       const az = Math.atan2(dx, -dz) - this.listenerYaw;
       pan = clamp(Math.sin(az) * 0.85, -0.95, 0.95);
       gain *= 1 / (1 + dist / (o.ref ?? 40));
@@ -374,7 +407,7 @@ export class AudioEngine {
     const p = ctx.createStereoPanner();
     p.pan.value = pan;
     g.connect(p);
-    p.connect(o.bus === 'amb' ? this.ambBus : this.sfx);
+    p.connect(o.bus === 'amb' ? this.ambBus : o.bus === 'hmg' ? this.hmgIn : this.sfx);
     if (o.reverb) {
       const rs = ctx.createGain(); rs.gain.value = o.reverb;
       p.connect(rs); rs.connect(this.reverbSend);
@@ -390,7 +423,53 @@ export class AudioEngine {
     return { src, gain: g };
   }
 
-  setListener(x, z, yaw) { this.listenerX = x; this.listenerZ = z; this.listenerYaw = yaw; }
+  setListener(x, z, yaw, y) { this.listenerX = x; this.listenerZ = z; this.listenerYaw = yaw; if (y !== undefined) this.listenerY = y; }
+
+  /**
+   * A looping, moving sound source (aircraft). Returns a handle:
+   * update(x, y, z, vx, vy, vz, level) once per frame, stop() to fade it out.
+   */
+  loop(buf, { ref = 120, reverb = 0.25, rate = 1 } = {}) {
+    if (!this.ready || !buf) return null;
+    const ctx = this.ctx;
+    const src = ctx.createBufferSource();
+    src.buffer = buf; src.loop = true; src.playbackRate.value = rate;
+    const f = ctx.createBiquadFilter(); f.type = 'lowpass'; f.frequency.value = 2000; f.Q.value = 0.6;
+    const g = ctx.createGain(); g.gain.value = 0;
+    const p = ctx.createStereoPanner();
+    src.connect(f); f.connect(g); g.connect(p); p.connect(this.sfx);
+    const rs = ctx.createGain(); rs.gain.value = reverb; p.connect(rs); rs.connect(this.reverbSend);
+    src.start(0, Math.random() * buf.duration);
+    const e = this;
+    const h = {
+      dead: false,
+      update(x, y, z, vx, vy, vz, level = 1) {
+        if (h.dead) return;
+        const t = ctx.currentTime;
+        const dx = x - e.listenerX, dy = y - e.listenerY, dz = z - e.listenerZ;
+        const dist = Math.max(1, Math.sqrt(dx * dx + dy * dy + dz * dz));
+        const az = Math.atan2(dx, -dz) - e.listenerYaw;
+        const vr = (vx * dx + vy * dy + vz * dz) / dist; // + receding
+        const dop = clamp(343 / (343 + vr), 0.7, 1.4);
+        g.gain.setTargetAtTime(level / (1 + dist / ref), t, 0.06);
+        p.pan.setTargetAtTime(clamp(Math.sin(az) * 0.85, -0.95, 0.95), t, 0.06);
+        f.frequency.setTargetAtTime(clamp(26000 * Math.exp(-dist / 210), 380, 20000), t, 0.08);
+        src.playbackRate.setTargetAtTime(rate * dop, t, 0.08);
+      },
+      stop(fade = 1.5) {
+        if (h.dead) return;
+        h.dead = true;
+        e._loops.delete(h);
+        const t = ctx.currentTime;
+        g.gain.cancelScheduledValues(t);
+        g.gain.setTargetAtTime(0, t, fade / 4);
+        try { src.stop(t + fade + 0.1); } catch { /* gone */ }
+        src.onended = () => { try { p.disconnect(); rs.disconnect(); } catch { /* noop */ } };
+      },
+    };
+    this._loops.add(h);
+    return h;
+  }
 
   setMuffle(amount) {
     if (!this.ctx) return;
@@ -426,9 +505,51 @@ export class AudioEngine {
   // ── the gun ────────────────────────────────────────────────────────────────
   hmg() {
     if (!this.ready) return;
-    this.play(this.pickVar('hmg'), { gain: 0.6, rate: rand(0.955, 1.045), pan: rand(-0.04, 0.04), reverb: 0.2, force: true });
+    const pan = rand(-0.04, 0.04);
+    // recorded report, pitched a touch down for weight, through the heavy chain
+    this.play(this.pickVar('hmg'), { gain: 0.5, rate: rand(0.86, 0.93), pan, reverb: 0.2, bus: 'hmg', force: true });
+    // the punch: sub kick, blast, crack and the bolt
+    this.play(this.pickVar('punch'), { gain: 0.62, rate: rand(0.94, 1.04), pan, bus: 'hmg', force: true });
     this._hmgLast = this.ctx.currentTime;
     this._hmgCount++;
+  }
+
+  /** Steel cooling down after a burst: hiss, spitting and contraction pings. */
+  barrelCool(heat) {
+    if (!this.ready) return;
+    this.stopCool(0.01);
+    const h = clamp(heat, 0, 1);
+    if (h < 0.18) return;
+    const dur = 1.0 + h * 4.6;
+    const v = this._cool;
+    const sz = this.B.sizzle && this.B.sizzle[0];
+    if (sz) v.push(this.play(sz, { gain: 0.03 + 0.26 * h * h, rate: rand(0.95, 1.06), pan: 0.06, duration: Math.min(sz.duration, dur), fadeIn: 0.06, fadeOut: Math.min(2, dur * 0.55), force: true }));
+    if (h > 0.5) {
+      const st = this.B.steam_long[0];
+      if (st) v.push(this.play(st, { gain: 0.1 * h, rate: rand(0.8, 0.9), pan: 0.1, lowpass: 3800, duration: Math.min(st.duration * 0.9, dur * 0.8), fadeIn: 0.25, fadeOut: 1.2, delay: 0.08, force: true }));
+    }
+    const n = Math.round(3 + h * 13);
+    let t = rand(0.12, 0.3);
+    for (let k = 0; k < n; k++) {
+      v.push(this.play(this.pickVar('tick'), { gain: rand(0.04, 0.11) * (0.45 + h * 0.7), rate: rand(0.85, 1.2), pan: rand(-0.15, 0.25), delay: t, reverb: 0.06, force: true }));
+      t += rand(0.06, 0.26) * (1 + k * 0.3);
+      if (t > dur + 1) break;
+    }
+  }
+
+  /** Firing again: cut the cool-down. */
+  stopCool(fade = 0.04) {
+    if (!this._cool.length) return;
+    const t = this.ctx.currentTime;
+    for (const v of this._cool) {
+      if (!v) continue;
+      try {
+        v.gain.gain.cancelScheduledValues(t);
+        v.gain.gain.setTargetAtTime(0, t, fade);
+        v.src.stop(t + fade * 5 + 0.02);
+      } catch { /* already stopped */ }
+    }
+    this._cool.length = 0;
   }
 
   casing() {
@@ -489,6 +610,57 @@ export class AudioEngine {
   flare() {
     this.play(this.B.flare_launch[0], { gain: 0.55, reverb: 0.4, force: true });
     this.play(this.B.flare_ignite[0], { gain: 0.22, delay: 2.3, lowpass: 7000, pan: rand(-0.3, 0.3), reverb: 0.6, force: true });
+  }
+
+  /** Heavy bomb: the crack, the sub-bass punch through the ground, the valley rolling it back. */
+  bigBlast(x, z) {
+    if (!this.ready) return;
+    const dist = Math.hypot(x - this.listenerX, z - this.listenerZ);
+    const B = this.B;
+    const o = { x, z, ref: 220, sos: true, force: true };
+    this.play(this.pickVar('boom'), { ...o, gain: 1.9, rate: rand(0.6, 0.66), reverb: 0.7 });
+    this.play(this.pickVar('boom'), { ...o, gain: 1.4, rate: rand(0.46, 0.5), delay: 0.03, reverb: 0.5 });
+    if (B.boom_sub[0]) this.play(B.boom_sub[0], { ...o, gain: 1.8, rate: 0.72 });
+    if (B.blast_sub) this.play(B.blast_sub[0], { ...o, gain: 1.9, lowpass: 19500 });
+    this.play(this.pickVar('boom_far'), { ...o, gain: 1.2, rate: 0.55, delay: 0.35, reverb: 0.9 });
+    this.play(this.pickVar('thunder'), { ...o, gain: 0.9, rate: 0.72, delay: 0.5, reverb: 0.5, lowpass: 2500 });
+    // clods and rock raining back down
+    for (let k = 0; k < 4; k++) this.play(this.pickVar('gib'), { x: x + rand(-15, 15), z: z + rand(-15, 15), ref: 60, gain: 0.25, rate: rand(0.45, 0.6), sos: true, delay: rand(2.2, 4.2), force: true });
+    const close = clamp(1 - dist / 260, 0, 1);
+    this.duck(0.5 + 0.4 * close, 0.4 + dist / 343, 1.8);
+    if (dist < 150) setTimeout(() => this.ringEars(clamp(1.25 - dist / 160, 0.35, 1)), (dist / 343) * 1000);
+  }
+
+  /** Falling bomb: a long, deep shriek that ends on impact. */
+  bombWhistle(x, z, flight) {
+    const buf = this.pickVar('incoming');
+    if (!buf) return;
+    const rate = 0.7, dur = buf.duration / rate;
+    this.play(buf, { gain: 0.95, rate, x, z, ref: 140, delay: Math.max(0, flight - dur), offset: Math.max(0, dur - flight) * rate, reverb: 0.3, force: true });
+  }
+
+  /** A gunship weapon report, heard from the aircraft after the light arrives. */
+  gunshipShot(kind, x, y, z) {
+    if (!this.ready) return;
+    const o = { x, y, z, sos: true, reverb: 0.55 };
+    if (kind === 25) this.play(this.pickVar('hmg'), { ...o, gain: 0.55, rate: rand(0.66, 0.74), ref: 140, lowpass: 2600, key: 'gs25', max: 16 });
+    else if (kind === 40) {
+      this.play(this.pickVar('mortar'), { ...o, gain: 1.2, rate: rand(1.15, 1.3), ref: 160, force: true });
+      this.play(this.pickVar('boom_far'), { ...o, gain: 0.7, rate: rand(1.0, 1.15), ref: 160, lowpass: 1800, force: true });
+    } else {
+      this.play(this.pickVar('boom'), { ...o, gain: 1.3, rate: rand(0.78, 0.86), ref: 180, lowpass: 1500, force: true });
+      if (this.B.boom_sub[0]) this.play(this.B.boom_sub[0], { ...o, gain: 1.0, ref: 180, force: true });
+    }
+  }
+
+  /** 25 mm HE rounds bursting in the field. */
+  gunshipImpact(x, z) {
+    this.play(this.pickVar('boom'), { gain: 0.32, rate: rand(1.7, 2.2), x, z, ref: 50, sos: true, reverb: 0.25, key: 'gsi', max: 7 });
+  }
+
+  /** Marker flare popping on the ground. */
+  markerIgnite(x, z) {
+    this.play(this.B.flare_ignite[0], { gain: 0.6, x, z, ref: 40, reverb: 0.5, force: true });
   }
 
   throwGrenade() { this.play(this.pickVar('throw'), { gain: 0.5, rate: rand(0.9, 1.1), pan: rand(-0.1, 0.2), force: true }); }
@@ -664,7 +836,10 @@ export class AudioEngine {
 
     // the valley throws the end of a burst back at you
     if (this._hmgCount > 0 && now - this._hmgLast > 0.13) {
-      this.play(this.pickVar('hmg_tail'), { gain: 0.22 + 0.3 * Math.min(1, this._hmgCount / 12), rate: rand(0.95, 1.05), reverb: 0.3, force: true });
+      const k = Math.min(1, this._hmgCount / 12);
+      this.play(this.pickVar('hmg_tail'), { gain: 0.24 + 0.32 * k, rate: rand(0.86, 0.94), reverb: 0.35, bus: 'hmg', force: true });
+      // a long burst comes back off the hills like distant thunder
+      if (this._hmgCount >= 5) this.play(this.pickVar('boom_far'), { gain: 0.12 + 0.2 * k, rate: rand(0.5, 0.6), pan: rand(-0.4, 0.4), lowpass: 900, delay: rand(0.15, 0.3), reverb: 0.8, force: true });
       this._hmgCount = 0;
     }
 

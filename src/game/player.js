@@ -243,7 +243,7 @@ export class Player {
 
   reset() {
     this.yaw = 0; this.pitch = -9 * DEG;
-    this.heat = 0; this.overheatT = 0; this.swapT = 0; this.fireAcc = 0;
+    this.heat = 0; this.overheatT = 0; this.swapT = 0; this.fireAcc = 0; this.wasFiring = false;
     this.recoilP = 0; this.recoilY = 0; this.trauma = 0; this.bloom = 0;
     this.shots = 0; this.hits = 0;
   }
@@ -324,6 +324,10 @@ export class Player {
       if (!input.mouse(0)) this.fireAcc = 0.999; // first shot fires instantly
       this.sinceShot += dt;
     }
+    // the barrel ticks and hisses as it cools after a burst
+    if (this.firing && !this.wasFiring) this.audio.stopCool();
+    else if (!this.firing && this.wasFiring) this.audio.barrelCool(this.heat);
+    this.wasFiring = this.firing;
     // cooling
     const cool = stats.hmgCool + (this.sinceShot > 0.3 ? stats.hmgCoolIdle : 0);
     if (this.overheatT <= 0) this.heat = Math.max(0, this.heat - cool * dt);

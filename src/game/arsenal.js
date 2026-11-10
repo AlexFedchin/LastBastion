@@ -6,6 +6,7 @@ import { WORLD, wallZ, wallDist, WING_COS, ABILITY, CLAYMORE } from '../config.j
 import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
 import { groundH, raycastGround } from '../world/terrain.js';
+import { AirSupport } from './air.js';
 
 const R = Math.random;
 const _v = new THREE.Vector3();
@@ -65,11 +66,13 @@ export class Arsenal {
 
     this.buildGunners();
     this.buildWire();
+    this.air = new AirSupport(this);
   }
 
   // ── Night lifecycle ──────────────────────────────────────────────────────
-  startNight(stats) {
+  startNight(stats, menu = false) {
     this.stats = stats;
+    this.air.startNight(menu);
     this.artyCd = 6;
     this.napalmCd = 0;
     this.napalmT = 0;
@@ -92,6 +95,7 @@ export class Arsenal {
   }
 
   endNight() {
+    this.air.endNight();
     this.releaseNapalmLights();
     this.clearNapalmFires();
     this.napalmT = 0;
@@ -628,6 +632,7 @@ export class Arsenal {
       this.audio.napalmLevel = this.napalmT > 0 ? fade : 0;
     } else this.audio.napalmLevel = 0;
 
+    this.air.update(dt);
     this.updateGunners(dt);
     this.updateMortar(dt);
     this.updateMines(dt);

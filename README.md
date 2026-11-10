@@ -87,6 +87,7 @@ Locally on Windows: `npm run dist:win` (output in `release/`).
 | Q | 105 mm fire mission on the crosshair |
 | E | Ignite the napalm trench in front of the wall |
 | F | Illumination flare — lit zombies take +25 % damage |
+| T | Red marker flare anywhere on the field — a bomber puts a 2000 lb bomb on it (75 s re-arm) |
 | G | Grenade bundle (short range — for the wall base) |
 | B | **Danger close** — carpet the wall line. Costs 3 survivors. Once per night. |
 | Esc | Pause |
@@ -102,6 +103,10 @@ on a pile) and Bloaters (night 4+, they burst and chain-react — and if one rea
 the wall its acid melts a ramp the others can climb). Surges are
 announced with a siren and the side they're coming from. The last stretch of
 every night is **the tide**.
+
+**Spectre.** An AC-130 gunship circles the valley all night and works the
+crowds in the field with its 25 mm, 40 mm and 105 mm guns. It won't fire close
+to the wall — that part is still yours.
 
 **Dawn.** Survive the night and clear the field. Every kill earns supplies;
 spend them on the gun, the artillery battery, wall gunners, wire, the mortar pit,

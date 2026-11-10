@@ -197,6 +197,18 @@ export const ABILITY = {
   grenade: { radius: 4.6, damage: 170, count: 3, maxRange: 70 },
   dangerClose: { cost: 3, shells: 40, radius: 7.5, damage: 420 },
   flare: { duration: 26, radius: 48, exposeMult: 1.25 },
+  // T: throw a red marker flare anywhere on the field; a bomber puts a 2000 lb bomb on it
+  bomber: { cooldown: 75, firstDelay: 12, maxRange: 320, minWallDist: 16, radius: 24, damage: 1400,
+    alt: 110, speed: 100, fall: 3.2 },
+};
+
+// ── AC-130 gunship: circles the valley all night and works the field ─────────
+export const GUNSHIP = {
+  center: { x: 0, z: -135 }, radius: 245, alt: 160, speed: 68,
+  engageMin: 5, engageMax: 11,           // seconds between engagements
+  g25: { rate: 28, burst: [1.1, 2.0], scatter: 4.5, damage: 75, radius: 2.4, minWall: 8 },
+  g40: { rounds: [3, 6], interval: 0.55, scatter: 3.5, damage: 240, radius: 4.8, minWall: 14 },
+  g105: { damage: 560, radius: 9, minWall: 26, minCluster: 9 },
 };
 
 // ── Radio. The story is told in fragments. ───────────────────────────────────

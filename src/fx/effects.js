@@ -28,6 +28,8 @@ export class Effects {
     const gibGeo = new THREE.IcosahedronGeometry(0.5, 0);
     this.gibs = new Debris(scene, gibGeo, gibMat, quality.gibs, floorAt);
     this.gibs.onTrail = (x, y, z) => {
+      // blood trails are the first thing to go when a huge blast fills the pool
+      if (this.smoke.count > this.smoke.cap * 0.8) return;
       this.smoke.spawn(x, y, z, 0, -1, 0, 0.35, 0.12, 0.3, PF.BLOOD + 1, 0.16, 0.006, 0.004, 0.7, 0.08, 0.003, 0.002, 4, 2);
     };
     this.gibs.onLand = (x, z) => { if (R() < 0.6) this.blood(x, z, rand(0.5, 1.1)); };
@@ -161,7 +163,7 @@ export class Effects {
   }
 
   // ── Explosions ────────────────────────────────────────────────────────────
-  explosion(x, y, z, scale = 1, { dirt = true, scorch = true, light = true, color = 0 } = {}) {
+  explosion(x, y, z, scale = 1, { dirt = true, scorch = true, light = true, color = 0, fires = true } = {}) {
     const s = scale;
     // white-hot flash
     this.glow.spawn(x, y + 1 * s, z, 0, 0, 0, 0.14, 6 * s, 14 * s, PF.GLOW, 9, 7, 5, 1, 6, 3, 1);
@@ -218,7 +220,7 @@ export class Effects {
     this.shocks.push({ x, y: y + 1.5 * s, z, t: 0, s });
     if (this.shocks.length > 6) this.shocks.shift();
     // burning debris left behind
-    if (this.fire && color === 0) {
+    if (this.fire && color === 0 && fires) {
       const nfire = s > 0.9 ? 2 + ((R() * 3) | 0) : (R() < 0.5 ? 1 : 0);
       for (let k = 0; k < nfire; k++) {
         const a = R() * 6.28, r = R() * 3.5 * s;
@@ -226,6 +228,107 @@ export class Effects {
         this.fire.add(fx, groundH(fx, fz), fz, rand(0.8, 1.4) * s, rand(0.7, 1.3) * s, rand(0.7, 1.1), { smoke: 0.7, embers: 1.5, life: rand(5, 11), fadeIn: 0.25 });
       }
     }
+  }
+
+  /**
+   * A 2000 lb bomb. White flash, a fireball that boils up into a mushroom,
+   * a dust shock racing out along the ground, a curtain of dirt and debris
+   * thrown a hundred feet up, burning ground and a crater. The smoke column
+   * that lingers afterwards is fed by `bigSmoke` (called per frame by its owner).
+   */
+  bigExplosion(x, y, z, s = 1) {
+    const gy = y;
+    // blinding flash + bright core
+    this.glow.spawn(x, gy + 6 * s, z, 0, 0, 0, 0.22, 30 * s, 70 * s, PF.GLOW, 14, 11, 8, 1, 8, 4, 1.5);
+    this.glow.spawn(x, gy + 3 * s, z, 0, 0, 0, 0.5, 14 * s, 40 * s, PF.GLOW, 8, 4.5, 1.6, 1, 3, 1, 0.2);
+    // condensation / shock rings
+    this.glow.spawn(x, gy + 2, z, 0, 0, 0, 0.55, 6 * s, 95 * s, PF.RING, 2.2, 2.0, 1.8, 0.7, 0.5, 0.45, 0.4);
+    this.glow.spawn(x, gy + 8 * s, z, 0, 0, 0, 0.8, 4 * s, 70 * s, PF.RING, 1.6, 1.2, 0.8, 0.45, 0.3, 0.2, 0.1);
+    // the ordinary blast at the core (scorch, ground fires, light)
+    this.explosion(x, gy, z, 2.2 * s);
+    for (let k = 0; k < 4; k++) {
+      const a = R() * 6.28, r = rand(4, 9) * s;
+      this.explosion(x + Math.cos(a) * r, groundH(x + Math.cos(a) * r, z + Math.sin(a) * r), z + Math.sin(a) * r, 1.2 * s, { light: false, scorch: k < 2 });
+    }
+    // fireball boiling upward — the stem and the cap of the mushroom
+    for (let k = 0; k < 70; k++) {
+      const a = R() * 6.28, rr = R();
+      const up = rand(14, 34) * s;
+      const out = rr * 9 * s;
+      this.glow.spawn(x + Math.cos(a) * rr * 4 * s, gy + rand(1, 5) * s, z + Math.sin(a) * rr * 4 * s,
+        Math.cos(a) * out, up, Math.sin(a) * out, rand(1.8, 3.4), rand(4, 7) * s, rand(10, 17) * s, PF.FIRE + ((R() * 4) | 0),
+        6, 3.0, 0.9, 1, 1.0, 0.18, 0.03, 4, 1.1, 0, R() * 6, (R() - 0.5) * 1.5, 0.02);
+    }
+    for (let k = 0; k < 30; k++) {
+      const a = R() * 6.28, sp = rand(10, 26) * s;
+      this.glow.spawn(x, gy + rand(18, 30) * s, z, Math.cos(a) * sp, rand(4, 10), Math.sin(a) * sp, rand(2.2, 3.8), rand(6, 9) * s, rand(14, 22) * s,
+        PF.FIRE + ((R() * 4) | 0), 4.5, 2.0, 0.6, 0.9, 0.7, 0.12, 0.02, 0, 1.4, 0, R() * 6, (R() - 0.5), 0.1);
+    }
+    // dark smoke: stem, cap rolling outward, lit from below at first
+    for (let k = 0; k < 50; k++) {
+      const h = R();
+      const a = R() * 6.28, out = (h > 0.6 ? rand(6, 16) : rand(1, 5)) * s;
+      this.smoke.spawn(x + Math.cos(a) * 3 * s, gy + rand(2, 8) * s, z + Math.sin(a) * 3 * s,
+        Math.cos(a) * out, rand(12, 30) * s * (0.5 + h), Math.sin(a) * out, rand(8, 16), rand(8, 12) * s, rand(26, 46) * s, PF.SMOKE + ((R() * 4) | 0),
+        0.95, 0.42, 0.13, 0.92, 0.075, 0.065, 0.06, -0.3, 0.75, 0, R() * 6, (R() - 0.5) * 0.2, 0.04);
+    }
+    // ground shock: a dust wall racing out
+    const nr = 60;
+    for (let k = 0; k < nr; k++) {
+      const a = (k / nr) * 6.28 + R() * 0.1, sp = rand(30, 52) * s;
+      this.smoke.spawn(x + Math.cos(a) * 3 * s, gy + 1.2, z + Math.sin(a) * 3 * s, Math.cos(a) * sp, rand(1, 4), Math.sin(a) * sp, rand(3, 5.5), 3 * s, rand(14, 22) * s,
+        PF.SMOKE + ((R() * 4) | 0), 0.12, 0.1, 0.08, 0.75, 0.05, 0.045, 0.04, -0.15, 1.3, 0, R() * 6, (R() - 0.5) * 0.4, 0.03);
+    }
+    // a curtain of earth thrown skyward
+    for (let k = 0; k < 70; k++) {
+      const a = R() * 6.28, sp = rand(4, 16) * s;
+      this.smoke.spawn(x + Math.cos(a) * 2, gy + 0.5, z + Math.sin(a) * 2, Math.cos(a) * sp, rand(22, 50) * s, Math.sin(a) * sp, rand(2.2, 4), rand(1.5, 3) * s, rand(4, 8) * s,
+        PF.DIRT, 0.07, 0.055, 0.04, 0.95, 0.04, 0.035, 0.03, 20, 0.35, 0, R() * 6, (R() - 0.5) * 2, 0, gy - 1);
+    }
+    // debris — clods, rock and hot fragments
+    for (let k = 0; k < 60; k++) {
+      const a = R() * 6.28, sp = rand(6, 26) * s;
+      const c = rand(0.04, 0.1), sz = rand(0.15, 0.6) * s;
+      this.gibs.spawn(x, gy + 1, z, Math.cos(a) * sp, rand(14, 42) * s, Math.sin(a) * sp, sz, sz * 0.7, sz, c, c * 0.85, c * 0.7, rand(3, 8), 0.2, 0);
+    }
+    for (let k = 0; k < 140; k++) {
+      const a = R() * 6.28, sp = rand(20, 70) * s;
+      this.glow.spawn(x, gy + 2, z, Math.cos(a) * sp * 0.7, rand(0.3, 1.1) * sp, Math.sin(a) * sp * 0.7, rand(1.2, 3.4), 0.16, 0.08, PF.SPARK,
+        7, 3.5, 1.2, 1, 2, 0.5, 0.1, 18, 0.35, 0.02, 0, 0, 0, gy);
+    }
+    // crater and scorched ground
+    this.scorch(x, z, 15 * s);
+    for (let k = 0; k < 4; k++) this.scorch(x + rand(-8, 8) * s, z + rand(-8, 8) * s, rand(6, 10) * s);
+    // light: the whole valley lights up
+    this.lights.flash(x, gy + 25 * s, z, 0xffa45a, 14000 * s, 420, 2.4, 0.35);
+    this.lights.flash(x, gy + 6, z, 0xff7a30, 5000 * s, 200, 4.5, 0.4);
+    // big screen-space shockwave
+    this.shocks.push({ x, y: gy + 5 * s, z, t: 0, s: 6 * s });
+    if (this.shocks.length > 6) this.shocks.shift();
+    // burning ground all around the crater
+    if (this.fire) {
+      for (let k = 0; k < 9; k++) {
+        const a = R() * 6.28, r = rand(2, 13) * s;
+        const fx = x + Math.cos(a) * r, fz = z + Math.sin(a) * r;
+        this.fire.add(fx, groundH(fx, fz), fz, rand(1.5, 3) * s, rand(2, 4) * s, rand(0.8, 1.1), { smoke: 1, embers: 2.5, life: rand(14, 28), fadeIn: 0.15 });
+      }
+    }
+  }
+
+  /** The column that keeps rising off a big crater; `k` fades 1 → 0, `hot` is the fire under it. */
+  bigSmoke(x, z, k, dt, hot = 0) {
+    const gy = groundH(x, z);
+    if (R() < dt * 9 * k) {
+      const a = R() * 6.28;
+      this.smoke.spawn(x + Math.cos(a) * 4, gy + 2, z + Math.sin(a) * 4, rand(-1, 1) + 1.2, rand(5, 9), rand(-1, 1), rand(9, 15), 6, rand(24, 38), PF.SMOKE + ((R() * 4) | 0),
+        0.12 + 0.45 * hot, 0.07 + 0.16 * hot, 0.05 + 0.04 * hot, 0.75 * k, 0.06, 0.052, 0.048, -0.1, 0.12, 0, R() * 6, (R() - 0.5) * 0.15, 0.1);
+    }
+    // firelight glowing inside the base of the column
+    if (hot > 0 && R() < dt * 14 * hot) {
+      this.glow.spawn(x + rand(-5, 5), gy + rand(2, 16), z + rand(-5, 5), rand(-0.5, 0.5), rand(2, 5), rand(-0.5, 0.5), rand(1.5, 3), 8, 18, PF.GLOW,
+        0.9 * hot, 0.35 * hot, 0.08 * hot, 0.8, 0.2 * hot, 0.05 * hot, 0.01, -0.1, 0.3);
+    }
+    if (R() < dt * 6 * k) this.ember(x + rand(-6, 6), gy + 1, z + rand(-6, 6));
   }
 
   // ── Fire ──────────────────────────────────────────────────────────────────
