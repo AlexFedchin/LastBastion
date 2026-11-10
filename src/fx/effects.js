@@ -117,6 +117,46 @@ export class Effects {
     if (R() < 0.3) this.glow.spawn(x, gy + 0.1, z, (R() - 0.5) * 6, rand(3, 7), (R() - 0.5) * 6, 0.25, 0.05, 0.03, PF.SPARK, 4, 2.4, 1, 1, 2, 0.8, 0.2, 14, 0, 0.02);
   }
 
+  // ── the player's .50: path and impacts that read at night, at range ─────────
+  /** Faint line from the muzzle to where the round went; gone in a fifth of a second. */
+  bulletPath(x0, y0, z0, x1, y1, z1, bright = 1, skip = 12) {
+    const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
+    // start a little way out: a world-width line right at the muzzle would swamp the screen
+    const full = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const len = full - skip;
+    if (len < 2) return;
+    // a streak particle: head at the impact, tail stretched back to the muzzle
+    const vx = dx / full, vy = dy / full, vz = dz / full;
+    const s = 1.25 * bright;
+    this.glow.spawn(x1, y1, z1, vx * 0.01, vy * 0.01, vz * 0.01, rand(0.16, 0.22), 0.11, 0.13, PF.STREAK,
+      1.1 * s, 0.75 * s, 0.4 * s, 0.6, 0.5 * s, 0.3 * s, 0.15 * s, 0, 0, len * 100);
+  }
+
+  /** A .50 round hitting dirt: flash, ricochet sparks, a kicked plume, a scar. k grows with distance. */
+  bulletGround(x, z, k = 1) {
+    const gy = groundH(x, z);
+    if (wetnessAt(x, z) > 0.45) { this.groundHit(x, z, true); return; }
+    this.glow.spawn(x, gy + 0.15, z, 0, 0, 0, 0.07, 0.35 * k, 0.9 * k, PF.GLOW, 5, 3.2, 1.6, 1, 2, 0.8, 0.2);
+    const ns = R() < 0.5 ? 3 : 1;
+    for (let n = 0; n < ns; n++) {
+      this.glow.spawn(x, gy + 0.1, z, (R() - 0.5) * 9, rand(3, 9), (R() - 0.5) * 9, rand(0.2, 0.45), 0.07, 0.04, PF.SPARK, 6, 3.4, 1.2, 1, 2, 0.6, 0.15, 16, 0.4, 0.018, 0, 0, 0, gy);
+    }
+    for (let n = 0; n < 3; n++) {
+      this.smoke.spawn(x, gy + 0.1, z, (R() - 0.5) * 1.6, rand(4, 8), (R() - 0.5) * 1.6, rand(0.5, 0.9), 0.15 * k, rand(0.5, 1.0) * k, PF.DIRT,
+        0.08, 0.065, 0.05, 0.95, 0.05, 0.045, 0.04, 14, 0.8, 0, R() * 6, 0, 0, gy);
+    }
+    this.smoke.spawn(x, gy + 0.3, z, (R() - 0.5) * 0.6, rand(0.4, 0.9), (R() - 0.5) * 0.6, rand(1.2, 2), 0.4 * k, 1.8 * k, PF.SMOKE + ((R() * 4) | 0),
+      0.09, 0.08, 0.07, 0.45, 0.05, 0.05, 0.05, -0.15, 1.0, 0, R() * 6, (R() - 0.5) * 0.4, 0.05);
+    if (R() < 0.6) this.decals.add(x, z, rand(0.35, 0.6), DF.CRATER, 0.55, 0.5, 0.45);
+  }
+
+  /** The round arriving in a body: a hot glint you can see from the wall, and a burst of red. */
+  bulletFlesh(x, y, z, dx, dy, dz, k = 1, head = false) {
+    this.glow.spawn(x, y, z, 0, 0, 0, 0.06, 0.25 * k, 0.6 * k, PF.GLOW, head ? 4 : 3, head ? 1.4 : 1.1, 0.5, 1, 1.4, 0.2, 0.05);
+    this.smoke.spawn(x, y, z, dx * 3, dy * 3 + 0.6, dz * 3, rand(0.4, 0.7), 0.3 * k, (head ? 1.6 : 1.1) * k, PF.BLOOD + 1,
+      0.3, 0.012, 0.008, 0.85, 0.12, 0.005, 0.004, 1, 2.6, 0, R() * 6, 0, 0);
+  }
+
   /** Bullet tearing through a body. d = bullet direction. */
   fleshHit(x, y, z, dx, dy, dz, power = 1) {
     // exit spray along the bullet

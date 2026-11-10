@@ -206,8 +206,8 @@ export function makeParticleAtlas(cell = 128) {
   put(13, cellImage((u, v) => { const r = Math.sqrt(u * u + v * v); const a = Math.exp(-Math.pow((r - 0.75) * 9, 2)); return [1, 1, 1, a]; }, 13));
   // 14 dirt clump
   put(14, cellImage((u, v, n) => { const r = Math.sqrt(u * u + v * v); const a = clamp(1 - r * (1.2 + (n - 0.5) * 2.5), 0, 1); return [0.45 + n * 0.2, 0.38 + n * 0.15, 0.3, Math.pow(a, 0.5)]; }, 14));
-  // 15 streak (vertical)
-  put(15, cellImage((u, v) => { const a = Math.exp(-u * u * 40) * clamp(1 - Math.abs(v), 0, 1); return [1, 1, 1, a]; }, 15));
+  // 15 streak (vertical): even along its length, soft at the very ends (bullet paths)
+  put(15, cellImage((u, v) => { const a = Math.exp(-u * u * 14) * clamp((1 - Math.abs(v)) * 10, 0, 1); return [1, 1, 1, a]; }, 15));
 
   void rng;
   const t = toTexture(c, { srgb: false, aniso: 1 });

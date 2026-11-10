@@ -386,6 +386,7 @@ export class Player {
       const px = o.x + _d.x * t, py = o.y + _d.y * t, pz = o.z + _d.z * t;
       const killed = horde.damage(i, dmg * (head ? HEADSHOT_MULT : 1), 'hmg', _d.x, _d.y, _d.z, head && !stopped);
       fx.fleshHit(px, py, pz, _d.x, _d.y, _d.z, head ? 1.5 : 1);
+      fx.bulletFlesh(px, py, pz, _d.x, _d.y, _d.z, clamp(t / 45, 1, 3), head);
       this.audio.flesh(px, pz, head && killed);
       if (stats.hmgIncendiary > 0 && Math.random() < stats.hmgIncendiary && !killed) horde.ignite(i, 4, 28);
       if (stats.hmgHE) {
@@ -404,7 +405,9 @@ export class Player {
     const ex = o.x + _d.x * endT, ey = Math.max(0, o.y + _d.y * endT), ez = o.z + _d.z * endT;
     // every round is a tracer; alternate brightness like a real belt mix
     fx.tracer(_m.x, _m.y, _m.z, ex, ey, ez, 560, this.shots % 3 === 0 ? 1.4 : 0.75);
-    if (!stopped && groundT < 600) fx.groundHit(ex, ez, false);
+    // the round's path, faintly, so you can see where the burst is going
+    fx.bulletPath(_m.x, _m.y, _m.z, ex, ey, ez, this.zoom > 0.5 ? 0.6 : 1, this.zoom > 0.5 ? 20 : 12);
+    if (!stopped && groundT < 600) fx.bulletGround(ex, ez, clamp(endT / 45, 1, 3));
     fx.muzzle(_m.x, _m.y, _m.z, _d.x, _d.y, _d.z, 1);
     this.muzzleLight.position.copy(_m);
     this.muzzleLight.intensity = rand(9, 15);

@@ -29,7 +29,8 @@ void main() {
     float len = length(axis);
     axis = len > 1e-4 ? axis / len : vec3(0.0, 1.0, 0.0);
     vec3 viewDir = normalize(mix(head, tail, 0.5));
-    vec3 perp = cross(axis, viewDir);
+    // (viewDir x axis keeps the quad's winding facing the camera; the other order mirrors it and it gets culled)
+    vec3 perp = cross(viewDir, axis);
     float pl = length(perp);
     perp = pl > 1e-4 ? perp / pl : vec3(1.0, 0.0, 0.0);
     // extend the streak by half a size at both ends so it is never degenerate
