@@ -320,9 +320,9 @@ export const UNLOCKS = {
 };
 export const isUnlocked = (key, night) => night >= (UNLOCKS[key] ?? 1);
 export const UNLOCK_INFO = {
-  napalm: 'NAPALM TRENCH [E]', grenades: 'GRENADES [G]', claymores: 'CLAYMORES (DAWN RESUPPLY)',
-  artillery: '105MM BATTERY [Q]', flares: 'ILLUMINATION FLARES [F]', mortar: 'MORTAR PIT (DAWN RESUPPLY)', gunship: 'AC-130 SPECTRE OVERHEAD',
-  bomber: 'BOMBER ON CALL [T]', dangerClose: 'DANGER CLOSE [B]',
+  napalm: 'NAPALM [E]', grenades: 'GRENADES [G]', claymores: 'CLAYMORES',
+  artillery: '105MM BATTERY [Q]', flares: 'FLARES [F]', mortar: 'MORTAR PIT', gunship: 'SPECTRE',
+  bomber: 'BOMBER [T]', dangerClose: 'DANGER CLOSE [B]',
 };
 export const UNLOCK_LINES = {
   2: [[CALL.kovac, 'Engineers filled the trench out front with napalm. E lights it — it burns right along the wall base. And there\'s a crate of grenades at your feet. G, for anything climbing.']],

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
   nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, ABILITY, CALL, COMMS,
-  UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked,
+  UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines,
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
@@ -118,6 +118,9 @@ class Game {
     renderer.compile(this.scene, this.camera);
     this.post.render(0.016, 0);
 
+    // first launch: measure this machine and pick the graphics preset
+    await this.autoQuality(step);
+
     await step('tuning the radio…');
     await Promise.race([soundLoaded, new Promise((r) => setTimeout(r, 6000))]);
 
@@ -132,6 +135,83 @@ class Game {
     window.addEventListener('beforeunload', () => { if (this.telemetry.n) this.telemetry.endNight('quit'); });
     window.__LB = this; // handy from devtools
     if (TEST) this.setupTestHooks();
+  }
+
+  /**
+   * First-launch graphics calibration. Renders a heavy night from the gun (a big
+   * horde, explosions, fire) for a few dozen frames, times it on the GPU, works
+   * out what that frame would cost at HIGH and picks the preset that should hold
+   * 60 fps in a heavy fight. Runs once; Settings ▸ Quality ▸ AUTO runs it again.
+   */
+  async autoQuality(step) {
+    if (TEST || params.get('quality') || this.settings.benchmarked) return;
+    await step('calibrating graphics for this machine…');
+    const cur = this.settings.quality in QUALITY ? this.settings.quality : 'high';
+    let ms = 0;
+    try { ms = await this.benchmarkFrame(); } catch (err) { console.warn('[quality] benchmark failed', err); return; }
+    // relative cost of each preset against HIGH (pixel count, MSAA, shadows)
+    const COST = { low: 0.35, medium: 0.6, high: 1, ultra: 2.3 };
+    const atHigh = ms / COST[cur];
+    const pick = atHigh <= 6 ? 'ultra' : atHigh <= 12 ? 'high' : atHigh <= 20 ? 'medium' : 'low';
+    this.settings.quality = pick;
+    this.settings.benchmarked = true;
+    this.settings.benchMs = Math.round(atHigh * 10) / 10;
+    saveSettings(this.settings);
+    console.info(`[quality] heavy frame ${ms.toFixed(1)} ms at ${cur} (~${atHigh.toFixed(1)} ms at high) → ${pick}`);
+    if (pick !== cur) {
+      await step(`graphics set to ${pick} — reloading…`);
+      location.reload();
+      await new Promise(() => {}); // the page is going away
+    }
+  }
+
+  /** Median GPU time (ms) of a heavy night frame seen from the gun. */
+  async benchmarkFrame() {
+    const r = this.renderer, gl = r.getContext(), cam = this.camera;
+    const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    // the gunner's view
+    cam.position.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z);
+    cam.rotation.order = 'YXZ';
+    cam.rotation.set(-0.16, 0, 0);
+    cam.fov = fitFov(this.settings.fov, cam.aspect);
+    cam.updateProjectionMatrix();
+    cam.updateMatrixWorld(true);
+    // a heavy night: a big horde, fire and blasts
+    for (let i = 0; i < 700; i++) this.horde.spawn(Math.random() < 0.8 ? ZT.SHAMBLER : ZT.RUNNER, rand(-80, 80), rand(-190, -20), 1, 1);
+    for (let k = 0; k < 6; k++) this.fx.explosion(rand(-40, 40), 0, rand(-120, -40), 1.4);
+    const frames = 36, warm = 10, qs = [], wall = [];
+    let t = 0;
+    for (let k = 0; k < frames + warm; k++) {
+      t += 1 / 60;
+      this.horde.update(1 / 60, t);
+      this.horde.syncRender();
+      this.env.update(1 / 60, t, this.horde, this.fx, this.audio);
+      this.fx.update(1 / 60);
+      let q = null;
+      if (ext && k >= warm) { q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); }
+      const a = performance.now();
+      this.post.render(1 / 60, t);
+      if (q) { gl.endQuery(ext.TIME_ELAPSED_EXT); qs.push(q); }
+      const px = new Uint8Array(4);
+      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); // wait for the GPU
+      if (k >= warm) wall.push(performance.now() - a);
+      if (k % 6 === 0) await nextFrame();
+    }
+    let times = [];
+    if (ext && !gl.getParameter(ext.GPU_DISJOINT_EXT)) {
+      for (const q of qs) {
+        for (let n = 0; n < 60 && !gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE); n++) await nextFrame();
+        if (gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) times.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6);
+        gl.deleteQuery(q);
+      }
+    }
+    if (times.length < frames / 2) times = wall; // no timer queries: wall time with a GPU sync
+    // back to the attract mode the menu expects
+    this.horde.clear();
+    this.fx.clear();
+    for (let i = 0; i < 220; i++) this.spawnMenuZombie(rand(-170, -30));
+    times.sort((x, y) => x - y);
+    return times[Math.floor(times.length / 2)];
   }
 
   applyPlayerSettings() {
@@ -232,7 +312,7 @@ class Game {
         this.screens.show('settings');
         break;
       case 'settings-back':
-        if (this.state === 'menu' && QUALITY[this.settings.quality] !== this.quality) { location.reload(); return; }
+        if (this.state === 'menu' && (QUALITY[this.settings.quality] !== this.quality || !this.settings.benchmarked)) { location.reload(); return; }
         this.screens.show(this.prevScreen || 'menu');
         break;
       case 'back': this.screens.show(this.state === 'paused' ? 'pause' : (this.prevScreen && this.prevScreen !== 'howto' && this.prevScreen !== 'settings' ? this.prevScreen : 'menu')); break;
@@ -316,6 +396,7 @@ class Game {
     this.screens.show(null);
     this.hud.show(true);
     this.hud.radioQueue.length = 0;
+    this.hud.clearAlerts();
     // radio script for the night
     const lines = (run.night <= FINAL_NIGHT && !run.endless) ? RADIO[run.night] : [pick(RADIO.endless), pick(RADIO.endless)];
     this.events.start(run.night, run.endless || run.night > FINAL_NIGHT);
@@ -412,7 +493,7 @@ class Game {
     this.damagePulse = 1;
     this.player.addTrauma(0.35);
     this.audio.scream(x, z);
-    this.hud.alert(`BREACH — ${SECTION_LABELS[sec] ?? 'WALL'} — WE LOST ONE`, 'red');
+    this.hud.alert('', 'red', { key: 'breach', item: SECTION_LABELS[sec] ?? 'WALL', format: (s, n) => `BREACH — ${s.join(' · ')} — ${n === 1 ? 'WE LOST ONE' : `WE LOST ${n}`}` });
     this.bark('breach', 0.35);
     // the climber is cut down on the walkway: blood on the parapet
     this.fx.headshot(x, WORLD.WALL_H + 1, z, 0, 0.4, 1);
@@ -422,7 +503,7 @@ class Game {
   onBloaterWall(sec, x, z) {
     if (!this.inPlay()) return;
     this.damagePulse = Math.max(this.damagePulse, 0.35);
-    this.hud.alert(`ACID BURST ON ${SECTION_LABELS[sec]} — THE WALL IS MELTING`, 'red');
+    this.hud.alert('', 'red', { key: 'acid', item: SECTION_LABELS[sec], format: (s) => `ACID ON ${s.join(' · ')} — THE WALL IS MELTING` });
     this.fx.explosion(x, 1.5, z, 0.6, { dirt: false, scorch: false, color: 1 });
     this.audio.acid(x, z);
     this.ns.acid = (this.ns.acid || 0) + 1;
@@ -432,7 +513,7 @@ class Game {
     if (this.state === 'menu') return;
     if (kind === 'surgeWarn') {
       const side = e.cx < -30 ? 'LEFT FLANK' : e.cx > 30 ? 'RIGHT FLANK' : 'CENTRE';
-      this.hud.alert(`HORDE INBOUND — ${side}`, '');
+      this.hud.alert('', '', { key: 'surge', item: side, format: (s) => `HORDE INBOUND — ${s.join(' & ')}` });
       this.audio.horn();
       this.bark('surge', 0.6);
     } else if (kind === 'tideWarn') {
@@ -544,6 +625,7 @@ class Game {
   // ── Main loop ────────────────────────────────────────────────────────────
   loop(now) {
     requestAnimationFrame((t) => this.loop(t));
+    if (this.frozen) { this.last = now; return; } // smoke tests drive every frame themselves
     const rdt = Math.min(0.05, Math.max(0.0001, (now - this.last) / 1000));
     this.last = now;
     this.step(rdt);
@@ -694,7 +776,7 @@ class Game {
       if (isUnlocked('grenades', n)) keys.push('G GRENADES');
       keys.push('R SWAP BARREL');
       this.hud.hint(keys.join(' · '));
-      for (const k of this.newUnlocks || []) this.hud.alert(`NEW — ${UNLOCK_INFO[k]}`);
+      for (const k of this.newUnlocks || []) this.hud.alert('', '', { key: 'new', item: UNLOCK_INFO[k], life: 7, priority: 1.5, format: (s) => `NEW — ${s.join(' · ')}` });
       setTimeout(() => this.hud.hint(''), 9000);
     }
   }
@@ -715,13 +797,13 @@ class Game {
         if (ok) {
           this.hud.alert(`FIRE MISSION — ${this.stats.artyShells} ROUNDS — SPLASH IN 3`);
           this.hud.radio(CALL.battery, COMMS.battery[this.stats.artyShells] || `Shot, over. ${this.stats.artyShells} rounds HE, splash in three.`, true);
-        } else this.hud.alert(`BATTERY RELOADING — ${Math.ceil(this.arsenal.artyCd)}s`);
+        } else this.hud.alert(`BATTERY RELOADING — ${Math.ceil(this.arsenal.artyCd)}s`, '', { key: 'arty-cd', plain: true });
       }
       if (input.hit('KeyE') && can('napalm')) {
         const ok = this.arsenal.igniteNapalm();
         T.ability('napalm', ok);
         if (ok) this.hud.alert('NAPALM TRENCH LIT');
-        else this.hud.alert(this.arsenal.napalmT > 0 ? 'TRENCH ALREADY BURNING' : `TRENCH REFILLING — ${Math.ceil(this.arsenal.napalmCd)}s`);
+        else this.hud.alert(this.arsenal.napalmT > 0 ? 'TRENCH ALREADY BURNING' : `TRENCH REFILLING — ${Math.ceil(this.arsenal.napalmCd)}s`, '', { key: 'napalm-cd', plain: true });
       }
       if (input.hit('KeyF') && can('flares')) {
         const ok = this.arsenal.launchFlare(this.player.aimPoint(240));
@@ -735,7 +817,7 @@ class Game {
         if (ok) {
           this.hud.alert('MARKER OUT — BOMBER INBOUND');
           this.hud.radio(CALL.kovac, COMMS.markerOut, true);
-        } else this.hud.alert(air.bomberBusy ? 'BOMBER ALREADY ON ITS RUN' : `BOMBER RE-ARMING — ${Math.ceil(air.bomberCd)}s`);
+        } else this.hud.alert(air.bomberBusy ? 'BOMBER ALREADY ON ITS RUN' : `BOMBER RE-ARMING — ${Math.ceil(air.bomberCd)}s`, '', { key: 'bomber-cd', plain: true });
       }
       if (input.hit('KeyG') && can('grenades')) {
         const ok = this.arsenal.throwGrenades(this.player.aimPoint(ABILITY.grenade.maxRange));
@@ -786,7 +868,7 @@ class Game {
       this.alertCd[s] = Math.max(0, this.alertCd[s] - rdt);
       if (p > 0.62 && this.alertCd[s] <= 0) {
         this.alertCd[s] = 9;
-        this.hud.alert(`${SECTION_LABELS[s]} — THEY'RE CLIMBING`, p > 0.85 ? 'red' : '');
+        this.hud.alert('', p > 0.85 ? 'red' : '', { key: 'climb', item: SECTION_LABELS[s], format: (secs) => `THEY'RE CLIMBING — ${secs.join(' · ')}` });
         if (p > 0.8) this.audio.klaxon();
         this.bark('pile', 0.35);
       }
@@ -890,7 +972,9 @@ class Game {
         this.noRender = false;
         if (!render) this.render(stepDt);
       },
-      event: (kind) => this.events.trigger(kind),
+      event: (kind) => { this.events.trigger(kind); },
+      freeze: (on = true) => { this.frozen = !!on; },
+      radioLines: () => allRadioLines(),
       state: () => ({ state: this.state, n: this.horde.n, kills: this.run?.kills, surv: this.run?.survivors, pile: Array.from(this.horde.pileH).map((v) => +v.toFixed(2)), t: this.director.t }),
     };
     void formatInt; void sectionCenterX; void wallZ;

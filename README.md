@@ -227,6 +227,19 @@ breaches by cause and section, how close the wall came to falling, abilities,
 event outcomes and frame times. Nothing leaves the machine. See
 `src/core/telemetry.js`.
 
+## Smoke tests
+
+`npm run test:smoke` boots the real game offscreen (muted) and drives it through
+its test hooks: boot and sound loading (every radio line voiced), that tracers,
+sparks and impacts actually draw, the gun firing and killing, the unlock schedule
+and shop gating, HUD alert merging, every night event, the bomber and Spectre's
+range, and the play-test log. Results and screenshots land in `tests/smoke/out/`.
+Run a subset with `npm run test:smoke -- events hud`. CI runs them on every push
+with software WebGL (`.github/workflows/smoke.yml`).
+
+**Graphics preset** is picked automatically on first launch (a short benchmark of
+a heavy night); *Settings ▸ Quality ▸ AUTO* runs it again.
+
 ## Troubleshooting
 
 * **F5 does nothing / "electron is not recognized"** — run `npm install` once in the

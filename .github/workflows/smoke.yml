@@ -1,0 +1,37 @@
+name: Smoke tests
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --no-audit --no-fund
+
+      - name: Run smoke tests (software WebGL under a virtual display)
+        run: xvfb-run -a --server-args="-screen 0 1280x800x24" npm run test:smoke
+        env:
+          SMOKE_GL: swiftshader
+
+      - name: Upload screenshots and results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-results
+          path: tests/smoke/out/
+          if-no-files-found: ignore

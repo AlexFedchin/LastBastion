@@ -59,7 +59,7 @@ export class Screens {
     const slider = (key, min, max, step, fmt) => `<input type="range" data-key="${key}" min="${min}" max="${max}" step="${step}" value="${settings[key]}"><span class="val" id="sv-${key}">${fmt(settings[key])}</span>`;
     const pct = (v) => `${Math.round(v * 100)}`;
     f.innerHTML = `
-      <label>QUALITY</label>${seg('quality', Object.entries(QUALITY).map(([k, q]) => [k, q.label]))}
+      <label>QUALITY</label>${seg('quality', [...Object.entries(QUALITY).map(([k, q]) => [k, q.label]), ['auto', 'AUTO']])}
       <label>SENSITIVITY</label>${slider('sensitivity', 0.2, 3, 0.05, (v) => Number(v).toFixed(2))}
       <label>FIELD OF VIEW</label>${slider('fov', 55, 85, 1, (v) => v)}
       <label>INVERT Y</label>${seg('invertY', [[false, 'OFF'], [true, 'ON']])}
@@ -70,7 +70,7 @@ export class Screens {
       ${window.bastion ? `<label>FULLSCREEN</label>${seg('fullscreen', [['toggle', 'TOGGLE (F11)']])}` : ''}
     `;
     const note = $('settings-note');
-    note.textContent = '';
+    note.textContent = settings.benchMs ? `Detected for this machine: a heavy fight costs ~${settings.benchMs} ms per frame at HIGH.` : '';
     const origQuality = settings.quality;
     f.querySelectorAll('input[type=range]').forEach((inp) => {
       inp.addEventListener('input', () => {
@@ -90,6 +90,13 @@ export class Screens {
         let v = b.dataset.v;
         if (v === 'true') v = true; else if (v === 'false') v = false;
         s.querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b));
+        if (k === 'quality' && v === 'auto') {
+          // detect again: the benchmark runs on the next launch (or right away from the menu)
+          this.game.settings.benchmarked = false;
+          this.game.applySetting('quality', origQuality);
+          note.textContent = inGame ? 'Graphics will be re-detected on the next launch.' : 'Graphics will be re-detected when you go back.';
+          return;
+        }
         this.game.applySetting(k, v);
         if (k === 'quality') {
           note.textContent = v !== origQuality

@@ -411,7 +411,7 @@ class Giant {
     h.acid[sec] = Math.min(h.acid[sec] + 2.2, 7.6); // smashed concrete: a ramp the others climb
     g.audio.giantSmash(x, z);
     g.player.addTrauma(0.4);
-    g.hud.alert(`${['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'][sec]} — THE WALL IS BREAKING`, 'red');
+    g.hud.alert('', 'red', { key: 'wallbreak', item: ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'][sec], format: (s) => `${s.join(' · ')} — THE WALL IS BREAKING` });
     if (this.smashes % 2 === 0) g.onBreach(sec, x, WORLD.WALL_H, z, this.kind);
   }
 

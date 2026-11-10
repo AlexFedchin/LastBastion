@@ -5,6 +5,7 @@ import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
 const LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
+const MAX_ALERTS = 3;
 
 export class HUD {
   constructor() {
@@ -31,6 +32,7 @@ export class HUD {
     this.radioT = 0;
     this.announceT = 0;
     this.carnageT = 0;
+    this.alerts = [];
     this.hitT = 0;
     this.killPulse = 0;
   }
@@ -80,14 +82,60 @@ export class HUD {
     this.announceT = dur;
   }
 
-  alert(text, cls = '') {
-    const d = document.createElement('div');
-    d.className = 'alert ' + cls;
-    d.textContent = text;
-    this.el.alerts.prepend(d);
-    while (this.el.alerts.children.length > 4) this.el.alerts.lastChild.remove();
-    setTimeout(() => d.classList.add('fade'), 2600);
-    setTimeout(() => d.remove(), 3400);
+  /**
+   * Show an alert. Alerts with the same key merge instead of stacking: a plain
+   * repeat shows "×N", a grouped alert (opts.item + opts.format) collects its
+   * items — "BREACH — L2 · L5 — WE LOST 2". At most MAX_ALERTS are on screen;
+   * when there are too many, the least urgent (then oldest) goes first, so red
+   * alerts push amber ones out rather than the other way round.
+   * opts: { key, item, format(items, count), priority, life, plain (no ×N: the text itself updates) }
+   */
+  alert(text, cls = '', opts = {}) {
+    const key = opts.key || text;
+    const pri = opts.priority ?? (cls.includes('red') ? 2 : 1);
+    let a = this.alerts.find((x) => x.key === key);
+    if (a) {
+      a.count++;
+      a.t = 0;
+      a.pri = Math.max(a.pri, pri);
+      if (cls.includes('red')) a.cls = cls;
+      a.el.classList.remove('fade');
+    } else {
+      const el = document.createElement('div');
+      a = { key, el, count: 1, t: 0, pri, cls, items: [] };
+      this.alerts.push(a);
+    }
+    a.text = text;
+    a.format = opts.format;
+    a.life = opts.life ?? (pri >= 2 ? 3.6 : 2.8);
+    if (opts.item !== undefined && !a.items.includes(opts.item)) a.items.push(opts.item);
+    a.el.className = 'alert ' + a.cls;
+    a.el.textContent = a.format ? a.format(a.items, a.count) : (a.count > 1 && !opts.plain ? `${text}  ×${a.count}` : text);
+    this.el.alerts.prepend(a.el); // newest / refreshed on top
+    while (this.alerts.length > MAX_ALERTS) {
+      let drop = 0;
+      for (let k = 1; k < this.alerts.length; k++) {
+        const x = this.alerts[k], d = this.alerts[drop];
+        if (x === a) continue;
+        if (d === a || x.pri < d.pri || (x.pri === d.pri && x.t > d.t)) drop = k;
+      }
+      this.alerts[drop].el.remove();
+      this.alerts.splice(drop, 1);
+    }
+  }
+
+  updateAlerts(dt) {
+    for (let k = this.alerts.length - 1; k >= 0; k--) {
+      const a = this.alerts[k];
+      a.t += dt;
+      if (a.t > a.life) a.el.classList.add('fade');
+      if (a.t > a.life + 0.8) { a.el.remove(); this.alerts.splice(k, 1); }
+    }
+  }
+
+  clearAlerts() {
+    for (const a of this.alerts) a.el.remove();
+    this.alerts.length = 0;
   }
 
   carnage(text, cls = '') {
@@ -143,6 +191,7 @@ export class HUD {
   }
 
   update(dt, g) {
+    this.updateAlerts(dt);
     this.updateEvents(g);
     const { run, director, player, arsenal, horde, stats } = g;
     const el = this.el;

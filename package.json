@@ -13,7 +13,8 @@
     "start": "node scripts/build.mjs && electron .",
     "play": "electron .",
     "dist:win": "node scripts/build.mjs && electron-builder --win portable nsis --x64 --publish never",
-    "dist:linux": "node scripts/build.mjs && electron-builder --linux AppImage --x64 --publish never"
+    "dist:linux": "node scripts/build.mjs && electron-builder --linux AppImage --x64 --publish never",
+    "test:smoke": "node scripts/build.mjs && electron tests/smoke/run.js"
   },
   "dependencies": {},
   "devDependencies": {
