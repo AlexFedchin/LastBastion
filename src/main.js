@@ -16,6 +16,7 @@ import { Horde } from './game/horde.js';
 import { Player } from './game/player.js';
 import { Arsenal } from './game/arsenal.js';
 import { Director } from './game/director.js';
+import { NightEvents } from './game/events.js';
 import { Post } from './render/post.js';
 import { AudioEngine } from './audio/audio.js';
 import { HUD } from './ui/hud.js';
@@ -92,6 +93,7 @@ class Game {
     this.applyPlayerSettings();
     this.arsenal = new Arsenal(this.scene, this.fx, this.audio, this.horde, this.env);
     this.director = new Director(this.horde);
+    this.events = new NightEvents(this);
     await step('loading the belt…');
     this.post = new Post(renderer, this.scene, this.camera, this.quality);
     this.hud = new HUD();
@@ -199,6 +201,7 @@ class Game {
     this.audio.setMusicMode('menu');
     this.audio.pressure = 0; this.audio.intensity = 0; this.audio.lowLife = false; this.audio.tide = false;
     this.letterboxTarget = 0;
+    if (this.events) this.events.reset();
     this.arsenal.startNight(this.menuStats, true);
     this.menuArtyT = 6;
     this.horde.pileMul = 0.6;
@@ -293,7 +296,7 @@ class Game {
     this.fx.glow.clear(); this.fx.smoke.clear(); this.fx.gibs.clear(); this.fx.casings.clear();
     this.fx.lights.releaseAll();
     this.arsenal.minesOwned = run.minesOwned;
-    this.arsenal.startNight(this.stats);
+    this.arsenal.startNight(this.stats, false, run.night);
     this.director.start(this.plan);
     this.player.reset();
     this.env.dawn = 0;
@@ -307,6 +310,7 @@ class Game {
     this.hud.radioQueue.length = 0;
     // radio script for the night
     const lines = (run.night <= FINAL_NIGHT && !run.endless) ? RADIO[run.night] : [pick(RADIO.endless), pick(RADIO.endless)];
+    this.events.start(run.night, run.endless || run.night > FINAL_NIGHT);
     this.radioScript = (lines || []).map((l, i) => ({ at: i === 0 ? 4 : this.plan.duration * 0.42, who: l[0], text: l[1], done: false }));
     this.audio.night = run.night;
     this.audio.setMusicMode('night');
@@ -432,6 +436,7 @@ class Game {
     this.hud.hint('');
     this.state = 'dawn';
     this.stateT = 0;
+    this.events.reset();
     this.arsenal.endNight();
     this.ignoreUnlock = true;
     this.input.unlock();
@@ -501,6 +506,7 @@ class Game {
     document.getElementById('scope').classList.remove('on');
     this.state = 'fallen';
     this.stateT = 0;
+    this.events.reset();
     this.ignoreUnlock = true;
     this.input.unlock();
     this.hud.announce('THE WALL HAS FALLEN', '', 6, 'red');
@@ -707,6 +713,7 @@ class Game {
     this.player.update(dt, rdt, input, this.stats, active, this.time);
     this.arsenal.update(dt, this.time);
     this.director.update(dt);
+    this.events.update(dt);
     this.horde.update(dt, this.time);
     document.getElementById('scope').classList.toggle('on', this.player.zoom > 0.55);
 
@@ -750,11 +757,11 @@ class Game {
     if (this.director.spawningDone) {
       this.doneT = (this.doneT || 0) + dt;
       this.horde.globalSpeed = 1.45; // stragglers hurry in
-      if (this.horde.alive > 0 && (this.doneT > 110 || (this.horde.alive <= 6 && this.doneT > 45))) {
+      if (this.horde.alive > 0 && !this.events.busy && (this.doneT > 110 || (this.horde.alive <= 6 && this.doneT > 45))) {
         this.horde.clearLiving();
         this.hud.alert('THE LAST OF THEM FALL BACK INTO THE FOG');
       }
-      if (this.horde.alive === 0 && this.horde.pending.length === 0) this.endNight();
+      if (this.horde.alive === 0 && this.horde.pending.length === 0 && !this.events.busy) this.endNight();
     } else this.doneT = 0;
   }
 
@@ -837,6 +844,7 @@ class Game {
         this.noRender = false;
         if (!render) this.render(stepDt);
       },
+      event: (kind) => this.events.trigger(kind),
       state: () => ({ state: this.state, n: this.horde.n, kills: this.run?.kills, surv: this.run?.survivors, pile: Array.from(this.horde.pileH).map((v) => +v.toFixed(2)), t: this.director.t }),
     };
     void formatInt; void sectionCenterX; void wallZ;

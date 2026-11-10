@@ -223,3 +223,26 @@ export function makeJet(ctx) {
   }
   return toBuffer(ctx, chans);
 }
+
+// ── the generator ───────────────────────────────────────────────────────────
+/** Mains hum winding down (or spinning back up) with a relay clunk. */
+export function makePower(ctx, up) {
+  const sr = ctx.sampleRate, dur = up ? 2.2 : 3.0, n = Math.floor(dur * sr);
+  const R = rng(up ? 77 : 78);
+  const out = new Float32Array(n);
+  let ph = 0, lp = 0;
+  const a = lpA(1800, sr);
+  for (let i = 0; i < n; i++) {
+    const t = i / sr, u = t / dur;
+    const f = up ? 18 + 82 * Math.pow(u, 0.6) : 100 * Math.pow(1 - u, 1.6) + 6;
+    ph += TAU * f / sr;
+    const saw = ((ph / TAU) % 1) * 2 - 1;
+    const env = up ? Math.min(1, u * 3) * (0.6 + 0.4 * u) : Math.pow(1 - u, 1.2);
+    const w = R();
+    lp += a * (w - lp);
+    const clunk = t < 0.08 ? lp * 6 * Math.exp(-t / 0.02) + Math.sin(TAU * 70 * t) * Math.exp(-t / 0.03) * 1.5 : 0;
+    out[i] = (saw * 0.5 + Math.sin(ph * 2) * 0.3) * env * 0.5 + clunk;
+  }
+  normalize(out, 0.9);
+  return toBuffer(ctx, [out, out]);
+}

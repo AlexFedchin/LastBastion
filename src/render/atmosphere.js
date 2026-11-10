@@ -30,12 +30,18 @@ float lbNoise(vec2 p){
 }
 // returns rgb = in-scattered colour, a = fog amount
 vec4 lbFog(vec3 wp, vec3 cam, vec3 baseCol, float t, float dawn){
+  // a fog bank rides on the dawn channel: values above 2 are 2 + bank strength (night only)
+  float bank = max(0.0, dawn - 2.0);
+  dawn = dawn > 1.5 ? 0.0 : dawn;
   vec3 rv = wp - cam;
   float d = length(rv);
   vec3 rd = rv / max(d, 1e-4);
   float Db = mix(${f(NIGHT.Db)}, ${f(DAWN.Db)}, dawn);
   float D0 = mix(${f(NIGHT.D0)}, ${f(DAWN.D0)}, dawn);
   float b = mix(${f(NIGHT.b)}, ${f(DAWN.b)}, dawn);
+  Db *= 1.0 + bank * 5.5;
+  D0 *= 1.0 + bank * 3.0;
+  b = mix(b, 0.045, bank);
   // drifting, patchy ground mist
   float m = lbNoise(wp.xz * 0.012 + t * vec2(0.010, 0.0035)) * 0.62 + lbNoise(wp.xz * 0.041 - t * vec2(0.004, 0.016)) * 0.38;
   m = 0.22 + 1.65 * m * m;

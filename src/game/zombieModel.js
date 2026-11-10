@@ -234,8 +234,8 @@ void zPose(inout vec3 p, inout vec3 n) {
   float atk = aState.z;
   float burn = clamp(aState.y, 0.0, 1.0);
   bool runner = type > 0.5 && type < 1.5;
-  bool brute = type > 1.5 && type < 2.5;
-  bool bloater = type > 2.5;
+  bool brute = (type > 1.5 && type < 2.5) || type > 3.5; // giants move like brutes
+  bool bloater = type > 2.5 && type < 3.5;
 
   // ── legs ──
   float amp = runner ? 0.95 : (brute ? 0.42 : (bloater ? 0.35 : 0.55));
@@ -370,7 +370,7 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
           zc = vZTint * vec3(0.5, 0.55, 0.6) * (0.8 + 0.35 * zN2);
           zc = mix(zc, vec3(0.09, 0.07, 0.05), smoothstep(0.55, 0.2, vZL.y) * (0.6 + 0.4 * zN1)); // mud
           zGore = max(zGore, smoothstep(0.7, 0.85, zN3) * 0.7);
-        } else if (mid < 4.5) { zc = vZType > 2.5 ? vec3(0.25, 0.32, 0.08) : vec3(0.2, 0.015, 0.012); }
+        } else if (mid < 4.5) { zc = (vZType > 2.5 && vZType < 3.5) ? vec3(0.25, 0.32, 0.08) : vec3(0.2, 0.015, 0.012); }
         else if (mid < 5.5) zc = vec3(0.17, 0.19, 0.12) * (0.75 + 0.4 * zN2) * (0.8 + 0.3 * zN1);
         else if (mid < 6.5) zc = vec3(0.07, 0.06, 0.05) * (0.8 + 0.4 * zN2);
         else if (mid < 7.5) {
@@ -396,7 +396,7 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
         totalEmissiveRadiance += vZState.x * vec3(1.6, 0.25, 0.15) * (1.0 - zEyeF);
         float zFlick = 0.55 + 0.45 * sin(uTime * 31.0 + vZSeed * 40.0);
         totalEmissiveRadiance += clamp(vZState.y, 0.0, 1.0) * vec3(1.4, 0.45, 0.08) * zFlick * (1.0 - uCorpse * 0.8) * (0.4 + zN1);
-        if (vZType > 2.5) totalEmissiveRadiance += step(3.5, vZMat) * step(vZMat, 4.5) * vec3(0.3, 0.6, 0.05) * (0.6 + 0.4 * sin(uTime * 4.0 + vZSeed * 9.0));`)
+        if (vZType > 2.5 && vZType < 3.5) totalEmissiveRadiance += step(3.5, vZMat) * step(vZMat, 4.5) * vec3(0.3, 0.6, 0.05) * (0.6 + 0.4 * sin(uTime * 4.0 + vZSeed * 9.0));`)
       .replace('#include <fog_fragment>', `
         #ifdef USE_FOG
           vec4 lbF = lbFog(vLbFogW, cameraPosition, fogColor, fogNear, fogFar);

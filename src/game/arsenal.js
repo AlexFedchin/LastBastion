@@ -70,9 +70,9 @@ export class Arsenal {
   }
 
   // ── Night lifecycle ──────────────────────────────────────────────────────
-  startNight(stats, menu = false) {
+  startNight(stats, menu = false, night = 1) {
     this.stats = stats;
-    this.air.startNight(menu);
+    this.air.startNight(menu, night);
     this.artyCd = 6;
     this.napalmCd = 0;
     this.napalmT = 0;

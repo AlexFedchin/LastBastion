@@ -11,6 +11,7 @@ import { groundH } from '../world/terrain.js';
 const R = Math.random;
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
+const _up = new THREE.Vector3(0, 1, 0);
 
 // ── geometry helpers ─────────────────────────────────────────────────────────
 function clean(g) {
@@ -50,7 +51,7 @@ function propeller(mat) {
 }
 
 /** AC-130: high wing, four turboprops, upswept tail, guns on the port side. Nose +z, port +x. */
-function buildGunship() {
+export function buildGunship() {
   const skin = new THREE.MeshStandardMaterial({ color: 0x3a3f44, roughness: 0.75, metalness: 0.35, emissive: 0x0b0d10 });
   const dark = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6, metalness: 0.5 });
   const g = new THREE.Group();
@@ -142,6 +143,10 @@ export class AirSupport {
     this.audio = arsenal.audio;
     this.horde = arsenal.horde;
     this.onRadio = null; // (who, text)
+    this.callsign = CALL.spectre;
+    this.holdFire = false;   // the gunship can't see (fog bank)
+    this.priority = null;    // () => {x, z} | null — something the gunship must kill first
+    this.onCrash = null;     // (x, y, z) the gunship hit the ground
 
     // bomber on call
     this.bomberCd = 0;
@@ -175,8 +180,12 @@ export class AirSupport {
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────────
-  startNight(menu = false) {
+  startNight(menu = false, night = 1) {
     this.clearBomber();
+    this.callsign = night > 8 ? CALL.spectre2 : CALL.spectre;
+    this.holdFire = false;
+    this.priority = null;
+    this.gs.crash = null;
     this.bomberCd = ABILITY.bomber.firstDelay;
     this.craters.length = 0;
     this.inFlight.length = 0;
@@ -214,7 +223,7 @@ export class AirSupport {
     this.markerMesh.visible = false;
   }
 
-  radio(text, who = CALL.spectre) { if (this.onRadio) this.onRadio(who, text); }
+  radio(text, who = this.callsign) { if (this.onRadio) this.onRadio(who, text); }
 
   get bomberBusy() { return !!(this.marker || this.bomber || this.bombs.length); }
 
@@ -388,6 +397,35 @@ export class AirSupport {
     const G = GUNSHIP;
     const grp = g.group;
     let x, y, z;
+    if (g.crash) {
+      // on fire, rolling off the orbit and down into the hills
+      const c = g.crash;
+      c.t += dt;
+      g.vel.applyAxisAngle(_up, dt * 0.16);
+      grp.position.addScaledVector(g.vel, dt);
+      c.vy -= dt * 3.2;
+      grp.position.y += c.vy * dt;
+      x = grp.position.x; y = grp.position.y; z = grp.position.z;
+      grp.lookAt(x + g.vel.x, y + c.vy, z + g.vel.z);
+      c.roll += dt * (0.25 + c.t * 0.05);
+      grp.rotateZ(-0.36 - c.roll);
+      grp.updateMatrixWorld();
+      const fx = this.fx;
+      for (const k of [2, 3]) {
+        _v.copy(g.exhausts[k]).applyMatrix4(grp.matrixWorld);
+        fx.flame(_v.x, _v.y, _v.z, 3.5, 2);
+        fx.glowDot(_v.x, _v.y, _v.z, 6, 9, 3.5, 0.8, 0.06);
+        if (R() < 0.6) fx.smoke.spawn(_v.x, _v.y, _v.z, rand(-2, 2), rand(0, 2), rand(-2, 2), rand(5, 9), 4, 16, PF.SMOKE + ((R() * 4) | 0), 0.3, 0.12, 0.05, 0.85, 0.04, 0.035, 0.03, -0.1, 0.2, 0, R() * 6, 0.1, 0.05);
+      }
+      if (g.loop) g.loop.update(x, y, z, g.vel.x, c.vy, g.vel.z, 2.6 * (1 + 0.4 * Math.sin(c.t * 9)));
+      const gy = groundH(x, z);
+      if (y <= gy + 4 || c.t > 30) {
+        if (g.loop) { g.loop.stop(0.05); g.loop = null; }
+        g.active = false; g.crash = null; grp.visible = false;
+        if (this.onCrash) this.onCrash(x, Math.max(gy, 0), z);
+      }
+      return;
+    }
     if (g.leaving > 0) {
       // straight out along the last heading, climbing
       g.leaving += dt;
@@ -424,6 +462,7 @@ export class AirSupport {
     if (g.leaving > 0) return;
     g.radioCd -= dt;
     // engagements
+    if (this.holdFire) { g.mode = 0; return; }
     if (!g.mode) {
       g.engageT -= dt;
       if (g.engageT <= 0) this.engage();
@@ -444,8 +483,9 @@ export class AirSupport {
       g.nextT -= dt;
       if (g.nextT <= 0) {
         // re-acquire: track the crowd as it moves
-        const c = this.horde.densest(G.g40.minWall, 240, 12, 6);
-        if (c && Math.hypot(c.x - g.tx, c.z - g.tz) < 60) { g.tx = c.x; g.tz = c.z; }
+        const pr = this.priority && this.priority();
+        const c = pr || this.horde.densest(G.g40.minWall, 240, 12, 6);
+        if (c && (pr || Math.hypot(c.x - g.tx, c.z - g.tz) < 60)) { g.tx = c.x; g.tz = c.z; }
         this.fire(40, g.tx + rand(-1, 1) * G.g40.scatter, g.tz + rand(-1, 1) * G.g40.scatter);
         g.rounds--;
         g.nextT = G.g40.interval * rand(0.85, 1.25);
@@ -462,6 +502,13 @@ export class AirSupport {
 
   engage() {
     const g = this.gs, G = GUNSHIP;
+    // something big on the field takes priority
+    const pr = this.priority && this.priority();
+    if (pr && R() < 0.5 && wallDist(pr.x, pr.z) > G.g40.minWall) {
+      g.tx = pr.x; g.tz = pr.z;
+      if (R() < 0.4 && wallDist(pr.x, pr.z) > G.g105.minWall) { g.mode = 105; g.nextT = 0.6; } else { g.mode = 40; g.rounds = 6; g.nextT = 0.2; }
+      return;
+    }
     const c = this.horde.densest(G.g25.minWall, 240, 44, 7);
     if (!c || c.count < 2) { g.engageT = 1.5; return; }
     const wd = wallDist(c.x, c.z);
@@ -482,12 +529,21 @@ export class AirSupport {
     if (!g.introDone) {
       g.introDone = true;
       g.radioCd = 35;
-      this.radio(COMMS.spectreIntro);
+      this.radio(this.callsign === CALL.spectre2 ? COMMS.spectreIntro2 : COMMS.spectreIntro);
       this.audio.radioStatic(0.8);
     } else if (g.radioCd <= 0 && R() < 0.35) {
       g.radioCd = 40;
       this.radio(pickLine(COMMS.spectre));
     }
+  }
+
+  /** Night 8: an engine fire, and Spectre goes down in the hills. */
+  crash() {
+    const g = this.gs;
+    if (!g.active || g.leaving > 0 || g.crash) return false;
+    g.mode = 0;
+    g.crash = { t: 0, vy: -2, roll: 0 };
+    return true;
   }
 
   endEngagement() {

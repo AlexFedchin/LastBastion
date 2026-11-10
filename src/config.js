@@ -60,13 +60,15 @@ export function sectionCenterX(s) {
 }
 
 // ── Zombies ──────────────────────────────────────────────────────────────────
-export const ZT = { SHAMBLER: 0, RUNNER: 1, BRUTE: 2, BLOATER: 3 };
+export const ZT = { SHAMBLER: 0, RUNNER: 1, BRUTE: 2, BLOATER: 3, GIANT: 4 };
 
 export const ZOMBIE_TYPES = [
   { name: 'Shambler', hp: 27, speed: [1.9, 2.6], scale: [0.9, 1.08], radius: 0.34, weight: 1, supplies: 0.6, animK: 3.0, lean: [0.1, 0.32] },
   { name: 'Runner',   hp: 22, speed: [5.2, 6.6], scale: [0.88, 1.0], radius: 0.32, weight: 1, supplies: 1.2, animK: 2.35, lean: [0.42, 0.62] },
   { name: 'Brute',    hp: 330, speed: [1.55, 1.85], scale: [1.5, 1.66], radius: 0.36, weight: 3, supplies: 8, animK: 2.3, lean: [0.18, 0.28] },
   { name: 'Bloater',  hp: 95, speed: [1.35, 1.65], scale: [1.12, 1.24], radius: 0.42, weight: 2, supplies: 3, animK: 3.1, lean: [-0.08, 0.05] },
+  // event boss only (never in the night mix): see EVENTS.giant
+  { name: 'Giant',    hp: 14000, speed: [1.5, 1.6], scale: [3.9, 4.1], radius: 0.4, weight: 0, supplies: 120, animK: 2.3, lean: [0.14, 0.2] },
 ];
 
 export const ZOMBIE_HEIGHT = 1.8;
@@ -262,7 +264,10 @@ export const RADIO = {
 };
 
 // Call signs and the radio traffic that has its own trigger in the game.
-export const CALL = { kovac: 'SGT. KOVAC', battery: 'BATTERY', hammer: 'HAMMER 1-1', spectre: 'SPECTRE 2-1' };
+export const CALL = {
+  kovac: 'SGT. KOVAC', aran: 'PVT. ARAN', command: 'COMMAND', unknown: 'UNKNOWN', battery: 'BATTERY',
+  hammer: 'HAMMER 1-1', spectre: 'SPECTRE 2-1', spectre2: 'SPECTRE 2-2', hollis: 'LT. HOLLIS', reach: 'REACH 3-1', survivor: 'SURVIVOR',
+};
 export const COMMS = {
   battery: {
     4: 'Shot, over. Four rounds HE, splash in three.',
@@ -283,6 +288,7 @@ export const COMMS = {
   ],
   hammerOff: ['Bomb impact. Hammer one-one off target, re-arming.'],
   spectreIntro: 'Bastion-7, Spectre two-one on station overhead. We\'ll work the crowds in the field — you hold that wall.',
+  spectreIntro2: 'Bastion-7, Spectre two-two on station. Two-one were friends of ours. Let\'s make them pay for it.',
   spectre105: 'Rifle, one-oh-five. Big group — splash in five.',
   spectre: [
     'Good hits, good hits. Lot of movement down there, Bastion.',
@@ -302,6 +308,94 @@ export const BARKS = {
   massacre: ['Look at them burn!', 'That\'s a whole column gone!', 'Keep it up!'],
 };
 
+// ── Night events: one signature event per night, random ones in endless ─────
+// [event, when (fraction of the night's spawning window)]
+export const NIGHT_EVENTS = {
+  1: [['patrol', 0.4]],
+  2: [['fog', 0.3]],
+  3: [['civilians', 0.55]],
+  4: [['drop', 0.32]],
+  5: [['giant', 0.42]],
+  6: [['stampede', 0.4]],
+  7: [['blackout', 0.3]],
+  8: [['gunshipDown', 0.28]],
+  9: [['drop', 0.18], ['bloaters', 0.5]],
+  10: [['behemoth', 0.5]],
+};
+export const ENDLESS_EVENTS = ['giant', 'stampede', 'bloaters', 'drop', 'fog', 'blackout', 'civilians'];
+
+export const EVENTS = {
+  patrol: { count: 4, speed: [4.5, 4.9], chasers: 16, catchR: 1.05, reward: { survivors: 1, supplies: 40 } },
+  civilians: { count: 6, speed: [3.8, 4.3], chasers: 20, catchR: 1.05, reward: { survivors: 1, supplies: 20 } },
+  drop: { hold: 35, tear: 1.3, maxTearing: 6, pull: 32, reward: { flares: 2, grenades: 3, supplies: 150 } },
+  giant: { name: 'GOLIATH', hpMul: 1, scale: 4.0, smash: 2.4 },
+  behemoth: { name: 'BEHEMOTH', hpMul: 1.8, scale: 5.4, smash: 1.8 },
+  stampede: { brutes: 14, speed: 1.75, runners: 20 },
+  bloaters: { count: 45 },
+  fog: { duration: 55 },
+  blackout: { duration: 45, flares: 2 },
+};
+// '@spectre' is whichever gunship crew is up that night
+export const EVENT_LINES = {
+  patrol: {
+    start: [[CALL.hollis, 'Bastion-7, this is Hollis, Recon Two. Four of us coming in hot down the road — they\'re right behind us. Cover us!']],
+    follow: [[CALL.kovac, 'Friendlies on the road! Kill what\'s chasing them — and watch your fire!']],
+    lost: [[CALL.hollis, 'Man down! Keep moving, keep moving!']],
+    saved: [[CALL.hollis, 'We\'re through the gate. Thanks for the cover, Bastion. Recon Two will take a spot on the wall.']],
+    some: [[CALL.kovac, 'Some of Recon Two made it in. Not all of them.']],
+    none: [[CALL.kovac, 'Recon Two is gone. Eyes front.']],
+  },
+  civilians: {
+    start: [[CALL.survivor, 'Bastion, we can see your lights! We\'re coming down the road — please, don\'t shoot!']],
+    follow: [[CALL.kovac, 'Civilians on the road. Hold your fire on them and cover them all the way to the gate!']],
+    lost: [[CALL.survivor, 'No! No, not him — keep running!']],
+    saved: [[CALL.kovac, 'Got them. Every last one. Somebody find them some blankets.']],
+    some: [[CALL.kovac, 'We got some of them in. Some.']],
+    none: [[CALL.kovac, 'None of them made it. Eyes front.']],
+  },
+  drop: {
+    start: [[CALL.reach, 'Bastion-7, Reach three-one, thirty seconds out with your resupply. Look for the strobe.']],
+    away: [[CALL.reach, 'Load away, load away. Good chute. Reach three-one is clear — good luck down there.']],
+    land: [[CALL.kovac, 'Crate\'s down in the field! Keep them off it until the recovery team gets out there!']],
+    hurt: [[CALL.kovac, 'They\'re all over the crate — clear them off!']],
+    saved: [[CALL.kovac, 'Recovery team has the crate! Flares, grenades, and the battery\'s reloaded.']],
+    lost: [[CALL.kovac, 'They\'ve torn the crate apart. Damn it.']],
+  },
+  giant: {
+    start: [[CALL.kovac, 'Something big coming down the road... my God, look at the size of it.']],
+    spectre: [['@spectre', 'We see it, Bastion. Putting everything we have on the big one.']],
+    wall: [[CALL.kovac, 'It\'s at the wall! It\'s tearing the wall apart — kill it!']],
+    down: [[CALL.kovac, 'It\'s down! The big one is down!']],
+  },
+  behemoth: {
+    start: [[CALL.kovac, 'That\'s not like the other one. That\'s bigger. Everything we have — put it on that thing!']],
+    spectre: [['@spectre', 'We see it, Bastion. Putting everything we have on the big one.']],
+    wall: [[CALL.kovac, 'It\'s at the wall! It\'s tearing the wall apart — kill it!']],
+    down: [[CALL.kovac, 'It\'s down. Whatever that was, it\'s down.']],
+  },
+  stampede: {
+    left: [[CALL.kovac, 'Brutes! A whole herd of them — left flank!']],
+    right: [[CALL.kovac, 'Brutes! A whole herd of them — right flank!']],
+  },
+  bloaters: {
+    start: [[CALL.kovac, 'Bloaters! A whole column of them on the road — pop them before they reach the wall!']],
+  },
+  fog: {
+    start: [[CALL.command, 'Bastion-7, Command. Fog bank moving up the valley. Expect visibility near zero.']],
+    spectre: [['@spectre', 'Spectre is blind in this soup. Holding fire until it clears.']],
+    clear: [[CALL.kovac, 'Fog\'s lifting. Back to work.']],
+  },
+  blackout: {
+    start: [[CALL.kovac, 'Generator\'s gone! We\'ve lost the lights — pop flares!']],
+    spectre: [['@spectre', 'We have you on thermals, Bastion. We\'ll be your eyes.']],
+    restored: [[CALL.kovac, 'Power\'s back. Thank God.']],
+  },
+  gunshipDown: {
+    start: [[CALL.spectre, 'Mayday, mayday! Spectre two-one, fire in number three — we\'ve lost hydraulics — we\'re going down!']],
+    down: [[CALL.kovac, 'Spectre\'s down... God rest them. We\'re on our own up here.']],
+  },
+};
+
 /** Every line that can come over the radio, as [who, text] — what the voice build records. */
 export function allRadioLines() {
   const out = [];
@@ -313,5 +407,13 @@ export function allRadioLines() {
   add(CALL.kovac, COMMS.dangerClose);
   for (const t of [...COMMS.hammerIn, ...COMMS.hammerGood, ...COMMS.hammerOff]) add(CALL.hammer, t);
   for (const t of [COMMS.spectreIntro, COMMS.spectre105, ...COMMS.spectre]) add(CALL.spectre, t);
+  for (const t of [COMMS.spectreIntro2, COMMS.spectre105, ...COMMS.spectre]) add(CALL.spectre2, t);
+  for (const ev of Object.values(EVENT_LINES)) {
+    for (const lines of Object.values(ev)) {
+      for (const [w, t] of lines) {
+        if (w === '@spectre') { add(CALL.spectre, t); add(CALL.spectre2, t); } else add(w, t);
+      }
+    }
+  }
   return out;
 }

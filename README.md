@@ -108,6 +108,17 @@ every night is **the tide**.
 crowds in the field with its 25 mm, 40 mm and 105 mm guns. It won't fire close
 to the wall — that part is still yours.
 
+**Every night is different.** Each night has its own event, with its own radio
+traffic: a recon patrol fighting its way back to the gate (1), a fog bank that
+blinds you and the gunship (2), the civilians from the overpass making a run for
+it (3), a resupply drop you have to hold until it's recovered (4), **Goliath**,
+a giant that smashes ramps into the wall and kills a man every other blow (5), a
+brute stampede down one flank (6), a blackout (7), Spectre going down in the
+hills (8), a bloater column plus a resupply (9), and the **Behemoth** before the
+last tide (10). Endless nights draw two at random. Objectives, a boss bar and
+markers show up on the HUD; schedule and tuning live in `NIGHT_EVENTS` /
+`EVENTS` in `src/config.js`.
+
 **Dawn.** Survive the night and clear the field. Every kill earns supplies;
 spend them on the gun, the artillery battery, wall gunners, wire, the mortar pit,
 claymores, flares and grenades. Ten nights to the end of the story — then you

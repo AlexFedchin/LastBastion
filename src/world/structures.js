@@ -221,6 +221,7 @@ export function buildFortification(env) {
     cylY(0.1, 0.12, 8, 0, 0.2, 0),
   ]);
   const lampGlass = new THREE.MeshBasicMaterial({ color: new THREE.Color(5, 2.3, 0.7) });
+  env.lampGlass = lampGlass;
   env.lampSprites = [];
   const poleGeos = [], headGeos = [], glassGeos = [];
   for (const w of wings) {

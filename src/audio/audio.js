@@ -13,7 +13,7 @@
 //  rises with the pressure on the wall and the tide brings in the drums.
 // ─────────────────────────────────────────────────────────────────────────────
 import { clamp, rand } from '../core/util.js';
-import { makePunch, makeSizzle, makeTick, makeBlastSub, makeProp, makeJet } from './synth.js';
+import { makePunch, makeSizzle, makeTick, makeBlastSub, makeProp, makeJet, makePower } from './synth.js';
 
 // name -> [variants (0 = single file), decode rate]
 const SFX = {
@@ -172,6 +172,7 @@ export class AudioEngine {
     this.hordeAlive = 0;
     this.dawn = 0;        // 0 night .. 1 day
     this.napalmLevel = 0;
+    this.lampPower = 1;   // blackout kills the sodium-lamp hum
     this.night = 1;
     this.tide = false;
     this.lowLife = false;
@@ -311,6 +312,8 @@ export class AudioEngine {
       this.B.blast_sub = [makeBlastSub(ctx)];
       this.B.prop = [makeProp(ctx)];
       this.B.jet = [makeJet(ctx)];
+      this.B.power_down = [makePower(ctx, false)];
+      this.B.power_up = [makePower(ctx, true)];
     } catch (err) { console.warn('[audio] synth', err); }
 
     this.ready = true;
@@ -671,6 +674,41 @@ export class AudioEngine {
     this.play(this.pickVar('boom'), { gain: 0.32, rate: rand(1.7, 2.2), x, z, ref: 50, sos: true, reverb: 0.25, key: 'gsi', max: 7 });
   }
 
+  // ── night events ──────────────────────────────────────────────────────────
+  /** A giant's footfall: felt more than heard. */
+  giantStep(x, z, size = 1) {
+    if (!this.ready) return;
+    const B = this.B;
+    if (B.boom_sub[0]) this.play(B.boom_sub[0], { gain: 0.55 * size, rate: rand(0.5, 0.6), x, z, ref: 70, sos: true, key: 'gstep', max: 3 });
+    this.play(this.pickVar('bodyfall'), { gain: 0.5 * size, rate: rand(0.35, 0.45), x, z, ref: 50, sos: true, reverb: 0.3, key: 'gstep2', max: 3 });
+  }
+
+  giantRoar(x, z, size = 1) {
+    if (!this.ready) return;
+    const r = 1 / Math.sqrt(size);
+    this.play(this.pickVar('brute'), { gain: 1.3, rate: rand(0.42, 0.5) * r, x, z, ref: 120, sos: true, reverb: 0.7, force: true });
+    this.play(this.pickVar('brute'), { gain: 0.9, rate: rand(0.3, 0.36) * r, x, z, ref: 120, sos: true, delay: 0.06, reverb: 0.5, force: true });
+    this.play(this.pickVar('shriek'), { gain: 0.35, rate: rand(0.45, 0.55) * r, x, z, ref: 120, sos: true, delay: 0.1, reverb: 0.6, force: true });
+  }
+
+  /** Concrete and steel giving under a giant's fists. */
+  giantSmash(x, z) {
+    if (!this.ready) return;
+    this.play(this.pickVar('boom'), { gain: 1.0, rate: rand(0.75, 0.85), x, z, ref: 60, reverb: 0.5, force: true });
+    this.play(this.B.latch[0], { gain: 0.8, rate: rand(0.35, 0.45), x, z, ref: 40, reverb: 0.4, force: true });
+    this.play(this.pickVar('gib'), { gain: 0.4, rate: rand(0.5, 0.6), x, z, ref: 40, delay: 0.05, force: true });
+    if (this.B.boom_sub[0]) this.play(this.B.boom_sub[0], { gain: 0.9, rate: 0.7, x, z, ref: 60, force: true });
+    this.duck(0.3, 0.15, 0.5);
+  }
+
+  powerDown() { if (this.B.power_down) this.play(this.B.power_down[0], { gain: 0.55, x: -9, z: 16, ref: 30, reverb: 0.4, force: true }); }
+  powerUp() { if (this.B.power_up) this.play(this.B.power_up[0], { gain: 0.5, x: -9, z: 16, ref: 30, reverb: 0.4, force: true }); }
+
+  /** The rescue party is torn down out in the field. */
+  scream2(x, z) {
+    this.play(this.pickVar('death'), { gain: 0.8, rate: rand(0.95, 1.1), x, z, ref: 40, reverb: 0.5, force: true });
+  }
+
   /** Marker flare popping on the ground. */
   markerIgnite(x, z) {
     this.play(this.B.flare_ignite[0], { gain: 0.6, x, z, ref: 40, reverb: 0.5, force: true });
@@ -697,7 +735,8 @@ export class AudioEngine {
     if (!this.ready || this.voices > this.maxVoices - 10) return;
     if (type === true) type = 2;
     let name = 'groan', rate = rand(0.86, 1.08), gain = 0.4;
-    if (type === 2) { name = 'brute'; rate = rand(0.76, 0.94); gain = 0.6; }
+    if (type === 4) { name = 'brute'; rate = rand(0.4, 0.5); gain = 1.0; }
+    else if (type === 2) { name = 'brute'; rate = rand(0.76, 0.94); gain = 0.6; }
     else if (type === 1 && Math.random() < 0.4) { name = 'shriek'; rate = rand(0.94, 1.12); gain = 0.34; }
     else if (type === 3) { rate = rand(0.68, 0.8); gain = 0.44; }
     this.play(this.pickVar(name), { gain, rate, x, z, ref: 16, reverb: 0.3, key: 'voice', max: 9 });
@@ -853,7 +892,7 @@ export class AudioEngine {
     b.shuffle.set(inPlay ? clamp(p * 1.5, 0, 1) * 0.3 : 0, tc);
     b.fire_roar.set(this.napalmLevel * 0.6, 0.6);
     b.fire_crackle.set(this.napalmLevel * 0.45 + 0.035 * night, 0.8);
-    b.lamp.set(0.05 * clamp(1 - day * 1.7, 0, 1), 1);
+    b.lamp.set(0.05 * clamp(1 - day * 1.7, 0, 1) * this.lampPower, 0.3);
     b.dawn.set(0.3 * day, 2.5);
     b.flies.set(0.1 * day, 3);
     b.radio_static.set(this.ctx.currentTime < this._radioUntil ? 0.03 : 0, 0.08);

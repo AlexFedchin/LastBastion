@@ -70,6 +70,8 @@ export class Environment {
 
     this.lightPools = [];
     this.lampSprites = [];
+    this.power = 1;   // wall lighting (blackout event drops it to 0)
+    this.fogBank = 0; // fog bank event, 0..1
     this.towerHousings = [];
     this.blinkers = [];
     this.flickerWindows = [];
@@ -190,7 +192,9 @@ export class Environment {
     this.terrain.update(time);
     if (this.cityUniforms) { this.cityUniforms.uTime.value = time; this.cityUniforms.uDawn.value = d; }
     if (this.plumeUniforms) { this.plumeUniforms.uTime.value = time; this.plumeUniforms.uDawn.value = d; }
-    if (this.poolUniforms) this.poolUniforms.uScale.value = 1 - d * 0.85;
+    const pw = this.power;
+    if (this.poolUniforms) this.poolUniforms.uScale.value = (1 - d * 0.85) * pw;
+    if (this.lampGlass) this.lampGlass.color.setRGB(5 * pw + 0.05, 2.3 * pw + 0.03, 0.7 * pw + 0.02);
 
     // lightning: a bolt out on the horizon, the cloud deck lights up
     this.nextLightning -= dt;
@@ -271,8 +275,8 @@ export class Environment {
       _dir.subVectors(sl.aim, sl.spot.position).normalize();
       sl.beam.quaternion.setFromUnitVectors(_down, _dir);
       sl.beam.material.uniforms.uTime.value = time;
-      sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d);
-      sl.spot.intensity = 2200 * (1 - d * 0.85);
+      sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d) * this.power;
+      sl.spot.intensity = 2200 * (1 - d * 0.85) * this.power;
       const hs = this.towerHousings[k];
       if (hs) hs.lookAt(sl.aim);
     }
@@ -282,12 +286,14 @@ export class Environment {
     // fog & sky follow the night/dawn blend
     const fc = this.scene.fog.color;
     fc.copy(this.nightFog).lerp(this.dawnFog, d);
+    const bank = d < 0.01 ? this.fogBank : 0;
+    if (bank > 0.001) fc.multiplyScalar(1 + bank * 1.5);
     if (this.flash > 0) fc.offsetHSL(0, 0, 0).add(_flashCol.setRGB(0.012, 0.014, 0.02).multiplyScalar(su.uFlash.value));
     this.scene.fog.near = time;
-    this.scene.fog.far = d;
+    this.scene.fog.far = bank > 0.001 ? 2 + bank : d;
     fogUniforms.lbFogColor.value.copy(fc);
     fogUniforms.lbTime.value = time;
-    fogUniforms.lbDawn.value = d;
+    fogUniforms.lbDawn.value = this.scene.fog.far;
     su.uHorizon.value.copy(fc);
     su.uZenith.value.setRGB(lerp(0.0025, 0.05, d), lerp(0.003, 0.055, d), lerp(0.0055, 0.068, d));
     su.uGlowAmt.value = lerp(1, 0.35, d);
@@ -296,7 +302,7 @@ export class Environment {
     this.moon.color.setRGB(lerp(0.56, 0.75, d), lerp(0.64, 0.74, d), lerp(0.78, 0.72, d));
     this.rim.intensity = lerp(1.0, 0.25, d);
     this.rainUniforms.uIntensity.value = lerp(0.32, 0.18, d);
-    for (const s of this.lampSprites) s.visible = d < 0.6;
+    for (const s of this.lampSprites) s.visible = d < 0.6 && this.power > 0.5;
     void audio;
   }
 

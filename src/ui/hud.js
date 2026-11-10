@@ -1,6 +1,7 @@
 // In-game HUD. Plain DOM, updated only when values change.
 import { WORLD, wallZ, sectionCenterX, ABILITY } from '../config.js';
 import { formatInt, formatTime } from '../core/util.js';
+import * as THREE from 'three';
 
 const $ = (id) => document.getElementById(id);
 const LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
@@ -19,7 +20,11 @@ export class HUD {
       announce: $('announce'), annBig: $('announce-big'), annSmall: $('announce-small'),
       alerts: $('alerts'), fps: $('fps'), hint: $('hint'), wire: $('h-wire'),
       edgeL: $('edge-l'), edgeR: $('edge-r'),
+      obj: $('h-obj'), objTitle: $('h-obj-title'), objText: $('h-obj-text'), objBar: $('h-obj-bar'),
+      boss: $('h-boss'), bossName: $('h-boss-name'), bossBar: $('h-boss-bar'), markers: $('h-markers'),
     };
+    this.markerEls = [];
+    this._mv = new THREE.Vector3();
     this.cache = {};
     this.buildWallMap();
     this.radioQueue = [];
@@ -100,7 +105,45 @@ export class HUD {
 
   hint(text) { this.el.hint.textContent = text; this.el.hint.classList.toggle('show', !!text); }
 
+  /** Night events: objective panel, boss bar and world markers. */
+  updateEvents(g) {
+    const el = this.el, ev = g.events;
+    const ob = ev && g.inPlay() ? ev.objective() : null;
+    this.set('objc', el.obj, 'objective' + (ob ? ' show ' + (ob.cls || '') : ''), 'className');
+    if (ob) {
+      this.set('objt', el.objTitle, ob.title);
+      this.set('objx', el.objText, ob.text);
+      this.set('objb', el.objBar.style, `${clamp01(ob.progress) * 100}%`, 'width');
+    }
+    const boss = ev && g.inPlay() ? ev.boss() : null;
+    this.set('bossc', el.boss, boss ? 'boss show' : 'boss', 'className');
+    if (boss) {
+      this.set('bossn', el.bossName, boss.name);
+      this.set('bossb', el.bossBar.style, `${clamp01(boss.hp) * 100}%`, 'width');
+    }
+    const mk = ev && g.inPlay() ? ev.markers() : [];
+    const W = window.innerWidth, H = window.innerHeight, v = this._mv;
+    while (this.markerEls.length < mk.length) {
+      const d = document.createElement('div');
+      d.className = 'mk';
+      el.markers.appendChild(d);
+      this.markerEls.push({ el: d, label: null, cls: null });
+    }
+    this.markerEls.forEach((m, k) => {
+      const t = mk[k];
+      if (!t) { if (m.el.style.display !== 'none') m.el.style.display = 'none'; return; }
+      v.set(t.x, t.y, t.z).project(g.camera);
+      if (v.z > 1 || v.x < -1.05 || v.x > 1.05 || v.y < -1.05 || v.y > 1.05) { m.el.style.display = 'none'; return; }
+      m.el.style.display = '';
+      m.el.style.left = `${(v.x * 0.5 + 0.5) * W}px`;
+      m.el.style.top = `${(-v.y * 0.5 + 0.5) * H}px`;
+      if (m.label !== t.label) { m.label = t.label; m.el.textContent = t.label; }
+      if (m.cls !== t.cls) { m.cls = t.cls; m.el.className = 'mk ' + (t.cls || ''); }
+    });
+  }
+
   update(dt, g) {
+    this.updateEvents(g);
     const { run, director, player, arsenal, horde, stats } = g;
     const el = this.el;
     const isDawn = g.state === 'dawn';
@@ -246,3 +289,5 @@ export class HUD {
 
   fps(v) { this.el.fps.textContent = v; }
 }
+
+function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }

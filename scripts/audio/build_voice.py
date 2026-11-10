@@ -49,6 +49,10 @@ CAST = {
     'BATTERY': dict(voice='am_eric', speed=1.1, radio='field'),
     'SPECTRE 2-1': dict(voice='am_michael', speed=1.02, radio='aircraft'),
     'HAMMER 1-1': dict(voice='am_adam', speed=1.06, radio='jet'),
+    'SPECTRE 2-2': dict(voice={'am_eric': 0.5, 'am_michael': 0.5}, speed=1.0, radio='aircraft'),
+    'LT. HOLLIS': dict(voice='am_echo', speed=1.12, radio='field'),
+    'REACH 3-1': dict(voice='bm_lewis', speed=1.05, radio='aircraft'),
+    'SURVIVOR': dict(voice='af_nicole', speed=1.05, radio='handheld'),  # the overpass woman, close now
 }
 # Kovac shouting over the gun (BARKS): faster, harder
 SHOUT_SPEED = 1.07

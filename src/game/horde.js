@@ -319,6 +319,7 @@ export class Horde {
     this.onKill = null;      // (type, cause, x, y, z, headshot)
     this.onBreach = null;    // (section, x, y, z)
     this.onBloaterWall = null;
+    this.onGiantWall = null;  // (i, section, x, z, dt)
     this.ctx = { fireAt: null, wireAt: null, flares: [] };
   }
 
@@ -375,9 +376,25 @@ export class Horde {
     let c = SHIRTS[(Math.random() * SHIRTS.length) | 0];
     if (type === ZT.BRUTE) c = [0.09, 0.1, 0.07];
     if (type === ZT.BLOATER) c = [0.2, 0.22, 0.15];
+    if (type === ZT.GIANT) c = [0.06, 0.05, 0.045];
     const v = rand(0.7, 1.25);
     this.tr[i] = c[0] * v; this.tg[i] = c[1] * v; this.tb[i] = c[2] * v;
     return i;
+  }
+
+  /** Send a zombie back to a lane on the wall (after an event pulled it elsewhere). */
+  resetLane(i, side = 0) {
+    const x = this.x[i];
+    const s = side || (Math.random() < 0.72 ? Math.sign(x || 1) : -Math.sign(x || 1));
+    const lx = s * rand(WORLD.GATE_HALF + 2.5, WORLD.WING_END - 3);
+    this.tgtX[i] = lx;
+    this.tgtZ[i] = wallZ(lx) - 0.2;
+  }
+
+  /** Index of a zombie by id, or -1 (indices move every frame as the dead are compacted). */
+  indexOf(id) {
+    for (let i = 0; i < this.n; i++) if (this.id[i] === id && !this.dead[i]) return i;
+    return -1;
   }
 
   // ── damage ───────────────────────────────────────────────────────────────
@@ -385,6 +402,7 @@ export class Horde {
   damage(i, amount, cause, dx = 0, dy = 0, dz = 0, headshot = false) {
     if (this.dead[i]) return false;
     if (this.exposed[i]) amount *= 1.25;
+    if (this.type[i] === ZT.GIANT && cause === 'gunship') amount *= 0.5; // thick hide: the gunship can't do it alone
     this.hp[i] -= amount;
     this.flash[i] = 1;
     if (this.hp[i] <= 0) {
@@ -417,12 +435,12 @@ export class Horde {
       this.pending.push({ x, y: y + 0.8, z, r: 5.2, dmg: 150, cause: 'bloater', t: 0.08 });
       return;
     }
-    if (explosive && (overkill > this.maxHp[i] * 1.2 || Math.random() < 0.28)) {
+    if (explosive && type !== ZT.GIANT && (overkill > this.maxHp[i] * 1.2 || Math.random() < 0.28)) {
       this.fx.gibBurst(x, y, z, s, dx, dy, dz, type === ZT.BRUTE ? 14 : 8);
       return;
     }
     // a .50 round sometimes just takes a body apart
-    if (cause === 'hmg' && type !== ZT.BRUTE && !headshot && Math.random() < 0.09) {
+    if (cause === 'hmg' && type !== ZT.BRUTE && type !== ZT.GIANT && !headshot && Math.random() < 0.09) {
       this.fx.gibBurst(x, y, z, s, dx * 9, 3, dz * 9, 6);
       return;
     }
@@ -468,7 +486,7 @@ export class Horde {
       if (killed) kills++;
       else {
         // stagger survivors
-        const kb = (1 - d / radius) * 0.9 * push;
+        const kb = this.type[i] === ZT.GIANT ? 0 : (1 - d / radius) * 0.9 * push;
         this.x[i] += ddx / hd * kb; this.z[i] += ddz / hd * kb;
         if (opts.ignite) this.ignite(i, 4, 30);
       }
@@ -657,7 +675,8 @@ export class Horde {
       // separation (uses last frame's grid)
       const sec = sectionOf(x);
       const zone = sec >= 0 ? PILE.ZONE_BASE + this.pileH[sec] * PILE.ZONE_PER_M : 0;
-      const inPile = sec >= 0 && dist < zone;
+      const giant = type === ZT.GIANT;
+      const inPile = !giant && sec >= 0 && dist < zone;
       const ri = this.radius[i] * (inPile ? 0.62 : 1);
       let pxs = 0, pzs = 0, checks = 0;
       const gx = Math.floor((x - GX0) / CELL), gz = Math.floor((z - GZ0) / CELL);
@@ -695,6 +714,9 @@ export class Horde {
         dist = minD;
       }
       X[i] = x; Z[i] = z;
+
+      // a giant at the wall beats on it (the event drives what that does)
+      if (giant && dist < 1.4 * this.scale[i] * 0.5 && this.onGiantWall) this.onGiantWall(i, sec, x, z, dt);
 
       // bloater reaching the wall detonates
       if (type === ZT.BLOATER && dist < 0.9 && sec >= 0) {
@@ -734,7 +756,7 @@ export class Horde {
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       this.yaw[i] += dy * (1 - Math.exp(-6 * dt));
 
-      const wantAtk = (dist < 1.6 + this.pileH[sec >= 0 ? sec : 0] * 0.12 || Y[i] > 1.0) ? 1 : 0;
+      const wantAtk = (dist < 1.6 + this.pileH[sec >= 0 ? sec : 0] * 0.12 || Y[i] > 1.0 || (giant && dist < 2.8)) ? 1 : 0;
       this.atk[i] += (wantAtk - this.atk[i]) * (1 - Math.exp(-5 * dt));
     }
 
@@ -795,7 +817,8 @@ export class Horde {
       const o = i * 16;
       const x = this.x[i], z = this.z[i];
       const y = this.y[i] + groundH(x, z);
-      const wide = this.type[i] === ZT.BLOATER ? 1.25 : (this.type[i] === ZT.BRUTE ? 1.12 : 1);
+      const ty = this.type[i];
+      const wide = ty === ZT.BLOATER ? 1.25 : (ty === ZT.BRUTE ? 1.12 : (ty === ZT.GIANT ? 1.18 : 1));
       M[o] = c * sc * wide; M[o + 1] = 0; M[o + 2] = -s * sc * wide; M[o + 3] = 0;
       M[o + 4] = 0; M[o + 5] = sc; M[o + 6] = 0; M[o + 7] = 0;
       M[o + 8] = s * sc * wide; M[o + 9] = 0; M[o + 10] = c * sc * wide; M[o + 11] = 0;
