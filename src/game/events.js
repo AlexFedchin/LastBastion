@@ -194,6 +194,7 @@ class Escort {
   finish() {
     const { E, P } = this, g = E.g;
     for (let i = 0; i < g.horde.n; i++) if (this.track.has(g.horde.id[i])) g.horde.resetLane(i);
+    E.report(this.kind, 'end', { saved: this.saved, lost: this.lost, of: this.units.length, seconds: Math.round(this.t) });
     if (this.saved === this.units.length) E.say(this.kind, 'saved', true);
     else if (this.saved > 0) { E.say(this.kind, 'some', true); if (this.kind === 'patrol') E.say(this.kind, 'saved'); }
     else E.say(this.kind, 'none', true);
@@ -325,6 +326,7 @@ class SupplyDrop {
 
   finish(ok) {
     const E = this.E, g = E.g, h = g.horde, c = this.crate, P = this.P;
+    E.report('drop', 'end', { recovered: ok, integrity: Math.max(0, Math.round(this.integrity)), pulled: this.track.size });
     for (let i = 0; i < h.n; i++) if (this.track.has(h.id[i])) h.resetLane(i);
     E.crate.visible = false; E.chute.visible = false;
     if (ok) {
@@ -410,7 +412,7 @@ class Giant {
     g.audio.giantSmash(x, z);
     g.player.addTrauma(0.4);
     g.hud.alert(`${['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'][sec]} — THE WALL IS BREAKING`, 'red');
-    if (this.smashes % 2 === 0) g.onBreach(sec, x, WORLD.WALL_H, z);
+    if (this.smashes % 2 === 0) g.onBreach(sec, x, WORLD.WALL_H, z, this.kind);
   }
 
   update(dt) {
@@ -435,6 +437,7 @@ class Giant {
       // dead
       this.downT = 0;
       g.arsenal.air.priority = null;
+      E.report(this.kind, 'end', { killed: true, seconds: Math.round(this.t), smashes: this.smashes, reachedWall: this.wallSaid });
       E.say(this.kind, 'down', true);
       g.hud.carnage(`${this.P.name} DOWN`, 'big red');
       g.slowmo = Math.max(g.slowmo, 0.9); g.radial = 1;
@@ -511,7 +514,8 @@ class Wave {
     let alive = 0;
     for (let i = 0; i < h.n; i++) if (!h.dead[i] && this.ids.has(h.id[i])) alive++;
     this.alive = alive;
-    return alive === 0 || this.t > 120;
+    if (alive === 0 || this.t > 120) { this.E.report(this.kind, 'end', { total: this.total, left: alive, seconds: Math.round(this.t) }); return true; }
+    return false;
   }
 
   end() {}
@@ -533,7 +537,7 @@ class FogBank {
     const air = g.arsenal.air;
     if (!this.saidSpectre && this.t > 7 && air.gs.active) { this.saidSpectre = true; this.E.say('fog', 'spectre'); }
     air.holdFire = this.t > 7 && this.t < P.duration - 6;
-    if (this.t >= P.duration) { this.E.say('fog', 'clear', true); return true; }
+    if (this.t >= P.duration) { this.E.say('fog', 'clear', true); this.E.report('fog', 'end'); return true; }
     return false;
   }
   end() { this.E.g.env.fogBank = 0; this.E.g.arsenal.air.holdFire = false; }
@@ -567,6 +571,7 @@ class Blackout {
     } else {
       this.power(1);
       this.E.say('blackout', 'restored', true);
+      this.E.report('blackout', 'end');
       return true;
     }
     if (!this.saidSpectre && this.t > 4 && g.arsenal.air.gs.active) { this.saidSpectre = true; this.E.say('blackout', 'spectre'); }
@@ -588,6 +593,7 @@ class GunshipDown {
       g.audio.bigBlast(x, z);
       g.hud.announce(`${CALL.spectre} IS DOWN`, '', 4, 'red');
       this.done = true;
+      this.E.report('gunshipDown', 'end');
       this.E.say('gunshipDown', 'down');
     };
   }
@@ -661,6 +667,7 @@ export class NightEvents {
     e.kind = e.kind || kind;
     e.start();
     this.active.push(e);
+    this.report(kind, 'start');
     return e;
   }
 
@@ -688,6 +695,9 @@ export class NightEvents {
       if (e.done || e.update(dt)) { e.end(); this.active.splice(k, 1); k--; }
     }
   }
+
+  /** Play-test telemetry for an event (start / outcome). */
+  report(kind, phase, data = {}) { if (this.g.telemetry) this.g.telemetry.event(kind, phase, data); }
 
   /** Radio a line from EVENT_LINES. prio: jump the queue (it's happening now). */
   say(kind, moment, prio = false) {

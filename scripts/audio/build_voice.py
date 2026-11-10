@@ -78,6 +78,10 @@ SPOKEN = [
     (r'\bGBU\b', 'G.B.U.'),
     (r'\bklicks\b', 'clicks'),
     (r'\s*—\s*', ', '),
+    # single key letters read as words ('Q' -> 'she', 'E' -> 'he'): name the key
+    (r'\bQ puts\b', 'The Q key puts'),
+    (r'\bE lights\b', 'The E key lights'),
+    (r"that's T\b", "that's the T key"),
 ]
 
 

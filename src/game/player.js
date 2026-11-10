@@ -299,6 +299,7 @@ export class Player {
     if (controlsActive && input.hit('KeyR') && this.swapT <= 0 && this.heat > 0.15) {
       this.swapT = stats.swapTime;
       this.audio.barrelSwap(stats.swapTime);
+      if (this.onSwap) this.onSwap(this.heat);
     }
     if (this.overheatT > 0) this.overheatT -= dt;
 

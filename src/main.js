@@ -5,6 +5,7 @@ import * as THREE from 'three';
 import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
   nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, ABILITY, CALL, COMMS,
+  UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked,
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
@@ -17,6 +18,7 @@ import { Player } from './game/player.js';
 import { Arsenal } from './game/arsenal.js';
 import { Director } from './game/director.js';
 import { NightEvents } from './game/events.js';
+import { Telemetry } from './core/telemetry.js';
 import { Post } from './render/post.js';
 import { AudioEngine } from './audio/audio.js';
 import { HUD } from './ui/hud.js';
@@ -94,6 +96,7 @@ class Game {
     this.arsenal = new Arsenal(this.scene, this.fx, this.audio, this.horde, this.env);
     this.director = new Director(this.horde);
     this.events = new NightEvents(this);
+    this.telemetry = new Telemetry(this);
     await step('loading the belt…');
     this.post = new Post(renderer, this.scene, this.camera, this.quality);
     this.hud = new HUD();
@@ -124,6 +127,9 @@ class Game {
     this.last = performance.now();
     requestAnimationFrame((t) => this.loop(t));
 
+    this.telemetry.session();
+    // closing the window mid-night still leaves a summary of it in the log
+    window.addEventListener('beforeunload', () => { if (this.telemetry.n) this.telemetry.endNight('quit'); });
     window.__LB = this; // handy from devtools
     if (TEST) this.setupTestHooks();
   }
@@ -146,10 +152,11 @@ class Game {
   wireEvents() {
     const h = this.horde;
     h.onKill = (type, cause, x, y, z, headshot) => this.onKill(type, cause, x, y, z, headshot);
-    h.onBreach = (sec, x, y, z) => this.onBreach(sec, x, y, z);
+    h.onBreach = (sec, x, y, z) => this.onBreach(sec, x, y, z, 'climb');
     h.onBloaterWall = (sec, x, z) => this.onBloaterWall(sec, x, z);
     this.player.onHit = (killed, head) => { this.hud.hitmarker(killed, head); };
-    this.player.onOverheat = () => { this.bark('overheat', 0.5); };
+    this.player.onOverheat = () => { this.bark('overheat', 0.5); this.telemetry.overheat(); };
+    this.player.onSwap = (heat) => this.telemetry.swap(heat);
     this.arsenal.onExplosionKills = (kills, x, z, cause) => this.onExplosionKills(kills, x, z, cause);
     this.arsenal.air.onRadio = (who, text) => { if (this.inPlay()) this.hud.radio(who, text, true); };
     this.arsenal.onShake = (scale, x, z) => {
@@ -232,6 +239,7 @@ class Game {
       case 'quit': window.bastion?.quit(); break;
       case 'resume': this.resume(); break;
       case 'abandon': this.abandonNight(); break;
+      case 'open-logs': window.bastion?.openTelemetry?.(); break;
       case 'buy': this.buyUpgrade(el.dataset.id); break;
       case 'buy-mines': this.buyMines(); break;
       case 'begin': this.beginNightFromShop(); break;
@@ -312,6 +320,13 @@ class Game {
     const lines = (run.night <= FINAL_NIGHT && !run.endless) ? RADIO[run.night] : [pick(RADIO.endless), pick(RADIO.endless)];
     this.events.start(run.night, run.endless || run.night > FINAL_NIGHT);
     this.radioScript = (lines || []).map((l, i) => ({ at: i === 0 ? 4 : this.plan.duration * 0.42, who: l[0], text: l[1], done: false }));
+    // new tools tonight: told over the radio, flagged on the HUD when you take the gun
+    this.newUnlocks = Object.keys(UNLOCKS).filter((k) => UNLOCKS[k] === run.night && !run.endless);
+    (UNLOCK_LINES[run.night] && !run.endless ? UNLOCK_LINES[run.night] : []).forEach((l, i) => this.radioScript.push({ at: 10 + i * 7, who: l[0], text: l[1], done: false }));
+    this.radioScript.sort((a, b) => a.at - b.at);
+    if (!isUnlocked('flares', run.night)) this.arsenal.flaresLeft = 0;
+    if (!isUnlocked('grenades', run.night)) this.arsenal.grenadesLeft = 0;
+    this.telemetry.startNight(run, this.plan, this.stats, Object.keys(UNLOCKS).filter((k) => isUnlocked(k, run.night)));
     this.audio.night = run.night;
     this.audio.setMusicMode('night');
     // cinematic camera move into the gun
@@ -330,6 +345,8 @@ class Game {
     if (this.state !== 'night') return;
     this.state = 'paused';
     this.pausedAt = performance.now();
+    const tn = document.getElementById('tele-note');
+    if (tn) tn.textContent = this.telemetry.path ? `Play-test log: ${this.telemetry.path}` : '';
     this.screens.show('pause');
     this.audio.setMuffle(0.7);
   }
@@ -344,6 +361,7 @@ class Game {
 
   abandonNight() {
     // retreat to the last dawn save
+    this.telemetry.endNight('abandoned');
     this.audio.setMuffle(0);
     this.arsenal.endNight();
     this.enterMenu();
@@ -357,6 +375,7 @@ class Game {
     const run = this.run;
     run.kills++;
     this.ns.kills++;
+    this.telemetry.kill(type, cause, headshot);
     if (headshot) { this.ns.headshots++; run.totals.headshots++; }
     const sup = ZOMBIE_TYPES[type].supplies * this.diff.supplyMul * this.plan.supplyMul;
     run.supplies += sup;
@@ -383,7 +402,8 @@ class Game {
     void cause;
   }
 
-  onBreach(sec, x, y, z) {
+  onBreach(sec, x, y, z, cause = 'climb') {
+    if (this.inPlay()) this.telemetry.breach(sec, cause);
     if (this.state === 'menu') return;
     if (!this.inPlay()) return;
     const run = this.run;
@@ -457,6 +477,7 @@ class Game {
     run.minesOwned = this.arsenal.minesOwned;
     run.atShop = true;
     writeSave(run);
+    this.telemetry.endNight('survived');
     this.hud.announce('DAWN', `NIGHT ${String(survived).padStart(2, '0')} SURVIVED · ${run.survivors} ALIVE`, 5);
     this.hud.radio(CALL.kovac, pick(BARKS.dawn), true);
     this.audio.setMusicMode('dawn');
@@ -482,6 +503,7 @@ class Game {
     if (run.supplies < cost) return;
     run.supplies -= cost;
     run.upgrades[id] = rank + 1;
+    this.telemetry.purchase(id, rank + 1, cost, run.supplies);
     this.audio.uiBuy();
     this.screens.buildShop(run, this.report);
   }
@@ -491,6 +513,7 @@ class Game {
     if (run.supplies < CLAYMORE.cost || run.minesOwned + CLAYMORE.perBuy > CLAYMORE.max) return;
     run.supplies -= CLAYMORE.cost;
     run.minesOwned += CLAYMORE.perBuy;
+    this.telemetry.purchase('claymores', run.minesOwned, CLAYMORE.cost, run.supplies);
     this.audio.uiBuy();
     this.screens.buildShop(run, this.report);
   }
@@ -504,6 +527,7 @@ class Game {
   fall() {
     if (this.state === 'fallen') return;
     document.getElementById('scope').classList.remove('on');
+    this.telemetry.endNight('fallen');
     this.state = 'fallen';
     this.stateT = 0;
     this.events.reset();
@@ -662,7 +686,15 @@ class Game {
       this.camera.rotation.setFromQuaternion(this.camera.quaternion, 'YXZ');
       this.letterboxTarget = 0;
       if (!this.input.locked && !TEST) this.screens.show('click');
-      this.hud.hint('LMB FIRE · RMB OPTICS · Q ARTILLERY · E NAPALM · F FLARE · T BOMBER MARKER · G GRENADES · R SWAP BARREL');
+      const n = this.run.night, keys = ['LMB FIRE', 'RMB OPTICS'];
+      if (isUnlocked('artillery', n)) keys.push('Q ARTILLERY');
+      if (isUnlocked('napalm', n)) keys.push('E NAPALM');
+      if (isUnlocked('flares', n)) keys.push('F FLARE');
+      if (isUnlocked('bomber', n)) keys.push('T BOMBER MARKER');
+      if (isUnlocked('grenades', n)) keys.push('G GRENADES');
+      keys.push('R SWAP BARREL');
+      this.hud.hint(keys.join(' · '));
+      for (const k of this.newUnlocks || []) this.hud.alert(`NEW — ${UNLOCK_INFO[k]}`);
       setTimeout(() => this.hud.hint(''), 9000);
     }
   }
@@ -672,33 +704,46 @@ class Game {
     const active = input.locked || TEST;
     const run = this.run;
 
-    // abilities
+    // abilities (each arrives on its own night: see UNLOCKS)
+    const can = (k) => isUnlocked(k, run.night);
+    const T = this.telemetry;
     if (active) {
-      if (input.hit('KeyQ')) {
+      if (input.hit('KeyQ') && can('artillery')) {
         const p = this.player.aimPoint(330);
-        if (this.arsenal.callArtillery(p)) {
+        const ok = this.arsenal.callArtillery(p);
+        T.ability('artillery', ok);
+        if (ok) {
           this.hud.alert(`FIRE MISSION — ${this.stats.artyShells} ROUNDS — SPLASH IN 3`);
           this.hud.radio(CALL.battery, COMMS.battery[this.stats.artyShells] || `Shot, over. ${this.stats.artyShells} rounds HE, splash in three.`, true);
         } else this.hud.alert(`BATTERY RELOADING — ${Math.ceil(this.arsenal.artyCd)}s`);
       }
-      if (input.hit('KeyE')) {
-        if (this.arsenal.igniteNapalm()) this.hud.alert('NAPALM TRENCH LIT');
+      if (input.hit('KeyE') && can('napalm')) {
+        const ok = this.arsenal.igniteNapalm();
+        T.ability('napalm', ok);
+        if (ok) this.hud.alert('NAPALM TRENCH LIT');
         else this.hud.alert(this.arsenal.napalmT > 0 ? 'TRENCH ALREADY BURNING' : `TRENCH REFILLING — ${Math.ceil(this.arsenal.napalmCd)}s`);
       }
-      if (input.hit('KeyF')) {
-        if (!this.arsenal.launchFlare(this.player.aimPoint(240))) this.hud.alert('NO FLARES LEFT');
+      if (input.hit('KeyF') && can('flares')) {
+        const ok = this.arsenal.launchFlare(this.player.aimPoint(240));
+        T.ability('flare', ok);
+        if (!ok) this.hud.alert('NO FLARES LEFT');
       }
-      if (input.hit('KeyT')) {
+      if (input.hit('KeyT') && can('bomber')) {
         const air = this.arsenal.air;
-        if (air.throwMarker(this.player.aimPoint(ABILITY.bomber.maxRange))) {
+        const ok = air.throwMarker(this.player.aimPoint(ABILITY.bomber.maxRange));
+        T.ability('bomber', ok);
+        if (ok) {
           this.hud.alert('MARKER OUT — BOMBER INBOUND');
           this.hud.radio(CALL.kovac, COMMS.markerOut, true);
         } else this.hud.alert(air.bomberBusy ? 'BOMBER ALREADY ON ITS RUN' : `BOMBER RE-ARMING — ${Math.ceil(air.bomberCd)}s`);
       }
-      if (input.hit('KeyG')) {
-        if (!this.arsenal.throwGrenades(this.player.aimPoint(ABILITY.grenade.maxRange))) this.hud.alert('NO GRENADES LEFT');
+      if (input.hit('KeyG') && can('grenades')) {
+        const ok = this.arsenal.throwGrenades(this.player.aimPoint(ABILITY.grenade.maxRange));
+        T.ability('grenades', ok);
+        if (!ok) this.hud.alert('NO GRENADES LEFT');
       }
-      if (input.hit('KeyB')) {
+      if (input.hit('KeyB') && can('dangerClose')) {
+        T.ability('dangerClose', !this.arsenal.dangerUsed && run.survivors > ABILITY.dangerClose.cost, { survivors: run.survivors });
         if (this.arsenal.dangerUsed) this.hud.alert('DANGER CLOSE ALREADY CALLED');
         else if (run.survivors <= ABILITY.dangerClose.cost) this.hud.alert('NOT ENOUGH MEN LEFT TO PAY FOR IT', 'red');
         else if (this.arsenal.dangerClose()) {
@@ -734,10 +779,10 @@ class Game {
     }
 
     // pile alerts
-    let maxP = 0;
+    let maxP = 0, maxS = -1;
     for (let s = 0; s < 10; s++) {
       const p = this.horde.pressure(s);
-      maxP = Math.max(maxP, p);
+      if (p > maxP) { maxP = p; maxS = s; }
       this.alertCd[s] = Math.max(0, this.alertCd[s] - rdt);
       if (p > 0.62 && this.alertCd[s] <= 0) {
         this.alertCd[s] = 9;
@@ -747,6 +792,7 @@ class Game {
       }
     }
     this.audio.intensity = clamp(this.horde.alive / 600 + maxP * 0.7, 0, 1);
+    this.telemetry.frame(rdt, maxP, maxS);
     this.audio.pressure = maxP;
     this.audio.lowLife = this.run.survivors <= 5;
     this.groans(dt);

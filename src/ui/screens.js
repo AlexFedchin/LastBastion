@@ -1,5 +1,5 @@
 // Menus, settings, the dawn resupply shop and the end screens.
-import { DIFFICULTY, UPGRADES, UPGRADE_GROUPS, CLAYMORE, FINAL_NIGHT } from '../config.js';
+import { DIFFICULTY, UPGRADES, UPGRADE_GROUPS, CLAYMORE, FINAL_NIGHT, isUnlocked } from '../config.js';
 import { QUALITY } from '../core/storage.js';
 import { formatInt } from '../core/util.js';
 
@@ -131,9 +131,14 @@ export class Screens {
     // upgrades
     const wrap = $('shop-upgrades');
     let html = '';
+    // only what's in play by the coming night (see UNLOCKS)
+    const avail = (u) => !u.unlock || isUnlocked(u.unlock, n);
     for (const grp of UPGRADE_GROUPS) {
+      const items = UPGRADES.filter((x) => x.group === grp.id && avail(x));
+      const mines = grp.id === 'support' && isUnlocked('claymores', n);
+      if (!items.length && !mines) continue;
       html += `<div class="ugroup"><h3>${grp.title}</h3><div class="gsub">${grp.sub}</div>`;
-      for (const u of UPGRADES.filter((x) => x.group === grp.id)) {
+      for (const u of items) {
         const rank = run.upgrades[u.id] || 0;
         const max = u.costs.length;
         const cost = rank < max ? u.costs[rank] : null;
@@ -143,7 +148,7 @@ export class Screens {
           : `<button class="buy" data-act="buy" data-id="${u.id}" ${run.supplies < cost ? 'disabled' : ''}>${formatInt(cost)}</button>`;
         html += `<div class="card"><div class="nm">${u.name}</div>${btn}<div class="ds">${u.desc}</div><div class="pips">${pips}</div></div>`;
       }
-      if (grp.id === 'support') {
+      if (mines) {
         const canBuy = run.minesOwned + CLAYMORE.perBuy <= CLAYMORE.max;
         html += `<div class="card"><div class="nm">CLAYMORES ×${CLAYMORE.perBuy}</div>
           <button class="buy" data-act="buy-mines" ${!canBuy || run.supplies < CLAYMORE.cost ? 'disabled' : ''}>${CLAYMORE.cost}</button>

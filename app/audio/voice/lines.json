@@ -27,6 +27,10 @@
   "dur": 6.621,
   "file": "command_6bca788847.ogg"
  },
+ "COMMAND|Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.": {
+  "dur": 8.595,
+  "file": "command_69313163d7.ogg"
+ },
  "COMMAND|Bastion-7, airdrop of fuel and ammunition inbound at dawn. Mark your drop zone.": {
   "dur": 6.594,
   "file": "command_65935c0edd.ogg"
@@ -42,6 +46,10 @@
  "COMMAND|Bastion-7... relief column has been... (static) ...rerouted. Hold position.": {
   "dur": 7.605,
   "file": "command_b157efab05.ogg"
+ },
+ "HAMMER 1-1|Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it — that's T — and keep your heads down.": {
+  "dur": 7.03,
+  "file": "hammer_1_1_240d9b6329.ogg"
  },
  "HAMMER 1-1|Bomb impact. Hammer one-one off target, re-arming.": {
   "dur": 3.243,
@@ -159,6 +167,14 @@
   "dur": 1.524,
   "file": "sgt_kovac_87c9fb5671.ogg"
  },
+ "SGT. KOVAC|Engineers filled the trench out front with napalm. E lights it — it burns right along the wall base. And there's a crate of grenades at your feet. G, for anything climbing.": {
+  "dur": 10.356,
+  "file": "sgt_kovac_d923206470.ogg"
+ },
+ "SGT. KOVAC|Flares came up with the shells. F puts one over the field — anything in the light goes down easier.": {
+  "dur": 5.847,
+  "file": "sgt_kovac_fe4d70ee82.ogg"
+ },
  "SGT. KOVAC|Fog's lifting. Back to work.": {
   "dur": 2.074,
   "file": "sgt_kovac_d9e75c0ba8.ogg"
@@ -206,6 +222,10 @@
  "SGT. KOVAC|Keep it up!": {
   "dur": 1.154,
   "file": "sgt_kovac_0f3cf8545b.ogg"
+ },
+ "SGT. KOVAC|Listen. If it all goes wrong, B brings the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.": {
+  "dur": 8.242,
+  "file": "sgt_kovac_718e1cba09.ogg"
  },
  "SGT. KOVAC|Look at them burn!": {
   "dur": 1.334,

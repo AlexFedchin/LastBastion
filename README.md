@@ -92,6 +92,12 @@ Locally on Windows: `npm run dist:win` (output in `release/`).
 | B | **Danger close** — carpet the wall line. Costs 3 survivors. Once per night. |
 | Esc | Pause |
 
+Not everything is there on night 1. Night 1 is the fifty and two crewed M240s on
+the wall; the rest arrives over the radio: napalm, grenades and claymores on
+night 2, the 105 mm battery, flares, the mortar pit and Spectre on night 3, the
+bomber on night 4, danger close on night 5. The dawn resupply only offers what's
+in play by the coming night. Schedule: `UNLOCKS` in `src/config.js`.
+
 **The pile.** Zombies that reach the wall press against it and climb on each
 other. Each wall section (L1–L5, R1–R5, painted on the wall and shown on the
 *Wall Pressure* map) builds a pile. When a pile reaches the top of the wall,
@@ -202,6 +208,24 @@ a different set per speaker (handheld on the wall, field radio, long-range HF fr
 Command, a dying civilian set, aircrew over their engines). Casting and radio profiles
 are at the top of the script. Add or change a line in `config.js`, rerun the script, and
 the game picks it up; a line without a take still shows on the HUD, just silently.
+
+## Play-test logs
+
+Every session writes a log (one JSON object per line) to
+
+| OS | Folder |
+|---|---|
+| Windows | `%APPDATA%\Last Bastion\telemetry\` |
+| Linux | `~/.config/Last Bastion/telemetry/` |
+| macOS | `~/Library/Application Support/Last Bastion/telemetry/` |
+
+*Pause ▸ Open play-test logs* opens the folder. Each night gets a `night_start`,
+a `sample` every 10 s (horde, wall pressure, survivors, fps), every ability use,
+breach, event and purchase, and a `night_summary`: kills by source (your gun /
+what you called in / autonomous support / chain reactions), accuracy, heat,
+breaches by cause and section, how close the wall came to falling, abilities,
+event outcomes and frame times. Nothing leaves the machine. See
+`src/core/telemetry.js`.
 
 ## Troubleshooting
 

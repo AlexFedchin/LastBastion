@@ -3,7 +3,7 @@
 // the crowds with its 25 mm, 40 mm and 105 mm guns.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { WORLD, ABILITY, GUNSHIP, wallZ, wallDist, WING_COS, CALL, COMMS } from '../config.js';
+import { WORLD, ABILITY, GUNSHIP, wallZ, wallDist, WING_COS, CALL, COMMS, isUnlocked } from '../config.js';
 import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
 import { groundH } from '../world/terrain.js';
@@ -195,6 +195,8 @@ export class AirSupport {
     g.introDone = menu; g.radioCd = 30;
     g.theta = R() * Math.PI * 2;
     g.group.visible = true;
+    // Spectre isn't on station until it's been introduced (night 3)
+    if (!menu && !isUnlocked('gunship', night)) this.hide();
   }
 
   endNight() {
@@ -506,7 +508,7 @@ export class AirSupport {
     const pr = this.priority && this.priority();
     if (pr && R() < 0.5 && wallDist(pr.x, pr.z) > G.g40.minWall) {
       g.tx = pr.x; g.tz = pr.z;
-      if (R() < 0.4 && wallDist(pr.x, pr.z) > G.g105.minWall) { g.mode = 105; g.nextT = 0.6; } else { g.mode = 40; g.rounds = 6; g.nextT = 0.2; }
+      if (R() < 0.4 && wallDist(pr.x, pr.z) > G.g105.minWall) { g.mode = 105; g.nextT = 0.6; } else { g.mode = 40; g.rounds = 5; g.nextT = 0.2; }
       return;
     }
     const c = this.horde.densest(G.g25.minWall, 240, 44, 7);
@@ -514,7 +516,7 @@ export class AirSupport {
     const wd = wallDist(c.x, c.z);
     const r = R();
     g.tx = c.x; g.tz = c.z;
-    if (c.count >= G.g105.minCluster && wd >= G.g105.minWall && r < 0.2) {
+    if (c.count >= G.g105.minCluster && wd >= G.g105.minWall && r < G.g105.chance) {
       g.mode = 105; g.nextT = 0.8;
       if (g.radioCd <= 0) { g.radioCd = 25; this.radio(COMMS.spectre105); }
     } else if (r < 0.55 && wd >= G.g40.minWall) {

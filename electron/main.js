@@ -1,5 +1,5 @@
 // Last Bastion — Electron shell
-const { app, BrowserWindow, ipcMain, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, screen, shell } = require('electron');
 const path = require('path');
 const fs = require('fs');
 
@@ -72,6 +72,29 @@ ipcMain.handle('app:readAsset', async (_e, rel) => {
   if (!full.startsWith(AUDIO_DIR + path.sep)) throw new Error('asset outside app/audio: ' + rel);
   return fs.promises.readFile(full);
 });
+
+// Play-test telemetry: the game sends one JSON line per record; we append them
+// to userData/telemetry/session-<date>.jsonl (one file per launch).
+const TELEMETRY_DIR = () => path.join(app.getPath('userData'), 'telemetry');
+let teleStream = null, teleFile = null;
+function telemetryFile() {
+  if (!teleFile) {
+    fs.mkdirSync(TELEMETRY_DIR(), { recursive: true });
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    teleFile = path.join(TELEMETRY_DIR(), `session-${stamp}.jsonl`);
+  }
+  return teleFile;
+}
+ipcMain.on('app:telemetry', (_e, line) => {
+  if (typeof line !== 'string' || line.length > 500000) return;
+  try {
+    if (!teleStream) teleStream = fs.createWriteStream(telemetryFile(), { flags: 'a' });
+    teleStream.write(line + '\n');
+  } catch { /* never let logging break the game */ }
+});
+ipcMain.handle('app:telemetryPath', () => telemetryFile());
+ipcMain.on('app:openTelemetry', () => { try { fs.mkdirSync(TELEMETRY_DIR(), { recursive: true }); shell.openPath(TELEMETRY_DIR()); } catch { /* noop */ } });
+app.on('before-quit', () => { if (teleStream) teleStream.end(); });
 
 app.whenReady().then(createWindow);
 app.on('window-all-closed', () => app.quit());

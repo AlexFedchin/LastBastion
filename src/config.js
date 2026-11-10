@@ -128,7 +128,8 @@ export function baseStats() {
     // 105mm battery
     artyShells: 4, artyCooldown: 30, artyRadius: 7.5, artyDamage: 340,
     // Wall gunners
-    gunners: 0, gunnerRate: 2.4, gunnerDamage: 19, gunnerSpread: 0.034,
+    // two crewed M240s are on the wall from the start; upgrades post the other two
+    gunners: 2, gunnerRate: 2.4, gunnerDamage: 15, gunnerSpread: 0.034,
     // Mortar pit
     mortar: 0, mortarInterval: 99, mortarShells: 1, mortarRadius: 5.5, mortarDamage: 240,
     // Napalm trench
@@ -165,27 +166,27 @@ export const UPGRADES = [
   { id: 'hmgHE', group: 'hmg', name: 'HE-I MIX', desc: 'Every hit detonates. Bodies come apart.', costs: [1500],
     apply: (s, r) => { s.hmgHE = r; } },
   // Artillery
-  { id: 'artyShells', group: 'arty', name: 'SECOND GUN SECTION', desc: '+2 shells per fire mission.', costs: [220, 480, 850],
+  { id: 'artyShells', group: 'arty', unlock: 'artillery', name: 'SECOND GUN SECTION', desc: '+2 shells per fire mission.', costs: [220, 480, 850],
     apply: (s, r) => { s.artyShells += 2 * r; } },
-  { id: 'artyCd', group: 'arty', name: 'FIRE DIRECTION CENTER', desc: '-20% time between fire missions.', costs: [200, 420, 780],
+  { id: 'artyCd', group: 'arty', unlock: 'artillery', name: 'FIRE DIRECTION CENTER', desc: '-20% time between fire missions.', costs: [200, 420, 780],
     apply: (s, r) => { s.artyCooldown *= 1 - 0.2 * r; } },
-  { id: 'artyHeavy', group: 'arty', name: 'HEAVY CHARGES', desc: '+20% blast radius and damage.', costs: [320, 700],
+  { id: 'artyHeavy', group: 'arty', unlock: 'artillery', name: 'HEAVY CHARGES', desc: '+20% blast radius and damage.', costs: [320, 700],
     apply: (s, r) => { s.artyRadius *= 1 + 0.2 * r; s.artyDamage *= 1 + 0.2 * r; } },
   // Wall
-  { id: 'gunners', group: 'wall', name: 'WALL GUNNERS', desc: 'Post another crewed M240 on the wall.', costs: [260, 480, 760, 1100],
-    apply: (s, r) => { s.gunners = r; } },
+  { id: 'gunners', group: 'wall', name: 'WALL GUNNERS', desc: 'Post another crewed M240 on the wall (two are posted from the start).', costs: [420, 820],
+    apply: (s, r) => { s.gunners = Math.min(4, 2 + r); } },
   { id: 'crews', group: 'wall', name: 'VETERAN CREWS', desc: 'Gunners fire faster, hit harder, aim truer.', costs: [300, 700],
     apply: (s, r) => { s.gunnerRate *= 1 + 0.25 * r; s.gunnerSpread *= 1 - 0.25 * r; s.gunnerDamage *= 1 + 0.15 * r; } },
   { id: 'wire', group: 'wall', name: 'CONCERTINA WIRE', desc: 'Rank 1: wire band at 22 m. Rank 2: second band at 45 m. Rank 3: double strand.', costs: [160, 340, 560],
     apply: (s, r) => { s.wireBands = Math.min(r, 2); if (r >= 3) s.wireHp *= 2.2; } },
-  { id: 'napalm', group: 'wall', name: 'NAPALM TRENCH', desc: 'Burns 3 s longer and refills 10 s faster per rank.', costs: [220, 480],
+  { id: 'napalm', group: 'wall', unlock: 'napalm', name: 'NAPALM TRENCH', desc: 'Burns 3 s longer and refills 10 s faster per rank.', costs: [220, 480],
     apply: (s, r) => { s.napalmDuration += 3 * r; s.napalmCooldown -= 10 * r; s.napalmDps *= 1 + 0.25 * r; } },
   // Support
-  { id: 'mortar', group: 'support', name: 'MORTAR PIT', desc: 'An 81 mm crew shells the thickest crowds. Ranks: faster, then twin tubes.', costs: [320, 560, 900],
+  { id: 'mortar', group: 'support', unlock: 'mortar', name: 'MORTAR PIT', desc: 'An 81 mm crew shells the thickest crowds. Ranks: faster, then twin tubes.', costs: [320, 560, 900],
     apply: (s, r) => { s.mortar = r; s.mortarInterval = [99, 6.5, 4.5, 3.4][r]; s.mortarShells = r >= 3 ? 2 : 1; } },
-  { id: 'flares', group: 'support', name: 'FLARE CACHE', desc: '+1 illumination flare per night. Lit targets take +25% damage.', costs: [90, 180, 300],
+  { id: 'flares', group: 'support', unlock: 'flares', name: 'FLARE CACHE', desc: '+1 illumination flare per night. Lit targets take +25% damage.', costs: [90, 180, 300],
     apply: (s, r) => { s.flares += r; } },
-  { id: 'grenades', group: 'support', name: 'GRENADE CRATE', desc: '+2 grenade bundles per night.', costs: [110, 240],
+  { id: 'grenades', group: 'support', unlock: 'grenades', name: 'GRENADE CRATE', desc: '+2 grenade bundles per night.', costs: [110, 240],
     apply: (s, r) => { s.grenades += 2 * r; } },
 ];
 
@@ -207,10 +208,11 @@ export const ABILITY = {
 // ── AC-130 gunship: circles the valley all night and works the field ─────────
 export const GUNSHIP = {
   center: { x: 0, z: -135 }, radius: 245, alt: 160, speed: 68,
-  engageMin: 5, engageMax: 11,           // seconds between engagements
-  g25: { rate: 28, burst: [1.1, 2.0], scatter: 4.5, damage: 75, radius: 2.4, minWall: 8 },
-  g40: { rounds: [3, 6], interval: 0.55, scatter: 3.5, damage: 240, radius: 4.8, minWall: 14 },
-  g105: { damage: 560, radius: 9, minWall: 26, minCluster: 9 },
+  // Spectre works the far field and leaves the wall to you (minWall = metres from the wall)
+  engageMin: 9, engageMax: 17,           // seconds between engagements
+  g25: { rate: 28, burst: [1.0, 1.7], scatter: 4.5, damage: 48, radius: 2.1, minWall: 45 },
+  g40: { rounds: [3, 5], interval: 0.55, scatter: 3.5, damage: 200, radius: 4.4, minWall: 45 },
+  g105: { damage: 520, radius: 8.5, minWall: 60, minCluster: 10, chance: 0.12 },
 };
 
 // ── Radio. The story is told in fragments. ───────────────────────────────────
@@ -306,6 +308,28 @@ export const BARKS = {
   overheat: ['Barrel\'s cooked!', 'Gun\'s too hot!'],
   dawn: ['Sun\'s up. We made it.', 'Dawn. Count the living.', 'Another night. Another dawn.'],
   massacre: ['Look at them burn!', 'That\'s a whole column gone!', 'Keep it up!'],
+};
+
+// ── What you have, and when: one new tool a night so nobody drowns on night 1 ─
+// (night 1 is the fifty and the two wall gunners)
+export const UNLOCKS = {
+  napalm: 2, grenades: 2, claymores: 2,
+  artillery: 3, flares: 3, mortar: 3, gunship: 3,
+  bomber: 4,
+  dangerClose: 5,
+};
+export const isUnlocked = (key, night) => night >= (UNLOCKS[key] ?? 1);
+export const UNLOCK_INFO = {
+  napalm: 'NAPALM TRENCH [E]', grenades: 'GRENADES [G]', claymores: 'CLAYMORES (DAWN RESUPPLY)',
+  artillery: '105MM BATTERY [Q]', flares: 'ILLUMINATION FLARES [F]', mortar: 'MORTAR PIT (DAWN RESUPPLY)', gunship: 'AC-130 SPECTRE OVERHEAD',
+  bomber: 'BOMBER ON CALL [T]', dangerClose: 'DANGER CLOSE [B]',
+};
+export const UNLOCK_LINES = {
+  2: [[CALL.kovac, 'Engineers filled the trench out front with napalm. E lights it — it burns right along the wall base. And there\'s a crate of grenades at your feet. G, for anything climbing.']],
+  3: [[CALL.command, 'Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.'],
+    [CALL.kovac, 'Flares came up with the shells. F puts one over the field — anything in the light goes down easier.']],
+  4: [[CALL.hammer, 'Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it — that\'s T — and keep your heads down.']],
+  5: [[CALL.kovac, 'Listen. If it all goes wrong, B brings the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.']],
 };
 
 // ── Night events: one signature event per night, random ones in endless ─────
@@ -408,6 +432,7 @@ export function allRadioLines() {
   for (const t of [...COMMS.hammerIn, ...COMMS.hammerGood, ...COMMS.hammerOff]) add(CALL.hammer, t);
   for (const t of [COMMS.spectreIntro, COMMS.spectre105, ...COMMS.spectre]) add(CALL.spectre, t);
   for (const t of [COMMS.spectreIntro2, COMMS.spectre105, ...COMMS.spectre]) add(CALL.spectre2, t);
+  for (const lines of Object.values(UNLOCK_LINES)) for (const [w, t] of lines) add(w, t);
   for (const ev of Object.values(EVENT_LINES)) {
     for (const lines of Object.values(ev)) {
       for (const [w, t] of lines) {
