@@ -272,6 +272,7 @@ def write_credits():
         m = meta.get(sid, {})
         lines.append(f'| [{m.get("title", sid)}]({m.get("url", "https://freesound.org/s/" + sid)}) | {m.get("user", "?")} | '
                      f'{", ".join(sorted(used[sid]))} |')
+    lines += [''] + ['## Radio voice-over', '', 'Every radio line is spoken by [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (hexgrad),', 'an open-weight text-to-speech model released under the', '[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), run through', '[kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) (MIT). The takes were processed into', 'radio transmissions for the game by `scripts/audio/build_voice.py`.']
     open(os.path.join(OUT, 'CREDITS.md'), 'w', encoding='utf8').write('\n'.join(lines) + '\n')
 
 

@@ -125,3 +125,11 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Bullet casings falling](https://freesound.org/people/barryshamir/sounds/834236/) | barryshamir | casing |
 | [Distant Machine Gun Firing](https://freesound.org/people/qubodup/sounds/854635/) | qubodup | distant_mg |
 | [Pulling and Releasing Barrett M82A1 Charging Handle to Load Round 2](https://freesound.org/people/qubodup/sounds/855599/) | qubodup | charge |
+
+## Radio voice-over
+
+Every radio line is spoken by [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (hexgrad),
+an open-weight text-to-speech model released under the
+[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), run through
+[kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) (MIT). The takes were processed into
+radio transmissions for the game by `scripts/audio/build_voice.py`.

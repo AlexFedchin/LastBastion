@@ -3,7 +3,7 @@
 // the crowds with its 25 mm, 40 mm and 105 mm guns.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { WORLD, ABILITY, GUNSHIP, wallZ, wallDist, WING_COS } from '../config.js';
+import { WORLD, ABILITY, GUNSHIP, wallZ, wallDist, WING_COS, CALL, COMMS } from '../config.js';
 import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
 import { groundH } from '../world/terrain.js';
@@ -133,14 +133,6 @@ function offsetZ(x, d) {
   return wallZ(x) - (Math.abs(x) <= WORLD.GATE_HALF ? d : d / WING_COS);
 }
 
-const SPECTRE = 'SPECTRE 2-1';
-const SPECTRE_LINES = [
-  'Good hits, good hits. Lot of movement down there, Bastion.',
-  'Shifting fire. Keep that fifty talking.',
-  'Spectre still on station. We have you covered.',
-  'Big group moving up the road — engaging.',
-  'Sparkle on the treeline. Rounds away.',
-];
 
 export class AirSupport {
   constructor(arsenal) {
@@ -222,7 +214,7 @@ export class AirSupport {
     this.markerMesh.visible = false;
   }
 
-  radio(text, who = SPECTRE) { if (this.onRadio) this.onRadio(who, text); }
+  radio(text, who = CALL.spectre) { if (this.onRadio) this.onRadio(who, text); }
 
   get bomberBusy() { return !!(this.marker || this.bomber || this.bombs.length); }
 
@@ -290,9 +282,7 @@ export class AirSupport {
     if (m.callT > 0) {
       m.callT -= dt;
       if (m.callT <= 0) {
-        this.radio(pickLine(['Hammer one-one, I have your red smoke. One GBU, danger close. Heads down, Bastion.',
-          'Hammer one-one, tally your mark. Two-thousand pounder inbound, ten seconds.',
-          'Copy red flare. Hammer one-one is in hot — keep your heads down.']), 'HAMMER 1-1');
+        this.radio(pickLine(COMMS.hammerIn), CALL.hammer);
         this.audio.radioStatic(0.6);
         this.launchBomber(m.tx, m.tz);
       }
@@ -388,8 +378,7 @@ export class AirSupport {
       this.marker = null;
       this.markerMesh.visible = false;
     }
-    setTimeout(() => this.radio(kills > 25 ? `Good effect on target. Looks like ${kills} down. Hammer one-one off and climbing.`
-      : 'Bomb impact. Hammer one-one off target, re-arming.', 'HAMMER 1-1'), 2500);
+    setTimeout(() => this.radio(pickLine(kills > 25 ? COMMS.hammerGood : COMMS.hammerOff), CALL.hammer), 2500);
   }
 
   // ── AC-130 ─────────────────────────────────────────────────────────────────
@@ -480,7 +469,7 @@ export class AirSupport {
     g.tx = c.x; g.tz = c.z;
     if (c.count >= G.g105.minCluster && wd >= G.g105.minWall && r < 0.2) {
       g.mode = 105; g.nextT = 0.8;
-      if (g.radioCd <= 0) { g.radioCd = 25; this.radio('Rifle, one-oh-five. Big group — splash in five.'); }
+      if (g.radioCd <= 0) { g.radioCd = 25; this.radio(COMMS.spectre105); }
     } else if (r < 0.55 && wd >= G.g40.minWall) {
       g.mode = 40; g.rounds = Math.round(rand(G.g40.rounds[0], G.g40.rounds[1])); g.nextT = 0.2;
     } else {
@@ -493,11 +482,11 @@ export class AirSupport {
     if (!g.introDone) {
       g.introDone = true;
       g.radioCd = 35;
-      this.radio('Bastion-7, Spectre two-one on station overhead. We\'ll work the crowds in the field — you hold that wall.');
+      this.radio(COMMS.spectreIntro);
       this.audio.radioStatic(0.8);
     } else if (g.radioCd <= 0 && R() < 0.35) {
       g.radioCd = 40;
-      this.radio(pickLine(SPECTRE_LINES));
+      this.radio(pickLine(COMMS.spectre));
     }
   }
 

@@ -60,6 +60,7 @@ async function pool(items, n, fn) {
 const SNAP = { menu: 0.4, night: 1, dawn: 0.85, gameover: 0.75, victory: 0.6 };
 const MUSIC_TRIM = 1.8; // the score is mastered quiet; sit it against the guns
 const OUTPUT_TRIM = 0.8; // ~-16 LUFS through a heavy night at default volume
+const VOICE_TRIM = 1.7; // radio voice-over sits on top of the gun
 
 const smooth = (a, b, x) => { const t = clamp((x - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); };
 
@@ -160,6 +161,7 @@ export class AudioEngine {
     this.B = {};       // one-shots: name -> AudioBuffer[]
     for (const k of Object.keys(SFX)) this.B[k] = [];
     this.bed = {};     // beds: name -> AudioBuffer
+    this.voices_ = {}; // radio voice-over: 'WHO|text' -> AudioBuffer
     this.loaded = null;
     this._last = {};   // no-immediate-repeat memory
     this._active = {}; // per-category voice counts
@@ -206,6 +208,13 @@ export class AudioEngine {
       jobs.push({ rel: `audio/amb/${name}.ogg`, rate, put: (b) => { this.bed[name] = b; } });
     }
     let failed = 0;
+    // radio voice-over (scripts/audio/build_voice.py): a manifest, then the takes
+    const voices = readBytes('audio/voice/lines.json').then((ab) => {
+      const man = JSON.parse(new TextDecoder().decode(ab));
+      return pool(Object.entries(man), 6, async ([key, v]) => {
+        try { this.voices_[key] = await decoder(16000).decodeAudioData(await readBytes(`audio/voice/${v.file}`)); } catch (err) { if (failed++ < 3) console.warn('[audio] voice', v.file, err); }
+      });
+    }).catch((err) => console.warn('[audio] no radio voice-over', err));
     this.loaded = pool(jobs, 8, async (j) => {
       try { j.put(await decoder(j.rate).decodeAudioData(await readBytes(j.rel))); } catch (err) {
         if (failed++ < 3) console.warn('[audio] could not load', j.rel, err);
@@ -213,7 +222,7 @@ export class AudioEngine {
     }).then(() => {
       for (const k of Object.keys(this.B)) this.B[k] = this.B[k].filter(Boolean);
       if (failed) console.warn(`[audio] ${failed} sound files missing`);
-    });
+    }).then(() => voices);
     return this.loaded;
   }
 
@@ -245,6 +254,9 @@ export class AudioEngine {
     this.snap.connect(this.muffle);
     this.sfx = ctx.createGain(); this.sfx.gain.value = this.settings.sfx;
     this.sfx.connect(this.snap);
+    // the radio is in your ear, not out in the valley: past the world mix, still deafened by blasts
+    this.voiceBus = ctx.createGain(); this.voiceBus.gain.value = this.settings.sfx * VOICE_TRIM;
+    this.voiceBus.connect(this.deafen);
 
     // the valley answers every shot
     this.reverb = ctx.createConvolver();
@@ -312,6 +324,7 @@ export class AudioEngine {
     this.master.gain.setTargetAtTime(this.settings.master * OUTPUT_TRIM, t, 0.05);
     this.music.gain.setTargetAtTime(this.settings.music * MUSIC_TRIM, t, 0.05);
     this.sfx.gain.setTargetAtTime(this.settings.sfx, t, 0.05);
+    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM, t, 0.05);
   }
 
   /** Outdoor impulse response: the wall and bunker up close, the valley sides
@@ -715,6 +728,26 @@ export class AudioEngine {
     const end = this.ctx.currentTime + Math.max(0.35, dur);
     this._radioUntil = Math.max(this._radioUntil, end);
     this.play(this.pickVar('radio_out'), { gain: 0.3, pan: -0.25, delay: Math.max(0.35, dur), force: true });
+  }
+
+  /** Speak a radio line if it was recorded. Returns its length in seconds (0 if none). */
+  radioVoice(who, text, delay = 0.14) {
+    const buf = this.voices_[who + '|' + text];
+    if (!this.ready || !buf) return 0;
+    if (this._voice) { try { this._voice.stop(); } catch { /* done */ } }
+    const ctx = this.ctx, src = ctx.createBufferSource();
+    src.buffer = buf;
+    const p = ctx.createStereoPanner(); p.pan.value = -0.18;
+    src.connect(p); p.connect(this.voiceBus);
+    src.start(ctx.currentTime + delay);
+    src.onended = () => { try { p.disconnect(); } catch { /* noop */ } if (this._voice === src) this._voice = null; };
+    this._voice = src;
+    // pull the score and the ambience back a little under the voice
+    const t = ctx.currentTime;
+    this.musicDuck.gain.cancelScheduledValues(t);
+    this.musicDuck.gain.setTargetAtTime(0.6, t, 0.08);
+    this.musicDuck.gain.setTargetAtTime(1, t + delay + buf.duration, 0.6);
+    return buf.duration + delay;
   }
 
   ui() { this.play(this.B.ui_click[0], { gain: 0.38, rate: rand(0.97, 1.03), force: true }); }

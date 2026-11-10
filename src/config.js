@@ -261,6 +261,38 @@ export const RADIO = {
   ],
 };
 
+// Call signs and the radio traffic that has its own trigger in the game.
+export const CALL = { kovac: 'SGT. KOVAC', battery: 'BATTERY', hammer: 'HAMMER 1-1', spectre: 'SPECTRE 2-1' };
+export const COMMS = {
+  battery: {
+    4: 'Shot, over. Four rounds HE, splash in three.',
+    6: 'Shot, over. Six rounds HE, splash in three.',
+    8: 'Shot, over. Eight rounds HE, splash in three.',
+    10: 'Shot, over. Ten rounds HE, splash in three.',
+  },
+  markerOut: 'Red smoke out! Get your heads down!',
+  dangerClose: 'Danger close! Everything on the wall line — God forgive us.',
+  hammerIn: [
+    'Hammer one-one, I have your red smoke. One GBU, danger close. Heads down, Bastion.',
+    'Hammer one-one, tally your mark. Two-thousand pounder inbound, ten seconds.',
+    'Copy red flare. Hammer one-one is in hot — keep your heads down.',
+  ],
+  hammerGood: [
+    'Good effect on target. That\'s a lot of them down. Hammer one-one off and climbing.',
+    'Shack. Direct hit on your mark. Hammer one-one off target.',
+  ],
+  hammerOff: ['Bomb impact. Hammer one-one off target, re-arming.'],
+  spectreIntro: 'Bastion-7, Spectre two-one on station overhead. We\'ll work the crowds in the field — you hold that wall.',
+  spectre105: 'Rifle, one-oh-five. Big group — splash in five.',
+  spectre: [
+    'Good hits, good hits. Lot of movement down there, Bastion.',
+    'Shifting fire. Keep that fifty talking.',
+    'Spectre still on station. We have you covered.',
+    'Big group moving up the road — engaging.',
+    'Sparkle on the treeline. Rounds away.',
+  ],
+};
+
 export const BARKS = {
   surge: ['Big group coming down the valley!', 'Horde inbound! Get on them!', 'Here they come — dozens! Hundreds!', 'Movement on the ridge — it\'s a whole wave!'],
   pile: ['They\'re stacking on the wall!', 'They\'re climbing! Clear that section!', 'Wall\'s going — shoot the pile!'],
@@ -269,3 +301,17 @@ export const BARKS = {
   dawn: ['Sun\'s up. We made it.', 'Dawn. Count the living.', 'Another night. Another dawn.'],
   massacre: ['Look at them burn!', 'That\'s a whole column gone!', 'Keep it up!'],
 };
+
+/** Every line that can come over the radio, as [who, text] — what the voice build records. */
+export function allRadioLines() {
+  const out = [];
+  const add = (who, text) => { if (!out.some((l) => l[0] === who && l[1] === text)) out.push([who, text]); };
+  for (const lines of Object.values(RADIO)) for (const [w, t] of lines) add(w, t);
+  for (const lines of Object.values(BARKS)) for (const t of lines) add(CALL.kovac, t);
+  for (const t of Object.values(COMMS.battery)) add(CALL.battery, t);
+  add(CALL.kovac, COMMS.markerOut);
+  add(CALL.kovac, COMMS.dangerClose);
+  for (const t of [...COMMS.hammerIn, ...COMMS.hammerGood, ...COMMS.hammerOff]) add(CALL.hammer, t);
+  for (const t of [COMMS.spectreIntro, COMMS.spectre105, ...COMMS.spectre]) add(CALL.spectre, t);
+  return out;
+}

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
-  nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, ABILITY,
+  nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, ABILITY, CALL, COMMS,
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
@@ -422,7 +422,7 @@ class Game {
   bark(kind, chance = 1) {
     if (this.barkCd > 0 || Math.random() > chance) return;
     this.barkCd = 12;
-    this.hud.radio('SGT. KOVAC', pick(BARKS[kind]), true);
+    this.hud.radio(CALL.kovac, pick(BARKS[kind]), true);
   }
 
   // ── Night end / fall ─────────────────────────────────────────────────────
@@ -453,7 +453,7 @@ class Game {
     run.atShop = true;
     writeSave(run);
     this.hud.announce('DAWN', `NIGHT ${String(survived).padStart(2, '0')} SURVIVED · ${run.survivors} ALIVE`, 5);
-    this.hud.radio('SGT. KOVAC', pick(BARKS.dawn), true);
+    this.hud.radio(CALL.kovac, pick(BARKS.dawn), true);
     this.audio.setMusicMode('dawn');
     this.audio.setTide(false);
     this.audio.pressure = 0; this.audio.lowLife = false;
@@ -672,7 +672,7 @@ class Game {
         const p = this.player.aimPoint(330);
         if (this.arsenal.callArtillery(p)) {
           this.hud.alert(`FIRE MISSION — ${this.stats.artyShells} ROUNDS — SPLASH IN 3`);
-          this.hud.radio('BATTERY', `Shot, over. ${this.stats.artyShells} rounds HE, splash in three.`, true);
+          this.hud.radio(CALL.battery, COMMS.battery[this.stats.artyShells] || `Shot, over. ${this.stats.artyShells} rounds HE, splash in three.`, true);
         } else this.hud.alert(`BATTERY RELOADING — ${Math.ceil(this.arsenal.artyCd)}s`);
       }
       if (input.hit('KeyE')) {
@@ -686,7 +686,7 @@ class Game {
         const air = this.arsenal.air;
         if (air.throwMarker(this.player.aimPoint(ABILITY.bomber.maxRange))) {
           this.hud.alert('MARKER OUT — BOMBER INBOUND');
-          this.hud.radio('SGT. KOVAC', 'Red smoke out! Get your heads down!', true);
+          this.hud.radio(CALL.kovac, COMMS.markerOut, true);
         } else this.hud.alert(air.bomberBusy ? 'BOMBER ALREADY ON ITS RUN' : `BOMBER RE-ARMING — ${Math.ceil(air.bomberCd)}s`);
       }
       if (input.hit('KeyG')) {
@@ -699,7 +699,7 @@ class Game {
           run.survivors -= ABILITY.dangerClose.cost;
           this.ns.lost += ABILITY.dangerClose.cost;
           this.hud.announce('DANGER CLOSE', 'THREE OF OURS WERE STILL ON THE WALL', 3.5, 'red');
-          this.hud.radio('SGT. KOVAC', 'Danger close! Everything on the wall line — God forgive us.', true);
+          this.hud.radio(CALL.kovac, COMMS.dangerClose, true);
         }
       }
     }

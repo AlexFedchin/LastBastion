@@ -205,18 +205,23 @@ export class HUD {
     if (this.radioT > 0) {
       this.radioT -= dt;
       const full = this.radioFull;
-      const shown = Math.min(full.length, Math.floor((this.radioDur - this.radioT) * 55));
+      const el2 = this.radioDur - this.radioT;
+      // type along with the voice when there is one
+      const shown = this.radioVoice > 0
+        ? Math.min(full.length, Math.floor(full.length * Math.max(0, el2 - 0.12) / Math.max(0.5, this.radioVoice - 0.35)))
+        : Math.min(full.length, Math.floor(el2 * 55));
       this.set('rtext', el.radioText, full.slice(0, shown));
       if (this.radioT <= 0) el.radio.classList.remove('show');
     } else if (this.radioQueue.length) {
       const [who, text] = this.radioQueue.shift();
       this.radioFull = text;
-      this.radioDur = this.radioT = Math.max(4.5, text.length * 0.065 + 2.5);
+      this.radioVoice = g.audio ? g.audio.radioVoice(who, text) : 0;
+      this.radioDur = this.radioT = Math.max(4.5, text.length * 0.065 + 2.5, this.radioVoice + 1.4);
       el.radioWho.textContent = who;
       el.radioText.textContent = '';
       this.cache.rtext = '';
       el.radio.classList.add('show');
-      if (g.audio) g.audio.radioStatic(this.radioDur);
+      if (g.audio) g.audio.radioStatic(this.radioVoice > 0 ? this.radioVoice + 0.1 : this.radioDur);
     }
 
     if (this.announceT > 0) {

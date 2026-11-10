@@ -153,6 +153,7 @@ one-shots and ambience beds are decoded into memory, the score is streamed.
 | `sfx/` | one-shots — the M2HB (4 layered variants + burst tails), wall M240s, brass, explosions near/far, incoming rounds, mortar, napalm, impacts, gore, 27 zombie voices, brutes, runners, the men on the wall, thunder, siren, radio, gun handling, UI, crows, a church bell |
 | `amb/` | seamless loops — rain near/far, wind, the horde at three distances, bodies against the wall, fire, the distant battle, dawn air, flies, sodium lamps, radio carrier |
 | `music/` | the score — menu, two night drones, two percussion layers that follow the pressure on the wall, the tide, dawn, resupply, the fall, victory |
+| `voice/` | every radio line, spoken and run through a radio chain (`lines.json` maps speaker + text to a take) |
 
 **Mix** (`src/audio/audio.js`): everything is spatialised against the gun (pan,
 distance, air absorption, speed-of-sound delay on blasts). Close explosions duck
@@ -175,6 +176,21 @@ python scripts/audio/build_audio.py hmg boom # only matching recipes
 The script downloads its sources (cached in `scripts/audio/.cache/`), then slices,
 layers, loop-crossfades, loudness-matches, limits and encodes every asset, and
 regenerates `CREDITS.md`. Every recipe is in that one file.
+
+**Radio voice-over** (Python 3 + Node; `pip install kokoro-onnx soundfile scipy numpy`):
+
+```
+python scripts/audio/build_voice.py          # every line in src/config.js (allRadioLines)
+python scripts/audio/build_voice.py KOVAC    # only matching speakers / lines
+```
+
+Lines are voiced with Kokoro-82M, a free open-weight TTS model (Apache 2.0; the ~350 MB
+model is downloaded into `scripts/audio/.cache/` on first run), then band-limited,
+compressed, overdriven and pushed through a low-rate codec with hiss, fading and crackle —
+a different set per speaker (handheld on the wall, field radio, long-range HF from
+Command, a dying civilian set, aircrew over their engines). Casting and radio profiles
+are at the top of the script. Add or change a line in `config.js`, rerun the script, and
+the game picks it up; a line without a take still shows on the HUD, just silently.
 
 ## Troubleshooting
 
