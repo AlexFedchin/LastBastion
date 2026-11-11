@@ -33,7 +33,8 @@ void main(){
   vSeed = iPos.w;
   vInt = iSize.z;
   vec4 f = lbFog(p, cameraPosition, lbFogColor, lbTime, lbDawn);
-  vFog = 1.0 - exp(log(max(1.0 - f.a, 1e-4)) * abs(iSize.w));
+  // far fires are fogged lightly so the city burns through the haze, but not through a fog bank
+  vFog = 1.0 - exp(log(max(1.0 - f.a, 1e-4)) * mix(abs(iSize.w), 1.0, clamp(lbDawn - 2.0, 0.0, 1.0)));
   gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
 }`;
 

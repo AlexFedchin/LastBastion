@@ -9,6 +9,7 @@
 // every mesh and collapsed per instance from a seed, so the horde is a mix of
 // soldiers, workers and civilians without extra draw calls.
 import * as THREE from 'three';
+import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { FOG_CUSTOM_GLSL } from '../render/atmosphere.js';
 
 // Part ids (pivots in the pose code must match these positions)
@@ -149,6 +150,182 @@ export function createZombieGeometry(lod = 0) {
   G.add(sph(0.12, 0, 1.745, 0.004, 0.97, 0.62, 1.02, HS, 3, Math.PI / 2), 2, 6, 5);   // cap
   G.add(bx(0.13, 0.012, 0.085, 0, 1.748, 0.12, -0.1), 2, 6, 5);
   G.add(seg(0.174, 0.207, [0, 1.06, 0], [0, 1.42, 0], R, 0.645), 1, 7, 6);        // hi-vis
+  return G.build();
+}
+
+// ── The giant (Goliath / Behemoth) ──────────────────────────────────────────
+// Seen at four to five times human size, up close, for minutes: it gets its own
+// sculpted mesh. Same part ids and joint pivots as the horde, so the shared pose
+// shader walks, smashes and topples it; everything else is new: a hunched,
+// lopsided mass of muscle with a bone-spined back, an opened rib cage, a hanging
+// gut, one swollen club of an arm, long clawed hands, tumours, rebar through the
+// chest and a lumpy, noise-displaced hide instead of clean cylinders.
+// Material 9 is bone.
+
+function vhash(x, y, z) { const s = Math.sin(x * 127.1 + y * 311.7 + z * 74.7) * 43758.5453; return s - Math.floor(s); }
+function vnoise(x, y, z) {
+  const ix = Math.floor(x), iy = Math.floor(y), iz = Math.floor(z);
+  let fx = x - ix, fy = y - iy, fz = z - iz;
+  fx = fx * fx * (3 - 2 * fx); fy = fy * fy * (3 - 2 * fy); fz = fz * fz * (3 - 2 * fz);
+  const l = (a, b, t) => a + (b - a) * t;
+  const h = (dx, dy, dz) => vhash(ix + dx, iy + dy, iz + dz);
+  return l(l(l(h(0, 0, 0), h(1, 0, 0), fx), l(h(0, 1, 0), h(1, 1, 0), fx), fy),
+    l(l(h(0, 0, 1), h(1, 0, 1), fx), l(h(0, 1, 1), h(1, 1, 1), fx), fy), fz);
+}
+
+/** Weld, push every vertex along its normal by layered noise, re-light: clean primitives become flesh. */
+function organic(geo, amp = 0.012, freq = 9) {
+  geo.deleteAttribute('uv');
+  const g = mergeVertices(geo, 1e-4);
+  g.computeVertexNormals();
+  const p = g.attributes.position, n = g.attributes.normal;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+    const d = (vnoise(x * freq, y * freq, z * freq) - 0.5) * amp * 2
+      + (vnoise(x * freq * 2.7 + 9, y * freq * 2.7, z * freq * 2.7) - 0.5) * amp * 0.8
+      + (vnoise(x * freq * 7 + 3, y * freq * 7, z * freq * 7) - 0.5) * amp * 0.25;
+    p.setXYZ(i, x + n.getX(i) * d, y + n.getY(i) * d, z + n.getZ(i) * d);
+  }
+  g.computeVertexNormals();
+  return g;
+}
+
+/** A limb or trunk from a to b with a radius profile (muscle bellies, joints), rounded at both ends. */
+function limb(a, b, radii, radial = 16, flatZ = 1, rows = 4) {
+  const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b);
+  const len = A.distanceTo(B);
+  const pts = [new THREE.Vector2(0, -radii[0] * 0.6)];
+  const n = radii.length;
+  for (let k = 0; k < (n - 1) * rows + 1; k++) {
+    const t = k / ((n - 1) * rows), f = t * (n - 1), i = Math.min(n - 2, Math.floor(f)), u = f - i;
+    const s = u * u * (3 - 2 * u);
+    pts.push(new THREE.Vector2(radii[i] + (radii[i + 1] - radii[i]) * s, t * len));
+  }
+  pts.push(new THREE.Vector2(0, len + radii[n - 1] * 0.6));
+  const g = new THREE.LatheGeometry(pts, radial);
+  g.scale(1, 1, flatZ);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(_up, B.clone().sub(A).normalize()));
+  g.translate(A.x, A.y, A.z);
+  return g;
+}
+
+function spike(r, len, x, y, z, dir, radial = 7) {
+  const g = new THREE.ConeGeometry(r, len, radial, 2);
+  g.translate(0, len / 2, 0);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(_up, new THREE.Vector3(...dir).normalize()));
+  g.translate(x, y, z);
+  return g;
+}
+
+/** A curved bone (rib, claw) along a quadratic arc. */
+function arc(p0, p1, p2, r, segs = 10, radial = 5) {
+  const c = new THREE.QuadraticBezierCurve3(new THREE.Vector3(...p0), new THREE.Vector3(...p1), new THREE.Vector3(...p2));
+  return new THREE.TubeGeometry(c, segs, r, radial, false);
+}
+
+export function createGiantGeometry() {
+  const G = builder();
+  const skin = (geo, part, amp = 0.012, freq = 9) => G.add(organic(geo, amp * 2.2, freq), part, 1);
+
+  // ── trunk ──
+  // pelvis and a heavy, sagging lower belly
+  skin(limb([0, 0.8, 0.0], [0, 1.08, 0.0], [0.17, 0.2, 0.21], 24, 0.8), 0);
+  // a filthy loincloth of what were trousers
+  G.add(organic(limb([0, 0.8, 0.02], [0, 0.97, 0.01], [0.2, 0.215, 0.21], 20, 0.85, 2), 0.02, 9), 0, 3);
+  // barrel chest, broader than the shoulders, swelling into a hump
+  skin(limb([0, 1.0, 0.0], [0, 1.53, -0.02], [0.2, 0.24, 0.27, 0.29, 0.27, 0.2], 32, 0.74), 1, 0.016, 7);
+  skin(sph(0.2, 0, 1.39, -0.1, 1.25, 0.85, 0.75, 22, 14), 1, 0.02, 8);                 // hump
+  skin(sph(0.21, 0, 1.02, 0.08, 1.0, 0.82, 0.85, 22, 14), 1, 0.014, 10);               // hanging gut
+  G.add(organic(bx(0.03, 0.2, 0.05, 0.02, 1.02, 0.25, 0.15, 0, 0.12), 0.004, 20), 1, 4); // split in it
+  // trapezius ridges up to a neck as wide as the head
+  for (const s of [-1, 1]) skin(limb([s * 0.06, 1.5, -0.02], [s * 0.27, 1.43, -0.01], [0.1, 0.12, 0.09], 14, 0.9, 3), 1, 0.012, 10);
+  // deltoids (the left one swollen)
+  skin(sph(0.135, 0.29, 1.42, 0.0, 1.1, 1.0, 1.05, 18, 12), 1, 0.016, 9);
+  skin(sph(0.105, -0.27, 1.43, 0.0, 1.0, 1.0, 1.0, 16, 12), 1, 0.012, 9);
+  // pectorals
+  for (const s of [-1, 1]) skin(sph(0.13, s * 0.11, 1.36, 0.1, 1.15, 0.75, 0.55, 16, 10), 1, 0.01, 10);
+
+  // opened rib cage on the right side: a wet cavity with ribs across it
+  G.add(organic(sph(0.11, -0.13, 1.22, 0.13, 0.9, 1.2, 0.5, 14, 10), 0.01, 12), 1, 4);
+  for (let k = 0; k < 5; k++) {
+    const y = 1.32 - k * 0.055, w = 0.1 - k * 0.006;
+    G.add(arc([-0.05, y + 0.01, 0.2], [-0.13, y - 0.02, 0.24], [-0.13 - w, y - 0.045, 0.13], 0.011, 8, 5), 1, 9);
+  }
+  // spine breaking through the back: vertebra knobs and bone spikes
+  for (let k = 0; k < 7; k++) {
+    const y = 1.08 + k * 0.065, z = -0.17 - Math.sin(k / 6 * Math.PI) * 0.12;
+    G.add(sph(0.032, 0, y, z, 1.2, 0.8, 1, 8, 6), 1, 9);
+    if (k > 0 && k < 6) G.add(spike(0.022 + (k % 2) * 0.008, 0.09 + (k % 3) * 0.04, (k % 2 ? 0.02 : -0.02), y, z - 0.01, [k % 2 ? 0.25 : -0.25, 0.5, -1]), 1, 9);
+  }
+  // spikes out of the swollen shoulder
+  G.add(spike(0.03, 0.16, 0.33, 1.5, -0.04, [0.6, 1, -0.3]), 1, 9);
+  G.add(spike(0.022, 0.11, 0.38, 1.44, 0.02, [1, 0.5, 0.2]), 1, 9);
+  // tumours clustered on the left side of the neck and chest
+  for (const [r, x, y, z] of [[0.06, 0.15, 1.5, 0.07], [0.045, 0.21, 1.47, 0.1], [0.035, 0.12, 1.45, 0.15], [0.05, 0.2, 1.18, 0.16], [0.03, 0.25, 1.24, 0.13]]) {
+    skin(sph(r, x, y, z, 1, 1, 1, 12, 9), 1, r * 0.25, 30);
+  }
+  // rebar driven through the chest, front to back
+  G.add(seg(0.012, 0.012, [0.05, 1.12, 0.38], [-0.1, 1.42, -0.36], 6, 1, true), 1, 6);
+
+  // ── head: small, sunk low between the shoulders, jaw hanging ──
+  skin(sph(0.105, 0, 1.69, 0.07, 1.0, 1.05, 1.05, 18, 14), 2, 0.012, 14);
+  skin(bx(0.19, 0.035, 0.07, 0, 1.745, 0.15, 0.25), 2, 0.008, 18);                 // heavy brow
+  skin(limb([0, 1.6, 0.06], [0, 1.585, 0.2], [0.075, 0.08, 0.06], 12, 1.4, 2), 2, 0.008, 16); // jaw
+  G.add(bx(0.09, 0.05, 0.03, 0, 1.63, 0.165, 0.3), 2, 4);                          // maw
+  for (let k = 0; k < 6; k++) {
+    const x = -0.04 + k * 0.016;
+    G.add(spike(0.006, 0.026 + (k % 2) * 0.012, x, 1.605, 0.18 + (k % 3) * 0.004, [0, 1, 0.15], 4), 2, 9);
+    G.add(spike(0.006, 0.022, x + 0.008, 1.66, 0.175, [0, -1, 0.1], 4), 2, 9);
+  }
+  for (const s of [-1, 1]) G.add(bx(0.03, 0.02, 0.012, s * 0.04, 1.715, 0.163), 2, 2);  // eyes, deep under the brow
+  G.add(organic(sph(0.04, 0.06, 1.77, 0.02, 1.4, 0.6, 1.2, 10, 8), 0.006, 30), 2, 4);  // skull wound
+
+  // ── arms: the left a swollen club, the right long and sinewy, both with claws ──
+  for (const s of [-1, 1]) {
+    const up = s > 0 ? 3 : 4, fo = s > 0 ? 9 : 10;
+    const k = s > 0 ? 1.35 : 1.0;
+    skin(limb([s * 0.27, 1.45, 0], [s * 0.27, 1.16, 0], [0.09 * k, 0.105 * k, 0.095 * k, 0.075 * k], 16, 0.95), up, 0.012 * k, 10);
+    // forearm reaches down past the knee
+    skin(limb([s * 0.27, 1.17, 0], [s * 0.29, 0.66, 0.06], [0.075 * k, 0.088 * k, 0.07 * k, 0.05 * k], 16, 0.9), fo, 0.012 * k, 10);
+    // hand: a broad palm and long curled claws
+    skin(sph(0.06 * k, s * 0.29, 0.62, 0.065, 0.9, 1.25, 0.6, 12, 10), fo, 0.008, 18);
+    for (let f = 0; f < 4; f++) {
+      const fx = s * (0.255 + f * 0.022 * k), fz = 0.08 + (f - 1.5) * 0.012;
+      G.add(arc([fx, 0.58, fz], [fx + s * 0.01, 0.5, fz + 0.04], [fx, 0.45, fz + 0.09], 0.012 * k, 8, 5), fo, 1);
+      G.add(spike(0.011 * k, 0.05, fx, 0.45, fz + 0.09, [0, -0.3, 1], 5), fo, 9);
+    }
+    // a thumb
+    G.add(arc([s * 0.27, 0.62, 0.1], [s * 0.25, 0.58, 0.14], [s * 0.245, 0.54, 0.16], 0.014 * k, 6, 5), fo, 1);
+  }
+  // bone breaking out along the club arm's forearm
+  for (let k = 0; k < 3; k++) G.add(spike(0.02, 0.08 + k * 0.03, 0.36, 1.05 - k * 0.12, -0.02 + k * 0.02, [1, 0.3, -0.4]), 9, 9);
+  G.add(organic(sph(0.05, 0.36, 0.92, 0.06, 0.6, 1.4, 0.8, 10, 8), 0.006, 25), 9, 4);   // where it tore through
+
+  // ── legs: thick, bowed, with splayed feet ──
+  for (const s of [-1, 1]) {
+    const th = s > 0 ? 5 : 7, sh = s > 0 ? 6 : 8;
+    skin(limb([s * 0.12, 0.92, 0], [s * 0.13, 0.48, 0.02], [0.13, 0.14, 0.12, 0.095], 18, 0.95), th, 0.014, 9);
+    // torn trouser leg with a ragged hem
+    G.add(organic(limb([s * 0.12, 0.9, 0], [s * 0.125, 0.7, 0.01], [0.145, 0.15, 0.14], 16, 0.97, 2), 0.01, 12), th, 3);
+    for (let k = 0; k < 10; k++) {
+      const a0 = (k / 10) * Math.PI * 2, a1 = ((k + 1) / 10) * Math.PI * 2, drop = 0.03 + ((k * 7919) % 11) / 11 * 0.09;
+      const r = 0.142, y = 0.7, cx = s * 0.125, cz = 0.01;
+      const p = new THREE.BufferGeometry();
+      const am = (a0 + a1) / 2;
+      p.setAttribute('position', new THREE.Float32BufferAttribute([cx + Math.sin(a0) * r, y, cz + Math.cos(a0) * r, cx + Math.sin(a1) * r, y, cz + Math.cos(a1) * r,
+        cx + Math.sin(am) * r * 1.03, y - drop, cz + Math.cos(am) * r * 1.03], 3));
+      p.setAttribute('normal', new THREE.Float32BufferAttribute([Math.sin(am), 0, Math.cos(am), Math.sin(am), 0, Math.cos(am), Math.sin(am), 0, Math.cos(am)], 3));
+      G.add(p, th, 3);
+    }
+    skin(sph(0.06, s * 0.13, 0.48, 0.08, 1, 0.9, 0.7, 10, 8), sh, 0.01, 14);       // knee
+    skin(limb([s * 0.13, 0.48, 0.02], [s * 0.14, 0.08, 0.0], [0.1, 0.105, 0.08, 0.07], 16, 0.95), sh, 0.012, 10);
+    // foot and toes
+    skin(limb([s * 0.14, 0.06, -0.06], [s * 0.16, 0.05, 0.2], [0.06, 0.08, 0.075], 12, 0.6, 3), sh, 0.01, 14);
+    for (let f = 0; f < 4; f++) {
+      const fx = s * (0.12 + f * 0.025);
+      G.add(organic(limb([fx, 0.035, 0.18], [fx + s * f * 0.006, 0.02, 0.26], [0.022, 0.02], 8, 0.8, 2), 0.003, 30), sh, 1);
+    }
+  }
   return G.build();
 }
 
@@ -351,6 +528,14 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
         float zN1 = zn3(zp * 9.0), zN2 = zn3(zp * 23.0), zN3 = zn3(zp * 4.0);
         vec3 skin = mix(vec3(0.19, 0.2, 0.16), vec3(0.25, 0.22, 0.2), fract(vZSeed * 3.7)) * (0.7 + 0.5 * zN1);
         skin = mix(skin, vec3(0.16, 0.13, 0.15), smoothstep(0.62, 0.8, zN3) * 0.6);  // bruising
+        if (vZType > 3.5) {
+          // the giant's hide: grey-green, mottled with necrotic patches and dark veins
+          skin = vec3(0.085, 0.09, 0.075) * (0.6 + 0.6 * zN1);
+          skin = mix(skin, vec3(0.1, 0.07, 0.08), smoothstep(0.55, 0.78, zN3) * 0.75);
+          float vein = 1.0 - smoothstep(0.0, 0.035, abs(zn3(zp * 5.0) - 0.5));
+          skin = mix(skin, vec3(0.09, 0.02, 0.03), vein * 0.7);
+          skin = mix(skin, vec3(0.2, 0.03, 0.02), smoothstep(0.78, 0.9, zn3(zp * 11.0)) * 0.8); // raw sores
+        }
         float sleeveLong = step(0.5, fract(vZSeed * 5.3));
         float mid = vZMat;
         if (mid > 0.5 && mid < 1.5 && (vZPart > 8.5) && sleeveLong > 0.5 && vZL.y > 0.95) mid = 0.0;
@@ -379,7 +564,12 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
           float band = step(abs(vZL.y - 1.16), 0.025) + step(abs(vZL.y - 1.3), 0.025);
           zc = mix(zc, vec3(0.7), clamp(band, 0.0, 1.0));
           zGore = max(zGore, smoothstep(0.5, 0.8, zN3) * 0.6);
-        } else zc = mix(vec3(0.05, 0.035, 0.025), vec3(0.32, 0.24, 0.12), step(0.8, fract(vZSeed * 9.1))) * (0.7 + 0.5 * zN2);
+        } else if (mid < 8.5) zc = mix(vec3(0.05, 0.035, 0.025), vec3(0.32, 0.24, 0.12), step(0.8, fract(vZSeed * 9.1))) * (0.7 + 0.5 * zN2);
+        else {
+          // bone: dirty ivory, darker and bloodied at the root
+          zc = vec3(0.42, 0.38, 0.3) * (0.7 + 0.45 * zN2);
+          zGore = max(zGore, smoothstep(0.55, 0.85, zN1) * 0.55);
+        }
         zc = mix(zc, vec3(0.13, 0.01, 0.008), zGore * (1.0 - zEyeF));
         // cavity darkening: armpits, crotch, under the chin
         float zAO = 0.65 + 0.35 * smoothstep(0.0, 0.5, vZL.y);
@@ -389,7 +579,9 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
         diffuseColor.rgb *= zc;`)
       .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
         roughnessFactor = mix(roughnessFactor, 0.28, max(step(3.5, vZMat) * step(vZMat, 4.5), zGore * 0.8));
-        roughnessFactor = mix(roughnessFactor, 0.55, step(5.5, vZMat) * step(vZMat, 6.5));`)
+        roughnessFactor = mix(roughnessFactor, 0.55, step(5.5, vZMat) * step(vZMat, 6.5));
+        roughnessFactor = mix(roughnessFactor, 0.45, step(8.5, vZMat));
+        if (vZType > 3.5 && vZMat > 0.5 && vZMat < 1.5) roughnessFactor = 0.78 + 0.2 * zN2; // leathery, matte: the searchlights live on it`)
       .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
         totalEmissiveRadiance += zEyeF * vec3(1.0, 0.82, 0.5) * uEyeGlow * (1.0 - uCorpse);
         float zRim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
@@ -405,7 +597,7 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
           gl_FragColor.rgb = mix(gl_FragColor.rgb, lbF.rgb, lbF.a);
         #endif`);
   };
-  mat.customProgramCacheKey = () => 'zombie-v2';
+  mat.customProgramCacheKey = () => 'zombie-v3';
   return mat;
 }
 
@@ -449,7 +641,8 @@ void main() {
   vUv = position.xy * 2.0;
   float fog = lbFog(world.xyz, cameraPosition, lbFogColor, lbTime, lbDawn).a * 0.55;
   vA = facing * (1.0 - step(0.5, aState.w)) * (1.0 + min(aState.w, 0.0)) * (1.0 - fog) * pow(worldSize / size, 0.55)
-     * smoothstep(12.0, 30.0, dist) * uEyeGlow * (1.0 - clamp(aState.y, 0.0, 1.0));
+     * smoothstep(12.0, 30.0, dist) * uEyeGlow * (1.0 - clamp(aState.y, 0.0, 1.0))
+     * (aAnim.z > 3.5 ? smoothstep(90.0, 150.0, dist) : 1.0);  // a giant's own eyes read up close; pin-pricks only far off
 }`;
 
 const EYE_FRAG = /* glsl */`

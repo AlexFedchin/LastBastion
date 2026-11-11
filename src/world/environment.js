@@ -236,16 +236,18 @@ export class Environment {
     if (fx) this.updateCombat(dt, fx);
 
     // city fires flicker, aviation lights blink, a candle in a village window
+    // (none of these are fogged geometry: a fog bank has to hide them by hand)
+    const clear = 1 - (d < 0.01 ? this.fogBank : 0);
     for (const f of this.cityFires) {
       const k = 0.75 + 0.25 * Math.sin(time * 1.3 + f.ph) * Math.sin(time * 2.9 + f.ph * 2);
-      f.sprite.material.color.copy(f.base).multiplyScalar(k * (1 - d * 0.6));
+      f.sprite.material.color.copy(f.base).multiplyScalar(k * (1 - d * 0.6) * clear * clear);
     }
-    for (const b of this.blinkers) b.sprite.visible = Math.sin(time * b.rate * 3.1 + b.ph) > 0.55;
+    for (const b of this.blinkers) b.sprite.visible = clear > 0.5 && Math.sin(time * b.rate * 3.1 + b.ph) > 0.55;
     for (const w of this.flickerWindows) w.material.color.setRGB(2.2, 1.2, 0.45).multiplyScalar(0.7 + 0.3 * Math.sin(time * 7 + w.id) * Math.sin(time * 3.3));
     for (const b of this.skyBeams) {
       b.mesh.rotation.z = Math.sin(time * b.sp + b.ph) * 0.4;
       b.mesh.rotation.x = -0.28 + Math.cos(time * b.sp * 0.7 + b.ph) * 0.12;
-      b.mesh.material.uniforms.uI.value = 0.022 * (1 - d);
+      b.mesh.material.uniforms.uI.value = 0.022 * (1 - d) * clear * clear;
     }
     this.beacon.material.opacity = Math.sin(time * 3) > 0.6 ? 1 : 0.05;
 
@@ -296,7 +298,8 @@ export class Environment {
     const fc = this.scene.fog.color;
     fc.copy(this.nightFog).lerp(this.dawnFog, d);
     const bank = d < 0.01 ? this.fogBank : 0;
-    if (bank > 0.001) fc.multiplyScalar(1 + bank * 1.5);
+    if (bank > 0.001) fc.multiplyScalar(1 + bank * 2.2);
+    su.uBank.value = bank;
     if (this.flash > 0) fc.offsetHSL(0, 0, 0).add(_flashCol.setRGB(0.012, 0.014, 0.02).multiplyScalar(su.uFlash.value));
     this.scene.fog.near = time;
     this.scene.fog.far = bank > 0.001 ? 2 + bank : d;

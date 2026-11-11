@@ -5,7 +5,7 @@ import {
   ZOMBIE_TYPES, ZT, WORLD, wallZ, wallDist, wallFacing, sectionOf, PILE,
   ZOMBIE_HEIGHT, HEADSHOT_FRAC, WING_COS,
 } from '../config.js';
-import { createZombieGeometry, createZombieMaterial, createZombieDepthMaterial, createEyeMesh } from './zombieModel.js';
+import { createZombieGeometry, createGiantGeometry, createZombieMaterial, createZombieDepthMaterial, createEyeMesh } from './zombieModel.js';
 import { rand } from '../core/util.js';
 import { groundH } from '../world/terrain.js';
 import { fogUniforms } from '../render/atmosphere.js';
@@ -40,15 +40,17 @@ class CorpseField {
     this.near = new Corpses(scene, Math.round(cap * 0.45), uniforms, 1);
     this.far = new Corpses(scene, Math.round(cap * 0.55), uniforms, 2);
     this.near2 = 62 * 62;
+    this.giant = new Corpses(scene, 3, uniforms, 'giant');
   }
   set onLand(fn) { this.near.onLand = fn; this.far.onLand = fn; }
-  get count() { return this.near.count + this.far.count; }
-  add(x, y, z, ...rest) {
+  get count() { return this.near.count + this.far.count + this.giant.count; }
+  add(x, y, z, yaw, scale, type, ...rest) {
     const dx = x - WORLD.CAM.x, dz = z - WORLD.CAM.z;
-    (dx * dx + dz * dz < this.near2 ? this.near : this.far).add(x, y, z, ...rest);
+    const C = type === ZT.GIANT ? this.giant : (dx * dx + dz * dz < this.near2 ? this.near : this.far);
+    C.add(x, y, z, yaw, scale, type, ...rest);
   }
-  update(dt) { this.near.update(dt); this.far.update(dt); }
-  clear() { this.near.clear(); this.far.clear(); }
+  update(dt) { this.near.update(dt); this.far.update(dt); this.giant.update(dt); }
+  clear() { this.near.clear(); this.far.clear(); this.giant.clear(); }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -57,7 +59,7 @@ class Corpses {
     this.cap = cap;
     this.head = 0;
     this.count = 0;
-    const geo = createZombieGeometry(lod);
+    const geo = lod === 'giant' ? createGiantGeometry() : createZombieGeometry(lod);
     this.aAnim = addInstanced(geo, 'aAnim', cap, 4);
     this.aState = addInstanced(geo, 'aState', cap, 4);
     this.aTint = addInstanced(geo, 'aTint', cap, 3);
@@ -65,7 +67,7 @@ class Corpses {
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
     this.mesh.receiveShadow = true;
-    this.mesh.castShadow = false;
+    this.mesh.castShadow = lod === 'giant';
     this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     scene.add(this.mesh);
 
@@ -268,13 +270,14 @@ export class Horde {
     // rendering: living — detailed mesh close to the wall, boxes far away
     const mat = createZombieMaterial(uniforms);
     const depth = createZombieDepthMaterial(uniforms);
-    this.lods = [createZombieGeometry(0), createZombieGeometry(2)].map((geo) => {
+    // (and the giants, few and huge, on a sculpted mesh of their own)
+    this.lods = [createZombieGeometry(0), createZombieGeometry(2), createGiantGeometry()].map((geo, li) => {
       const L = {
-        aAnim: addInstanced(geo, 'aAnim', N, 4),
-        aState: addInstanced(geo, 'aState', N, 4),
-        aTint: addInstanced(geo, 'aTint', N, 3),
+        aAnim: addInstanced(geo, 'aAnim', li === 2 ? 4 : N, 4),
+        aState: addInstanced(geo, 'aState', li === 2 ? 4 : N, 4),
+        aTint: addInstanced(geo, 'aTint', li === 2 ? 4 : N, 3),
       };
-      L.mesh = new THREE.InstancedMesh(geo, mat, N);
+      L.mesh = new THREE.InstancedMesh(geo, mat, li === 2 ? 4 : N);
       L.mesh.customDepthMaterial = depth;
       L.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       L.mesh.count = 0;
@@ -805,12 +808,12 @@ export class Horde {
     const n = this.n;
     const M = this.eyes.instanceMatrix.array;
     const A = this.aAnim.array, S = this.aState.array, T = this.tintBuf;
-    const near = this.lods[0], far = this.lods[1];
-    const MN = near.mesh.instanceMatrix.array, MF = far.mesh.instanceMatrix.array;
+    const near = this.lods[0], far = this.lods[1], big = this.lods[2];
+    const MN = near.mesh.instanceMatrix.array, MF = far.mesh.instanceMatrix.array, MG = big.mesh.instanceMatrix.array;
     const AN = near.aAnim.array, AF = far.aAnim.array, SN = near.aState.array, SF = far.aState.array, TN = near.aTint.array, TF = far.aTint.array;
     const cx = WORLD.CAM.x, cz = WORLD.CAM.z, lim = this.lodNear2;
     const fire = this.fire;
-    let a = 0, b = 0;
+    let a = 0, b = 0, gi = 0;
     for (let i = 0; i < n; i++) {
       const c = Math.cos(this.yaw[i]), s = Math.sin(this.yaw[i]);
       const sc = this.scale[i];
@@ -818,7 +821,7 @@ export class Horde {
       const x = this.x[i], z = this.z[i];
       const y = this.y[i] + groundH(x, z);
       const ty = this.type[i];
-      const wide = ty === ZT.BLOATER ? 1.25 : (ty === ZT.BRUTE ? 1.12 : (ty === ZT.GIANT ? 1.18 : 1));
+      const wide = ty === ZT.BLOATER ? 1.25 : (ty === ZT.BRUTE ? 1.12 : 1);  // the giant's own mesh is built at its proportions
       M[o] = c * sc * wide; M[o + 1] = 0; M[o + 2] = -s * sc * wide; M[o + 3] = 0;
       M[o + 4] = 0; M[o + 5] = sc; M[o + 6] = 0; M[o + 7] = 0;
       M[o + 8] = s * sc * wide; M[o + 9] = 0; M[o + 10] = c * sc * wide; M[o + 11] = 0;
@@ -831,7 +834,8 @@ export class Horde {
       // copy into the LOD that draws it
       const dx = x - cx, dz = z - cz;
       let k, LM, LA, LS, LT;
-      if (dx * dx + dz * dz < lim) { k = a++; LM = MN; LA = AN; LS = SN; LT = TN; } else { k = b++; LM = MF; LA = AF; LS = SF; LT = TF; }
+      if (ty === ZT.GIANT && gi < 4) { k = gi++; LM = MG; LA = big.aAnim.array; LS = big.aState.array; LT = big.aTint.array; }
+      else if (dx * dx + dz * dz < lim) { k = a++; LM = MN; LA = AN; LS = SN; LT = TN; } else { k = b++; LM = MF; LA = AF; LS = SF; LT = TF; }
       const ko = k * 16, k4 = k * 4, k3 = k * 3;
       for (let j = 0; j < 16; j++) LM[ko + j] = M[o + j];
       LA[k4] = A[q4]; LA[k4 + 1] = A[q4 + 1]; LA[k4 + 2] = A[q4 + 2]; LA[k4 + 3] = A[q4 + 3];
@@ -841,6 +845,7 @@ export class Horde {
     }
     near.mesh.count = a;
     far.mesh.count = b;
+    big.mesh.count = gi;
     this.eyes.count = n;
     this.blobs.count = n;
     const upd = (attr, cnt) => {
@@ -852,6 +857,7 @@ export class Horde {
     upd(this.eyes.instanceMatrix, n); upd(this.aAnim, n); upd(this.aState, n);
     upd(near.mesh.instanceMatrix, a); upd(near.aAnim, a); upd(near.aState, a); upd(near.aTint, a);
     upd(far.mesh.instanceMatrix, b); upd(far.aAnim, b); upd(far.aState, b); upd(far.aTint, b);
+    upd(big.mesh.instanceMatrix, gi); upd(big.aAnim, gi); upd(big.aState, gi); upd(big.aTint, gi);
   }
 
   /** 0..1 pressure per section for the HUD */

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { WORLD } from '../config.js';
 import { makeRng } from '../core/util.js';
 import { groundH } from './terrain.js';
-import { GLOW_RGB } from '../render/atmosphere.js';
+import { GLOW_RGB, FOG_CUSTOM_GLSL, fogUniforms } from '../render/atmosphere.js';
 
 export const NOISE_GLSL = /* glsl */`
 float zHash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
@@ -27,6 +27,7 @@ void main(){
 }`;
 const SKY_FRAG = /* glsl */`
 ${NOISE_GLSL}
+${FOG_CUSTOM_GLSL}
 varying vec3 vDir;
 uniform float uTime;
 uniform float uFlash;
@@ -36,6 +37,7 @@ uniform vec3 uHorizon;
 uniform vec3 uGlow;
 uniform float uGlowAmt;
 uniform float uCloudLight;
+uniform float uBank;
 void main(){
   vec3 d = normalize(vDir);
   float h = d.y;
@@ -60,6 +62,13 @@ void main(){
   col = mix(col, cloudCol, dens * 0.96);
   col += fl * 0.04 * vec3(0.6, 0.65, 0.8);
   col = mix(col, uHorizon + uGlow * glow, smoothstep(0.02, -0.06, h));
+  // fog bank: the sky goes too, leaving only a smear of the city's glow low down
+  // fog bank: the sky takes exactly the colour lbFog() gives far geometry, so whatever
+  // the bank swallows leaves no silhouette against it
+  if (uBank > 0.001) {
+    vec4 fb = lbFog(cameraPosition + d * 1400.0, cameraPosition, lbFogColor, lbTime, lbDawn);
+    col = mix(col, fb.rgb, uBank * fb.a);
+  }
   gl_FragColor = vec4(col, 1.0);
 }`;
 
@@ -73,6 +82,8 @@ export function buildSky(env) {
     uGlow: { value: new THREE.Color(...GLOW_RGB) },
     uGlowAmt: { value: 1 },
     uCloudLight: { value: 1 },
+    uBank: { value: 0 },
+    ...fogUniforms,
   };
   const sky = new THREE.Mesh(
     new THREE.SphereGeometry(1500, 48, 24),

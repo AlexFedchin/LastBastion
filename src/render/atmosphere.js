@@ -39,8 +39,9 @@ vec4 lbFog(vec3 wp, vec3 cam, vec3 baseCol, float t, float dawn){
   float Db = mix(${f(NIGHT.Db)}, ${f(DAWN.Db)}, dawn);
   float D0 = mix(${f(NIGHT.D0)}, ${f(DAWN.D0)}, dawn);
   float b = mix(${f(NIGHT.b)}, ${f(DAWN.b)}, dawn);
-  Db *= 1.0 + bank * 5.5;
-  D0 *= 1.0 + bank * 3.0;
+  // a real bank: the wall base still reads (~30% at 15 m), the field is gone past ~80 m
+  Db *= 1.0 + bank * 19.0;
+  D0 *= 1.0 + bank * 5.0;
   b = mix(b, 0.045, bank);
   // drifting, patchy ground mist
   float m = lbNoise(wp.xz * 0.012 + t * vec2(0.010, 0.0035)) * 0.62 + lbNoise(wp.xz * 0.041 - t * vec2(0.004, 0.016)) * 0.38;
@@ -53,9 +54,12 @@ vec4 lbFog(vec3 wp, vec3 cam, vec3 baseCol, float t, float dawn){
   float toward = max(0.0, -dxz.y);
   float glow = toward * toward * exp(-max(rd.y, 0.0) * 13.0) * mix(1.0, 0.35, dawn);
   glow *= 1.0 - exp(-max(d - 120.0, 0.0) / 700.0);   // only long paths pick up the city's light
+  glow *= 1.0 - 0.75 * bank;                          // a dense bank swallows most of it
   vec3 G = vec3(${GLOW_RGB.map(f).join(', ')});
   vec3 cb = baseCol + G * glow;
-  vec3 ch = baseCol * 1.75 + G * glow * 0.55;
+  // inside a bank everything is one milky colour: the haze/mist tint split (weighted by
+  // mist noise at the far end of the ray) would otherwise draw fogged-out skylines
+  vec3 ch = mix(baseCol * 1.75 + G * glow * 0.55, cb, bank);
   float tau = (tb + th) * LB_FOG_SCALE;
   vec3 col = (cb * tb + ch * th) / max(tb + th, 1e-6);
   return vec4(col, 1.0 - exp(-tau));

@@ -68,7 +68,7 @@ export const ZOMBIE_TYPES = [
   { name: 'Brute',    hp: 330, speed: [1.55, 1.85], scale: [1.5, 1.66], radius: 0.36, weight: 3, supplies: 8, animK: 2.3, lean: [0.18, 0.28] },
   { name: 'Bloater',  hp: 95, speed: [1.35, 1.65], scale: [1.12, 1.24], radius: 0.42, weight: 2, supplies: 3, animK: 3.1, lean: [-0.08, 0.05] },
   // event boss only (never in the night mix): see EVENTS.giant
-  { name: 'Giant',    hp: 14000, speed: [1.5, 1.6], scale: [3.9, 4.1], radius: 0.4, weight: 0, supplies: 120, animK: 2.3, lean: [0.14, 0.2] },
+  { name: 'Giant',    hp: 14000, speed: [1.5, 1.6], scale: [3.9, 4.1], radius: 0.4, weight: 0, supplies: 120, animK: 2.3, lean: [0.32, 0.4] },
 ];
 
 export const ZOMBIE_HEIGHT = 1.8;
