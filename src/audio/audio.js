@@ -180,7 +180,7 @@ export class AudioEngine {
     this.musicMode = 'menu';
     this._mi = 0;         // smoothed music intensity
     this._tideOn = false;
-    this._hmgLast = 0; this._hmgCount = 0;
+    this._hmgLast = 0; this._hmgCount = 0; this._hmgVoices = [];
     this._lastHitSound = 0;
     this._radioUntil = 0;
     this._gust = 0.4; this._gustV = 0;
@@ -287,20 +287,23 @@ export class AudioEngine {
 
     // the M2: its own heavy chain — low-end shelf, chest and bite EQ, tape-style
     // saturation and a fast compressor that keeps every round hitting hard
+    // (kept lean in the lows: heavy low shelf + saturation turned a burst into a hum)
     this.hmgIn = ctx.createGain(); this.hmgIn.gain.value = 1;
-    const shelf = ctx.createBiquadFilter(); shelf.type = 'lowshelf'; shelf.frequency.value = 120; shelf.gain.value = 7;
-    const chest = ctx.createBiquadFilter(); chest.type = 'peaking'; chest.frequency.value = 230; chest.Q.value = 0.9; chest.gain.value = 3;
-    const mud = ctx.createBiquadFilter(); mud.type = 'peaking'; mud.frequency.value = 600; mud.Q.value = 1.2; mud.gain.value = -2.5;
-    const bite = ctx.createBiquadFilter(); bite.type = 'peaking'; bite.frequency.value = 3200; bite.Q.value = 0.8; bite.gain.value = 3;
-    const drive = ctx.createGain(); drive.gain.value = 1.15;
+    const rumble = ctx.createBiquadFilter(); rumble.type = 'highpass'; rumble.frequency.value = 42; rumble.Q.value = 0.7;
+    const shelf = ctx.createBiquadFilter(); shelf.type = 'lowshelf'; shelf.frequency.value = 110; shelf.gain.value = 2.5;
+    const chest = ctx.createBiquadFilter(); chest.type = 'peaking'; chest.frequency.value = 200; chest.Q.value = 1.0; chest.gain.value = 2;
+    const mud = ctx.createBiquadFilter(); mud.type = 'peaking'; mud.frequency.value = 450; mud.Q.value = 1.0; mud.gain.value = -4;
+    const bite = ctx.createBiquadFilter(); bite.type = 'peaking'; bite.frequency.value = 2800; bite.Q.value = 0.7; bite.gain.value = 5;
+    const drive = ctx.createGain(); drive.gain.value = 1.0;
     const shaper = ctx.createWaveShaper();
     const curve = new Float32Array(2048);
-    for (let i = 0; i < curve.length; i++) { const x = i / (curve.length - 1) * 2 - 1; curve[i] = Math.tanh(x * 2.4) / Math.tanh(2.4); }
+    for (let i = 0; i < curve.length; i++) { const x = i / (curve.length - 1) * 2 - 1; curve[i] = Math.tanh(x * 1.6) / Math.tanh(1.6); }
     shaper.curve = curve; shaper.oversample = '4x';
+    // slower attack so the crack of every round gets through before the squeeze
     const hcomp = ctx.createDynamicsCompressor();
-    hcomp.threshold.value = -16; hcomp.knee.value = 6; hcomp.ratio.value = 4; hcomp.attack.value = 0.003; hcomp.release.value = 0.08;
-    const hout = ctx.createGain(); hout.gain.value = 0.6;
-    this.hmgIn.connect(shelf); shelf.connect(chest); chest.connect(mud); mud.connect(bite); bite.connect(drive);
+    hcomp.threshold.value = -9; hcomp.knee.value = 6; hcomp.ratio.value = 2.5; hcomp.attack.value = 0.008; hcomp.release.value = 0.06;
+    const hout = ctx.createGain(); hout.gain.value = 0.74;
+    this.hmgIn.connect(rumble); rumble.connect(shelf); shelf.connect(chest); chest.connect(mud); mud.connect(bite); bite.connect(drive);
     drive.connect(shaper); shaper.connect(hcomp); hcomp.connect(hout); hout.connect(this.sfx);
     const hrev = ctx.createGain(); hrev.gain.value = 0.3; hout.connect(hrev); hrev.connect(this.reverbSend);
 
@@ -521,12 +524,34 @@ export class AudioEngine {
   // ── the gun ────────────────────────────────────────────────────────────────
   hmg() {
     if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    // choke the previous round: at 10 rounds a second its ~0.9 s low body would
+    // still be ringing under the next eight, and together they blur into a drone.
+    // Each round gets its own crack and thump; only the last one of a burst rings
+    // out (followed by the valley's answer, see update()).
+    for (const v of this._hmgVoices) {
+      if (!v) continue;
+      const g = v.gain.gain;
+      g.cancelScheduledValues(t);
+      g.setValueAtTime(g.value, t + 0.006);
+      g.setTargetAtTime(0, t + 0.006, 0.014);
+      try { v.src.stop(t + 0.12); } catch { /* already stopped */ }
+    }
     const pan = rand(-0.04, 0.04);
-    // recorded report, pitched a touch down for weight, through the heavy chain
-    this.play(this.pickVar('hmg'), { gain: 0.5, rate: rand(0.86, 0.93), pan, reverb: 0.2, bus: 'hmg', force: true });
-    // the punch: sub kick, blast, crack and the bolt
-    this.play(this.pickVar('punch'), { gain: 0.62, rate: rand(0.94, 1.04), pan, bus: 'hmg', force: true });
-    this._hmgLast = this.ctx.currentTime;
+    // recorded report through the heavy chain
+    const report = this.play(this.pickVar('hmg'), { gain: 0.95, rate: rand(0.97, 1.03), pan, reverb: 0.2, bus: 'hmg', force: true });
+    // the recorded slices hold their level for ~150 ms (they're cut from continuous
+    // fire), so shape each into a round: full crack, then a quick fall to a low body
+    // that the next round chokes, or that rings on if this was the last one
+    if (report) {
+      const g = report.gain.gain, v = g.value;
+      g.setValueAtTime(v, t + 0.016);
+      g.setTargetAtTime(v * 0.14, t + 0.016, 0.022);
+    }
+    // the punch: a little sub and the bolt under the report (kept well below it: louder, it was a hum)
+    const punch = this.play(this.pickVar('punch'), { gain: 0.2, rate: rand(0.97, 1.05), pan, bus: 'hmg', force: true });
+    this._hmgVoices = [report, punch];
+    this._hmgLast = t;
     this._hmgCount++;
   }
 

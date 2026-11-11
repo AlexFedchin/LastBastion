@@ -61,7 +61,8 @@ export function makePunch(ctx, seed) {
       // sub kick: a fast pitch drop into the chest
       const f = subF + subTop * Math.exp(-t / 0.02);
       ph += TAU * f / sr;
-      sub[i] = Math.sin(ph) * (1 - Math.exp(-t / 0.0007)) * Math.exp(-t / 0.085);
+      // (short: at 10 rounds a second a longer sub stacks into a drone)
+      sub[i] = Math.sin(ph) * (1 - Math.exp(-t / 0.0007)) * Math.exp(-t / 0.045);
       const w = R();
       // muzzle blast body
       lb += aBody * (w - lb);
@@ -71,7 +72,7 @@ export function makePunch(ctx, seed) {
       crack[i] = (w - lc) * Math.exp(-t / 0.0022);
       // pressure wave rolling off — the heavy air
       la1 += aAir * (w - la1); la2 += aAir * (la1 - la2);
-      air[i] = la2 * Math.min(1, t / 0.006) * Math.exp(-t / 0.16);
+      air[i] = la2 * Math.min(1, t / 0.006) * Math.exp(-t / 0.06);
       // bolt slamming home ~28 ms later
       const tm = t - 0.028;
       if (tm > 0) {
@@ -83,7 +84,8 @@ export function makePunch(ctx, seed) {
     for (const a of [sub, body, crack, air, mech]) normalize(a, 1);
     const out = new Float32Array(n);
     for (let i = 0; i < n; i++) {
-      const x = sub[i] * 0.95 + body[i] * 0.55 + crack[i] * 0.42 + air[i] * 0.75 + mech[i] * 0.07;
+      // crack and the bolt's clack up front: that's what makes it read as a gun
+      const x = sub[i] * 0.8 + body[i] * 0.6 + crack[i] * 0.7 + air[i] * 0.4 + mech[i] * 0.22;
       out[i] = Math.tanh(x * 1.5);
     }
     chans.push(normalize(out, 0.95));
