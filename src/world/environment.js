@@ -121,7 +121,7 @@ export class Environment {
       const tx = side * 77, tz = wallZ(77) + 2;
       const spot = new THREE.SpotLight(0xe4ecff, 0, 330, 0.115, 0.5, 1.15);
       spot.position.set(tx, groundH(tx, tz) + 17.2, tz);
-      spot.intensity = 2200;
+      spot.intensity = 650;
       const shadow = q.spotShadows > k;
       spot.castShadow = shadow;
       // shadow maps are refreshed on alternate frames (see update): half the shadow passes
@@ -284,7 +284,7 @@ export class Environment {
       sl.beam.quaternion.setFromUnitVectors(_down, _dir);
       sl.beam.material.uniforms.uTime.value = time;
       sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d) * this.power;
-      sl.spot.intensity = 2200 * (1 - d * 0.85) * this.power;
+      sl.spot.intensity = 650 * (1 - d * 0.85) * this.power;
       if (sl.spot.castShadow && shadowNow) sl.spot.shadow.needsUpdate = true;
       const hs = this.towerHousings[k];
       if (hs) hs.lookAt(sl.aim);

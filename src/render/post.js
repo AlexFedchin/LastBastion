@@ -27,7 +27,7 @@ class ScenePass extends Pass {
     // clamp extreme HDR before bloom: stacked fires must glow, not white out the frame.
     // Also scrub NaN/Inf — bloom would blur a single bad pixel into a black screen.
     this.mat = new THREE.ShaderMaterial({
-      uniforms: { tDiffuse: { value: this.rt.texture }, uMax: { value: 4.0 } },
+      uniforms: { tDiffuse: { value: this.rt.texture }, uMax: { value: 3.0 } },
       vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
       fragmentShader: 'uniform sampler2D tDiffuse; uniform float uMax; varying vec2 vUv; void main(){ vec3 c = texture2D(tDiffuse, vUv).rgb; if (any(isnan(c)) || any(isinf(c))) c = vec3(0.0); c = max(c, vec3(0.0)); float m = max(c.r, max(c.g, c.b)); c *= m > uMax ? uMax / m : 1.0; gl_FragColor = vec4(c, 1.0); }',
       depthTest: false, depthWrite: false,
@@ -64,9 +64,9 @@ const FinalShader = {
     uRadial: { value: 0 },
     uFade: { value: 1 },
     uWarm: { value: 0 },
-    uFlare: { value: 0.1 },
-    uStreak: { value: 0.09 },
-    uDirt: { value: 0.22 },
+    uFlare: { value: 0.035 },
+    uStreak: { value: 0.025 },
+    uDirt: { value: 0.07 },
     uBarrel: { value: 0.025 },
     uHeat: { value: Array.from({ length: MAX_HEAT }, () => new THREE.Vector4()) },
     uHeatN: { value: 0 },
@@ -224,7 +224,8 @@ export class Post {
     this.composer = new EffectComposer(renderer, rt);
     this.scenePass = new ScenePass(scene, camera, size.x, size.y, quality.msaa);
     this.composer.addPass(this.scenePass);
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x * quality.bloomScale, size.y * quality.bloomScale), 0.85, 0.38, 1.0);
+    // subtle and tight: a soft glow round hot things, not a haze over the frame
+    this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x * quality.bloomScale, size.y * quality.bloomScale), 0.42, 0.22, 1.0);
     this.composer.addPass(this.bloom);
     this.final = new ShaderPass(FinalShader);
     this.composer.addPass(this.final);

@@ -583,8 +583,8 @@ export class Arsenal {
         y = Math.max(2, 72 - ht * 2.4);
         const life = 1 - ht / f.life;
         const flick = 0.82 + R() * 0.18;
-        if (f.light) { f.light.position.set(x, y, z); f.light.intensity = 2600 * Math.min(1, ht * 2) * Math.min(1, life * 4) * flick; }
-        fx.glowDot(x, y, z, 2.6 * flick, 9, 6, 4.5, 0.05);
+        if (f.light) { f.light.position.set(x, y, z); f.light.intensity = 480 * Math.min(1, ht * 2) * Math.min(1, life * 4) * flick; }
+        fx.glowDot(x, y, z, 1.8 * flick, 6, 4, 3, 0.05);
         if (R() < 0.4) fx.smokePuff(x, y, z, 1.2, 0.07, 6, 0.5);
         if (R() < 0.35) fx.spark(x, y, z, rand(-1, 1), rand(-2, 0), rand(-1, 1), 6, 4, 2, 1.2);
         this.flareZones.push({ x, z, r2: ABILITY.flare.radius * ABILITY.flare.radius });
