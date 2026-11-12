@@ -14,7 +14,7 @@
 // Kill sources are grouped so it's easy to see who is doing the work:
 //   gun      the fifty itself (hmg, he)
 //   called   what the player called in (arty, grenade, bomb, danger, fire*)
-//   support  autonomous help (gunner, gunship, mortar, mine, wire)
+//   support  autonomous help (gunner, rifle, gunship, mortar, mine, wire)
 //   chain    bloaters bursting, bodies at the wall
 // (*fire is mostly the napalm trench, plus incendiary rounds and burning wrecks)
 import { ZOMBIE_TYPES } from '../config.js';
@@ -22,7 +22,7 @@ import { ZOMBIE_TYPES } from '../config.js';
 const GROUP = {
   hmg: 'gun', he: 'gun',
   arty: 'called', grenade: 'called', bomb: 'called', danger: 'called', fire: 'called',
-  gunner: 'support', gunship: 'support', mortar: 'support', mine: 'support', wire: 'support',
+  gunner: 'support', rifle: 'support', gunship: 'support', mortar: 'support', mine: 'support', wire: 'support',
   bloater: 'chain', wall: 'chain',
 };
 const TYPE_NAMES = ZOMBIE_TYPES.map((t) => t.name.toLowerCase());

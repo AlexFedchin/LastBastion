@@ -2,7 +2,7 @@
 // grenades, danger-close, wall gunners, the mortar pit, claymores and wire.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { WORLD, wallZ, wallDist, WING_COS, ABILITY, CLAYMORE } from '../config.js';
+import { WORLD, wallZ, wallDist, WING_COS, WING_SIN, ABILITY, CLAYMORE } from '../config.js';
 import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
 import { groundH, raycastGround } from '../world/terrain.js';
@@ -17,7 +17,26 @@ function offsetZ(x, d) {
   return wallZ(x) - (ax <= WORLD.GATE_HALF ? d : d / WING_COS);
 }
 
+/** Tapered limb segment from a to b. */
+function segGeo(r0, r1, a, b) {
+  const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b);
+  const len = A.distanceTo(Bv);
+  const g = new THREE.CylinderGeometry(r1, r0, len, 8);
+  g.translate(0, len / 2, 0);
+  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), Bv.clone().sub(A).normalize()));
+  g.translate(A.x, A.y, A.z);
+  return g;
+}
+function boxGeo(w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); return g; }
+function mergeCrew(list) {
+  return mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal'].includes(k)) g.deleteAttribute(k); return g; }));
+}
+
 const GUNNER_POSTS = [-27, 27, -52, 52];
+// riflemen along the wings, clear of the gun nest and the M240 firing steps.
+// Atmosphere first: weak, inaccurate, and they spread their fire around.
+const RIFLE_POSTS = [-15, 16, -38.5, 39.5, -63, 64];
+const RIFLE = { damage: 5, spread: 0.05, mag: 30, range: 75 };
 
 export class Arsenal {
   constructor(scene, fx, audio, horde, env) {
@@ -65,6 +84,7 @@ export class Arsenal {
     scene.add(this.mineMesh);
 
     this.buildGunners();
+    this.buildRiflemen();
     this.buildWire();
     this.air = new AirSupport(this);
   }
@@ -230,17 +250,8 @@ export class Arsenal {
     const helm = new THREE.MeshStandardMaterial({ color: 0x353b2a, roughness: 0.6, metalness: 0.15 });
     const skin = new THREE.MeshStandardMaterial({ color: 0x5a4a3e, roughness: 0.7 });
     const gunM = new THREE.MeshStandardMaterial({ color: 0x1a1b1c, roughness: 0.5, metalness: 0.7 });
-    const seg = (r0, r1, a, b) => {
-      const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b);
-      const len = A.distanceTo(Bv);
-      const g = new THREE.CylinderGeometry(r1, r0, len, 8);
-      g.translate(0, len / 2, 0);
-      g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), Bv.clone().sub(A).normalize()));
-      g.translate(A.x, A.y, A.z);
-      return g;
-    };
-    const bx = (w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); return g; };
-    const mg = (list) => mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal'].includes(k)) g.deleteAttribute(k); return g; }));
+    const seg = segGeo, bx = boxGeo, mg = mergeCrew;
+    this.crewMats = { body, gear, helm, skin, gunM };
     // leaning into the parapet, shouldering a light machine gun
     const bodyGeo = mg([
       seg(0.075, 0.065, [0.12, 0.0, 0.25], [0.12, 0.48, 0.12]), seg(0.065, 0.055, [0.12, 0.48, 0.12], [0.11, 0.9, 0.1]),
@@ -351,6 +362,131 @@ export class Arsenal {
     if (g.shots % 2 === 0) fx.tracer(ox, oy, oz, ox + dx * endT, oy + dy * endT, oz + dz * endT, 480, 0.9, 6.5, 1.4, 0.6);
     fx.muzzle(ox, oy, oz, dx, dy, dz, 0.6);
     if (g.shots % 2 === 0) this.audio.wallGun(ox, oz);
+  }
+
+  // ── Riflemen ─────────────────────────────────────────────────────────────
+  buildRiflemen() {
+    this.riflemen = [];
+    const { body, gear, helm, skin, gunM } = this.crewMats;
+    const seg = segGeo, bx = boxGeo, mg = mergeCrew;
+    const SH = 1.36; // shoulder pivot: arms and rifle swing about it
+    // standing at the parapet, left foot forward
+    const bodyGeo = mg([
+      seg(0.08, 0.075, [0.1, 0.0, 0.18], [0.1, 0.47, 0.1]), seg(0.08, 0.095, [0.1, 0.47, 0.1], [0.1, 0.92, 0.06]),
+      seg(0.08, 0.075, [-0.1, 0.0, -0.16], [-0.1, 0.47, -0.08]), seg(0.08, 0.095, [-0.1, 0.47, -0.08], [-0.1, 0.92, 0.04]),
+      seg(0.16, 0.19, [0, 0.9, 0.05], [0, 1.4, -0.03]),
+      bx(0.1, 0.05, 0.24, 0.1, 0.03, 0.12), bx(0.1, 0.05, 0.24, -0.1, 0.03, -0.2),
+    ]);
+    const gearGeo = mg([
+      bx(0.4, 0.36, 0.3, 0, 1.18, 0.0, -0.1),
+      bx(0.08, 0.1, 0.05, -0.1, 1.06, -0.16, -0.1), bx(0.08, 0.1, 0.05, 0.0, 1.06, -0.16, -0.1), bx(0.08, 0.1, 0.05, 0.1, 1.06, -0.16, -0.1),
+      bx(0.3, 0.34, 0.15, 0, 1.2, 0.22, -0.1), bx(0.38, 0.06, 0.28, 0, 0.92, 0.04),
+    ]);
+    const helmGeo = mg([
+      (() => { const g = new THREE.SphereGeometry(0.145, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2); g.scale(1, 0.85, 1.1); g.translate(0, 1.64, -0.04); return g; })(),
+      bx(0.06, 0.05, 0.04, 0, 1.71, -0.18),
+    ]);
+    const headGeo = mg([(() => { const g = new THREE.SphereGeometry(0.105, 10, 8); g.translate(0, 1.59, -0.05); return g; })()]);
+    // arms + rifle, modelled around the shoulder pivot (y = 0 at the shoulder)
+    const armsGeo = mg([
+      seg(0.05, 0.045, [0.2, 0, 0.02], [0.24, -0.16, -0.14]), seg(0.045, 0.04, [0.24, -0.16, -0.14], [0.08, 0.0, -0.22]),
+      seg(0.05, 0.045, [-0.2, 0, 0.02], [-0.16, -0.17, -0.28]), seg(0.045, 0.04, [-0.16, -0.17, -0.28], [0.02, 0.02, -0.46]),
+    ]);
+    const rifleGeo = mg([
+      bx(0.05, 0.08, 0.36, 0.05, 0.06, -0.3), bx(0.045, 0.07, 0.22, 0.05, 0.03, 0.0), bx(0.03, 0.05, 0.03, 0.05, 0.13, -0.24),
+      bx(0.03, 0.15, 0.06, 0.05, -0.05, -0.3, 0.25), bx(0.03, 0.09, 0.04, 0.05, -0.02, -0.15, -0.3),
+      bx(0.055, 0.06, 0.22, 0.05, 0.06, -0.58),
+      seg(0.011, 0.011, [0.05, 0.065, -0.69], [0.05, 0.065, -0.92]),
+    ]);
+    const deckY = WORLD.WALL_H - 0.9;
+    for (const px of RIFLE_POSTS) {
+      const g = new THREE.Group();
+      for (const [geo, m] of [[bodyGeo, body], [gearGeo, gear], [helmGeo, helm], [headGeo, skin]]) g.add(new THREE.Mesh(geo, m));
+      const arms = new THREE.Group();
+      arms.position.set(0, SH, 0);
+      arms.add(new THREE.Mesh(armsGeo, body), new THREE.Mesh(rifleGeo, gunM));
+      const muzzle = new THREE.Object3D(); muzzle.position.set(0.05, 0.065, -0.93); arms.add(muzzle);
+      g.add(arms);
+      const nx = px > 0 ? WING_SIN : -WING_SIN, nz = WING_COS; // inward wall normal
+      const x = px + nx * 1.0, z = wallZ(px) + nz * 1.0;
+      g.position.set(x, deckY, z);
+      g.scale.setScalar(rand(0.95, 1.05));
+      const home = Math.atan2(nx, nz); // facing out over the wall
+      g.rotation.y = home;
+      this.scene.add(g);
+      this.riflemen.push({
+        group: g, arms, muzzle, x, z, home, yaw: home, pitch: -0.25, target: -1, targetId: 0,
+        retarget: rand(0, 1), shotT: rand(0.5, 2), burst: 0, ammo: 5 + ((RIFLE.mag * R()) | 0), reload: 0, kick: 0,
+      });
+    }
+  }
+
+  updateRiflemen(dt) {
+    const h = this.horde;
+    for (const r of this.riflemen) {
+      r.kick = Math.max(0, r.kick - dt * 9);
+      r.retarget -= dt;
+      if (r.target >= 0 && (r.target >= h.n || h.id[r.target] !== r.targetId || h.dead[r.target])) { r.target = -1; r.retarget = Math.min(r.retarget, rand(0.15, 0.5)); }
+      if (r.retarget <= 0) {
+        // pick a random contact in the field ahead: spread the fire, cheap to find
+        r.retarget = rand(0.8, 1.6);
+        const cx = r.x - Math.sin(r.home) * 32, cz = r.z - Math.cos(r.home) * 32;
+        const n = h.queryRadius(cx, cz, 38, h._q);
+        r.target = n ? h._q[(R() * n) | 0] : -1;
+        if (r.target >= 0) r.targetId = h.id[r.target];
+      }
+      let wantYaw = r.home, wantPitch = -0.3;
+      const i = r.target;
+      if (i >= 0) {
+        const dx = h.x[i] - r.x, dz = h.z[i] - r.z;
+        const d = Math.sqrt(dx * dx + dz * dz);
+        let dy = Math.atan2(-dx, -dz) - r.home; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        if (d > RIFLE.range || Math.abs(dy) > 1.1) { r.target = -1; r.retarget = Math.min(r.retarget, 0.2); }
+        else {
+          wantYaw = r.home + dy;
+          wantPitch = clamp(Math.atan2(h.y[i] + h.scale[i] - (r.group.position.y + 1.4), d), -0.35, 0.15);
+        }
+      }
+      if (r.reload > 0) { r.reload -= dt; wantPitch = -0.85; }
+      r.yaw += (wantYaw - r.yaw) * Math.min(1, dt * 4);
+      r.pitch += (wantPitch - r.pitch) * Math.min(1, dt * (r.reload > 0 ? 5 : 7));
+      r.group.rotation.y = r.yaw;
+      r.arms.rotation.x = r.pitch + r.kick * 0.09;
+      r.arms.position.z = r.kick * 0.045;
+      if (r.target < 0 || r.reload > 0) continue;
+      r.shotT -= dt;
+      if (r.shotT > 0) continue;
+      this.rifleShot(r, r.target);
+      r.kick = 1;
+      if (--r.ammo <= 0) { r.ammo = RIFLE.mag; r.reload = rand(2.4, 3.6); r.burst = 0; r.shotT = rand(0.3, 0.8); continue; }
+      if (++r.burst >= 2 + ((R() * 5) | 0)) { r.burst = 0; r.shotT = rand(0.7, 2.2); }
+      else r.shotT = rand(0.16, 0.42);
+    }
+  }
+
+  rifleShot(r, i) {
+    const h = this.horde, fx = this.fx;
+    r.group.updateMatrixWorld();
+    r.muzzle.getWorldPosition(_v);
+    const ox = _v.x, oy = _v.y, oz = _v.z;
+    const ty = h.y[i] + 1.1 * h.scale[i] + rand(-0.4, 0.5);
+    let dx = h.x[i] - ox, dy = ty - oy, dz = h.z[i] - oz;
+    const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    const sp = RIFLE.spread;
+    dx = dx / d + (R() - 0.5) * sp * 2; dy = dy / d + (R() - 0.5) * sp * 2; dz = dz / d + (R() - 0.5) * sp * 2;
+    const l = Math.sqrt(dx * dx + dy * dy + dz * dz); dx /= l; dy /= l; dz /= l;
+    const gt = raycastGround(ox, oy, oz, dx, dy, dz, 200);
+    let endT = gt >= 0 ? gt : 200;
+    const cnt = h.raycast(ox, oy, oz, dx, dy, dz, endT, 1);
+    if (cnt > 0 && h.hitT[0] < endT) {
+      endT = h.hitT[0];
+      const head = h.hitFrac[0] > 0.83;
+      h.damage(h.hitIdx[0], RIFLE.damage * (head ? 2 : 1), 'rifle', dx, dy, dz, head);
+      fx.fleshHit(ox + dx * endT, oy + dy * endT, oz + dz * endT, dx, dy, dz, 0.5);
+    } else if (gt >= 0) fx.groundHit(ox + dx * endT, oz + dz * endT);
+    if (R() < 0.6) fx.tracer(ox, oy, oz, ox + dx * endT, oy + dy * endT, oz + dz * endT, 560, 0.55, 6.5, 1.6, 0.6);
+    fx.muzzle(ox, oy, oz, dx, dy, dz, 0.3);
+    this.audio.rifle(ox, oz);
   }
 
   // ── Mortar ───────────────────────────────────────────────────────────────
@@ -634,6 +770,7 @@ export class Arsenal {
 
     this.air.update(dt);
     this.updateGunners(dt);
+    this.updateRiflemen(dt);
     this.updateMortar(dt);
     this.updateMines(dt);
     void time;

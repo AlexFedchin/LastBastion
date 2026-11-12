@@ -612,6 +612,8 @@ export class AudioEngine {
     this.play(this.B.steam_long[0], { gain: 0.45, delay: 0.25, force: true });
   }
 
+  // the riflemen: the same rifle report, pitched up and kept back in the mix
+  rifle(x, z) { this.play(this.pickVar('mg'), { gain: 0.13, rate: rand(1.18, 1.34), x, z, ref: 22, reverb: 0.5, key: 'rifle', max: 4 }); }
   wallGun(x, z) { this.play(this.pickVar('mg'), { gain: 0.3, rate: rand(0.94, 1.08), x, z, ref: 25, reverb: 0.45, key: 'mg', max: 10 }); }
 
   // ── ordnance ───────────────────────────────────────────────────────────────
