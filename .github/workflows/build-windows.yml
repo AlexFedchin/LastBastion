@@ -1,11 +1,9 @@
 name: Build Windows .exe
 
-# Started by hand from the Actions tab ("Run workflow"); a pushed v* tag still
-# builds and publishes the release on its own.
+# Started by hand from the Actions tab ("Run workflow"). Run it on a v* tag
+# (pick the tag in the branch dropdown) to also publish the release.
 on:
   workflow_dispatch:
-  push:
-    tags: ['v*']
 
 permissions:
   contents: write
