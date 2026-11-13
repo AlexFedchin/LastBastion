@@ -7,6 +7,7 @@ import { WORLD, ABILITY, GUNSHIP, wallZ, wallDist, WING_COS, CALL, COMMS, isUnlo
 import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
 import { groundH } from '../world/terrain.js';
+import { cloneModel } from '../world/models.js';
 
 const R = Math.random;
 const _v = new THREE.Vector3();
@@ -42,82 +43,40 @@ function nose(r, len, x, y, z, dir = 1) {
   return g;
 }
 
-function propeller(mat) {
-  const p = new THREE.Group();
-  const blade = new THREE.BoxGeometry(0.28, 2.1, 0.06);
-  blade.translate(0, 1.05, 0);
-  const geo = merge([0, 1, 2, 3].map((k) => { const b = blade.clone(); b.rotateZ(k * Math.PI / 2); return b; }));
-  p.add(new THREE.Mesh(geo, mat));
-  return p;
+const V = (x, y, z) => new THREE.Vector3(x, y, z);
+/** Night tint: a faint glow so a dark airframe still reads against the clouds. */
+function tint(group, hex) {
+  group.traverse((o) => { if (o.isMesh && o.material.emissive) o.material.emissive.setHex(hex); });
 }
 
-/** AC-130: high wing, four turboprops, upswept tail, guns on the port side. Nose +z, port +x. */
+/**
+ * AC-130 (app/models/ac130.glb): metres, nose +z, port +x, Y up. The four
+ * propellers are separate nodes on their hubs so they can spin.
+ */
 export function buildGunship() {
-  const skin = new THREE.MeshStandardMaterial({ color: 0x3a3f44, roughness: 0.75, metalness: 0.35, emissive: 0x0b0d10 });
-  const dark = new THREE.MeshStandardMaterial({ color: 0x15171a, roughness: 0.6, metalness: 0.5 });
-  const g = new THREE.Group();
-  const body = merge([
-    tube(2.1, 2.1, 20, 0, 0, 1),
-    nose(2.1, 4.2, 0, 0, 11, 1),
-    tube(2.1, 0.7, 11, 0, 0.9, -14.5),      // upswept tail cone
-    box(3.6, 1.2, 9, 0, -1.7, 0),           // gear sponsons
-    box(41, 0.5, 4.4, 0, 2.15, 2.2),        // wing
-    box(3.2, 1.1, 5, 0, 2.3, 2.2),          // wing root fairing
-    box(0.5, 7.5, 5.2, 0, 4.8, -16.2, 0, 0, -0.12), // fin
-    box(15.5, 0.35, 3.8, 0, 1.6, -17),      // tailplane
-  ]);
-  g.add(new THREE.Mesh(body, skin));
-  const nacelles = merge([-12.4, -6.6, 6.6, 12.4].map((x) => tube(0.85, 0.65, 6, x, 1.4, 3.9)));
-  g.add(new THREE.Mesh(nacelles, skin));
-  const guns = merge([
-    tube(0.12, 0.12, 2.4, 2.2, -0.3, 6.6), tube(0.18, 0.18, 2.6, 2.2, -0.5, 0.5), tube(0.3, 0.3, 3.2, 2.3, -0.7, -3.8),
-    box(0.3, 1.2, 2.8, 2.05, -0.5, -3.8), box(0.3, 0.9, 2.2, 2.05, -0.4, 0.5),
-  ]);
-  g.add(new THREE.Mesh(guns, dark));
-  const props = [];
-  for (const x of [-12.4, -6.6, 6.6, 12.4]) {
-    const p = propeller(dark);
-    p.position.set(x, 1.4, 7.05);
-    g.add(p);
-    props.push(p);
-  }
-  return {
-    group: g, props,
-    muzzle: new THREE.Vector3(2.4, -0.3, 7.8),
-    lights: { port: new THREE.Vector3(20.5, 2.2, 2), stbd: new THREE.Vector3(-20.5, 2.2, 2), tail: new THREE.Vector3(0, 8.5, -18), belly: new THREE.Vector3(0, -2.3, 0) },
-    exhausts: [-12.4, -6.6, 6.6, 12.4].map((x) => new THREE.Vector3(x, 1.9, 0.6)),
-  };
-}
-
-/** Swept-wing four-engine jet bomber. Nose +z. */
-function buildBomber() {
-  const skin = new THREE.MeshStandardMaterial({ color: 0x2c3036, roughness: 0.7, metalness: 0.4, emissive: 0x08090b });
-  const g = new THREE.Group();
-  const wing = (side) => {
-    const w = new THREE.BoxGeometry(24, 0.5, 6.5);
-    w.translate(side * 12, 0, 0);
-    w.rotateY(side * 0.55);
-    w.translate(side * 1.5, 0.6, 1);
-    return w;
-  };
-  const tail = (side) => {
-    const w = new THREE.BoxGeometry(8, 0.3, 3.4);
-    w.translate(side * 4, 0, 0);
-    w.rotateY(side * 0.6);
-    w.translate(side * 0.8, 1.2, -21);
-    return w;
-  };
-  const geo = merge([
-    tube(2.4, 2.4, 34, 0, 0, 0), nose(2.4, 7, 0, 0, 17, 1), tube(2.4, 0.6, 9, 0, 0.6, -21.5),
-    wing(1), wing(-1), tail(1), tail(-1),
-    box(0.4, 7, 6, 0, 4.3, -22, 0, 0, -0.35),
-    tube(0.75, 0.6, 5.5, 8.5, -1.0, 0.5), tube(0.75, 0.6, 5.5, 14, -1.0, -3.8), tube(0.75, 0.6, 5.5, -8.5, -1.0, 0.5), tube(0.75, 0.6, 5.5, -14, -1.0, -3.8),
-  ]);
-  g.add(new THREE.Mesh(geo, skin));
+  const g = cloneModel('ac130');
+  tint(g, 0x0b0d10);
   return {
     group: g,
-    engines: [new THREE.Vector3(8.5, -1, -2.4), new THREE.Vector3(14, -1, -6.7), new THREE.Vector3(-8.5, -1, -2.4), new THREE.Vector3(-14, -1, -6.7)],
-    lights: { port: new THREE.Vector3(23, 0.6, -14), stbd: new THREE.Vector3(-23, 0.6, -14), tail: new THREE.Vector3(0, 7.6, -24) },
+    props: [0, 1, 2, 3].map((k) => g.getObjectByName('prop_' + k)),
+    muzzle: V(2.7, -0.6, 7.6), // the GAU-12 port, ahead of the wing on the left side
+    lights: { port: V(20.3, 2.4, 2.4), stbd: V(-20.3, 2.4, 2.4), tail: V(0, 9.5, -12.1), belly: V(0, -2.3, 0) },
+    exhausts: [-10.15, -5.06, 5.06, 10.15].map((x) => V(x, 2.3, 0.2)),
+  };
+}
+
+/**
+ * B-36 (app/models/b36.glb): metres, nose +z, port +x. Six pusher props on
+ * their hubs; the four jets ride in two pods outboard.
+ */
+function buildBomber() {
+  const g = cloneModel('b36');
+  tint(g, 0x08090b);
+  return {
+    group: g,
+    props: [0, 1, 2, 3, 4, 5].map((k) => g.getObjectByName('prop_' + k)),
+    engines: [23.1, 24.5, -23.1, -24.5].map((x) => V(x, -2.6, -2.9)),
+    lights: { port: V(35.1, -2.3, -1.6), stbd: V(-35.1, -2.3, -1.6), tail: V(0, 6.3, -20.9) },
   };
 }
 
@@ -336,6 +295,7 @@ export class AirSupport {
     grp.position.set(x, y, z);
     grp.lookAt(x + b.dx, y, z + b.dz);
     grp.updateMatrixWorld();
+    for (const p of this.bomberModel.props) p.rotation.z += dt * 30;
     // engine glow and nav lights
     for (const e of this.bomberModel.engines) { _v.copy(e).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1.3, 3.2, 1.4, 0.5, 0.05); }
     const L = this.bomberModel.lights;

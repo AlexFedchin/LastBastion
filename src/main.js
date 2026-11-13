@@ -24,6 +24,7 @@ import { AudioEngine } from './audio/audio.js';
 import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { Loader } from './ui/loader.js';
+import { loadModels } from './world/models.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
 
 const SECTION_LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
@@ -61,6 +62,7 @@ class Game {
     let stepN = 0;
     const step = async (t) => { this.loader.step(t, stepN++ / BOOT_STEPS); await nextFrame(); };
     await step('warming the generators…');
+    const modelsLoaded = loadModels();
     const canvas = document.getElementById('game');
     this.canvas = canvas;
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
@@ -96,6 +98,7 @@ class Game {
     this.audio = new AudioEngine();
     this.audio.applySettings(this.settings);
     const soundLoaded = this.audio.preload();
+    await modelsLoaded;
     this.player = new Player(this.camera, this.scene, this.fx, this.audio, this.horde);
     this.applyPlayerSettings();
     this.arsenal = new Arsenal(this.scene, this.fx, this.audio, this.horde, this.env);

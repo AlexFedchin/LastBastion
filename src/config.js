@@ -196,7 +196,7 @@ export const ABILITY = {
   dangerClose: { cost: 3, shells: 40, radius: 7.5, damage: 420 },
   // T: throw a red marker flare anywhere on the field; a bomber puts a 2000 lb bomb on it
   bomber: { cooldown: 75, firstDelay: 12, maxRange: 320, minWallDist: 16, radius: 24, damage: 1400,
-    alt: 175, speed: 100, fall: 4.0, scale: 0.7 },
+    alt: 175, speed: 100, fall: 4.0, scale: 0.45 }, // B-36: 70 m span
 };
 
 // ── AC-130 gunship: circles the valley all night and works the field ─────────

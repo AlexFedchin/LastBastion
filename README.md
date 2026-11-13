@@ -28,8 +28,9 @@ Hold until dawn. Spend what you scavenged. Do it again.
 </p>
 
 > [!NOTE]
-> **Every texture is generated procedurally at startup.** No image files, no texture packs: the mud, the
-> T-wall concrete, the zombies' torn clothes and the burning skyline are all painted in code.
+> **The world is painted procedurally at startup.** No texture packs: the mud, the
+> T-wall concrete, the zombies' torn clothes and the burning skyline are all generated in code.
+> The exceptions are three downloaded models: your M2HB, the AC-130 and the B-36.
 > The sound is the opposite: real field recordings, a real .50 BMG report and an adaptive score.
 
 ---
@@ -196,7 +197,7 @@ Difficulties: **Recruit**, **Veteran** *(intended)*, **Last Stand**.
 
 ```
 electron/        main process + preload (window, fullscreen, quit)
-app/             index.html, style.css, bundled game (app/build/), audio/
+app/             index.html, style.css, bundled game (app/build/), audio/, models/
 src/
   main.js        game state machine and main loop
   config.js      ★ all tunables: zombies, pile rules, nights, unlocks, costs, radio script
@@ -207,7 +208,7 @@ src/
   render/        atmosphere (shared fog), post (bloom, lens, haze, grading)
   audio/         sound engine: mix bus, valley reverb, ambience beds, adaptive score
   ui/            HUD, menus, shop, loader
-scripts/         build (esbuild), VS Code pre-launch, audio/ sound + voice build
+scripts/         build (esbuild), VS Code pre-launch, audio/ sound + voice build, models/ model build
 tests/smoke/     offscreen smoke tests
 ```
 
@@ -244,6 +245,20 @@ python scripts/audio/build_audio.py hmg boom # only matching recipes
 The script downloads its sources (cached in `scripts/audio/.cache/`), then slices, layers,
 loop-crossfades, loudness-matches, limits and encodes every asset, and regenerates `CREDITS.md`.
 Every recipe is in that one file.
+
+**Rebuilding the models** (Node):
+
+```bash
+cd scripts/models && npm i                    # gltf-transform, meshoptimizer, sharp
+node scripts/models/build_models.mjs          # everything (from the repo root)
+node scripts/models/build_models.mjs m2hb     # only the gun (or ac130, b36)
+```
+
+The downloaded sources go in `scripts/models/source/` (git-ignored). The script reorients and scales
+each model to the game's axes, removes parts that are never seen, simplifies, resizes textures to
+WebP and writes meshopt-compressed GLBs to `app/models/`. The game loads them at boot
+(`src/world/models.js`). `scripts/models/preview.cjs` renders a GLB from six angles to a PNG
+for checking orientation.
 
 **Radio voice-over** (Python 3 + Node; an NVIDIA GPU for recording):
 
@@ -337,6 +352,7 @@ Music by **Kevin MacLeod** ([incompetech.com](https://incompetech.com)), CC BY 4
 Sound effects from **Freesound** contributors, CC0. The full list (every recording, its author and
 what it became) is in [`app/audio/CREDITS.md`](app/audio/CREDITS.md) and ships with the game.
 Radio voices performed by **Qwen3-TTS** (Apache 2.0), partly re-voiced with **Chatterbox** voice conversion (MIT).
+3D models of the M2HB, AC-130 and B-36: see [`app/models/CREDITS.md`](app/models/CREDITS.md).
 
 <div align="center">
 

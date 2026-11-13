@@ -1,0 +1,54 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script type="importmap">{ "imports": {
+  "three": "../../node_modules/three/build/three.module.js",
+  "three/addons/": "../../node_modules/three/examples/jsm/"
+} }</script>
+<style>html,body{margin:0;background:#222}</style></head>
+<body>
+<script type="module">
+// Renders a GLB from six angles into one sheet with axis gizmo: red +x, green +y, blue +z.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+
+const q = new URLSearchParams(location.search);
+const W = 600, H = 450;
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(W * 3, H * 2);
+renderer.setScissorTest(true);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x6a7480);
+scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(3, 5, 4); scene.add(sun);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x404040, 0.6));
+
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+const gltf = await loader.loadAsync(q.get('f'));
+const root = gltf.scene;
+scene.add(root);
+if (q.get('debug') === 'normals') root.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshNormalMaterial({ side: THREE.DoubleSide }); });
+if (q.get('debug') === 'front') root.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ color: 0x40ff40, side: THREE.FrontSide }); });
+if (q.get('debug') === 'mat') { const cols = [0xff4040, 0x40ff40, 0x4040ff, 0xffff40, 0xff40ff, 0x40ffff]; const seen = new Map();
+  root.traverse((o) => { if (o.isMesh) { const k = o.material.name; if (!seen.has(k)) { seen.set(k, cols[seen.size % 6]); console.log('mat', k, seen.get(k).toString(16)); } o.material = new THREE.MeshBasicMaterial({ color: seen.get(k) }); } }); }
+const box = new THREE.Box3().setFromObject(root);
+const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
+const r = size.length() * 0.5;
+const ax = new THREE.AxesHelper(r * 0.6); ax.position.copy(c); ax.material.depthTest = false; ax.renderOrder = 9; scene.add(ax);
+// named anchor nodes show as small yellow balls
+root.traverse((o) => { if (!o.isMesh && o.name.startsWith('anchor')) { const b = new THREE.Mesh(new THREE.SphereGeometry(r * 0.02), new THREE.MeshBasicMaterial({ color: 0xffff00, depthTest: false })); b.renderOrder = 10; o.add(b); } });
+const views = q.get('views') ? JSON.parse(q.get('views')) : [[1, 0.6, 1], [-1, 0.6, -1], [0, 1, 0.001], [1, 0, 0], [0, 0, 1], [0, 0, -1]];
+const zoom = +(q.get('zoom') || 1);
+const cam = new THREE.PerspectiveCamera(35, W / H, r * 0.01, r * 20);
+views.forEach((v, i) => {
+  const d = new THREE.Vector3(...v).normalize();
+  cam.position.copy(c).addScaledVector(d, r * 3.2 / zoom);
+  cam.lookAt(c);
+  const x = (i % 3) * W, y = (1 - Math.floor(i / 3)) * H;
+  renderer.setViewport(x, y, W, H); renderer.setScissor(x, y, W, H);
+  renderer.render(scene, cam);
+});
+window.__done = { size: size.toArray(), min: box.min.toArray(), max: box.max.toArray() };
+</script></body></html>

@@ -94,7 +94,7 @@ app.whenReady().then(async () => {
   const files = fs.readdirSync(path.join(__dirname, 'tests')).filter((f) => f.endsWith('.test.js')).sort()
     .filter((f) => !filters.length || filters.some((x) => f.includes(x)));
   const results = [];
-  if (!booted) results.push({ name: 'boot', ok: false, error: 'the game never reached the main menu', ms: 0 });
+  if (!booted) results.push({ name: 'boot', ok: false, error: 'the game never reached the main menu' + (consoleErrors.length ? ': ' + consoleErrors.join(' | ').slice(0, 800) : ''), ms: 0 });
   else {
     await t.js('__LB.test.freeze(true)');
     for (const f of files) {
