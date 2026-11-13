@@ -93,9 +93,11 @@ def pick_refs(spk):
     for f in os.listdir(RAW):
         if f.endswith('.wav'):
             by.setdefault(f.rsplit('_', 2)[0], []).append(f)
-    chosen = {}
+    # a character keeps the reference it already has: its converted takes were made on it
+    path = os.path.join(REFS, 'chosen.json')
+    chosen = json.load(open(path)) if os.path.exists(path) else {}
     for v in PERSONA:
-        if v in SAME_VOICE:
+        if v in SAME_VOICE or slug_of(v) in chosen:
             continue
         files = [f for w in PERSONA if voice_of(w) == v for f in by.get(slug_of(w), [])]
         if not files:
@@ -112,6 +114,7 @@ def pick_refs(spk):
 
 def main():
     dev = 'cpu' if '--cpu' in sys.argv else 'cuda:0'
+    args = [a for a in sys.argv[1:] if not a.startswith('--')]
     spk = Speaker(dev)
     if '--refs' in sys.argv:
         return pick_refs(spk)
@@ -139,8 +142,11 @@ def main():
             anchors[v] = centroid(E)
     cache_path = os.path.join(WORK, 'score_cache.json')
     cache = json.load(open(cache_path, encoding='utf-8')) if os.path.exists(cache_path) else {}
-    sel = {}
+    sel_path = os.path.join(WORK, 'selection.json')
+    sel = json.load(open(sel_path, encoding='utf-8')) if os.path.exists(sel_path) and args else {}
     for n, (who, text, shout) in enumerate(lines):
+        if args and not any(a.lower() in (who + ' ' + text).lower() for a in args):
+            continue  # only re-pick the lines asked for; the others keep their takes
         lid = line_id(who, text)
         if lid not in cands:
             print('  !! no takes for', who, text)
@@ -173,7 +179,7 @@ def main():
         if n % 10 == 9:
             json.dump(cache, open(cache_path, 'w', encoding='utf-8'), ensure_ascii=False)
     json.dump(cache, open(cache_path, 'w', encoding='utf-8'), ensure_ascii=False)
-    json.dump(sel, open(os.path.join(WORK, 'selection.json'), 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
+    json.dump(sel, open(sel_path, 'w', encoding='utf-8'), indent=1, ensure_ascii=False)
 
 
 if __name__ == '__main__':

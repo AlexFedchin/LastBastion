@@ -79,6 +79,21 @@ Each stage skips work already on disk. To re-record a line, delete its takes fro
 `.cache/voice_qwen/raw/` and `vc/` (files start with the speaker slug and a hash of the line) and
 run the stages again. `build_voice.py --kokoro` rebuilds the original Kokoro voice-over.
 
+Adding lines without touching the rest: pass the same filter to every stage, e.g. `NARRATOR`.
+`pick_voice.py NARRATOR` re-picks only matching lines (the others keep the take they have, and
+`selection.json` keeps their scores), and `pick_voice.py --refs` keeps every character's existing
+reference voice and only chooses one for a new character. Their converted takes were made on that
+reference, so changing it would split a voice in two.
+
+### The narrator
+
+The dawn chronicle (`CHRONICLE` in `src/config.js`, composed in `src/ui/chronicle.js`) is spoken by
+`NARRATOR`, an old soldier telling the siege years later. Same recording, conversion and scoring as
+the radio cast, but `build_voice.py` gives him no radio: a close voice-over chain (rumble filter,
+gentle compression, a little body and presence, about −18 dBFS speech RMS) kept at 24 kHz.
+`lines.json` records the rate (`"sr": 24000`) so the game decodes it at full bandwidth; radio lines
+stay at 16 kHz.
+
 ## Directing a line
 
 Edit `scripts/audio/voice_cast.py`:

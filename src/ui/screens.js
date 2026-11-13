@@ -132,7 +132,8 @@ export class Screens {
       <h3 style="margin-top:22px">CAMPAIGN</h3>
       <div class="st"><span>TOTAL KILLS</span><b>${formatInt(run.kills)}</b></div>
       <div class="st"><span>NIGHTS HELD</span><b>${run.night - 1}</b></div>
-      <div class="log">${run.log.slice(-5).map((l) => `<p><em>${l[0]}:</em> ${l[1]}</p>`).join('')}</div>
+      ${run.chronicle ? `<div class="chron"><h3>${run.chronicle.title}</h3>${run.chronicle.lines.map((l) => `<p>${l}</p>`).join('')}</div>`
+    : `<div class="log">${run.log.slice(-5).map((l) => `<p><em>${l[0]}:</em> ${l[1]}</p>`).join('')}</div>`}
     `;
 
     // upgrades
@@ -168,8 +169,9 @@ export class Screens {
   }
 
   // ── End screens ──────────────────────────────────────────────────────────
-  buildGameOver(run, hasSave) {
-    $('over-text').textContent = `${formatInt(run.kills)} of them will never walk again. It was not enough. On night ${run.night}, the last of Bastion-7 went quiet, and the valley belonged to the dead.`;
+  buildGameOver(run, hasSave, epitaph) {
+    // the narrator's last words over the wall (voiced), or the old epitaph
+    $('over-text').textContent = epitaph || `${formatInt(run.kills)} of them will never walk again. It was not enough. On night ${run.night}, the last of Bastion-7 went quiet, and the valley belonged to the dead.`;
     $('over-stats').innerHTML = this.statsHtml(run);
     $('btn-retry').disabled = !hasSave;
   }

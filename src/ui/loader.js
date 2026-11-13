@@ -12,7 +12,7 @@ const TIPS = [
   'Headshots do more than double damage. Optics (RMB) tighten the spread.',
   'Bloaters burst and take their neighbours with them. If one reaches the wall, its acid melts a ramp.',
   'A brute weighs as much as three men on a pile. Kill them before they get there.',
-  'Napalm burns right along the wall base — exactly where the piles grow.',
+  'A Molotov on the wall base burns right where the piles grow — and whatever walks through it catches.',
   'Artillery takes three seconds to land. Lead the crowd.',
   'Danger close clears the whole wall line. It also kills three of ours.',
   'The tide comes at the end of every night. Save something for it.',

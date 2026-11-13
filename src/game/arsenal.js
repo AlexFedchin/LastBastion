@@ -1,10 +1,10 @@
-// Everything that kills besides your own gun: artillery, napalm,
+// Everything that kills besides your own gun: artillery, Molotovs,
 // grenades, danger-close, wall gunners, riflemen, claymores and wire.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { WORLD, wallZ, wallDist, WING_COS, WING_SIN, ABILITY, CLAYMORE } from '../config.js';
 import { clamp, rand, lerp } from '../core/util.js';
-import { PF } from '../world/textures.js';
+import { PF, DF } from '../world/textures.js';
 import { groundH, raycastGround } from '../world/terrain.js';
 import { AirSupport } from './air.js';
 
@@ -48,11 +48,10 @@ export class Arsenal {
     this.shells = [];   // artillery rounds in flight
     this.grenades = [];
     this.artyCd = 0;
-    this.napalmCd = 0;
-    this.napalmT = 0;
-    this.napalmLights = [];
-    this.napalmFires = [];
-    this.napalmNext = WORLD.GATE_HALF + 1;
+    this.molotovsLeft = 0;
+    this.molotovCd = 0;
+    this.molotovs = [];   // bottles in the air (or being lit)
+    this.pools = [];      // burning fuel on the ground
     this.grenadesLeft = 0;
     this.grenadeCd = 0;
     this.dangerUsed = false;
@@ -73,6 +72,26 @@ export class Arsenal {
       this.grenadeMeshes.push(m);
     }
 
+    // Molotovs: a dark glass bottle, the rag stuffed in its neck burning
+    const prof = [[0, 0], [0.043, 0], [0.046, 0.01], [0.046, 0.15], [0.04, 0.18], [0.017, 0.205], [0.016, 0.27], [0.019, 0.275], [0, 0.275]]
+      .map(([r, y]) => new THREE.Vector2(r, y - 0.13));
+    const bottleGeo = new THREE.LatheGeometry(prof, 10);
+    const glassMat = new THREE.MeshStandardMaterial({ color: 0x2c3a22, roughness: 0.12, metalness: 0.2, emissive: 0x2a0d02, emissiveIntensity: 0.6 });
+    const ragGeo = new THREE.CylinderGeometry(0.022, 0.03, 0.09, 6);
+    ragGeo.translate(0, 0.17, 0);
+    ragGeo.rotateZ(0.25);
+    const ragMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 1.0, 0.25) });
+    this.bottleMeshes = [];
+    for (let k = 0; k < 6; k++) {
+      const g = new THREE.Group();
+      g.add(new THREE.Mesh(bottleGeo, glassMat), new THREE.Mesh(ragGeo, ragMat));
+      g.scale.setScalar(1.5); // read from the gun at 60 m
+      g.visible = false;
+      scene.add(g);
+      this.bottleMeshes.push(g);
+    }
+    this._rag = new THREE.Vector3(0, 0.2, 0);
+
     // claymores
     const mineGeo = new THREE.BoxGeometry(0.24, 0.16, 0.06);
     const mineMat = new THREE.MeshStandardMaterial({ color: 0x3b4128, roughness: 0.8 });
@@ -92,27 +111,24 @@ export class Arsenal {
     this.stats = stats;
     this.air.startNight(menu, night);
     this.artyCd = 6;
-    this.napalmCd = 0;
-    this.napalmT = 0;
+    this.molotovsLeft = stats.molotovs;
+    this.molotovCd = 0;
     this.grenadesLeft = stats.grenades;
     this.grenadeCd = 0;
     this.dangerUsed = false;
     this.shells.length = 0;
     this.grenades.length = 0;
-    this.releaseNapalmLights();
-    this.clearNapalmFires();
+    this.clearMolotovs();
     this.placeMines();
     this.setGunners(stats.gunners);
     this.setWire(stats.wireBands, stats.wireHp);
-    this.horde.ctx.fireAt = (x, dist) => this.fireAt(x, dist);
+    this.horde.ctx.fireAt = (x, z) => (this.pools.length ? this.fireAt(x, z) : 0);
     this.horde.ctx.wireAt = (x, dist, w, dt) => this.wireAt(x, dist, w, dt);
   }
 
   endNight() {
     this.air.endNight();
-    this.releaseNapalmLights();
-    this.clearNapalmFires();
-    this.napalmT = 0;
+    this.clearMolotovs();
     for (const m of this.grenadeMeshes) m.visible = false;
     this.grenades.length = 0;
     this.shells.length = 0;
@@ -154,46 +170,193 @@ export class Arsenal {
     return true;
   }
 
-  // ── Napalm trench ────────────────────────────────────────────────────────
-  igniteNapalm() {
-    if (this.napalmCd > 0 || this.napalmT > 0) return false;
-    this.napalmT = this.stats.napalmDuration;
-    this.napalmCd = this.stats.napalmCooldown;
-    this.napalmAge = 0;
-    this.clearNapalmFires();
-    this.audio.napalm(0, -12);
-    this.releaseNapalmLights();
-    for (const x of [-48, -22, 22, 48]) {
-      const l = this.fx.lights.acquire();
-      if (!l) continue;
-      l.position.set(x, 2.5, offsetZ(x, 9));
-      l.color.setRGB(1, 0.45, 0.12);
-      l.distance = 45;
-      l.decay = 1.6;
-      this.napalmLights.push(l);
-    }
+  // ── Molotovs ─────────────────────────────────────────────────────────────
+  /**
+   * Light the rag and throw a bottle at the crosshair. 'empty' / 'rearm' / true.
+   * The Zippo goes first; the bottle leaves the hand a beat later.
+   */
+  throwMolotov(target) {
+    if (this.molotovsLeft <= 0) return 'empty';
+    if (this.molotovCd > 0) return 'rearm';
+    const mesh = this.bottleMeshes.find((m) => !m.visible && !this.molotovs.some((b) => b.mesh === m));
+    if (!mesh) return 'rearm';
+    const M = ABILITY.molotov;
+    this.molotovsLeft--;
+    this.molotovCd = M.rearm;
+    this.audio.molotovLight();
+    const cx = WORLD.CAM.x, cz = WORLD.CAM.z;
+    let dx = target.x - cx, dz = target.z - cz;
+    const d = Math.hypot(dx, dz) || 1;
+    if (d > M.maxRange) { dx *= M.maxRange / d; dz *= M.maxRange / d; }
+    const dd = Math.min(d, M.maxRange);
+    const tx = cx + dx + rand(-0.7, 0.7), tz = cz + dz + rand(-0.7, 0.7);
+    // thrown from the left hand, past the gun
+    this.molotovs.push({
+      mesh, t: -M.light, launched: false, light: null,
+      sx: cx - 0.45, sy: WORLD.CAM.y + 0.15, sz: cz - 0.7, tx, tz,
+      dur: 0.85 + dd * 0.015, arc: 3.5 + dd * 0.11, spin: rand(-7, 7), dirx: dx / d, dirz: dz / d,
+    });
     return true;
   }
 
-  clearNapalmFires() {
-    if (this.fx.fire) for (const id of this.napalmFires) this.fx.fire.remove(id);
-    this.napalmFires.length = 0;
-    this.napalmNext = WORLD.GATE_HALF + 1;
+  /** Burning damage per second at a point (horde calls it for every zombie), 0 if none. */
+  fireAt(x, z) {
+    const P = this.pools;
+    let best = 0;
+    for (let k = 0; k < P.length; k++) {
+      const p = P[k];
+      if (p.k <= 0.15) continue;
+      const dx = x - p.cx, dz = z - p.cz;
+      if (dx * dx + dz * dz < p.r2 && p.dps * p.k > best) best = p.dps * p.k;
+    }
+    return best;
   }
 
-  releaseNapalmLights() {
-    for (const l of this.napalmLights) this.fx.lights.release(l);
-    this.napalmLights.length = 0;
+  updateMolotovs(dt) {
+    const fx = this.fx;
+    for (let k = 0; k < this.molotovs.length; k++) {
+      const b = this.molotovs[k];
+      b.t += dt;
+      if (b.t < 0) continue; // still lighting the rag
+      const m = b.mesh;
+      if (!b.launched) {
+        b.launched = true;
+        m.visible = true;
+        this.audio.molotovThrow();
+        b.light = fx.lights.acquire();
+        if (b.light) { b.light.color.setRGB(1, 0.55, 0.2); b.light.distance = 16; b.light.decay = 1.8; }
+      }
+      const u = Math.min(1, b.t / b.dur);
+      const x = lerp(b.sx, b.tx, u), z = lerp(b.sz, b.tz, u);
+      const y = lerp(b.sy, groundH(b.tx, b.tz) + 0.15, u) + Math.sin(u * Math.PI) * b.arc;
+      m.position.set(x, y, z);
+      m.rotation.x += dt * 9;
+      m.rotation.z += dt * b.spin;
+      m.updateMatrixWorld();
+      _v.copy(this._rag).applyMatrix4(m.matrixWorld);
+      // the rag streams fire behind it
+      fx.flame(_v.x, _v.y, _v.z, 0.32, 1.2);
+      fx.glowDot(_v.x, _v.y, _v.z, 0.7, 3.2, 1.3, 0.35, 0.05);
+      if (R() < 0.35) fx.ember(_v.x, _v.y, _v.z);
+      if (b.light) { b.light.position.copy(_v); b.light.intensity = 40 + R() * 30; }
+      if (u >= 1) {
+        m.visible = false;
+        if (b.light) { fx.lights.release(b.light); b.light = null; }
+        this.splash(b.tx, b.tz, b.dirx, b.dirz);
+        this.molotovs.splice(k, 1); k--;
+      }
+    }
   }
 
-  fireAt(x, dist) {
-    if (this.napalmT <= 0) return 0;
-    const ax = Math.abs(x);
-    if (ax < WORLD.GATE_HALF + 1 || ax > 70) return 0;
-    // fire races outward from the centre on ignition
-    if (ax > 9 + this.napalmAge * 110) return 0;
-    if (Math.abs(dist - 9) > 1.6) return 0;
-    return this.stats.napalmDps;
+  /** The bottle bursts: glass, a sheet of burning fuel thrown forward, and a pool that burns. */
+  splash(x, z, dirx, dirz) {
+    const fx = this.fx, s = this.stats, M = ABILITY.molotov;
+    const gy = groundH(x, z);
+    const r = s.molotovRadius;
+    this.audio.molotov(x, z);
+    // glass
+    for (let k = 0; k < 18; k++) {
+      const a = R() * 6.28, sp = rand(2, 7);
+      fx.glow.spawn(x, gy + 0.25, z, Math.cos(a) * sp, rand(1.5, 5), Math.sin(a) * sp, rand(0.35, 0.8), 0.05, 0.03, PF.SPARK,
+        2.6, 3.0, 2.6, 1, 0.4, 0.5, 0.4, 16, 0.4, 0.012, 0, 0, 0, gy);
+    }
+    // the whoomph: a ball of flame rolling up off the ground
+    fx.glow.spawn(x, gy + 1.2, z, 0, 0, 0, 0.22, 2.5 * r / 4.2, 7 * r / 4.2, PF.GLOW, 6, 3, 0.9, 1, 2, 0.6, 0.1);
+    for (let k = 0; k < 14; k++) {
+      const a = R() * 6.28, sp = rand(1, 3.5);
+      fx.glow.spawn(x + dirx * rand(0, r * 0.6), gy + 0.5, z + dirz * rand(0, r * 0.6), Math.cos(a) * sp + dirx * 2, rand(3, 7), Math.sin(a) * sp + dirz * 2,
+        rand(0.6, 1.1), rand(1.4, 2.2), rand(3.5, 5.5), PF.FIRE + ((R() * 4) | 0), 5, 2.5, 0.8, 1, 1.1, 0.22, 0.04, -2, 1.6, 0, R() * 6, (R() - 0.5) * 2, 0);
+    }
+    // burning fuel flung forward along the throw, raining back down
+    for (let k = 0; k < 40; k++) {
+      const a = Math.atan2(dirz, dirx) + (R() - 0.5) * 2.4, sp = rand(3, 10);
+      fx.glow.spawn(x, gy + 0.35, z, Math.cos(a) * sp, rand(2, 6), Math.sin(a) * sp, rand(0.5, 1.0), rand(0.35, 0.7), rand(0.8, 1.4),
+        PF.FIRE + ((R() * 4) | 0), 5, 2.2, 0.6, 1, 1.4, 0.3, 0.05, 11, 0.8, 0, R() * 6, (R() - 0.5) * 3, 0, gy + 0.1);
+    }
+    fx.smokePuff(x, gy + 2, z, 3, 0.04, 5, 2.5);
+    fx.lights.flash(x, gy + 2.2, z, 0xff8a3c, 420, 36, 0.55, 0.3);
+    fx.decals.add(x + dirx * r * 0.3, z + dirz * r * 0.3, r * 2.3, DF.SCORCH + ((R() * 2) | 0), 1, 1, 1);
+    // the pool: one big fire, smaller ones spread forward and to the sides
+    const life = s.molotovBurn * rand(0.92, 1.08);
+    const cx = x + dirx * r * 0.3, cz = z + dirz * r * 0.3;
+    const pool = { cx, cz, gy, r, r2: r * r, dps: s.molotovDps, t: 0, life, k: 0, fires: [], light: null, snd: null, acc: 0 };
+    const fire = fx.fire, sc = r / 4.2;
+    if (fire) {
+      const add = (px, pz, w, h, fade) => {
+        const id = fire.add(px, groundH(px, pz) - 0.05, pz, w, h, 0.95, { smoke: 0.6, embers: 2.2, life: life + rand(-1, 1.2), fadeIn: fade });
+        if (id >= 0) pool.fires.push(id);
+      };
+      add(cx, cz, 3.0 * sc, 4.8 * sc, 0.08);
+      const px = -dirz, pz = dirx; // across the throw
+      for (let k = 0; k < 9; k++) {
+        const along = rand(-0.55, 1.05) * r, across = (R() - 0.5) * 1.3 * r * (1 - Math.abs(along) / (r * 1.6));
+        // the middle of the splash burns tallest, the fringes lick low
+        const edge = Math.min(1, Math.hypot(along - r * 0.3, across) / r);
+        add(x + dirx * along + px * across, z + dirz * along + pz * across, rand(1.4, 2.3) * sc, rand(2.6, 4.4) * sc * (1 - 0.45 * edge), rand(0.05, 0.4));
+      }
+    }
+    pool.light = fx.lights.acquire();
+    if (pool.light) { pool.light.color.setRGB(1, 0.48, 0.14); pool.light.distance = 30; pool.light.decay = 1.7; pool.light.position.set(cx, gy + 1.6, cz); }
+    // too many fires: the oldest one burns out sooner
+    if (this.pools.length >= M.maxPools) this.pools[0].life = Math.min(this.pools[0].life, this.pools[0].t + 1.5);
+    this.pools.push(pool);
+    // whoever was standing in it goes up at once
+    const h = this.horde, n = h.queryRadius(cx, cz, r, h._q);
+    for (let q = 0; q < n; q++) {
+      const i = h._q[q];
+      h.ignite(i, M.igniteSeconds + 1, M.igniteDps);
+      h.damage(i, 12, 'fire', 0, 1, 0);
+    }
+  }
+
+  updatePools(dt) {
+    const fx = this.fx, fire = fx.fire;
+    let level = 0;
+    for (let k = 0; k < this.pools.length; k++) {
+      const p = this.pools[k];
+      p.t += dt;
+      p.k = clamp((p.life - p.t) / 2.5, 0, 1) * Math.min(1, p.t / 0.15);
+      level += p.k;
+      if (fire) for (const id of p.fires) fire.set(id, 0.95 * (0.78 + R() * 0.4));
+      // flames licking up across the pool, oily smoke, embers
+      p.acc += dt * 32 * p.k * (p.r / 4.2);
+      while (p.acc >= 1) {
+        p.acc -= 1;
+        const a = R() * 6.28, rr = Math.sqrt(R()) * p.r * 0.85;
+        const x = p.cx + Math.cos(a) * rr, z = p.cz + Math.sin(a) * rr;
+        fx.flame(x, groundH(x, z) + 0.15, z, rand(0.8, 1.3), 3.8);
+      }
+      // a column of fuel smoke, lit orange from beneath, cooling to soot as it climbs
+      if (R() < dt * 7 * p.k) {
+        const a = R() * 6.28, rr = R() * p.r * 0.5;
+        fx.smoke.spawn(p.cx + Math.cos(a) * rr, p.gy + rand(2.5, 4), p.cz + Math.sin(a) * rr, rand(-0.4, 0.4) + 0.5, rand(2.4, 4), rand(-0.4, 0.4),
+          rand(4, 6.5), rand(1.6, 2.6), rand(6, 10), PF.SMOKE + ((R() * 4) | 0), 0.34, 0.14, 0.045, 0.8, 0.035, 0.032, 0.03,
+          -0.15, 0.35, 0, R() * 6, (R() - 0.5) * 0.3, 0.1);
+      }
+      if (R() < dt * 10 * p.k) fx.ember(p.cx + rand(-p.r, p.r) * 0.7, p.gy + 1.5, p.cz + rand(-p.r, p.r) * 0.7);
+      if (p.light) p.light.intensity = (150 + R() * 110) * p.k * (p.r / 4.2);
+      // sound: the closest few roar on their own, the rest are the bed
+      if (!p.snd && p.k > 0.3 && this.pools.filter((o) => o.snd).length < 4) p.snd = this.audio.firePool();
+      if (p.snd) p.snd.update(p.cx, p.gy + 1, p.cz, 0, 0, 0, 1.6 * p.k);
+      if (R() < dt * 1.4 * p.k) this.audio.crackle(p.cx, p.cz, 0.3);
+      if (p.t >= p.life) { this.endPool(p); this.pools.splice(k, 1); k--; }
+    }
+    this.audio.fireLevel = clamp(level * 0.3, 0, 1);
+  }
+
+  endPool(p) {
+    if (p.light) { this.fx.lights.release(p.light); p.light = null; }
+    if (p.snd) { p.snd.stop(1.2); p.snd = null; }
+    if (this.fx.fire) for (const id of p.fires) this.fx.fire.remove(id);
+    p.fires.length = 0;
+  }
+
+  clearMolotovs() {
+    for (const b of this.molotovs) { b.mesh.visible = false; if (b.light) this.fx.lights.release(b.light); }
+    this.molotovs.length = 0;
+    for (const p of this.pools) this.endPool(p);
+    this.pools.length = 0;
+    this.audio.fireLevel = 0;
   }
 
   // ── Grenades ─────────────────────────────────────────────────────────────
@@ -609,7 +772,7 @@ export class Arsenal {
     const fx = this.fx;
     this.artyCd = Math.max(0, this.artyCd - dt);
     this.grenadeCd = Math.max(0, this.grenadeCd - dt);
-    this.napalmCd = Math.max(0, this.napalmCd - (this.napalmT > 0 ? 0 : dt));
+    this.molotovCd = Math.max(0, this.molotovCd - dt);
 
     // marker smoke
     if (this.marker && this.marker.t > 0) {
@@ -652,40 +815,9 @@ export class Arsenal {
       }
     }
 
-    // napalm trench
-    if (this.napalmT > 0) {
-      this.napalmT -= dt;
-      this.napalmAge += dt;
-      const reach = Math.min(70, 9 + this.napalmAge * 110);
-      const fade = Math.min(1, this.napalmT * 0.8);
-      const fire = fx.fire;
-      if (fire) {
-        // light the ditch progressively outward from the gate
-        while (this.napalmNext <= reach) {
-          const ax = this.napalmNext;
-          for (const side of [-1, 1]) {
-            const x = side * ax, z = offsetZ(x, 9) + rand(-0.4, 0.4);
-            const id = fire.add(x, groundH(x, z) - 0.1, z, rand(1.8, 2.5), rand(3.0, 4.8), 0.95, { smoke: 0.3, embers: 2.0, fadeIn: 0.25 });
-            if (id >= 0) this.napalmFires.push(id);
-          }
-          this.napalmNext += 2.6;
-        }
-        for (let k = 0; k < this.napalmFires.length; k++) fire.set(this.napalmFires[k], 0.95 * fade * (0.85 + R() * 0.3));
-      }
-      const n = Math.round(8 * fade * (reach / 70) + 1);
-      for (let k = 0; k < n; k++) {
-        const side = R() < 0.5 ? -1 : 1;
-        const x = side * rand(WORLD.GATE_HALF + 1, reach);
-        const z = offsetZ(x, 9) + rand(-0.9, 0.9);
-        fx.flame(x, groundH(x, z) + 0.2, z, 1.5 * (0.7 + fade * 0.5), 4.2);
-        if (R() < 0.08) fx.smokePuff(x, 3, z, 2.5, 0.025, 6, 3.5);
-        if (R() < 0.1) fx.ember(x, 1.5, z);
-      }
-      for (const l of this.napalmLights) l.intensity = (230 + R() * 110) * fade;
-      if (R() < dt * 2) this.audio.crackle(rand(-40, 40), -14, 0.5);
-      if (this.napalmT <= 0) { this.releaseNapalmLights(); this.clearNapalmFires(); }
-      this.audio.napalmLevel = this.napalmT > 0 ? fade : 0;
-    } else this.audio.napalmLevel = 0;
+    // Molotovs: bottles in flight, pools burning
+    this.updateMolotovs(dt);
+    this.updatePools(dt);
 
     this.air.update(dt);
     this.updateGunners(dt);

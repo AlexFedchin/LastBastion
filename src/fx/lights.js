@@ -33,7 +33,7 @@ export class LightPool {
     best.active = true;
   }
 
-  /** Reserve a light for manual control (flares, napalm). Returns null if none free. */
+  /** Reserve a light for manual control (flares, Molotovs). Returns null if none free. */
   acquire() {
     let best = null;
     for (const it of this.items) {

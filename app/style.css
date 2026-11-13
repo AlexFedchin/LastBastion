@@ -348,3 +348,25 @@ table.keys td:first-child { font-family: var(--mono); color: var(--amber); width
 .mk.friend { color: #8fd27a; }
 .mk.danger { color: var(--red); }
 .mk.objective { color: #cfe3ff; }
+
+/* ── the chronicle: the night as it will be remembered (dawn) ───────────── */
+.chronicle-screen { align-items: center; justify-content: center; cursor: pointer; padding: 0 16px;
+  background: linear-gradient(180deg, rgba(4,4,3,0.55), rgba(4,4,3,0.82) 30%, rgba(4,4,3,0.82) 70%, rgba(4,4,3,0.6)),
+    radial-gradient(ellipse at 50% 50%, rgba(6,5,4,0.3) 0%, rgba(3,3,2,0.7) 100%); }
+.chronicle-screen.active { animation: fadein 1.8s ease; }
+.chr { width: min(760px, 100%); text-align: center; }
+.chr .pre { margin-bottom: 20px; }
+.chr-night { font-family: var(--mono); font-size: 13px; letter-spacing: 0.5em; color: var(--bone-dim); }
+.chr-title { font-size: clamp(32px, 5vw, 58px); font-weight: 600; letter-spacing: 0.2em; margin: 6px 0 18px; color: var(--bone); text-shadow: 0 0 34px rgba(224,165,66,0.2); }
+.chr-rule { width: 140px; height: 1px; margin: 0 auto 32px; background: linear-gradient(90deg, transparent, var(--amber), transparent); }
+.chr-body p { font-family: Georgia, "Palatino Linotype", "Book Antiqua", "Times New Roman", serif; font-style: italic;
+  font-size: clamp(17px, 1.55vw, 21px); line-height: 1.65; color: var(--bone); max-width: 680px; margin: 0 auto 16px;
+  opacity: 0; transform: translateY(8px); filter: blur(3px); text-shadow: 0 1px 12px rgba(0,0,0,0.9);
+  transition: opacity 1.4s ease, transform 1.4s ease, filter 1.4s ease, color 1.6s ease; }
+.chr-body p.on { opacity: 1; transform: none; filter: none; }
+.chr-body p.past { color: var(--bone-dim); }
+.chr-next { margin-top: 32px; font-size: 13px; letter-spacing: 0.35em; color: var(--amber); opacity: 0; transition: opacity 1.2s; }
+.chr-next.on { opacity: 0.85; animation: chrPulse 2.6s ease-in-out infinite; }
+@keyframes chrPulse { 50% { opacity: 0.35; } }
+.report .chron { margin-top: 20px; }
+.report .chron p { font-family: Georgia, "Palatino Linotype", "Times New Roman", serif; font-style: italic; font-size: 14px; line-height: 1.6; color: var(--bone-dim); margin-bottom: 8px; }

@@ -334,12 +334,13 @@ class SupplyDrop {
       for (let k = 0; k < 12; k++) g.fx.smoke.spawn(c.x, c.y, c.z, rand(-1, 1), rand(1.5, 3), rand(-1, 1), rand(4, 7), 1, 6, PF.SMOKE + ((R() * 4) | 0), 0.05, 0.3, 0.08, 0.7, 0.02, 0.06, 0.02, -0.2, 0.4);
       const a = g.arsenal, run = g.run;
       a.grenadesLeft += P.reward.grenades;
+      a.molotovsLeft += P.reward.molotovs;
       a.artyCd = 0;
       a.air.bomberCd = 0;
       const sup = Math.round(P.reward.supplies * (1 + 0.1 * (run.night - 1)));
       run.supplies += sup; g.ns.supplies += sup;
       E.say('drop', 'saved', true);
-      g.hud.alert(`RESUPPLY: +${P.reward.grenades} GRENADES · BATTERY & BOMBER READY · +${sup} SUPPLIES`);
+      g.hud.alert(`RESUPPLY: +${P.reward.grenades} GRENADES · +${P.reward.molotovs} MOLOTOVS · BATTERY & BOMBER READY · +${sup} SUPPLIES`);
       g.audio.uiBuy();
     } else {
       g.fx.explosion(c.x, c.y - 0.5, c.z, 0.5, { fires: false, scorch: false });
@@ -640,6 +641,7 @@ export class NightEvents {
   /** Schedule tonight's events. */
   start(night, endless) {
     this.reset();
+    this.log = []; // what happened tonight, for the chronicle at dawn
     const plan = endless
       ? [[pickOne(ENDLESS_EVENTS), rand(0.22, 0.32)], [pickOne(ENDLESS_EVENTS), rand(0.55, 0.65)]]
       : (NIGHT_EVENTS[night] || []);
@@ -695,7 +697,10 @@ export class NightEvents {
   }
 
   /** Play-test telemetry for an event (start / outcome). */
-  report(kind, phase, data = {}) { if (this.g.telemetry) this.g.telemetry.event(kind, phase, data); }
+  report(kind, phase, data = {}) {
+    (this.log || (this.log = [])).push({ kind, phase, data });
+    if (this.g.telemetry) this.g.telemetry.event(kind, phase, data);
+  }
 
   /** Radio a line from EVENT_LINES. prio: jump the queue (it's happening now). */
   say(kind, moment, prio = false) {

@@ -10,15 +10,16 @@ module.exports = {
     // fast-forward the night to dawn
     for (let k = 0; k < 60 && (await t.get('__LB.state')) === 'night'; k++) await t.js('__LB.horde.clearLiving(); __LB.director.t = 1e4; __LB.test.advance(1, 1/30, false)');
     t.eq(await t.get('__LB.state'), 'dawn', 'night 2 ends at dawn');
-    await t.advance(12);
+    await t.advance(7); // the chronicle comes up over the dawn; skip it like a player would
+    await t.js(`__LB.chronicle.advance(); __LB.chronicle.advance(); __LB.test.advance(5, 1/30, false)`);
     t.eq(await t.get('__LB.state'), 'shop', 'the resupply opens');
     await t.js(`__LB.run.supplies = 5000; document.querySelector('[data-act="buy"]').click(); __LB.onAction('begin')`);
     await t.js(`(() => { const t = __LB.test; t.skipIntro(); t.advance(0.3, 1/30, false); __LB.run.survivors = 1; t.spawn(500, -60, -10, 0); for (let k = 0; k < 240 && __LB.state !== 'fallen'; k++) t.advance(1, 1/30, false); })()`);
     t.eq(await t.get('__LB.state'), 'fallen', 'night 3 is lost');
-    const sums = await t.get(`__LB.telemetry.recent.filter((r) => r.type === 'night_summary').slice(-2).map((r) => ({ night: r.night, outcome: r.outcome, napalm: r.abilities.napalm ? r.abilities.napalm.used : 0, shots: r.gun.shots, kills: r.kills.total }))`);
+    const sums = await t.get(`__LB.telemetry.recent.filter((r) => r.type === 'night_summary').slice(-2).map((r) => ({ night: r.night, outcome: r.outcome, molotov: r.abilities.molotov ? r.abilities.molotov.used : 0, shots: r.gun.shots, kills: r.kills.total }))`);
     t.log(JSON.stringify(sums));
     t.eq(sums.map((s) => [s.night, s.outcome]), [[2, 'survived'], [3, 'fallen']], 'both nights are summarised');
-    t.assert(sums[0].napalm === 1 && sums[0].shots > 0, 'ability use and shots are counted');
+    t.assert(sums[0].molotov === 1 && sums[0].shots > 0, 'ability use and shots are counted');
     // and it all reached the file
     await t.sleep(800);
     const file = t.telemetryFile();

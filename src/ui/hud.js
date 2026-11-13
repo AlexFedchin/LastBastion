@@ -232,12 +232,12 @@ export class HUD {
     const a = arsenal;
     const all = [
       ['Q', 'ARTILLERY', a.artyCd > 0 ? `${Math.ceil(a.artyCd)}s` : `READY ×${stats.artyShells}`, a.artyCd > 0 ? 1 - a.artyCd / stats.artyCooldown : 1, a.artyCd <= 0],
-      ['E', 'NAPALM', a.napalmT > 0 ? 'BURNING' : (a.napalmCd > 0 ? `${Math.ceil(a.napalmCd)}s` : 'READY'), a.napalmT > 0 ? a.napalmT / stats.napalmDuration : (a.napalmCd > 0 ? 1 - a.napalmCd / stats.napalmCooldown : 1), a.napalmCd <= 0 && a.napalmT <= 0],
+      ['E', 'MOLOTOV', `×${a.molotovsLeft}`, a.molotovsLeft > 0 ? 1 - a.molotovCd / ABILITY.molotov.rearm : 0, a.molotovsLeft > 0 && a.molotovCd <= 0],
       ['T', 'BOMBER', a.air.bomberBusy ? 'INBOUND' : (a.air.bomberCd > 0 ? `${Math.ceil(a.air.bomberCd)}s` : 'READY'), a.air.bomberBusy ? 1 : (a.air.bomberCd > 0 ? 1 - a.air.bomberCd / ABILITY.bomber.cooldown : 1), a.air.bomberCd <= 0 && !a.air.bomberBusy],
       ['G', 'GRENADES', `×${a.grenadesLeft}`, a.grenadesLeft > 0 ? 1 : 0, a.grenadesLeft > 0],
       ['B', 'DANGER CLOSE', a.dangerUsed ? 'SPENT' : `−3 LIVES`, a.dangerUsed ? 0 : 1, !a.dangerUsed && run.survivors > 3],
     ];
-    const UNLOCK_KEY = { Q: 'artillery', E: 'napalm', T: 'bomber', G: 'grenades', B: 'dangerClose' };
+    const UNLOCK_KEY = { Q: 'artillery', E: 'molotov', T: 'bomber', G: 'grenades', B: 'dangerClose' };
     const night = g.state === 'dawn' ? run.night - 1 : run.night;
     const rows = all.filter((r) => isUnlocked(UNLOCK_KEY[r[0]], night));
     const sig = rows.map((r) => r[0]).join('');

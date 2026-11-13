@@ -332,6 +332,7 @@ export class Horde {
     // hooks set by the game
     this.onKill = null;      // (type, cause, x, y, z, headshot)
     this.onBreach = null;    // (section, x, y, z)
+    this.onIgnite = null;    // (index): one of them just caught fire
     this.onBloaterWall = null;
     this.onGiantWall = null;  // (i, section, x, z, dt)
     this.ctx = { fireAt: null, wireAt: null };
@@ -427,6 +428,7 @@ export class Horde {
 
   ignite(i, seconds, dps) {
     if (this.dead[i]) return;
+    if (this.burn[i] <= 0 && this.onIgnite) this.onIgnite(i); // it catches: it screams
     this.burn[i] = Math.max(this.burn[i], seconds);
     this.burnDps[i] = Math.max(this.burnDps[i], dps);
   }
@@ -658,11 +660,12 @@ export class Horde {
       }
 
       let dist = wallDist(x, z);
-      // napalm / wire
+      // burning fuel on the ground / wire
       if (ctx.fireAt) {
-        const fdps = ctx.fireAt(x, dist);
+        const fdps = ctx.fireAt(x, z, dist);
         if (fdps > 0) {
-          this.ignite(i, 3.5, fdps * 0.3);
+          // walking through it is enough: they come out the other side alight
+          this.ignite(i, 5, fdps * 0.35);
           if (this.damage(i, fdps * dt, 'fire', 0, 1, 0)) continue;
         }
       }

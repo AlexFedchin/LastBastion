@@ -16,7 +16,7 @@
 //   called   what the player called in (arty, grenade, bomb, danger, fire*)
 //   support  autonomous help (gunner, rifle, gunship, mortar, mine, wire)
 //   chain    bloaters bursting, bodies at the wall
-// (*fire is mostly the napalm trench, plus incendiary rounds and burning wrecks)
+// (*fire is mostly Molotov pools, plus incendiary rounds and burning wrecks)
 import { ZOMBIE_TYPES } from '../config.js';
 
 const GROUP = {

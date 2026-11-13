@@ -28,6 +28,9 @@ PERSONA = {
                   "a little breathy through an oxygen mask.",
     'LT. HOLLIS': "Male, early thirties, an American recon lieutenant: firm, athletic voice, out of breath from running.",
     'REACH 3-1': "Male, forties, a British transport aircraft pilot: steady, warm, calm professional voice, northern English accent.",
+    # the chronicle at every dawn: not on the radio, told years later
+    'NARRATOR': "Male, about seventy, an old soldier telling the story of the siege decades later: a deep, warm, weathered "
+                "baritone with soft gravel, slow and measured, intimate and haunted, a storyteller by a fire; clear, unhurried diction.",
 }
 
 # What the voice reference is designed on: a neutral line in the character's normal register.
@@ -44,6 +47,7 @@ REF_TEXT = {
     'HAMMER 1-1': "Hammer flight, check in. Fuel is good, systems are good. Proceeding to the holding point, angels twelve.",
     'LT. HOLLIS': "Okay, listen up. We move fast and we move quiet. Stay on my six and nobody stops for anything.",
     'REACH 3-1': "Good evening, this is Reach. We're established on the approach, cargo is rigged, and the crew is ready back there.",
+    'NARRATOR': "It was a long time ago now. But some nights, when the wind comes down the valley, I can still hear the gun.",
 }
 
 # characters sharing a voice: the survivor is the woman from the overpass, close now
@@ -64,6 +68,7 @@ DEFAULT = {
     'HAMMER 1-1': ("Crisp, fast, confident pilot radio call.", 0.45),
     'LT. HOLLIS': ("Urgent and out of breath, running.", 0.7),
     'REACH 3-1': ("Calm, warm, professional pilot radio call.", 0.3),
+    'NARRATOR': ("Slow, low and measured, an old man remembering; quiet gravity, unhurried pauses between the sentences.", 0.22),
 }
 
 # text -> (direction, intensity)
@@ -200,7 +205,7 @@ DIRECTION = {
     "Mayday, mayday! Spectre two-one, fire in number three — we've lost hydraulics — we're going down!":
         ("Screaming a mayday call in terror, frantic and breathless, all the calm gone, alarms in the cockpit.", 1.0),
     # ── unlock briefings ──────────────────────────────────────────────────
-    "Engineers filled the trench out front with napalm. E lights it — it burns right along the wall base. And there's a crate of grenades at your feet. G, for anything climbing.":
+    "Engineers found a crate of bottles and a jerrycan in the depot. E throws a Molotov — put it on the wall base and let them burn. And there's a crate of grenades at your feet. G, for anything climbing.":
         ("Practical, gruff briefing, with grim satisfaction, conversational.", 0.35),
     'Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.':
         ("Composed, formal and businesslike briefing.", 0.3),
@@ -273,6 +278,111 @@ DIRECTION = {
         ("Exhaling with relief, quiet.", 0.25),
     "Spectre's down... God rest them. We're on our own up here.":
         ("Stunned and grieving, quiet and slow, then grim and resigned.", 0.25),
+    # ── the chronicle at dawn (NARRATOR) ──────────────────────────────────
+    'On the first night, the dead came down the valley in their thousands. Bastion-7 answered them with one gun.':
+        ("Slow and grave, the opening of a long story; a pause, then quiet pride on 'one gun'.", 0.25),
+    'On the second night, word came that the bridge at Halden was down. The relief would be late. Only late, we told ourselves.':
+        ("Measured and weary, a wry, sad smile on 'Only late, we told ourselves'.", 0.2),
+    "The third night began with a woman's voice on the radio, begging for help that we could not give.":
+        ("Low and heavy with old guilt, slowing down at the end.", 0.2),
+    'On the fourth night, Command promised us an airdrop. The bloaters came down the valley to meet it.':
+        ("Dry and grim, measured storytelling with a bitter edge.", 0.22),
+    'On the fifth night, Bastion-3 fell, and Bastion-5 went silent. We were the last lights left on the line.':
+        ("Hushed and solemn, a long pause before the last sentence, quiet and lonely.", 0.2),
+    'On the sixth night, the radio told us the relief column had been rerouted. Nobody on the wall believed it.':
+        ("Dry, weary and sardonic, an old man shaking his head.", 0.2),
+    "By the seventh night, Command had stopped answering. Out on the horizon, the city's fires were going out.":
+        ("Quiet, numb and slow, haunted, almost a whisper at the end.", 0.15),
+    'On the eighth night, a recorded voice told us that no one was listening anymore. We kept talking anyway.':
+        ("Low and weary, then a stubborn, defiant warmth on 'We kept talking anyway'.", 0.25),
+    'On the ninth night, the biggest horde we had ever seen filled the valley from the wall to the ridge. We gave it everything.':
+        ("Building tension, growing intensity, then firm and proud on 'We gave it everything'.", 0.4),
+    'The tenth night. The seventy-second hour. The last night — if the promises had ever meant anything at all.':
+        ("Very slow and solemn, each phrase weighted, then bitter and quiet at the end.", 0.25),
+    'Another night came, as they always did, and the dead came with it.':
+        ("Weary and fatalistic, slow.", 0.18),
+    'There were no more orders and no more promises. Only the wall, the night, and the gun.':
+        ("Low, meditative and grim, a slow cadence on the last three things.", 0.2),
+    'We had stopped counting the nights. The dead had not stopped coming.':
+        ("Hollow and tired, slow, the second sentence colder.", 0.18),
+    'Recon Two came down the road with half the valley at their heels. Every one of them made it through the gate.':
+        ("Rising with remembered excitement, then warm relief and pride on the last sentence.", 0.45),
+    'Recon Two ran the last mile under our guns. Not all of them reached the gate, and the ones who did never spoke of the others.':
+        ("Tense at first, then quiet and sombre.", 0.3),
+    'Recon Two died on the road, a few hundred metres from the gate. We watched every moment of it through the sights.':
+        ("Flat and heavy with grief, slow, a haunted pause before the last sentence.", 0.2),
+    'The woman from the overpass found our lights. She brought every one of those children through the gate alive. For one night, the wall meant something.':
+        ("Tender and moved, voice softening with emotion, warm and proud on the last sentence.", 0.3),
+    'The people from the overpass ran for our lights. Some of them made it inside. The mother would never say the names of the others.':
+        ("Gentle and sad, slow, quieter at the end.", 0.2),
+    'The people from the overpass ran for our lights. None of them reached the gate. Their voices stopped, one by one, out on the open road.':
+        ("Grief-stricken and quiet, very slow at the end, almost breaking.", 0.2),
+    'The crate came down under a grey canopy, and we held the field around it until the recovery team dragged it home. Ammunition, bottles, and a little hope.':
+        ("Vivid and lively storytelling, a warm smile on 'a little hope'.", 0.35),
+    'The crate came down in the field, and the dead tore it open like a carcass. We watched our supplies scatter in the mud.':
+        ("Bitter and grim, disgust on 'like a carcass'.", 0.3),
+    'Then the first giant came down the road, as tall as the wall itself. It fell in the open field, and the whole valley shook when it hit the ground.':
+        ("Awed and ominous, building, then a powerful, dramatic release at the end.", 0.45),
+    'Then the first giant came. It reached the wall and tore at the concrete with its bare hands, and the bastion shook, until at last we brought it down.':
+        ("Dread building to intensity in the middle, then a hard-won, exhausted triumph at the end.", 0.5),
+    'And then it came — the biggest of them all. We threw everything we had left at it, and somehow, out there in the field, it fell.':
+        ("Ominous and hushed at first, growing in intensity, then awed disbelief at the end.", 0.45),
+    "And then it came — the biggest of them all. It reached our wall, and for a long moment I thought the whole line would come down with it. It didn't. It fell.":
+        ("Hushed dread building to a peak, a long pause, then a quiet, shaken 'It didn't. It fell.'", 0.5),
+    'A herd of brutes came down the flank in a stampede, and the wall shuddered under their weight. It held. Barely.':
+        ("Vivid and intense, then clipped and dry on 'It held. Barely.'", 0.45),
+    'A column of bloaters walked down the road like a funeral procession. We burst them in the field, one after another, and the valley stank of it for days.':
+        ("Dark, grim humour, slow and deliberate.", 0.3),
+    'Then the fog rolled up the valley, thick as wet wool, and the dead walked out of it close enough to touch. We fired at shadows.':
+        ("Eerie and hushed, creeping dread, slow.", 0.3),
+    'Then the generator died, and the lights went out all along the wall. We fought on in the dark, by flare-light and muzzle flash.':
+        ("Tense and vivid, quickening a little, then grim determination.", 0.4),
+    'Spectre went down that night. We watched it fall burning into the hills, and after that there was no one above us but God.':
+        ("Grieving and slow, heavy, the last words almost a prayer.", 0.22),
+    'When the wall was lost, we called the guns down on our own heads. Three of ours died in that fire. The wall held.':
+        ("Heavy with guilt that never faded, slow, the last sentence hard and quiet.", 0.3),
+    "The wall base burned all night. The dead walked into the flames screaming, and kept on walking, until they didn't.":
+        ("Dark and haunted, vivid, the last words cold and final.", 0.35),
+    'Somewhere past midnight the gun found its rhythm, and the dead went down in rows, like wheat before the scythe.':
+        ("Grim and rhythmic, a terrible poetry, low and steady.", 0.35),
+    'Not one name was added to the list that night. On that wall, it was as close to a miracle as we ever came.':
+        ("Warm, quiet wonder, a soft smile.", 0.25),
+    'We lost good men on the walkway that night. We buried them at first light, beside the others.':
+        ("Quiet, sorrowful and dignified.", 0.18),
+    'The wall took a terrible toll that night. By morning there were empty places all along the walkway, and nobody spoke of them.':
+        ("Heavy grief, slow and hushed.", 0.18),
+    'By dawn there were so few of us left that we stood further apart, so that from the valley, the wall would still look manned.':
+        ("Hushed and broken, near tears but holding steady, very slow.", 0.2),
+    'When the sun came up, the valley was grey with bodies. Seventy-two hours, Command had said. Sixty-four to go.':
+        ("Weary and grim, a dry, tired cadence on 'Sixty-four to go'.", 0.22),
+    'At dawn the gate was still shut. Whatever we had heard out there in the dark, we never opened it.':
+        ("Quiet and haunted, slow.", 0.18),
+    'By morning the radio was quiet. Kovac sat beside it for a long time, listening to the static.':
+        ("Tender and sad, slow, fading out at the end.", 0.15),
+    'The fourth dawn came up cold and red. The crows had learned where to find us.':
+        ("Bleak and poetic, slow.", 0.18),
+    'That morning we understood that there was no line anymore. There was only us.':
+        ("Quiet realisation, solemn, a long pause before 'There was only us'.", 0.2),
+    'At dawn, Kovac loaded a fresh belt without a word. Nobody said rerouted out loud again.':
+        ("Dry, quiet and wry, an old soldier's understatement.", 0.2),
+    'That morning the city on the horizon lay dark and still. There was nothing left in it to burn.':
+        ("Hushed and desolate, very slow.", 0.15),
+    'When the sun came up, we said it to each other, one by one, all along the line. Bastion-7 is holding.':
+        ("Quiet pride growing, the last sentence firm and moved.", 0.3),
+    'At dawn, Aran told the sergeant it had been an honour. Kovac told him to save it. One more night.':
+        ("Tender and bittersweet, a small smile on 'save it', resolute on 'One more night'.", 0.25),
+    'And then the sun rose on the seventy-second hour. No column came down the road. But we were still there.':
+        ("Slow and deeply moved, voice catching with pride on 'But we were still there'.", 0.3),
+    'The sun rose again. It did not care who was still alive to see it.':
+        ("Bleak and philosophical, slow.", 0.15),
+    'Dawn. We counted the living, then the dead, and then we stopped counting.':
+        ("Weary, hollow, slow.", 0.15),
+    'Another morning on the wall. Tomorrow they would come again. So would we.':
+        ("Tired but stubborn, a quiet resolve on 'So would we'.", 0.22),
+    'Bastion-7 went quiet that night. The dead came over the wall like water through a broken dam, and the last light on the line went out.':
+        ("Mournful and grave, an elegy, slowing to a whisper at the end.", 0.25),
+    'No one was left to write it down. The gun fell silent before the dawn, and in the morning, the valley belonged to the dead.':
+        ("Hushed and final, an epitaph, very slow.", 0.2),
 }
 
 

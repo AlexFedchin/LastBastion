@@ -70,7 +70,8 @@ function makeContext(consoleErrors) {
 
 app.whenReady().then(async () => {
   win = new BrowserWindow({
-    width: 960, height: 540, show: false,
+    // SMOKE_SIZE=1600x900 for screenshots worth keeping
+    ...(([w, h]) => ({ width: +w || 960, height: +h || 540 }))((process.env.SMOKE_SIZE || '').split('x')), show: false,
     webPreferences: { preload: path.join(ROOT, 'electron', 'preload.js'), contextIsolation: true, offscreen: true, backgroundThrottling: false },
   });
   win.webContents.setAudioMuted(true); // tests never make a sound

@@ -130,8 +130,8 @@ export function baseStats() {
     // Wall gunners
     // two crewed M240s are on the wall from the start; upgrades post the other two
     gunners: 2, gunnerRate: 2.4, gunnerDamage: 15, gunnerSpread: 0.034,
-    // Napalm trench
-    napalmDuration: 7, napalmCooldown: 50, napalmDps: 85,
+    // Molotovs: bottles per night, and the burning pool each one leaves
+    molotovs: 6, molotovBurn: 9, molotovRadius: 4.2, molotovDps: 70,
     // Wire
     wireBands: 0, wireHp: 450,
     // Consumables per night
@@ -175,8 +175,8 @@ export const UPGRADES = [
     apply: (s, r) => { s.gunnerRate *= 1 + 0.25 * r; s.gunnerSpread *= 1 - 0.25 * r; s.gunnerDamage *= 1 + 0.15 * r; } },
   { id: 'wire', group: 'wall', name: 'CONCERTINA WIRE', desc: 'Rank 1: wire band at 22 m. Rank 2: second band at 45 m. Rank 3: double strand.', costs: [160, 340, 560],
     apply: (s, r) => { s.wireBands = Math.min(r, 2); if (r >= 3) s.wireHp *= 2.2; } },
-  { id: 'napalm', group: 'wall', unlock: 'napalm', name: 'NAPALM TRENCH', desc: 'Burns 3 s longer and refills 10 s faster per rank.', costs: [220, 480],
-    apply: (s, r) => { s.napalmDuration += 3 * r; s.napalmCooldown -= 10 * r; s.napalmDps *= 1 + 0.25 * r; } },
+  { id: 'molotov', group: 'wall', unlock: 'molotov', name: 'MOLOTOV CRATE', desc: '+3 bottles a night. The fires burn longer, wider and hotter per rank.', costs: [220, 480],
+    apply: (s, r) => { s.molotovs += 3 * r; s.molotovBurn += 3 * r; s.molotovRadius *= 1 + 0.15 * r; s.molotovDps *= 1 + 0.25 * r; } },
   // Support
   { id: 'grenades', group: 'support', unlock: 'grenades', name: 'GRENADE CRATE', desc: '+4 grenades per night.', costs: [110, 240],
     apply: (s, r) => { s.grenades += 4 * r; } },
@@ -191,6 +191,8 @@ export const SUPPLY_BONUS = (night, survivors) => 200 + 30 * night + 4 * survivo
 export const ABILITY = {
   // thrown one at a time (G), a short re-arm between throws
   grenade: { radius: 7.5, damage: 320, maxRange: 90, rearm: 0.45 },
+  // E: light the rag, throw the bottle. What stands in the pool burns; what walks through it catches.
+  molotov: { maxRange: 85, rearm: 0.75, light: 0.2, igniteSeconds: 5, igniteDps: 24, maxPools: 10 },
   dangerClose: { cost: 3, shells: 40, radius: 7.5, damage: 420 },
   // T: throw a red marker flare anywhere on the field; a bomber puts a 2000 lb bomb on it
   bomber: { cooldown: 75, firstDelay: 12, maxRange: 320, minWallDist: 16, radius: 24, damage: 1400,
@@ -261,6 +263,7 @@ export const RADIO = {
 export const CALL = {
   kovac: 'SGT. KOVAC', aran: 'PVT. ARAN', command: 'COMMAND', unknown: 'UNKNOWN', battery: 'BATTERY',
   hammer: 'HAMMER 1-1', spectre: 'SPECTRE 2-1', spectre2: 'SPECTRE 2-2', hollis: 'LT. HOLLIS', reach: 'REACH 3-1', survivor: 'SURVIVOR',
+  narrator: 'NARRATOR',
 };
 export const COMMS = {
   battery: {
@@ -304,19 +307,19 @@ export const BARKS = {
 // ── What you have, and when: one new tool a night so nobody drowns on night 1 ─
 // (night 1 is the fifty and the two wall gunners)
 export const UNLOCKS = {
-  napalm: 2, grenades: 2, claymores: 2,
+  molotov: 2, grenades: 2, claymores: 2,
   artillery: 3, gunship: 3,
   bomber: 4,
   dangerClose: 5,
 };
 export const isUnlocked = (key, night) => night >= (UNLOCKS[key] ?? 1);
 export const UNLOCK_INFO = {
-  napalm: 'NAPALM [E]', grenades: 'GRENADES [G]', claymores: 'CLAYMORES',
+  molotov: 'MOLOTOVS [E]', grenades: 'GRENADES [G]', claymores: 'CLAYMORES',
   artillery: '105MM BATTERY [Q]', gunship: 'SPECTRE',
   bomber: 'BOMBER [T]', dangerClose: 'DANGER CLOSE [B]',
 };
 export const UNLOCK_LINES = {
-  2: [[CALL.kovac, 'Engineers filled the trench out front with napalm. E lights it — it burns right along the wall base. And there\'s a crate of grenades at your feet. G, for anything climbing.']],
+  2: [[CALL.kovac, 'Engineers found a crate of bottles and a jerrycan in the depot. E throws a Molotov — put it on the wall base and let them burn. And there\'s a crate of grenades at your feet. G, for anything climbing.']],
   3: [[CALL.command, 'Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.']],
   4: [[CALL.hammer, 'Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it — that\'s T — and keep your heads down.']],
   5: [[CALL.kovac, 'Listen. If it all goes wrong, B brings the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.']],
@@ -341,7 +344,7 @@ export const ENDLESS_EVENTS = ['giant', 'stampede', 'bloaters', 'drop', 'fog', '
 export const EVENTS = {
   patrol: { count: 4, speed: [4.5, 4.9], chasers: 16, catchR: 1.05, reward: { survivors: 1, supplies: 40 } },
   civilians: { count: 6, speed: [3.8, 4.3], chasers: 20, catchR: 1.05, reward: { survivors: 1, supplies: 20 } },
-  drop: { hold: 35, tear: 1.3, maxTearing: 6, pull: 32, reward: { grenades: 6, supplies: 150 } },
+  drop: { hold: 35, tear: 1.3, maxTearing: 6, pull: 32, reward: { grenades: 6, molotovs: 3, supplies: 150 } },
   giant: { name: 'GOLIATH', hpMul: 1, scale: 4.0, smash: 2.4 },
   behemoth: { name: 'BEHEMOTH', hpMul: 1.8, scale: 5.4, smash: 1.8 },
   stampede: { brutes: 14, speed: 1.75, runners: 20 },
@@ -410,7 +413,107 @@ export const EVENT_LINES = {
   },
 };
 
-/** Every line that can come over the radio, as [who, text] — what the voice build records. */
+// ── The chronicle: after every night, the story of it, told years later ──────
+// Built at dawn from what actually happened (chronicle.js): how the night
+// opened, how each of its events ended, one deed if the night had one, what it
+// cost, and how the morning found us. Every fragment is voiced (CALL.narrator).
+export const CHRONICLE = {
+  title: {
+    1: 'THE FIRST NIGHT', 2: 'THE FOG', 3: 'THE OVERPASS', 4: 'THE DROP', 5: 'GOLIATH',
+    6: 'THE STAMPEDE', 7: 'LIGHTS OUT', 8: 'SPECTRE FALLS', 9: 'EVERYTHING WE HAD', 10: 'THE SEVENTY-SECOND HOUR',
+    endless: 'NO RELIEF',
+  },
+  open: {
+    1: 'On the first night, the dead came down the valley in their thousands. Bastion-7 answered them with one gun.',
+    2: 'On the second night, word came that the bridge at Halden was down. The relief would be late. Only late, we told ourselves.',
+    3: 'The third night began with a woman\'s voice on the radio, begging for help that we could not give.',
+    4: 'On the fourth night, Command promised us an airdrop. The bloaters came down the valley to meet it.',
+    5: 'On the fifth night, Bastion-3 fell, and Bastion-5 went silent. We were the last lights left on the line.',
+    6: 'On the sixth night, the radio told us the relief column had been rerouted. Nobody on the wall believed it.',
+    7: 'By the seventh night, Command had stopped answering. Out on the horizon, the city\'s fires were going out.',
+    8: 'On the eighth night, a recorded voice told us that no one was listening anymore. We kept talking anyway.',
+    9: 'On the ninth night, the biggest horde we had ever seen filled the valley from the wall to the ridge. We gave it everything.',
+    10: 'The tenth night. The seventy-second hour. The last night — if the promises had ever meant anything at all.',
+    endless: [
+      'Another night came, as they always did, and the dead came with it.',
+      'There were no more orders and no more promises. Only the wall, the night, and the gun.',
+      'We had stopped counting the nights. The dead had not stopped coming.',
+    ],
+  },
+  // how each night event ended (keys: see Chronicle.eventLine)
+  events: {
+    patrol: {
+      all: 'Recon Two came down the road with half the valley at their heels. Every one of them made it through the gate.',
+      some: 'Recon Two ran the last mile under our guns. Not all of them reached the gate, and the ones who did never spoke of the others.',
+      none: 'Recon Two died on the road, a few hundred metres from the gate. We watched every moment of it through the sights.',
+    },
+    civilians: {
+      all: 'The woman from the overpass found our lights. She brought every one of those children through the gate alive. For one night, the wall meant something.',
+      some: 'The people from the overpass ran for our lights. Some of them made it inside. The mother would never say the names of the others.',
+      none: 'The people from the overpass ran for our lights. None of them reached the gate. Their voices stopped, one by one, out on the open road.',
+    },
+    drop: {
+      saved: 'The crate came down under a grey canopy, and we held the field around it until the recovery team dragged it home. Ammunition, bottles, and a little hope.',
+      lost: 'The crate came down in the field, and the dead tore it open like a carcass. We watched our supplies scatter in the mud.',
+    },
+    giant: {
+      field: 'Then the first giant came down the road, as tall as the wall itself. It fell in the open field, and the whole valley shook when it hit the ground.',
+      wall: 'Then the first giant came. It reached the wall and tore at the concrete with its bare hands, and the bastion shook, until at last we brought it down.',
+    },
+    behemoth: {
+      field: 'And then it came — the biggest of them all. We threw everything we had left at it, and somehow, out there in the field, it fell.',
+      wall: 'And then it came — the biggest of them all. It reached our wall, and for a long moment I thought the whole line would come down with it. It didn\'t. It fell.',
+    },
+    stampede: { held: 'A herd of brutes came down the flank in a stampede, and the wall shuddered under their weight. It held. Barely.' },
+    bloaters: { held: 'A column of bloaters walked down the road like a funeral procession. We burst them in the field, one after another, and the valley stank of it for days.' },
+    fog: { held: 'Then the fog rolled up the valley, thick as wet wool, and the dead walked out of it close enough to touch. We fired at shadows.' },
+    blackout: { held: 'Then the generator died, and the lights went out all along the wall. We fought on in the dark, by flare-light and muzzle flash.' },
+    gunshipDown: { down: 'Spectre went down that night. We watched it fall burning into the hills, and after that there was no one above us but God.' },
+  },
+  // at most one per night, in this order of precedence
+  deeds: {
+    danger: 'When the wall was lost, we called the guns down on our own heads. Three of ours died in that fire. The wall held.',
+    fire: 'The wall base burned all night. The dead walked into the flames screaming, and kept on walking, until they didn\'t.',
+    massacre: 'Somewhere past midnight the gun found its rhythm, and the dead went down in rows, like wheat before the scythe.',
+  },
+  toll: {
+    none: 'Not one name was added to the list that night. On that wall, it was as close to a miracle as we ever came.',
+    few: 'We lost good men on the walkway that night. We buried them at first light, beside the others.',
+    many: 'The wall took a terrible toll that night. By morning there were empty places all along the walkway, and nobody spoke of them.',
+    heavy: 'By dawn there were so few of us left that we stood further apart, so that from the valley, the wall would still look manned.',
+  },
+  close: {
+    1: 'When the sun came up, the valley was grey with bodies. Seventy-two hours, Command had said. Sixty-four to go.',
+    2: 'At dawn the gate was still shut. Whatever we had heard out there in the dark, we never opened it.',
+    3: 'By morning the radio was quiet. Kovac sat beside it for a long time, listening to the static.',
+    4: 'The fourth dawn came up cold and red. The crows had learned where to find us.',
+    5: 'That morning we understood that there was no line anymore. There was only us.',
+    6: 'At dawn, Kovac loaded a fresh belt without a word. Nobody said rerouted out loud again.',
+    7: 'That morning the city on the horizon lay dark and still. There was nothing left in it to burn.',
+    8: 'When the sun came up, we said it to each other, one by one, all along the line. Bastion-7 is holding.',
+    9: 'At dawn, Aran told the sergeant it had been an honour. Kovac told him to save it. One more night.',
+    10: 'And then the sun rose on the seventy-second hour. No column came down the road. But we were still there.',
+    endless: [
+      'The sun rose again. It did not care who was still alive to see it.',
+      'Dawn. We counted the living, then the dead, and then we stopped counting.',
+      'Another morning on the wall. Tomorrow they would come again. So would we.',
+    ],
+  },
+  fallen: [
+    'Bastion-7 went quiet that night. The dead came over the wall like water through a broken dam, and the last light on the line went out.',
+    'No one was left to write it down. The gun fell silent before the dawn, and in the morning, the valley belonged to the dead.',
+  ],
+};
+
+/** Every chronicle fragment, flat. */
+export function chronicleLines() {
+  const C = CHRONICLE, out = [];
+  const flat = (v) => (typeof v === 'string' ? [v] : Array.isArray(v) ? v : Object.values(v).flatMap(flat));
+  for (const part of [C.open, C.events, C.deeds, C.toll, C.close, C.fallen]) out.push(...flat(part));
+  return out;
+}
+
+/** Every voiced line, as [who, text]: the radio traffic and the chronicle (what the voice build records). */
 export function allRadioLines() {
   const out = [];
   const add = (who, text) => { if (!out.some((l) => l[0] === who && l[1] === text)) out.push([who, text]); };
@@ -430,5 +533,6 @@ export function allRadioLines() {
       }
     }
   }
+  for (const t of chronicleLines()) add(CALL.narrator, t);
   return out;
 }

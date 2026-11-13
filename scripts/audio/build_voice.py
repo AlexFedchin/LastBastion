@@ -56,6 +56,7 @@ CAST = {
     'LT. HOLLIS': dict(voice='am_echo', speed=1.12, radio='field'),
     'REACH 3-1': dict(voice='bm_lewis', speed=1.05, radio='aircraft'),
     'SURVIVOR': dict(voice='af_nicole', speed=1.05, radio='handheld'),  # the overpass woman, close now
+    'NARRATOR': dict(voice='bm_lewis', speed=0.9, radio='narration'),  # the chronicle at dawn: no radio
 }
 # Kovac shouting over the gun (BARKS): faster, harder
 SHOUT_SPEED = 1.07
@@ -83,7 +84,7 @@ SPOKEN = [
     (r'\s*—\s*', ', '),
     # single key letters read as words ('Q' -> 'she', 'E' -> 'he'): name the key
     (r'\bQ puts\b', 'The Q key puts'),
-    (r'\bE lights\b', 'The E key lights'),
+    (r'\bE throws\b', 'The E key throws'),
     (r"that's T\b", "that's the T key"),
 ]
 
@@ -324,6 +325,28 @@ def radio(a, marks, sr_in, prof, seed):
     return y.astype(np.float32), sr
 
 
+def narration(a, sr):
+    """The chronicle is not a radio: a close, warm voice-over. Rumble out, a gentle
+    compressor, a little body and presence, speech to about -18 dBFS RMS."""
+    x = a / (np.max(np.abs(a)) + 1e-9) * 0.9
+    x = np.concatenate([np.zeros(int(0.06 * sr), np.float32), x, np.zeros(int(0.3 * sr), np.float32)])
+    x = signal.sosfilt(signal.butter(2, 70, 'highpass', fs=sr, output='sos'), x)
+    x = compress(x, sr, thr_db=-20, ratio=2.2, makeup_db=4)
+    for f, g, q in ((180, 1.5, 0.8), (350, -1.5, 1.0), (3200, 2.0, 0.9)):
+        b, aa = peaking(f, g, q, sr)
+        x = signal.lfilter(b, aa, x)
+    speech = np.abs(x) > 0.02 * np.max(np.abs(x))
+    rms = np.sqrt(np.mean(x[speech] ** 2)) if speech.any() else np.sqrt(np.mean(x ** 2))
+    y = x * (10 ** (-18 / 20) / (rms + 1e-9))
+    y = np.tanh(y * 1.1) / 1.1
+    pk = np.max(np.abs(y))
+    if pk > 0.89:
+        y *= 0.89 / pk
+    fo = int(0.02 * sr)
+    y[-fo:] *= np.linspace(1, 0, fo)
+    return y.astype(np.float32), sr
+
+
 # ── main ────────────────────────────────────────────────────────────────────
 def radio_lines():
     js = ("import(" + json.dumps('file://' + os.path.join(ROOT, 'src', 'config.js')) + ").then(m => {"
@@ -353,11 +376,15 @@ def main():
         h = hashlib.sha1((who + '|' + text).encode()).hexdigest()[:10]
         name = f'{slug(who)}_{h}.ogg'
         a, marks = take(who, text, shout)
-        y, sr = radio(a, marks, 24000, CAST[who]['radio'], int(h, 16) & 0xffffffff)
+        if CAST[who]['radio'] == 'narration':
+            y, sr = narration(a, 24000)
+        else:
+            y, sr = radio(a, marks, 24000, CAST[who]['radio'], int(h, 16) & 0xffffffff)
         sf.write(os.path.join(OUT, name), y, sr, format='OGG', subtype='VORBIS')
         dur = len(y) / sr
         total += dur
-        manifest[who + '|' + text] = {'file': name, 'dur': round(dur, 3)}
+        # the game decodes each line at its own rate (radio 16 kHz, narration 24 kHz)
+        manifest[who + '|' + text] = {'file': name, 'dur': round(dur, 3), **({'sr': sr} if sr != SR_OUT else {})}
         print(f'  {who:12s} {dur:5.2f}s  {text[:70]}')
     # drop files nothing points at any more
     keep = {v['file'] for v in manifest.values()}

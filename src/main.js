@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
   nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, ABILITY, CALL, COMMS,
-  UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines,
+  UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines, CHRONICLE,
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
@@ -24,6 +24,7 @@ import { AudioEngine } from './audio/audio.js';
 import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { Loader } from './ui/loader.js';
+import { Chronicle, composeChronicle } from './ui/chronicle.js';
 
 const SECTION_LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
 const params = new URLSearchParams(location.search);
@@ -51,6 +52,7 @@ class Game {
     this.killTimes = [];
     this.carnageShown = 0;
     this.groanAcc = 0;
+    this.burnAcc = 0;
   }
 
   async boot() {
@@ -104,6 +106,7 @@ class Game {
     this.post = new Post(renderer, this.scene, this.camera, this.quality);
     this.hud = new HUD();
     this.screens = new Screens(this);
+    this.chronicle = new Chronicle(this);
     this.input = new Input(canvas);
 
     this.wireEvents();
@@ -296,6 +299,7 @@ class Game {
     h.onKill = (type, cause, x, y, z, headshot) => this.onKill(type, cause, x, y, z, headshot);
     h.onBreach = (sec, x, y, z) => this.onBreach(sec, x, y, z, 'climb');
     h.onBloaterWall = (sec, x, z) => this.onBloaterWall(sec, x, z);
+    h.onIgnite = (i) => { if (this.inPlay()) this.audio.ignited(h.x[i], h.z[i], h.type[i]); };
     this.player.onHit = (killed, head) => { this.hud.hitmarker(killed, head); };
     this.player.onOverheat = () => { this.bark('overheat', 0.5); this.telemetry.overheat(); };
     this.arsenal.onExplosionKills = (kills, x, z, cause) => this.onExplosionKills(kills, x, z, cause);
@@ -321,6 +325,7 @@ class Game {
     document.getElementById('s-click').addEventListener('click', () => { this.audio.init(); this.input.lock(); });
     document.addEventListener('keydown', (e) => {
       this.audio.init();
+      if (this.chronicle.active && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.chronicle.advance(); return; }
       if (e.code === 'Escape') {
         if (this.state === 'paused' && performance.now() - (this.pausedAt || 0) > 350) this.resume();
         else if (this.screens.current === 'settings' || this.screens.current === 'howto') this.onAction('back');
@@ -350,6 +355,8 @@ class Game {
     this.audio.pressure = 0; this.audio.intensity = 0; this.audio.lowLife = false; this.audio.tide = false;
     this.letterboxTarget = 0;
     if (this.events) this.events.reset();
+    if (this.chronicle) this.chronicle.stop();
+    this.audio.stopVoice();
     this.arsenal.startNight(this.menuStats, true);
     this.menuArtyT = 6;
     this.horde.pileMul = 0.6;
@@ -388,6 +395,7 @@ class Game {
       case 'retry': { const s = loadSave(); if (s) this.deploy(s, () => this.startRun(s)); break; }
       case 'menu': this.enterMenu(); break;
       case 'endless': this.run.endless = true; writeSave(this.run); this.openShop(); break;
+      case 'chronicle-next': this.chronicle.advance(); break;
       default: break;
     }
   }
@@ -409,6 +417,9 @@ class Game {
     this.run = JSON.parse(JSON.stringify(save));
     this.run.totals = this.run.totals || { shots: 0, hits: 0, headshots: 0 };
     this.run.log = this.run.log || [];
+    // saves from before the Molotovs: the napalm upgrade carries over to the bottles
+    const up = this.run.upgrades || (this.run.upgrades = {});
+    if (up.napalm) { up.molotov = Math.max(up.molotov || 0, up.napalm); delete up.napalm; }
     this.diff = DIFFICULTY[this.run.difficulty] || DIFFICULTY.veteran;
     this.stats = this.computeStats();
     if (this.run.atShop) {
@@ -440,6 +451,7 @@ class Game {
     this.diff = diff;
     this.stats = this.computeStats();
     this.plan = nightPlan(run.night, diff);
+    this.audio.stopVoice();
     this.horde.clear();
     this.horde.pileMul = diff.pileMul;
     this.fx.glow.clear(); this.fx.smoke.clear(); this.fx.gibs.clear();
@@ -449,7 +461,7 @@ class Game {
     this.director.start(this.plan);
     this.player.reset();
     this.env.dawn = 0;
-    this.ns = { kills: 0, headshots: 0, lost: 0, shots: 0, hits: 0, bestStreak: 0, supplies: 0, bonus: 0 };
+    this.ns = { kills: 0, headshots: 0, lost: 0, shots: 0, hits: 0, bestStreak: 0, supplies: 0, bonus: 0, fireKills: 0 };
     this.killTimes.length = 0;
     this.alertCd.fill(0);
     this.doneT = 0;
@@ -467,6 +479,7 @@ class Game {
     (UNLOCK_LINES[run.night] && !run.endless ? UNLOCK_LINES[run.night] : []).forEach((l, i) => this.radioScript.push({ at: 10 + i * 7, who: l[0], text: l[1], done: false }));
     this.radioScript.sort((a, b) => a.at - b.at);
     if (!isUnlocked('grenades', run.night)) this.arsenal.grenadesLeft = 0;
+    if (!isUnlocked('molotov', run.night)) this.arsenal.molotovsLeft = 0;
     this.telemetry.startNight(run, this.plan, this.stats, Object.keys(UNLOCKS).filter((k) => isUnlocked(k, run.night)));
     this.audio.night = run.night;
     this.audio.setMusicMode('night');
@@ -518,6 +531,7 @@ class Game {
     this.ns.kills++;
     this.telemetry.kill(type, cause, headshot);
     if (headshot) { this.ns.headshots++; run.totals.headshots++; }
+    if (cause === 'fire') this.ns.fireKills++;
     const sup = ZOMBIE_TYPES[type].supplies * this.diff.supplyMul * this.plan.supplyMul;
     run.supplies += sup;
     this.ns.supplies += sup;
@@ -602,6 +616,13 @@ class Game {
     this.ignoreUnlock = true;
     this.input.unlock();
     setTimeout(() => { this.ignoreUnlock = false; }, 300);
+    // the night as it will be remembered: told over the dawn, kept for the resupply screen
+    this.story = composeChronicle({
+      night: run.night, endless: run.endless, log: this.events.log || [], ns: this.ns,
+      survivors: run.survivors, dangerUsed: this.arsenal.dangerUsed,
+    });
+    run.chronicle = { night: this.story.night, title: this.story.title, lines: this.story.lines };
+    this.chronicleStarted = false;
     const bonus = Math.round(SUPPLY_BONUS(run.night, run.survivors) * this.diff.supplyMul);
     run.supplies += bonus;
     this.ns.bonus = bonus;
@@ -830,7 +851,7 @@ class Game {
       if (!this.input.locked && !TEST) this.screens.show('click');
       const n = this.run.night, keys = ['LMB FIRE', 'RMB OPTICS'];
       if (isUnlocked('artillery', n)) keys.push('Q ARTILLERY');
-      if (isUnlocked('napalm', n)) keys.push('E NAPALM');
+      if (isUnlocked('molotov', n)) keys.push('E MOLOTOV');
       if (isUnlocked('bomber', n)) keys.push('T BOMBER MARKER');
       if (isUnlocked('grenades', n)) keys.push('G GRENADES');
       this.hud.hint(keys.join(' · '));
@@ -857,11 +878,10 @@ class Game {
           this.hud.radio(CALL.battery, COMMS.battery[this.stats.artyShells] || `Shot, over. ${this.stats.artyShells} rounds HE, splash in three.`, true);
         } else this.hud.alert(`BATTERY RELOADING — ${Math.ceil(this.arsenal.artyCd)}s`, '', { key: 'arty-cd', plain: true });
       }
-      if (input.hit('KeyE') && can('napalm')) {
-        const ok = this.arsenal.igniteNapalm();
-        T.ability('napalm', ok);
-        if (ok) this.hud.alert('NAPALM TRENCH LIT');
-        else this.hud.alert(this.arsenal.napalmT > 0 ? 'TRENCH ALREADY BURNING' : `TRENCH REFILLING — ${Math.ceil(this.arsenal.napalmCd)}s`, '', { key: 'napalm-cd', plain: true });
+      if (input.hit('KeyE') && can('molotov')) {
+        const r = this.arsenal.throwMolotov(this.player.aimPoint(ABILITY.molotov.maxRange));
+        if (r !== 'rearm') T.ability('molotov', r === true);
+        if (r === 'empty') this.hud.alert('NO BOTTLES LEFT', '', { key: 'molotov-empty', plain: true });
       }
       if (input.hit('KeyT') && can('bomber')) {
         const air = this.arsenal.air;
@@ -931,6 +951,7 @@ class Game {
     this.audio.pressure = maxP;
     this.audio.lowLife = this.run.survivors <= 5;
     this.groans(dt);
+    this.burnScreams(dt);
 
     this.hud.update(rdt, this);
 
@@ -956,6 +977,22 @@ class Game {
     }
   }
 
+  /** The ones still burning keep screaming until the fire or a bullet ends it. */
+  burnScreams(dt) {
+    const h = this.horde;
+    let n = 0;
+    for (let i = 0; i < h.n; i++) if (h.burn[i] > 0 && !h.dead[i]) n++;
+    if (!n) { this.burnAcc = 0; return; }
+    this.burnAcc += dt * Math.min(5, 0.6 + n * 0.3);
+    while (this.burnAcc >= 1) {
+      this.burnAcc -= 1;
+      for (let k = 0; k < 12; k++) {
+        const i = (Math.random() * h.n) | 0;
+        if (h.burn[i] > 0 && !h.dead[i]) { this.audio.burnScream(h.x[i], h.z[i], h.type[i]); break; }
+      }
+    }
+  }
+
   updateDawn(dt, rdt) {
     // first light: the dark lifts slowly, then the grey morning comes up over the valley
     const u = Math.min(1, this.stateT / 10);
@@ -968,8 +1005,16 @@ class Game {
     this.arsenal.update(dt, this.time);
     this.audio.intensity = 0;
     this.audio.pressure = 0;
-    this.hud.update(rdt, this);
-    if (this.stateT > 11) {
+    // once the light is coming up, the chronicle of the night is told over it
+    if (!this.chronicleStarted && this.story && this.stateT > 5.5) {
+      this.chronicleStarted = true;
+      this.hud.show(false);
+      this.hud.radioQueue.length = 0;
+      this.chronicle.play(this.story, () => { this.story = null; });
+    }
+    if (this.chronicle.active) this.chronicle.update(rdt);
+    else this.hud.update(rdt, this);
+    if (this.stateT > 11 && !this.chronicle.active) {
       if (this.victory) {
         this.state = 'victory';
         this.hud.show(false);
@@ -1003,8 +1048,11 @@ class Game {
     this.groans(dt);
     if (this.stateT > 5 && this.screens.current !== 'over') {
       this.hud.show(false);
-      this.screens.buildGameOver(this.run, !!loadSave());
+      this.hud.radioQueue.length = 0;
+      const epitaph = pick(CHRONICLE.fallen);
+      this.screens.buildGameOver(this.run, !!loadSave(), epitaph);
       this.screens.show('over');
+      this.audio.narrate(CALL.narrator, epitaph, 1.2);
     }
   }
 

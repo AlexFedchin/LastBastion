@@ -327,9 +327,41 @@ for k, (src, ss, t, fo) in enumerate([(529239, 0.28, 3.0, 1.6), (184382, 0.985, 
 for k, sid in enumerate([241837, 241838, 241839, 241840]):
     clip(f'sfx/incoming_{k + 1}', sid, 0, 2.2, sr=32000, fi=0.08, fo=0.06, target=-14)
 
-# napalm: the igniter's blast, then the ditch goes up with a roar
-oneshot('sfx/napalm', [dict(src=447941, ss=0.27, t=1.6, fo=0.8),
-                       dict(src=33943, ss=2.9, t=6.0, fi=0.02, fo=3.0, vol=-2)], ch=2, target=-10, limit=4)
+# ── Molotov cocktails ───────────────────────────────────────────────────────
+# lighting the rag: a Zippo strike, then the soaked cloth catches
+oneshot('sfx/molotov_light', [dict(src=47988, ss=1.95, t=0.45, fo=0.15),
+                              dict(src=637533, ss=0.03, t=0.6, vol=-7, delay=0.24, fo=0.3)], target=-17)
+# the bottle tumbling through the air, the rag streaming flame
+clip('sfx/molotov_flight', 242721, 1.0, 1.4, sr=32000, hp=150, fi=0.15, fo=0.6, target=-21)
+# impact: the bottle bursts on the ground, then the fuel goes up with a whoomph
+# (the whoomphs are a torch being lit, from a pro foley library; the glass leads by a frame)
+TORCH = 483322
+for k, (glass, burst) in enumerate([
+    (dict(src=118198, ss=0.27, t=1.3), dict(src=592572, ss=0.0, t=1.8, lp=6000, vol=-6, delay=0.05)),
+    (dict(src=401619, ss=0.02, t=0.9), dict(src=260554, ss=0.02, t=2.0, vol=-4, delay=0.05)),
+    (dict(src=401619, ss=1.29, t=0.9), dict(src=592572, ss=0.0, t=1.8, rate=0.85, lp=6000, vol=-6, delay=0.06)),
+    (dict(src=118198, ss=0.27, t=1.3, rate=1.08), dict(src=260555, ss=0.03, t=2.0, vol=-4, delay=0.05)),
+]):
+    whoomph = [(4.68, 2.2), (11.56, 2.6), (22.45, 2.4), (25.2, 2.5)][k]
+    oneshot(f'sfx/molotov_{k + 1}', [dict(glass, fo=0.4),
+                                     dict(src=TORCH, ss=whoomph[0], t=whoomph[1], delay=0.03, fo=0.9),
+                                     dict(burst, fo=0.8)], target=-10, limit=5)
+# a body catching: a small, hungry whoof
+oneshot('sfx/ignite', [dict(src=637533, ss=0.03, t=0.6, fo=0.3),
+                       dict(src=260554, ss=0.02, t=0.8, rate=1.4, vol=-6, fo=0.4)], sr=32000, target=-17)
+# the dead, burning: human agony pitched down into something that isn't, with a
+# zombie's anguished moan underneath so it never reads as a man
+BURN = [((542128, 2.5, 3.3, 0.86), (876576, 0.36, 1.9)), ((542128, 8.3, 3.1, 0.84), None),
+        ((542128, 14.36, 3.2, 0.9), (876576, 2.66, 2.0)), ((171819, 4.85, 3.4, 0.85), (876576, 5.18, 2.3)),
+        ((171819, 14.85, 3.2, 0.88), None), ((171819, 25.72, 3.0, 0.86), (876576, 7.94, 2.4)),
+        ((863442, 1.79, 2.0, 0.82), None), ((863442, 0.01, 1.5, 0.85), (876576, 13.37, 1.6)),
+        ((530471, 7.2, 1.7, 0.84), (876576, 10.77, 2.1)), ((162157, 4.63, 2.3, 0.85), None),
+        ((640217, 0.63, 3.0, 0.92), None), ((530471, 22.84, 1.9, 0.86), (876576, 15.64, 1.7))]
+for k, ((src, ss, t, rate), moan) in enumerate(BURN):
+    layers = [dict(src=src, ss=ss, t=t, rate=rate, hp=110, lp=7500, fi=0.03, fo=min(0.7, t * 0.35))]
+    if moan:
+        layers.append(dict(src=moan[0], ss=moan[1], t=moan[2], rate=0.9, hp=80, vol=-7, fi=0.05, fo=0.5, delay=0.08))
+    oneshot(f'sfx/burn_{k + 1}', layers, sr=32000, target=-14, q=4)
 
 # ── bodies ───────────────────────────────────────────────────────────────────
 for k, (src, ss, t) in enumerate([(423301, 1.41, 0.26), (423301, 1.75, 0.25), (423301, 2.11, 0.36),
@@ -409,6 +441,8 @@ loop('amb/wind', 30444, 20, 24)
 loop('amb/wind_howl', 159509, 8, 22)
 loop('amb/fire_roar', 387924, 1, 14)
 loop('amb/fire_crackle', 813328, 5, 16)
+# a molotov pool burning close by (mono: played as a positioned source, see audio.firePool)
+loop('amb/fire_pool', 483288, 0.5, 12, ch=1)
 loop('amb/horde_far', 669845, 2, 22)
 loop('amb/horde_mid', 483592, 1, 20)
 loop('amb/horde_near', 165872, 2, 24)

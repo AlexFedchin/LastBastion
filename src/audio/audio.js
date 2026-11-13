@@ -20,7 +20,7 @@ import { GUNSHIP } from '../config.js';
 const SFX = {
   hmg: [4, 44100], hmg_tail: [2, 32000], mg: [5, 32000], casing: [6, 44100],
   boom: [5, 44100], boom_far: [3, 22050], boom_sub: [0, 22050], mortar: [3, 44100], incoming: [4, 32000],
-  napalm: [0, 44100], flesh: [5, 32000], headshot: [3, 32000], gib: [4, 32000], bloater: [0, 32000],
+  molotov: [4, 44100], molotov_light: [0, 44100], molotov_flight: [0, 32000], ignite: [0, 32000], burn: [12, 32000], flesh: [5, 32000], headshot: [3, 32000], gib: [4, 32000], bloater: [0, 32000],
   acid: [0, 32000], bodyfall: [0, 32000], groan: [27, 32000], brute: [5, 32000], shriek: [3, 32000],
   death: [4, 32000], thunder: [7, 22050], siren: [0, 32000], klaxon: [0, 32000], radio_in: [0, 22050],
   radio_out: [2, 22050], latch: [0, 44100], barrel_seat: [0, 44100], charge: [0, 44100], steam: [0, 32000],
@@ -29,7 +29,7 @@ const SFX = {
   tinnitus: [0, 32000], crow: [5, 32000], bell: [0, 32000], dog: [3, 22050], distant_mg: [4, 22050],
 };
 const BEDS = {
-  rain_far: 32000, rain_near: 32000, wind: 32000, wind_howl: 32000, fire_roar: 32000, fire_crackle: 32000,
+  rain_far: 32000, rain_near: 32000, wind: 32000, wind_howl: 32000, fire_roar: 32000, fire_crackle: 32000, fire_pool: 32000,
   horde_far: 32000, horde_mid: 32000, horde_near: 32000, horde_surge: 32000, shuffle: 32000, war: 22050,
   dawn: 32000, flies: 32000, lamp: 32000, radio_static: 22050,
 };
@@ -172,7 +172,8 @@ export class AudioEngine {
     this.pressure = 0;    // 0..1 worst pile on the wall
     this.hordeAlive = 0;
     this.dawn = 0;        // 0 night .. 1 day
-    this.napalmLevel = 0;
+    this.fireLevel = 0;   // 0..1 how much Molotov fire is burning
+    this._burnT = 0;
     this.lampPower = 1;   // blackout kills the sodium-lamp hum
     this.night = 1;
     this.tide = false;
@@ -214,7 +215,7 @@ export class AudioEngine {
     const voices = readBytes('audio/voice/lines.json').then((ab) => {
       const man = JSON.parse(new TextDecoder().decode(ab));
       return pool(Object.entries(man), 6, async ([key, v]) => {
-        try { this.voices_[key] = await decoder(16000).decodeAudioData(await readBytes(`audio/voice/${v.file}`)); } catch (err) { if (failed++ < 3) console.warn('[audio] voice', v.file, err); }
+        try { this.voices_[key] = await decoder(v.sr || 16000).decodeAudioData(await readBytes(`audio/voice/${v.file}`)); } catch (err) { if (failed++ < 3) console.warn('[audio] voice', v.file, err); }
       });
     }).catch((err) => console.warn('[audio] no radio voice-over', err));
     this.loaded = pool(jobs, 8, async (j) => {
@@ -635,9 +636,48 @@ export class AudioEngine {
   }
 
 
-  napalm(x, z) { this.play(this.B.napalm[0], { gain: 1.0, x, z, ref: 40, reverb: 0.4, force: true }); }
+  // ── Molotovs ───────────────────────────────────────────────────────────────
+  /** Zippo strike, the rag catching. */
+  molotovLight() { this.play(this.B.molotov_light[0], { gain: 0.55, rate: rand(0.96, 1.04), pan: -0.2, force: true }); }
 
-  /** A burst of crackle somewhere along the burning ditch. */
+  /** The bottle leaves the hand: the arm, then the rag fluttering away. */
+  molotovThrow() {
+    this.play(this.pickVar('throw'), { gain: 0.5, rate: rand(0.9, 1.05), pan: -0.15, force: true });
+    this.play(this.B.molotov_flight[0], { gain: 0.3, rate: rand(0.92, 1.08), pan: -0.05, delay: 0.04, force: true });
+  }
+
+  /** Glass bursting and the fuel going up. */
+  molotov(x, z) {
+    if (!this.ready) return;
+    const dist = Math.hypot(x - this.listenerX, z - this.listenerZ);
+    this.play(this.pickVar('molotov'), { gain: 1.15, rate: rand(0.94, 1.06), x, z, ref: 45, sos: true, reverb: 0.4, force: true });
+    if (this.B.boom_sub[0]) this.play(this.B.boom_sub[0], { gain: 0.25, rate: rand(1.3, 1.5), x, z, ref: 50, sos: true, force: true });
+    if (dist < 50) this.duck(0.15 * (1 - dist / 50), 0.15, 0.5);
+  }
+
+  /** A pool of burning fuel: a positioned roar that follows the fire's strength. */
+  firePool() { return this.loop(this.bed.fire_pool, { ref: 26, reverb: 0.15, rate: rand(0.9, 1.1) }); }
+
+  /** One of them catches fire: the whoof, and the scream. type as in groan(). */
+  ignited(x, z, type = 0) {
+    this.play(this.B.ignite[0], { gain: 0.45, rate: rand(0.85, 1.2), x, z, ref: 20, key: 'ignite', max: 3 });
+    this.burnScream(x, z, type, 0.06);
+  }
+
+  /** The dead, burning. Rationed: a crowd going up is a chorus, not a wall of noise. */
+  burnScream(x, z, type = 0, delay = 0) {
+    if (!this.ready || type === 4) return;
+    const now = this.ctx.currentTime;
+    if (now - this._burnT < 0.11) return;
+    this._burnT = now;
+    let rate = rand(0.9, 1.06), gain = 0.6;
+    if (type === 2) { rate = rand(0.68, 0.78); gain = 0.8; }      // brutes: a bellow
+    else if (type === 1) { rate = rand(1.04, 1.16); gain = 0.55; } // runners: higher, frantic
+    else if (type === 3) { rate = rand(0.78, 0.86); gain = 0.6; }  // bloaters: wet and low
+    this.play(this.pickVar('burn'), { gain, rate, x, z, ref: 22, delay, reverb: 0.35, key: 'burn', max: 6 });
+  }
+
+  /** A burst of crackle somewhere around a fire. */
   crackle(x, z, gain = 0.3) {
     const buf = this.bed.fire_crackle;
     if (!buf) return;
@@ -803,6 +843,39 @@ export class AudioEngine {
     return buf.duration + delay;
   }
 
+  /**
+   * The chronicle: a voice-over, not a transmission. Centred, no squelch, the
+   * score and the world pulled well back under it. Returns the line's length in
+   * seconds (0 if it was never recorded).
+   */
+  narrate(who, text, delay = 0.1) {
+    const buf = this.voices_[who + '|' + text];
+    if (!this.ready || !buf) return 0;
+    this.stopVoice();
+    const ctx = this.ctx, src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.connect(this.voiceBus);
+    src.start(ctx.currentTime + delay);
+    src.onended = () => { try { src.disconnect(); } catch { /* noop */ } if (this._voice === src) this._voice = null; };
+    this._voice = src;
+    const t = ctx.currentTime, end = t + delay + buf.duration;
+    for (const [g, lvl] of [[this.musicDuck.gain, 0.42], [this.ambDuck.gain, 0.55]]) {
+      g.cancelScheduledValues(t);
+      g.setTargetAtTime(lvl, t, 0.25);
+      g.setTargetAtTime(1, end + 0.4, 1.2);
+    }
+    return buf.duration + delay;
+  }
+
+  stopVoice() {
+    if (!this._voice) return;
+    try { this._voice.stop(); } catch { /* done */ }
+    this._voice = null;
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    for (const g of [this.musicDuck.gain, this.ambDuck.gain]) { g.cancelScheduledValues(t); g.setTargetAtTime(1, t, 0.6); }
+  }
+
   ui() { this.play(this.B.ui_click[0], { gain: 0.38, rate: rand(0.97, 1.03), force: true }); }
   uiHover() { this.play(this.B.ui_hover[0], { gain: 0.14, rate: rand(0.95, 1.05), force: true }); }
   uiBuy() { this.play(this.B.ui_buy[0], { gain: 0.55, force: true }); }
@@ -904,8 +977,8 @@ export class AudioEngine {
     b.horde_near.set(inPlay ? clamp(p * 1.3 + alive / 1200, 0, 1) * 0.36 : 0, tc);
     b.horde_surge.set(inPlay ? smooth(0.45, 0.85, p) * 0.42 : 0, 0.8);
     b.shuffle.set(inPlay ? clamp(p * 1.5, 0, 1) * 0.3 : 0, tc);
-    b.fire_roar.set(this.napalmLevel * 0.6, 0.6);
-    b.fire_crackle.set(this.napalmLevel * 0.45 + 0.035 * night, 0.8);
+    b.fire_roar.set(this.fireLevel * 0.4, 0.6);
+    b.fire_crackle.set(this.fireLevel * 0.35 + 0.035 * night, 0.8);
     b.lamp.set(0.05 * clamp(1 - day * 1.7, 0, 1) * this.lampPower, 0.3);
     b.dawn.set(0.3 * day, 2.5);
     b.flies.set(0.1 * day, 3);

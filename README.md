@@ -38,11 +38,11 @@ Hold until dawn. Spend what you scavenged. Do it again.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/napalm.jpg" alt="Napalm trench ignited in front of the wall"></td>
+    <td width="50%"><img src="docs/screenshots/molotov.jpg" alt="Molotov fire burning at the foot of the wall"></td>
     <td width="50%"><img src="docs/screenshots/arty.jpg" alt="105 mm fire mission landing in the horde"></td>
   </tr>
   <tr>
-    <td align="center"><b>[E] Napalm.</b> The trench in front of the wall goes up from the centre outward.</td>
+    <td align="center"><b>[E] Molotov.</b> Light the rag, throw the bottle. The dead walk into the fire screaming.</td>
     <td align="center"><b>[Q] 105 mm fire mission.</b> Four rounds HE, splash in three. <i>Carnage ×16.</i></td>
   </tr>
   <tr>
@@ -100,7 +100,7 @@ of a heavy night; *Settings ▸ Quality ▸ AUTO* runs it again.
 | **LMB** | Fire |
 | **RMB** | Optics: zoom and a tighter spread |
 | **Q** | 105 mm fire mission on the crosshair |
-| **E** | Ignite the napalm trench in front of the wall |
+| **E** | Light and throw a Molotov at the crosshair, one bottle at a time |
 | **T** | Red marker flare anywhere on the field. A bomber puts a **2000 lb bomb** on it (75 s re-arm) |
 | **G** | Throw a grenade at the crosshair (one per press) |
 | **B** | ☠️ **Danger close.** Carpet the wall line. Costs 3 survivors. Once per night. |
@@ -136,7 +136,7 @@ Your arsenal grows over the radio:
 
 ```
 NIGHT 1 ─── the fifty + two crewed M240s on the wall
-NIGHT 2 ─── napalm · grenades · claymores
+NIGHT 2 ─── Molotovs · grenades · claymores
 NIGHT 3 ─── 105 mm battery · Spectre
 NIGHT 4 ─── the bomber
 NIGHT 5 ─── danger close
@@ -163,6 +163,8 @@ Every night has its own event and its own radio traffic. Objectives, a boss bar 
 | **9** | A bloater column, plus a resupply |
 | **10** | 👹 **The Behemoth**, before the last tide |
 
+**The chronicle.** As the light comes up, an old voice tells the night you just survived: not the numbers but the story, years later. It is built from what actually happened: whether Recon Two made it to the gate, whether the giant reached the wall, whether the danger-close fire cost you men, how many places stood empty on the walkway by morning. Every line is narrated (Space reveals it all; Space again moves on), and the story stays on the resupply screen.
+
 **Dawn.** Survive the night and clear the field. Every kill earns supplies: spend them on the gun, the
 artillery battery, wall gunners, wire, claymores and grenades. Ten nights to
 the end of the story, then **Endless**: keep holding for as long as you last (two random events a night).
@@ -180,12 +182,12 @@ Difficulties: **Recruit**, **Veteran** *(intended)*, **Last Stand**.
 
 | | |
 |---|---|
-| ⛰️ **Terrain** | A real heightfield valley: shell craters with standing water and rain ripples, the napalm ditch, an old forward trench, a cratered road to the city, cliffs, forested hills. Layered mud / dead turf / rock / asphalt, wind-blown grass. |
+| ⛰️ **Terrain** | A real heightfield valley: shell craters with standing water and rain ripples, the anti-climb ditch, an old forward trench, a cratered road to the city, cliffs, forested hills. Layered mud / dead turf / rock / asphalt, wind-blown grass. |
 | 🧱 **The wall** | Precast T-wall slabs over HESCO fill, duckboard walkways, razor wire on outriggers, sodium lamps, and **blood that climbs the face as the pile does**. |
 | 🚗 **The field** | A column of abandoned cars, burnt-out trucks, a tank hulk, a downed helicopter, hedgehogs, wire fences, dead trees, telephone poles, ruined farms. |
 | 🌆 **The horizon** | A dead village and church, a broken highway viaduct, power pylons, a radio mast, far mountains, and a **burning city** with smoke plumes, searchlights in the clouds, tracer fire and flak. |
 | 🌫️ **Atmosphere** | One fog model for every material: haze, drifting ground mist and in-scattered firelight that matches the sky. Storm clouds lit from below, lightning bolts, rain glittering in the searchlights. |
-| 🔥 **Fire** | Per-pixel procedural flames with ground glow, smoke and embers: napalm, wrecks, barrels, burning dead, lingering blast fires. |
+| 🔥 **Fire** | Per-pixel procedural flames with ground glow, smoke and embers: Molotov pools, wrecks, barrels, burning dead, lingering blast fires. |
 | 🧟 **Zombies** | Three LODs, elbows and knees, faces, hands, torn clothes, gear (helmets, plate carriers, packs, caps, hi-vis), mud and blood shading. |
 | 🔭 **Lens** | Heat haze over fires, blast shockwaves, ghosts and halo, anamorphic streaks, a dirty lens catching bright light, gentle barrel distortion. |
 | 🔊 **Sound** | A real .50 BMG report layered over US Army M2 footage, valley reverb with slapback off the hillsides, brass on the platform, artillery that **arrives at the speed of sound**, a horde mixed at three distances, and an adaptive score that rises with the pressure on the wall. |
@@ -222,10 +224,10 @@ beds are decoded into memory, the score is streamed.
 
 | Folder | What |
 |---|---|
-| `sfx/` | one-shots: the M2HB (4 layered variants + burst tails), wall M240s, brass, explosions near/far, incoming rounds, mortar, napalm, impacts, gore, 27 zombie voices, brutes, runners, the men on the wall, thunder, siren, radio, gun handling, UI, crows, a church bell |
+| `sfx/` | one-shots: the M2HB (4 layered variants + burst tails), wall M240s, brass, explosions near/far, incoming rounds, mortar, Molotovs (Zippo, bottle, glass, the whoomph), impacts, burning zombies screaming, gore, 27 zombie voices, brutes, runners, the men on the wall, thunder, siren, radio, gun handling, UI, crows, a church bell |
 | `amb/` | seamless loops: rain near/far, wind, the horde at three distances, bodies against the wall, fire, the distant battle, dawn air, flies, sodium lamps, radio carrier |
 | `music/` | the score: menu, two night drones, two percussion layers that follow the pressure on the wall, the tide, dawn, resupply, the fall, victory |
-| `voice/` | every radio line, spoken and run through a radio chain (`lines.json` maps speaker + text to a take) |
+| `voice/` | every radio line, spoken and run through a radio chain, and the dawn chronicle, narrated clean at 24 kHz (`lines.json` maps speaker + text to a take) |
 
 **Mix** (`src/audio/audio.js`): everything is spatialised against the gun (pan, distance, air
 absorption, speed-of-sound delay on blasts). Close explosions duck the world and the score and can
@@ -256,7 +258,7 @@ and the best one is kept. Recording needs a separate GPU environment; see
 [`docs/VOICEOVER.md`](docs/VOICEOVER.md). `build_voice.py` then band-limits, compresses, overdrives and
 pushes each take through a low-rate codec with hiss, fading and crackle. Each speaker gets a different chain:
 handheld on the wall, field radio, long-range HF from Command, a dying civilian set, aircrew over
-their engines. Radio profiles are at the top of `build_voice.py`; voices and directions are in `voice_cast.py`. Add or change a line in
+their engines. The narrator of the dawn chronicle gets no radio at all: a close, warm voice-over chain. Radio profiles are at the top of `build_voice.py`; voices and directions are in `voice_cast.py`. Add or change a line in
 `config.js`, rerun the script, and the game picks it up; a line without a take still shows on the
 HUD, just silently.
 
