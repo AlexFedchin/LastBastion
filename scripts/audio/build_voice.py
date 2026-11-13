@@ -1,18 +1,21 @@
-"""Last Bastion — radio voice build.
+"""Last Bastion — radio voice build (final stage).
 
-Records every line of radio traffic in the game (src/config.js → allRadioLines)
-with Kokoro-82M, a free, open-weight neural text-to-speech model (Apache 2.0,
-https://huggingface.co/hexgrad/Kokoro-82M, run through kokoro-onnx), then puts
-each one through a radio chain — band-limiting, compression, overdriven
-transmitter, a cheap codec, carrier hiss, fading and crackle — tuned per
-speaker: the sergeant's handheld on the wall, HF from Command a long way off,
-aircrew talking over their engines.
+Takes the performance chosen for every line of radio traffic in the game
+(src/config.js → allRadioLines) and puts it through a radio chain —
+band-limiting, compression, overdriven transmitter, a cheap codec, carrier
+hiss, fading and crackle — tuned per speaker: the sergeant's handheld on the
+wall, HF from Command a long way off, aircrew talking over their engines.
+
+The performances come from the directed Qwen3-TTS pipeline
+(record_voice.py → convert_voice.py → pick_voice.py; see docs/VOICEOVER.md),
+which leaves one take per line in .cache/voice_qwen/chosen/. With --kokoro the
+lines are instead read by Kokoro-82M (Apache 2.0, via kokoro-onnx), the
+original flat voice-over.
 
 Writes app/audio/voice/*.ogg and app/audio/voice/lines.json ("WHO|text" → file).
 
 Requirements: Python 3.10+, Node (to read the lines from config.js), and
-    pip install kokoro-onnx soundfile scipy numpy
-The model (~350 MB) is downloaded into scripts/audio/.cache/kokoro on first run.
+    pip install soundfile scipy numpy          (+ kokoro-onnx for --kokoro)
 
     python scripts/audio/build_voice.py              # everything
     python scripts/audio/build_voice.py KOVAC        # only speakers/lines matching
@@ -127,8 +130,23 @@ def voice_style(v):
     return sum(k.get_voice_style(name) * w for name, w in v.items())
 
 
+CHOSEN = os.path.join(CACHE, 'voice_qwen', 'chosen')
+
+
 def take(who, text, shout):
-    """Raw TTS (cached): float32 mono at 24 kHz with markers for static bursts."""
+    """The performance: float32 mono at 24 kHz with markers for static bursts."""
+    if '--kokoro' not in sys.argv:
+        lid = re.sub(r'[^a-z0-9]+', '_', who.lower()).strip('_') + '_' + hashlib.sha1((who + '|' + text).encode()).hexdigest()[:10]
+        p = os.path.join(CHOSEN, lid + '.npz')
+        if not os.path.exists(p):
+            sys.exit(f'no recorded take for {who}: {text}\n  run record_voice.py, convert_voice.py and pick_voice.py first (or pass --kokoro)')
+        d = np.load(p)
+        return d['a'], [tuple(x) for x in d['m']]
+    return kokoro_take(who, text, shout)
+
+
+def kokoro_take(who, text, shout):
+    """Kokoro TTS (cached): float32 mono at 24 kHz with markers for static bursts."""
     c = CAST[who]
     key = hashlib.sha1(json.dumps([who, spoken_parts(text), c['voice'], c['speed'], shout]).encode()).hexdigest()[:16]
     path = os.path.join(TAKES, key + '.npz')
@@ -311,7 +329,7 @@ def radio_lines():
     js = ("import(" + json.dumps('file://' + os.path.join(ROOT, 'src', 'config.js')) + ").then(m => {"
           "const b = new Set(Object.values(m.BARKS).flat());"
           "console.log(JSON.stringify(m.allRadioLines().map(([w, t]) => [w, t, b.has(t)])));})")
-    r = subprocess.run(['node', '--no-warnings', '--input-type=module', '-e', js], capture_output=True, text=True, check=True)
+    r = subprocess.run(['node', '--no-warnings', '--input-type=module', '-e', js], capture_output=True, text=True, encoding='utf-8', check=True)
     return json.loads(r.stdout)
 
 
@@ -324,7 +342,7 @@ def main():
     lines = radio_lines()
     os.makedirs(OUT, exist_ok=True)
     man_path = os.path.join(OUT, 'lines.json')
-    manifest = json.load(open(man_path)) if os.path.exists(man_path) and args else {}
+    manifest = json.load(open(man_path, encoding='utf-8')) if os.path.exists(man_path) and args else {}
     total = 0.0
     for who, text, shout in lines:
         if who not in CAST:
@@ -346,7 +364,7 @@ def main():
     for f in os.listdir(OUT):
         if f.endswith('.ogg') and f not in keep:
             os.remove(os.path.join(OUT, f))
-    json.dump(manifest, open(man_path, 'w'), indent=1, ensure_ascii=False, sort_keys=True)
+    json.dump(manifest, open(man_path, 'w', encoding='utf-8'), indent=1, ensure_ascii=False, sort_keys=True)
     print(f'{len(manifest)} lines, {total:.0f} s of speech → {os.path.relpath(OUT, ROOT)}')
 
 

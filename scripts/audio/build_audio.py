@@ -272,7 +272,7 @@ def write_credits():
         m = meta.get(sid, {})
         lines.append(f'| [{m.get("title", sid)}]({m.get("url", "https://freesound.org/s/" + sid)}) | {m.get("user", "?")} | '
                      f'{", ".join(sorted(used[sid]))} |')
-    lines += [''] + ['## Radio voice-over', '', 'Every radio line is spoken by [Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) (hexgrad),', 'an open-weight text-to-speech model released under the', '[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), run through', '[kokoro-onnx](https://github.com/thewh1teagle/kokoro-onnx) (MIT). The takes were processed into', 'radio transmissions for the game by `scripts/audio/build_voice.py`.']
+    lines += [''] + ['## Radio voice-over', '', 'Every radio line is performed by [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign)', '(Qwen team, Alibaba Cloud; 1.7B VoiceDesign model and 12 Hz tokenizer), released under the', '[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), each line directed from a written', 'character description and delivery note. Some takes were re-voiced onto one reference voice per', 'character with the voice-conversion model of [Chatterbox](https://github.com/resemble-ai/chatterbox)', '(Resemble AI, MIT). The takes were processed into radio transmissions for the game by', '`scripts/audio/build_voice.py`.']
     open(os.path.join(OUT, 'CREDITS.md'), 'w', encoding='utf8').write('\n'.join(lines) + '\n')
 
 

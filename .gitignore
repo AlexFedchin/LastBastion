@@ -6,3 +6,4 @@ dist/
 .DS_Store
 scripts/audio/.cache/
 tests/smoke/out/
+__pycache__/

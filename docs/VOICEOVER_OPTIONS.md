@@ -1,6 +1,10 @@
 # Voice-over: options for replacing Kokoro
 
-The radio lines are currently voiced with **Kokoro-82M** (`scripts/audio/build_voice.py`).
+> **Done (November 2026):** Kokoro was replaced by directed **Qwen3-TTS** takes, with Chatterbox
+> voice conversion for consistency, picked by automatic scoring. The measured comparison and the
+> pipeline are in [`VOICEOVER.md`](VOICEOVER.md). This note is kept for the remaining candidates.
+
+The radio lines were voiced with **Kokoro-82M** (`scripts/audio/build_voice.py`).
 It sounds clean, but the intonation, pauses and emotion are flat: a panicked sergeant
 and a calm HQ operator are delivered the same way.
 

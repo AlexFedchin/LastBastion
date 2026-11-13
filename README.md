@@ -245,18 +245,20 @@ The script downloads its sources (cached in `scripts/audio/.cache/`), then slice
 loop-crossfades, loudness-matches, limits and encodes every asset, and regenerates `CREDITS.md`.
 Every recipe is in that one file.
 
-**Radio voice-over** (Python 3 + Node; `pip install kokoro-onnx soundfile scipy numpy`):
+**Radio voice-over** (Python 3 + Node; an NVIDIA GPU for recording):
 
 ```bash
 python scripts/audio/build_voice.py          # every line in src/config.js (allRadioLines)
 python scripts/audio/build_voice.py KOVAC    # only matching speakers / lines
 ```
 
-Lines are voiced with Kokoro-82M, a free open-weight TTS model (Apache 2.0; the ~350 MB model is
-downloaded into `scripts/audio/.cache/` on first run), then band-limited, compressed, overdriven and
-pushed through a low-rate codec with hiss, fading and crackle. Each speaker gets a different chain:
+Every line is performed by Qwen3-TTS (Apache 2.0) from a written character description and a
+per-line direction (`scripts/audio/voice_cast.py`); several takes per line are scored automatically
+and the best one is kept. Recording needs a separate GPU environment; see
+[`docs/VOICEOVER.md`](docs/VOICEOVER.md). `build_voice.py` then band-limits, compresses, overdrives and
+pushes each take through a low-rate codec with hiss, fading and crackle. Each speaker gets a different chain:
 handheld on the wall, field radio, long-range HF from Command, a dying civilian set, aircrew over
-their engines. Casting and radio profiles are at the top of the script. Add or change a line in
+their engines. Radio profiles are at the top of `build_voice.py`; voices and directions are in `voice_cast.py`. Add or change a line in
 `config.js`, rerun the script, and the game picks it up; a line without a take still shows on the
 HUD, just silently.
 
@@ -334,7 +336,7 @@ Locally: `npm run dist:win` (Windows) or `npm run dist:linux` (AppImage). Output
 Music by **Kevin MacLeod** ([incompetech.com](https://incompetech.com)), CC BY 4.0.
 Sound effects from **Freesound** contributors, CC0. The full list (every recording, its author and
 what it became) is in [`app/audio/CREDITS.md`](app/audio/CREDITS.md) and ships with the game.
-Radio voices by **Kokoro-82M** (Apache 2.0).
+Radio voices performed by **Qwen3-TTS** (Apache 2.0), partly re-voiced with **Chatterbox** voice conversion (MIT).
 
 <div align="center">
 

@@ -1,446 +1,446 @@
 {
  "AUTOMATED|This frequency is no longer monitored. This frequency is no longer monitored.": {
-  "dur": 5.094,
+  "dur": 5.2,
   "file": "automated_e52c600763.ogg"
  },
  "BATTERY|Shot, over. Eight rounds HE, splash in three.": {
-  "dur": 3.111,
+  "dur": 3.06,
   "file": "battery_01671b390b.ogg"
  },
  "BATTERY|Shot, over. Four rounds HE, splash in three.": {
-  "dur": 3.178,
+  "dur": 3.7,
   "file": "battery_fa197285fd.ogg"
  },
  "BATTERY|Shot, over. Six rounds HE, splash in three.": {
-  "dur": 3.243,
+  "dur": 3.54,
   "file": "battery_fcec00a640.ogg"
  },
  "BATTERY|Shot, over. Ten rounds HE, splash in three.": {
-  "dur": 3.164,
+  "dur": 3.5,
   "file": "battery_05d06ca6ef.ogg"
  },
  "COMMAND|...all stations, Bastion-3 has fallen. Bastion-5 is not responding.": {
-  "dur": 6.239,
+  "dur": 6.54,
   "file": "command_6223956d9e.ogg"
  },
  "COMMAND|Bastion-7, Command. Fog bank moving up the valley. Expect visibility near zero.": {
-  "dur": 6.621,
+  "dur": 6.22,
   "file": "command_6bca788847.ogg"
  },
  "COMMAND|Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.": {
-  "dur": 8.595,
+  "dur": 8.655,
   "file": "command_69313163d7.ogg"
  },
  "COMMAND|Bastion-7, airdrop of fuel and ammunition inbound at dawn. Mark your drop zone.": {
-  "dur": 6.594,
+  "dur": 6.02,
   "file": "command_65935c0edd.ogg"
  },
  "COMMAND|Bastion-7, relief column delayed. Bridge at Halden is down. Keep the gate shut.": {
-  "dur": 6.31,
+  "dur": 7.18,
   "file": "command_ca76ae91fb.ogg"
  },
  "COMMAND|Bastion-7, this is Command. Relief column departs at dawn. Hold for seventy-two hours.": {
-  "dur": 7.092,
+  "dur": 7.54,
   "file": "command_67599b0bdc.ogg"
  },
  "COMMAND|Bastion-7... relief column has been... (static) ...rerouted. Hold position.": {
-  "dur": 7.605,
+  "dur": 6.7,
   "file": "command_b157efab05.ogg"
  },
  "HAMMER 1-1|Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it — that's T — and keep your heads down.": {
-  "dur": 7.03,
+  "dur": 6.68,
   "file": "hammer_1_1_240d9b6329.ogg"
  },
  "HAMMER 1-1|Bomb impact. Hammer one-one off target, re-arming.": {
-  "dur": 3.243,
+  "dur": 3.24,
   "file": "hammer_1_1_dd3e25010d.ogg"
  },
  "HAMMER 1-1|Copy red flare. Hammer one-one is in hot — keep your heads down.": {
-  "dur": 3.914,
+  "dur": 3.92,
   "file": "hammer_1_1_23b4f47e25.ogg"
  },
  "HAMMER 1-1|Good effect on target. That's a lot of them down. Hammer one-one off and climbing.": {
-  "dur": 4.682,
+  "dur": 4.72,
   "file": "hammer_1_1_eafa8f7e5a.ogg"
  },
  "HAMMER 1-1|Hammer one-one, I have your red smoke. One GBU, danger close. Heads down, Bastion.": {
-  "dur": 5.467,
+  "dur": 6.24,
   "file": "hammer_1_1_cb0268eb3f.ogg"
  },
  "HAMMER 1-1|Hammer one-one, tally your mark. Two-thousand pounder inbound, ten seconds.": {
-  "dur": 4.481,
+  "dur": 5.2,
   "file": "hammer_1_1_4274760056.ogg"
  },
  "HAMMER 1-1|Shack. Direct hit on your mark. Hammer one-one off target.": {
-  "dur": 3.563,
+  "dur": 3.92,
   "file": "hammer_1_1_cac7a97c07.ogg"
  },
  "LT. HOLLIS|Bastion-7, this is Hollis, Recon Two. Four of us coming in hot down the road — they're right behind us. Cover us!": {
-  "dur": 6.529,
+  "dur": 7.947,
   "file": "lt_hollis_332db6f3d7.ogg"
  },
  "LT. HOLLIS|Man down! Keep moving, keep moving!": {
-  "dur": 2.509,
+  "dur": 3.042,
   "file": "lt_hollis_eefb9a9900.ogg"
  },
  "LT. HOLLIS|We're through the gate. Thanks for the cover, Bastion. Recon Two will take a spot on the wall.": {
-  "dur": 4.994,
+  "dur": 5.627,
   "file": "lt_hollis_e1874e2dd0.ogg"
  },
  "PVT. ARAN|I stopped writing their names down.": {
-  "dur": 2.411,
+  "dur": 2.529,
   "file": "pvt_aran_9f75de4bcc.ogg"
  },
  "PVT. ARAN|Sarge, if this is it... it was an honour.": {
-  "dur": 3.429,
+  "dur": 3.66,
   "file": "pvt_aran_36b26a8e49.ogg"
  },
  "PVT. ARAN|Sarge... the city stopped burning.": {
-  "dur": 3.016,
+  "dur": 3.18,
   "file": "pvt_aran_9ac2b4e004.ogg"
  },
  "REACH 3-1|Bastion-7, Reach three-one, thirty seconds out with your resupply. Look for the strobe.": {
-  "dur": 5.942,
+  "dur": 5.5,
   "file": "reach_3_1_521ecb2870.ogg"
  },
  "REACH 3-1|Load away, load away. Good chute. Reach three-one is clear — good luck down there.": {
-  "dur": 5.443,
+  "dur": 6.38,
   "file": "reach_3_1_babe69a46c.ogg"
  },
  "SGT. KOVAC|Another night. Another dawn.": {
-  "dur": 1.88,
+  "dur": 3.4,
   "file": "sgt_kovac_1b26b08652.ogg"
  },
  "SGT. KOVAC|Barrel's cooked!": {
-  "dur": 1.249,
+  "dur": 1.462,
   "file": "sgt_kovac_0ac401ff1b.ogg"
  },
  "SGT. KOVAC|Big group coming down the valley!": {
-  "dur": 2.059,
+  "dur": 2.36,
   "file": "sgt_kovac_d69d50bbec.ogg"
  },
  "SGT. KOVAC|Biggest one yet coming down the valley. Everything we have, tonight.": {
-  "dur": 3.953,
+  "dur": 5.12,
   "file": "sgt_kovac_15415c55c3.ogg"
  },
  "SGT. KOVAC|Bloaters in the mix tonight. Don't let them touch the wall.": {
-  "dur": 3.301,
+  "dur": 3.84,
   "file": "sgt_kovac_185b0b7aa7.ogg"
  },
  "SGT. KOVAC|Bloaters! A whole column of them on the road — pop them before they reach the wall!": {
-  "dur": 4.541,
+  "dur": 5.502,
   "file": "sgt_kovac_23f61fb001.ogg"
  },
  "SGT. KOVAC|Breach! We lost someone!": {
-  "dur": 1.625,
+  "dur": 3.442,
   "file": "sgt_kovac_a71307f29f.ogg"
  },
  "SGT. KOVAC|Brutes! A whole herd of them — left flank!": {
-  "dur": 2.394,
+  "dur": 3.745,
   "file": "sgt_kovac_cfec691662.ogg"
  },
  "SGT. KOVAC|Brutes! A whole herd of them — right flank!": {
-  "dur": 2.417,
+  "dur": 3.2,
   "file": "sgt_kovac_fa98a6ff96.ogg"
  },
  "SGT. KOVAC|Civilians on the road. Hold your fire on them and cover them all the way to the gate!": {
-  "dur": 4.918,
+  "dur": 4.44,
   "file": "sgt_kovac_b33ed935dd.ogg"
  },
  "SGT. KOVAC|Command hasn't answered since 0300. I'm sure it's the antenna.": {
-  "dur": 4.541,
+  "dur": 5.16,
   "file": "sgt_kovac_487efb2421.ogg"
  },
  "SGT. KOVAC|Count the survivors. Then count the dead out there. Keep counting.": {
-  "dur": 3.726,
+  "dur": 5.84,
   "file": "sgt_kovac_4b650e095b.ogg"
  },
  "SGT. KOVAC|Crate's down in the field! Keep them off it until the recovery team gets out there!": {
-  "dur": 4.754,
+  "dur": 5.28,
   "file": "sgt_kovac_fb8d9de8d1.ogg"
  },
  "SGT. KOVAC|Danger close! Everything on the wall line — God forgive us.": {
-  "dur": 3.617,
+  "dur": 5.76,
   "file": "sgt_kovac_071b7828bc.ogg"
  },
  "SGT. KOVAC|Dawn. Count the living.": {
-  "dur": 1.524,
+  "dur": 2.821,
   "file": "sgt_kovac_87c9fb5671.ogg"
  },
  "SGT. KOVAC|Engineers filled the trench out front with napalm. E lights it — it burns right along the wall base. And there's a crate of grenades at your feet. G, for anything climbing.": {
-  "dur": 10.356,
+  "dur": 11.2,
   "file": "sgt_kovac_d923206470.ogg"
  },
  "SGT. KOVAC|Flares came up with the shells. F puts one over the field — anything in the light goes down easier.": {
-  "dur": 5.847,
+  "dur": 6.84,
   "file": "sgt_kovac_fe4d70ee82.ogg"
  },
  "SGT. KOVAC|Fog's lifting. Back to work.": {
-  "dur": 2.074,
+  "dur": 3.128,
   "file": "sgt_kovac_d9e75c0ba8.ogg"
  },
  "SGT. KOVAC|Friendlies on the road! Kill what's chasing them — and watch your fire!": {
-  "dur": 3.684,
+  "dur": 4.76,
   "file": "sgt_kovac_3259a5215c.ogg"
  },
  "SGT. KOVAC|Generator's gone! We've lost the lights — pop flares!": {
-  "dur": 3.135,
+  "dur": 3.52,
   "file": "sgt_kovac_039c7bfb33.ogg"
  },
  "SGT. KOVAC|Got them. Every last one. Somebody find them some blankets.": {
-  "dur": 3.768,
+  "dur": 6.64,
   "file": "sgt_kovac_ebf8d1728e.ogg"
  },
  "SGT. KOVAC|Gun's too hot!": {
-  "dur": 1.363,
+  "dur": 1.72,
   "file": "sgt_kovac_8981f4493c.ogg"
  },
  "SGT. KOVAC|Here they come — dozens! Hundreds!": {
-  "dur": 2.078,
+  "dur": 3.44,
   "file": "sgt_kovac_d28aaa65ba.ogg"
  },
  "SGT. KOVAC|Horde inbound! Get on them!": {
-  "dur": 1.769,
+  "dur": 2.48,
   "file": "sgt_kovac_4c36c0c2f3.ogg"
  },
  "SGT. KOVAC|If anyone is listening: Bastion-7 is holding. Bastion-7 is holding.": {
-  "dur": 4.988,
+  "dur": 6.2,
   "file": "sgt_kovac_9632e1a304.ogg"
  },
  "SGT. KOVAC|It's at the wall! It's tearing the wall apart — kill it!": {
-  "dur": 2.907,
+  "dur": 4.4,
   "file": "sgt_kovac_abd83878a8.ogg"
  },
  "SGT. KOVAC|It's down! The big one is down!": {
-  "dur": 1.942,
+  "dur": 2.96,
   "file": "sgt_kovac_4603f7ae98.ogg"
  },
  "SGT. KOVAC|It's down. Whatever that was, it's down.": {
-  "dur": 2.465,
+  "dur": 4.72,
   "file": "sgt_kovac_130448e432.ogg"
  },
  "SGT. KOVAC|Keep it up!": {
-  "dur": 1.154,
+  "dur": 1.0,
   "file": "sgt_kovac_0f3cf8545b.ogg"
  },
  "SGT. KOVAC|Listen. If it all goes wrong, B brings the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.": {
-  "dur": 8.242,
+  "dur": 10.72,
   "file": "sgt_kovac_718e1cba09.ogg"
  },
  "SGT. KOVAC|Look at them burn!": {
-  "dur": 1.334,
+  "dur": 2.16,
   "file": "sgt_kovac_3a364f69fc.ogg"
  },
  "SGT. KOVAC|Man down! They got in!": {
-  "dur": 1.653,
+  "dur": 3.0,
   "file": "sgt_kovac_e3b10737c3.ogg"
  },
  "SGT. KOVAC|Movement on the ridge — it's a whole wave!": {
-  "dur": 2.447,
+  "dur": 3.76,
   "file": "sgt_kovac_971743d1d3.ogg"
  },
  "SGT. KOVAC|No relief. No orders. Just the night, and the gun.": {
-  "dur": 3.001,
+  "dur": 5.233,
   "file": "sgt_kovac_d57bbba184.ogg"
  },
  "SGT. KOVAC|None of them made it. Eyes front.": {
-  "dur": 2.205,
+  "dur": 2.92,
   "file": "sgt_kovac_b16aaf963e.ogg"
  },
  "SGT. KOVAC|Overpass is forty klicks out. There's nothing we can do. Eyes front.": {
-  "dur": 4.152,
+  "dur": 4.88,
   "file": "sgt_kovac_7bc282411c.ogg"
  },
  "SGT. KOVAC|Power's back. Thank God.": {
-  "dur": 1.81,
+  "dur": 2.44,
   "file": "sgt_kovac_b87e9706e1.ogg"
  },
  "SGT. KOVAC|Recon Two is gone. Eyes front.": {
-  "dur": 2.396,
+  "dur": 2.96,
   "file": "sgt_kovac_8ea7d6c5a1.ogg"
  },
  "SGT. KOVAC|Recovery team has the crate! Flares, grenades, and the battery's reloaded.": {
-  "dur": 4.524,
+  "dur": 4.84,
   "file": "sgt_kovac_012fb8622b.ogg"
  },
  "SGT. KOVAC|Red smoke out! Get your heads down!": {
-  "dur": 2.285,
+  "dur": 3.16,
   "file": "sgt_kovac_5ec18c8275.ogg"
  },
  "SGT. KOVAC|Rerouted. Sure. Load the belt.": {
-  "dur": 2.035,
+  "dur": 3.53,
   "file": "sgt_kovac_5d859172b5.ogg"
  },
  "SGT. KOVAC|Seventy-two hours. This is the last night. Whatever comes down that valley — we are still here.": {
-  "dur": 5.341,
+  "dur": 9.8,
   "file": "sgt_kovac_e5d31812b1.ogg"
  },
  "SGT. KOVAC|Some of Recon Two made it in. Not all of them.": {
-  "dur": 2.993,
+  "dur": 3.68,
   "file": "sgt_kovac_c2d2c39aba.ogg"
  },
  "SGT. KOVAC|Something big coming down the road... my God, look at the size of it.": {
-  "dur": 4.197,
+  "dur": 5.64,
   "file": "sgt_kovac_a364b3f7f9.ogg"
  },
  "SGT. KOVAC|Spectre's down... God rest them. We're on our own up here.": {
-  "dur": 3.805,
+  "dur": 6.715,
   "file": "sgt_kovac_b059171287.ogg"
  },
  "SGT. KOVAC|Sun's up. We made it.": {
-  "dur": 1.494,
+  "dur": 2.52,
   "file": "sgt_kovac_6a5e0e530d.ogg"
  },
  "SGT. KOVAC|That's a whole column gone!": {
-  "dur": 1.78,
+  "dur": 2.24,
   "file": "sgt_kovac_f15586a445.ogg"
  },
  "SGT. KOVAC|That's not like the other one. That's bigger. Everything we have — put it on that thing!": {
-  "dur": 4.457,
+  "dur": 7.4,
   "file": "sgt_kovac_321e273ef5.ogg"
  },
  "SGT. KOVAC|Then we monitor it. Bastion-7 is holding. Say it.": {
-  "dur": 3.25,
+  "dur": 5.04,
   "file": "sgt_kovac_91a8492aaa.ogg"
  },
  "SGT. KOVAC|They'll come again tomorrow. So will we.": {
-  "dur": 2.322,
+  "dur": 3.4,
   "file": "sgt_kovac_169ece1839.ogg"
  },
  "SGT. KOVAC|They're all over the crate — clear them off!": {
-  "dur": 2.226,
+  "dur": 2.56,
   "file": "sgt_kovac_4bae692eb5.ogg"
  },
  "SGT. KOVAC|They're climbing! Clear that section!": {
-  "dur": 2.04,
+  "dur": 2.6,
   "file": "sgt_kovac_ef232f76f0.ogg"
  },
  "SGT. KOVAC|They're over the wall!": {
-  "dur": 1.421,
+  "dur": 1.478,
   "file": "sgt_kovac_7f8552542f.ogg"
  },
  "SGT. KOVAC|They're stacking on the wall!": {
-  "dur": 1.655,
+  "dur": 1.76,
   "file": "sgt_kovac_162423a289.ogg"
  },
  "SGT. KOVAC|They've torn the crate apart. Damn it.": {
-  "dur": 2.291,
+  "dur": 4.28,
   "file": "sgt_kovac_bcf07e797c.ogg"
  },
  "SGT. KOVAC|Wall's going — shoot the pile!": {
-  "dur": 1.892,
+  "dur": 3.44,
   "file": "sgt_kovac_45fc119985.ogg"
  },
  "SGT. KOVAC|We got some of them in. Some.": {
-  "dur": 1.902,
+  "dur": 3.219,
   "file": "sgt_kovac_5ee12a3d20.ogg"
  },
  "SGT. KOVAC|We're what's left on this line. Make it count.": {
-  "dur": 2.452,
+  "dur": 2.96,
   "file": "sgt_kovac_3789d25c4b.ogg"
  },
  "SGT. KOVAC|Whatever you hear out there tonight — the gate stays shut.": {
-  "dur": 3.029,
+  "dur": 4.193,
   "file": "sgt_kovac_df087a12fc.ogg"
  },
  "SGT. KOVAC|You heard the man. Seventy-two hours. Keep that barrel cool and the wall clean.": {
-  "dur": 4.762,
+  "dur": 7.0,
   "file": "sgt_kovac_47d70ccabf.ogg"
  },
  "SPECTRE 2-1|Bastion-7, Spectre two-one on station overhead. We'll work the crowds in the field — you hold that wall.": {
-  "dur": 7.283,
+  "dur": 7.52,
   "file": "spectre_2_1_74b7e4dfdb.ogg"
  },
  "SPECTRE 2-1|Big group moving up the road — engaging.": {
-  "dur": 2.776,
+  "dur": 2.88,
   "file": "spectre_2_1_aff73e4728.ogg"
  },
  "SPECTRE 2-1|Good hits, good hits. Lot of movement down there, Bastion.": {
-  "dur": 3.948,
+  "dur": 4.04,
   "file": "spectre_2_1_c69f16a944.ogg"
  },
  "SPECTRE 2-1|Mayday, mayday! Spectre two-one, fire in number three — we've lost hydraulics — we're going down!": {
-  "dur": 6.287,
+  "dur": 6.931,
   "file": "spectre_2_1_1eb63bac24.ogg"
  },
  "SPECTRE 2-1|Rifle, one-oh-five. Big group — splash in five.": {
-  "dur": 3.611,
+  "dur": 4.12,
   "file": "spectre_2_1_136ff42184.ogg"
  },
  "SPECTRE 2-1|Shifting fire. Keep that fifty talking.": {
-  "dur": 2.989,
+  "dur": 2.84,
   "file": "spectre_2_1_f9f36bfe32.ogg"
  },
  "SPECTRE 2-1|Sparkle on the treeline. Rounds away.": {
-  "dur": 2.913,
+  "dur": 3.0,
   "file": "spectre_2_1_a014aeaa58.ogg"
  },
  "SPECTRE 2-1|Spectre is blind in this soup. Holding fire until it clears.": {
-  "dur": 4.334,
+  "dur": 4.44,
   "file": "spectre_2_1_698b1f1143.ogg"
  },
  "SPECTRE 2-1|Spectre still on station. We have you covered.": {
-  "dur": 3.055,
+  "dur": 3.12,
   "file": "spectre_2_1_c1d3b898ce.ogg"
  },
  "SPECTRE 2-1|We have you on thermals, Bastion. We'll be your eyes.": {
-  "dur": 3.711,
+  "dur": 3.4,
   "file": "spectre_2_1_22ce2bbe06.ogg"
  },
  "SPECTRE 2-1|We see it, Bastion. Putting everything we have on the big one.": {
-  "dur": 3.969,
+  "dur": 3.92,
   "file": "spectre_2_1_a417d4af11.ogg"
  },
  "SPECTRE 2-2|Bastion-7, Spectre two-two on station. Two-one were friends of ours. Let's make them pay for it.": {
-  "dur": 6.08,
+  "dur": 6.72,
   "file": "spectre_2_2_964d465647.ogg"
  },
  "SPECTRE 2-2|Big group moving up the road — engaging.": {
-  "dur": 2.6,
+  "dur": 2.96,
   "file": "spectre_2_2_28d921c6cb.ogg"
  },
  "SPECTRE 2-2|Good hits, good hits. Lot of movement down there, Bastion.": {
-  "dur": 3.684,
+  "dur": 4.64,
   "file": "spectre_2_2_85abed23f3.ogg"
  },
  "SPECTRE 2-2|Rifle, one-oh-five. Big group — splash in five.": {
-  "dur": 3.32,
+  "dur": 3.88,
   "file": "spectre_2_2_163683336a.ogg"
  },
  "SPECTRE 2-2|Shifting fire. Keep that fifty talking.": {
-  "dur": 2.66,
+  "dur": 3.48,
   "file": "spectre_2_2_294702aa53.ogg"
  },
  "SPECTRE 2-2|Sparkle on the treeline. Rounds away.": {
-  "dur": 2.53,
+  "dur": 2.84,
   "file": "spectre_2_2_2994a7729f.ogg"
  },
  "SPECTRE 2-2|Spectre is blind in this soup. Holding fire until it clears.": {
-  "dur": 4.014,
+  "dur": 4.76,
   "file": "spectre_2_2_d6ac26c9b3.ogg"
  },
  "SPECTRE 2-2|Spectre still on station. We have you covered.": {
-  "dur": 2.722,
+  "dur": 3.84,
   "file": "spectre_2_2_44814fadef.ogg"
  },
  "SPECTRE 2-2|We have you on thermals, Bastion. We'll be your eyes.": {
-  "dur": 3.328,
+  "dur": 3.84,
   "file": "spectre_2_2_b17b11892a.ogg"
  },
  "SPECTRE 2-2|We see it, Bastion. Putting everything we have on the big one.": {
-  "dur": 3.699,
+  "dur": 4.08,
   "file": "spectre_2_2_cec58f8fdb.ogg"
  },
  "SURVIVOR|Bastion, we can see your lights! We're coming down the road — please, don't shoot!": {
-  "dur": 6.728,
+  "dur": 5.114,
   "file": "survivor_b23e35ad37.ogg"
  },
  "SURVIVOR|No! No, not him — keep running!": {
-  "dur": 2.858,
+  "dur": 3.249,
   "file": "survivor_b7eb732e0c.ogg"
  },
  "UNKNOWN|...anyone on this frequency... we're at the overpass, we have children with us, please—": {
-  "dur": 6.734,
+  "dur": 6.022,
   "file": "unknown_2bf1d2d677.ogg"
  }
 }
