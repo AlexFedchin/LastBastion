@@ -442,7 +442,7 @@ class Game {
     this.plan = nightPlan(run.night, diff);
     this.horde.clear();
     this.horde.pileMul = diff.pileMul;
-    this.fx.glow.clear(); this.fx.smoke.clear(); this.fx.gibs.clear(); this.fx.casings.clear();
+    this.fx.glow.clear(); this.fx.smoke.clear(); this.fx.gibs.clear();
     this.fx.lights.releaseAll();
     this.arsenal.minesOwned = run.minesOwned;
     this.arsenal.startNight(this.stats, false, run.night);

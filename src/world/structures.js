@@ -29,7 +29,7 @@ function wingFrames() {
   return out;
 }
 /** Matrix placing local (u along wall, y, w inward) on a wing. */
-function wingMatrix(w, u, y, inward, out = _m, sx = 1, sy = 1, sz = 1, rotY = 0, rotX = 0) {
+export function wingMatrix(w, u, y, inward, out = _m, sx = 1, sy = 1, sz = 1, rotY = 0, rotX = 0) {
   _x.set(w.tx, 0, w.tz); _z.set(w.nx, 0, w.nz);
   out.makeBasis(_x, _y, _z);
   if (rotY || rotX) out.multiply(new THREE.Matrix4().makeRotationFromEuler(new THREE.Euler(rotX, rotY, 0)));
@@ -361,7 +361,7 @@ function buildBunker(env) {
   bags.receiveShadow = true;
   scene.add(bags);
 
-  // ammo cans, radio, helmet, spent brass
+  // ammo cans, radio, helmet
   const olive = mats.olive;
   const A = [];
   const can = (x, z, ry, y = top) => {
@@ -379,15 +379,6 @@ function buildBunker(env) {
   const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), olive);
   helmet.position.set(2.1, top + 0.01, -2.6); helmet.scale.set(1.15, 0.85, 1.25);
   scene.add(helmet);
-  const brassMat = new THREE.MeshStandardMaterial({ color: 0x8a6a2c, metalness: 0.95, roughness: 0.35, envMapIntensity: 1.6 });
-  const brass = new THREE.InstancedMesh(new THREE.CylinderGeometry(0.011, 0.011, 0.1, 6), brassMat, 260);
-  for (let i = 0; i < 260; i++) {
-    const a = rng() * Math.PI * 2, r = Math.pow(rng(), 0.6) * 1.3;
-    _q.setFromEuler(new THREE.Euler(Math.PI / 2, rng() * 6.28, 0));
-    _m.compose(_v.set(0.9 + Math.cos(a) * r, top + 0.012, -2.2 + Math.sin(a) * r * 0.8), _q, new THREE.Vector3(1, 1, 1));
-    brass.setMatrixAt(i, _m);
-  }
-  scene.add(brass);
 
   // flag, mast, beacon
   const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 8, 6), mats.darkSteel);

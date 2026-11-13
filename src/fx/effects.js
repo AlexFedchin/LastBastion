@@ -34,9 +34,6 @@ export class Effects {
     };
     this.gibs.onLand = (x, z) => { if (R() < 0.6) this.blood(x, z, rand(0.5, 1.1)); };
 
-    const casingMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.9, envMapIntensity: 1.6 });
-    const casingGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 7);
-    this.casings = new Debris(scene, casingGeo, casingMat, 300, floorAt);
 
     this.onShake = null; // (amount) => void
     this.fire = null;    // FireSystem (set by the game)
@@ -53,12 +50,11 @@ export class Effects {
     this.smoke.update(dt);
     this.decals.update();
     this.gibs.update(dt);
-    this.casings.update(dt);
     this.lights.update(dt);
   }
 
   clear() {
-    this.glow.clear(); this.smoke.clear(); this.decals.clear(); this.gibs.clear(); this.casings.clear();
+    this.glow.clear(); this.smoke.clear(); this.decals.clear(); this.gibs.clear();
     this.lights.releaseAll();
   }
 
@@ -95,10 +91,6 @@ export class Effects {
     }
     // gun smoke
     this.smoke.spawn(x + dx * 0.3, y + dy * 0.3, z + dz * 0.3, dx * 2 + (R() - 0.5), dy * 2 + 0.6, dz * 2 + (R() - 0.5), rand(0.8, 1.5), 0.25 * scale, 1.4 * scale, PF.SMOKE + ((R() * 4) | 0), 0.11, 0.105, 0.1, 0.35, 0.08, 0.08, 0.08, -0.4, 1.6, 0, R() * 6, (R() - 0.5), 0.1);
-  }
-
-  casing(x, y, z, rx, rz) {
-    this.casings.spawn(x, y, z, rx * rand(2.5, 4) + (R() - 0.5), rand(2, 3.5), rz * rand(2.5, 4) + (R() - 0.5), 0.024, 0.1, 0.024, 0.75, 0.5, 0.16, 5, 0.35, 0);
   }
 
   groundHit(x, z, big = false) {

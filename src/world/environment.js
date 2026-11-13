@@ -14,8 +14,9 @@ import { patchFogChunks, patchLightChunks, fogUniforms, createSceneFog } from '.
 import { Terrain, groundH } from './terrain.js';
 import { FireSystem } from '../fx/fire.js';
 import { makeMaterials, weather } from './kit.js';
-import { buildFortification, buildTowers, buildBase, buildLightPools, updateWallBlood } from './structures.js';
+import { buildFortification, buildTowers, buildBase, buildLightPools, updateWallBlood, wingMatrix } from './structures.js';
 import { buildProps } from './props.js';
+import { buildDressing } from './dressing.js';
 import { buildFar } from './far.js';
 import { buildSky, buildEnvMap, buildRain, buildSplashes, Bolts, BEAM_VERT, BEAM_FRAG } from './sky.js';
 import { PF } from './textures.js';
@@ -88,6 +89,7 @@ export class Environment {
     buildFortification(this);
     buildTowers(this);
     buildBase(this);
+    buildDressing(this, wingMatrix);
     buildProps(this);
     buildFar(this);
     buildLightPools(this);

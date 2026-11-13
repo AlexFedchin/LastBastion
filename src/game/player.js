@@ -229,9 +229,6 @@ export class Player {
     this.muzzle = new THREE.Object3D();
     this.muzzle.position.set(0, 0.02, -2.19);
     g.add(this.muzzle);
-    this.ejector = new THREE.Object3D();
-    this.ejector.position.set(0.11, -0.05, -0.45);
-    g.add(this.ejector);
 
     g.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.receiveShadow = false; } });
     this.gunBase = new THREE.Vector3(0.02, -0.43, 0.0);
@@ -401,10 +398,6 @@ export class Player {
     fx.muzzle(_m.x, _m.y, _m.z, _d.x, _d.y, _d.z, 0.7);
     this.muzzleLight.position.copy(_m);
     this.muzzleLight.intensity = rand(5, 8);
-    // casing out to the right
-    this.ejector.getWorldPosition(_v);
-    _right.set(1, 0, 0).applyQuaternion(cam.quaternion);
-    fx.casing(_v.x, _v.y, _v.z, _right.x, _right.z);
     this.audio.hmg();
     this.audio.casing();
     // recoil
