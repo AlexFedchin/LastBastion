@@ -197,7 +197,7 @@ export const ABILITY = {
   flare: { duration: 26, radius: 48, exposeMult: 1.25 },
   // T: throw a red marker flare anywhere on the field; a bomber puts a 2000 lb bomb on it
   bomber: { cooldown: 75, firstDelay: 12, maxRange: 320, minWallDist: 16, radius: 24, damage: 1400,
-    alt: 110, speed: 100, fall: 3.2 },
+    alt: 175, speed: 100, fall: 4.0, scale: 0.7 },
 };
 
 // ── AC-130 gunship: circles the valley all night and works the field ─────────

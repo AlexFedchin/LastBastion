@@ -156,7 +156,7 @@ export class AirSupport {
     this.bombs = [];
     this.craters = [];
     const bm = buildBomber();
-    bm.group.scale.setScalar(1.3);
+    bm.group.scale.setScalar(ABILITY.bomber.scale); // high up and small, like the gunship
     this.bomberModel = bm;
     bm.group.visible = false;
     this.scene.add(bm.group);
