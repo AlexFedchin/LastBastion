@@ -8,11 +8,10 @@ const $ = (id) => document.getElementById(id);
 
 const TIPS = [
   'The pile is the enemy, not the horde. Watch the wall map and cut down whatever is climbing.',
-  'A barrel past 75% is a barrel about to cook. Short bursts — or swap it with R before it locks up.',
+  'A barrel past 75% is a barrel about to cook. Short bursts, or it locks up to cool.',
   'Headshots do more than double damage. Optics (RMB) tighten the spread.',
   'Bloaters burst and take their neighbours with them. If one reaches the wall, its acid melts a ramp.',
   'A brute weighs as much as three men on a pile. Kill them before they get there.',
-  'Lit targets take a quarter more damage. A flare over a surge is never wasted.',
   'Napalm burns right along the wall base — exactly where the piles grow.',
   'Artillery takes three seconds to land. Lead the crowd.',
   'Danger close clears the whole wall line. It also kills three of ours.',

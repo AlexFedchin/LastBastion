@@ -59,11 +59,9 @@ module.exports = {
 
     // blackout
     await t.start(7, { survivors: 999 });
-    const f0 = await t.get('__LB.arsenal.flaresLeft');
     await trigger('blackout');
     await t.advance(4);
     t.eq(await t.get('__LB.env.power'), 0, 'the lights go out');
-    t.eq(await t.get('__LB.arsenal.flaresLeft'), f0 + 2, 'two flares are issued');
     t.assert(await until(done, 60), 'the generator comes back');
     t.eq(await t.get('__LB.env.power'), 1, 'and so do the lights');
 

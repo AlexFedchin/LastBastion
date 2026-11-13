@@ -397,9 +397,10 @@ export class Player {
     // the round's path, faintly, so you can see where the burst is going
     fx.bulletPath(_m.x, _m.y, _m.z, ex, ey, ez, this.zoom > 0.5 ? 0.6 : 1, this.zoom > 0.5 ? 20 : 12);
     if (!stopped && groundT < 600) fx.bulletGround(ex, ez, clamp(endT / 45, 1, 3));
-    fx.muzzle(_m.x, _m.y, _m.z, _d.x, _d.y, _d.z, 1);
+    // a modest flash: it's in your face all night, so it shouldn't shout
+    fx.muzzle(_m.x, _m.y, _m.z, _d.x, _d.y, _d.z, 0.7);
     this.muzzleLight.position.copy(_m);
-    this.muzzleLight.intensity = rand(9, 15);
+    this.muzzleLight.intensity = rand(5, 8);
     // casing out to the right
     this.ejector.getWorldPosition(_v);
     _right.set(1, 0, 0).applyQuaternion(cam.quaternion);

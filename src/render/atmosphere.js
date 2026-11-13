@@ -39,9 +39,9 @@ vec4 lbFog(vec3 wp, vec3 cam, vec3 baseCol, float t, float dawn){
   float Db = mix(${f(NIGHT.Db)}, ${f(DAWN.Db)}, dawn);
   float D0 = mix(${f(NIGHT.D0)}, ${f(DAWN.D0)}, dawn);
   float b = mix(${f(NIGHT.b)}, ${f(DAWN.b)}, dawn);
-  // a real bank: the wall base still reads (~30% at 15 m), the field is gone past ~80 m
-  Db *= 1.0 + bank * 19.0;
-  D0 *= 1.0 + bank * 5.0;
+  // a real bank: the wall base still reads close in, the field is gone past ~40 m
+  Db *= 1.0 + bank * 38.0;
+  D0 *= 1.0 + bank * 9.0;
   b = mix(b, 0.045, bank);
   // drifting, patchy ground mist
   float m = lbNoise(wp.xz * 0.012 + t * vec2(0.010, 0.0035)) * 0.62 + lbNoise(wp.xz * 0.041 - t * vec2(0.004, 0.016)) * 0.38;
@@ -52,7 +52,7 @@ vec4 lbFog(vec3 wp, vec3 cam, vec3 baseCol, float t, float dawn){
   float tb = Db * d;
   vec2 dxz = normalize(rd.xz + 1e-5);
   float toward = max(0.0, -dxz.y);
-  float glow = toward * toward * exp(-max(rd.y, 0.0) * 13.0) * mix(1.0, 0.35, dawn);
+  float glow = toward * toward * exp(-max(rd.y, 0.0) * 13.0) * mix(0.5, 0.35, dawn);
   glow *= 1.0 - exp(-max(d - 120.0, 0.0) / 700.0);   // only long paths pick up the city's light
   glow *= 1.0 - 0.75 * bank;                          // a dense bank swallows most of it
   vec3 G = vec3(${GLOW_RGB.map(f).join(', ')});
@@ -75,7 +75,7 @@ ${FOG_FUNCS}
 `;
 
 export const fogUniforms = {
-  lbFogColor: { value: new THREE.Color(0.0105, 0.0115, 0.015) },
+  lbFogColor: { value: new THREE.Color(0.0055, 0.006, 0.0085) },
   lbTime: { value: 0 },
   lbDawn: { value: 0 },
 };

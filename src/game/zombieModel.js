@@ -594,11 +594,11 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
       .replace('#include <fog_fragment>', `
         #ifdef USE_FOG
           vec4 lbF = lbFog(vLbFogW, cameraPosition, fogColor, fogNear, fogFar);
-          lbF.a *= 1.0 - 0.65 * zEyeF * (1.0 - uCorpse);
+          lbF.a *= 1.0 - 0.65 * zEyeF * (1.0 - uCorpse) * (1.0 - clamp(fogFar - 2.0, 0.0, 1.0));
           gl_FragColor.rgb = mix(gl_FragColor.rgb, lbF.rgb, lbF.a);
         #endif`);
   };
-  mat.customProgramCacheKey = () => 'zombie-v4';
+  mat.customProgramCacheKey = () => 'zombie-v5';
   return mat;
 }
 
@@ -640,7 +640,9 @@ void main() {
   mv.xy += position.xy * size * vec2(1.7, 0.7);
   gl_Position = projectionMatrix * mv;
   vUv = position.xy * 2.0;
-  float fog = lbFog(world.xyz, cameraPosition, lbFogColor, lbTime, lbDawn).a * 0.55;
+  // eyes cut through ordinary haze, but a fog bank swallows them like everything else
+  float fogA = lbFog(world.xyz, cameraPosition, lbFogColor, lbTime, lbDawn).a;
+  float fog = mix(fogA * 0.55, min(1.0, fogA * 1.2), clamp(lbDawn - 2.0, 0.0, 1.0));
   vA = facing * (1.0 - step(0.5, aState.w)) * (1.0 + min(aState.w, 0.0)) * (1.0 - fog) * pow(worldSize / size, 0.55)
      * smoothstep(12.0, 30.0, dist) * uEyeGlow * (1.0 - clamp(aState.y, 0.0, 1.0))
      * (aAnim.z > 3.5 ? smoothstep(90.0, 150.0, dist) : 1.0);  // a giant's own eyes read up close; pin-pricks only far off

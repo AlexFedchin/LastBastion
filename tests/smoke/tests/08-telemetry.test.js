@@ -10,7 +10,7 @@ module.exports = {
     // fast-forward the night to dawn
     for (let k = 0; k < 60 && (await t.get('__LB.state')) === 'night'; k++) await t.js('__LB.horde.clearLiving(); __LB.director.t = 1e4; __LB.test.advance(1, 1/30, false)');
     t.eq(await t.get('__LB.state'), 'dawn', 'night 2 ends at dawn');
-    await t.advance(8);
+    await t.advance(12);
     t.eq(await t.get('__LB.state'), 'shop', 'the resupply opens');
     await t.js(`__LB.run.supplies = 5000; document.querySelector('[data-act="buy"]').click(); __LB.onAction('begin')`);
     await t.js(`(() => { const t = __LB.test; t.skipIntro(); t.advance(0.3, 1/30, false); __LB.run.survivors = 1; t.spawn(500, -60, -10, 0); for (let k = 0; k < 240 && __LB.state !== 'fallen'; k++) t.advance(1, 1/30, false); })()`);

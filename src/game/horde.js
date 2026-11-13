@@ -248,14 +248,14 @@ export class Horde {
     this.scale = F(); this.radius = F(); this.weight = F();
     this.tgtX = F(); this.tgtZ = F();
     this.flash = F(); this.burn = F(); this.burnDps = F(); this.atk = F();
-    this.climb = F(); this.climbDur = F(); this.exposed = new Uint8Array(N); this.slow = F();
+    this.climb = F(); this.climbDur = F(); this.slow = F();
     this.tr = F(); this.tg = F(); this.tb = F();
     this.type = new Uint8Array(N); this.dead = new Uint8Array(N);
     this.pileJit = F();
     this.fadeIn = F();
     this._arrays = [this.id, this.x, this.y, this.z, this.yaw, this.hp, this.maxHp, this.speed, this.rate, this.phase, this.lean,
       this.scale, this.radius, this.weight, this.tgtX, this.tgtZ, this.flash, this.burn, this.burnDps, this.atk, this.climb,
-      this.climbDur, this.exposed, this.slow, this.tr, this.tg, this.tb, this.type, this.dead, this.pileJit, this.fadeIn];
+      this.climbDur, this.slow, this.tr, this.tg, this.tb, this.type, this.dead, this.pileJit, this.fadeIn];
 
     // sections
     this.secW = new Float32Array(WORLD.SECTIONS);
@@ -334,7 +334,7 @@ export class Horde {
     this.onBreach = null;    // (section, x, y, z)
     this.onBloaterWall = null;
     this.onGiantWall = null;  // (i, section, x, z, dt)
-    this.ctx = { fireAt: null, wireAt: null, flares: [] };
+    this.ctx = { fireAt: null, wireAt: null };
   }
 
   clear() {
@@ -385,7 +385,7 @@ export class Horde {
     this.yaw[i] = Math.atan2(lx - x, this.tgtZ[i] - z);
     this.flash[i] = 0; this.burn[i] = 0; this.burnDps[i] = 0; this.atk[i] = 0;
     this.climb[i] = 0; this.climbDur[i] = rand(PILE.CLIMB_TIME[0], PILE.CLIMB_TIME[1]);
-    this.exposed[i] = 0; this.slow[i] = 0;
+    this.slow[i] = 0;
     this.pileJit[i] = Math.random();
     let c = SHIRTS[(Math.random() * SHIRTS.length) | 0];
     if (type === ZT.BRUTE) c = [0.09, 0.1, 0.07];
@@ -415,7 +415,6 @@ export class Horde {
   /** Returns true if this hit killed the zombie. */
   damage(i, amount, cause, dx = 0, dy = 0, dz = 0, headshot = false) {
     if (this.dead[i]) return false;
-    if (this.exposed[i]) amount *= 1.25;
     if (this.type[i] === ZT.GIANT && cause === 'gunship') amount *= 0.5; // thick hide: the gunship can't do it alone
     this.hp[i] -= amount;
     this.flash[i] = 1;
@@ -641,7 +640,6 @@ export class Horde {
     const n = this.n;
     const X = this.x, Z = this.z, Y = this.y;
     const ctx = this.ctx;
-    const flares = ctx.flares;
     const WALL_H = WORLD.WALL_H;
     const gs = this.globalSpeed;
 
@@ -675,15 +673,6 @@ export class Horde {
           if (this.damage(i, 7 * dt, 'wire', 0, 0, 0)) continue;
         }
       }
-      // flare exposure
-      let ex = 0;
-      for (let f = 0; f < flares.length; f++) {
-        const fl = flares[f];
-        const fx = x - fl.x, fz = z - fl.z;
-        if (fx * fx + fz * fz < fl.r2) { ex = 1; break; }
-      }
-      this.exposed[i] = ex;
-
       // steering toward lane target
       let sp = this.speed[i] * gs * slowMul;
       if (this.burn[i] > 0) sp *= 1.25;

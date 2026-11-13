@@ -135,7 +135,7 @@ export function baseStats() {
     // Wire
     wireBands: 0, wireHp: 450,
     // Consumables per night
-    flares: 2, grenades: 8,
+    grenades: 8,
   };
 }
 
@@ -178,8 +178,6 @@ export const UPGRADES = [
   { id: 'napalm', group: 'wall', unlock: 'napalm', name: 'NAPALM TRENCH', desc: 'Burns 3 s longer and refills 10 s faster per rank.', costs: [220, 480],
     apply: (s, r) => { s.napalmDuration += 3 * r; s.napalmCooldown -= 10 * r; s.napalmDps *= 1 + 0.25 * r; } },
   // Support
-  { id: 'flares', group: 'support', unlock: 'flares', name: 'FLARE CACHE', desc: '+1 illumination flare per night. Lit targets take +25% damage.', costs: [90, 180, 300],
-    apply: (s, r) => { s.flares += r; } },
   { id: 'grenades', group: 'support', unlock: 'grenades', name: 'GRENADE CRATE', desc: '+4 grenades per night.', costs: [110, 240],
     apply: (s, r) => { s.grenades += 4 * r; } },
 ];
@@ -194,7 +192,6 @@ export const ABILITY = {
   // thrown one at a time (G), a short re-arm between throws
   grenade: { radius: 7.5, damage: 320, maxRange: 90, rearm: 0.45 },
   dangerClose: { cost: 3, shells: 40, radius: 7.5, damage: 420 },
-  flare: { duration: 26, radius: 48, exposeMult: 1.25 },
   // T: throw a red marker flare anywhere on the field; a bomber puts a 2000 lb bomb on it
   bomber: { cooldown: 75, firstDelay: 12, maxRange: 320, minWallDist: 16, radius: 24, damage: 1400,
     alt: 175, speed: 100, fall: 4.0, scale: 0.7 },
@@ -308,20 +305,19 @@ export const BARKS = {
 // (night 1 is the fifty and the two wall gunners)
 export const UNLOCKS = {
   napalm: 2, grenades: 2, claymores: 2,
-  artillery: 3, flares: 3, gunship: 3,
+  artillery: 3, gunship: 3,
   bomber: 4,
   dangerClose: 5,
 };
 export const isUnlocked = (key, night) => night >= (UNLOCKS[key] ?? 1);
 export const UNLOCK_INFO = {
   napalm: 'NAPALM [E]', grenades: 'GRENADES [G]', claymores: 'CLAYMORES',
-  artillery: '105MM BATTERY [Q]', flares: 'FLARES [F]', gunship: 'SPECTRE',
+  artillery: '105MM BATTERY [Q]', gunship: 'SPECTRE',
   bomber: 'BOMBER [T]', dangerClose: 'DANGER CLOSE [B]',
 };
 export const UNLOCK_LINES = {
   2: [[CALL.kovac, 'Engineers filled the trench out front with napalm. E lights it — it burns right along the wall base. And there\'s a crate of grenades at your feet. G, for anything climbing.']],
-  3: [[CALL.command, 'Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.'],
-    [CALL.kovac, 'Flares came up with the shells. F puts one over the field — anything in the light goes down easier.']],
+  3: [[CALL.command, 'Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.']],
   4: [[CALL.hammer, 'Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it — that\'s T — and keep your heads down.']],
   5: [[CALL.kovac, 'Listen. If it all goes wrong, B brings the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.']],
 };
@@ -345,13 +341,13 @@ export const ENDLESS_EVENTS = ['giant', 'stampede', 'bloaters', 'drop', 'fog', '
 export const EVENTS = {
   patrol: { count: 4, speed: [4.5, 4.9], chasers: 16, catchR: 1.05, reward: { survivors: 1, supplies: 40 } },
   civilians: { count: 6, speed: [3.8, 4.3], chasers: 20, catchR: 1.05, reward: { survivors: 1, supplies: 20 } },
-  drop: { hold: 35, tear: 1.3, maxTearing: 6, pull: 32, reward: { flares: 2, grenades: 6, supplies: 150 } },
+  drop: { hold: 35, tear: 1.3, maxTearing: 6, pull: 32, reward: { grenades: 6, supplies: 150 } },
   giant: { name: 'GOLIATH', hpMul: 1, scale: 4.0, smash: 2.4 },
   behemoth: { name: 'BEHEMOTH', hpMul: 1.8, scale: 5.4, smash: 1.8 },
   stampede: { brutes: 14, speed: 1.75, runners: 20 },
   bloaters: { count: 45 },
   fog: { duration: 55 },
-  blackout: { duration: 45, flares: 2 },
+  blackout: { duration: 45 },
 };
 // '@spectre' is whichever gunship crew is up that night
 export const EVENT_LINES = {

@@ -4,15 +4,15 @@ module.exports = {
     const state = () => t.get(`({
       rows: [...document.querySelectorAll('#h-abilities .ab .key')].map((e) => e.textContent).join(''),
       gunners: __LB.arsenal.gunners.filter((g) => g.active).length,
-      gunship: __LB.arsenal.air.gs.active, flares: __LB.arsenal.flaresLeft, grenades: __LB.arsenal.grenadesLeft,
+      gunship: __LB.arsenal.air.gs.active, grenades: __LB.arsenal.grenadesLeft,
     })`);
     await t.start(1);
-    await t.js(`['KeyQ','KeyE','KeyF','KeyT','KeyG','KeyB'].forEach((k) => __LB.test.press(k)); __LB.test.advance(0.2, 1/30, false)`);
+    await t.js(`['KeyQ','KeyE','KeyT','KeyG','KeyB'].forEach((k) => __LB.test.press(k)); __LB.test.advance(0.2, 1/30, false)`);
     const n1 = await state();
     const used = await t.get(`({ napalm: __LB.arsenal.napalmT > 0, marker: !!__LB.arsenal.air.marker, shells: __LB.arsenal.shells.length, danger: __LB.arsenal.dangerUsed })`);
-    t.eq(n1, { rows: '', gunners: 2, gunship: false, flares: 0, grenades: 0 }, 'night 1 loadout');
+    t.eq(n1, { rows: '', gunners: 2, gunship: false, grenades: 0 }, 'night 1 loadout');
     t.eq(used, { napalm: false, marker: false, shells: 0, danger: false }, 'locked keys do nothing on night 1');
-    const expect = { 2: 'EG', 3: 'QEFG', 4: 'QEFTG', 5: 'QEFTGB' };
+    const expect = { 2: 'EG', 3: 'QEG', 4: 'QETG', 5: 'QETGB' };
     for (const n of [2, 3, 4, 5]) {
       await t.start(n);
       const s = await state();

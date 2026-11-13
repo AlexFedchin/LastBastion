@@ -41,7 +41,7 @@ export class Environment {
     this.onDistantBoom = null;
     this.onDistantGunfire = null;
 
-    this.nightFog = new THREE.Color(0.0105, 0.0115, 0.015);
+    this.nightFog = new THREE.Color(0.0055, 0.006, 0.0085);
     this.dawnFog = new THREE.Color(0.075, 0.078, 0.085);
     scene.fog = createSceneFog(this.nightFog);
     this.fogUniforms = fogUniforms;
@@ -100,16 +100,16 @@ export class Environment {
   // ── Lights ───────────────────────────────────────────────────────────────
   buildLights() {
     const q = this.quality;
-    this.hemi = new THREE.HemisphereLight(0x3a465e, 0x15110d, 0.9);
+    this.hemi = new THREE.HemisphereLight(0x3a465e, 0x15110d, 0.28);
     this.scene.add(this.hemi);
 
-    this.moon = new THREE.DirectionalLight(0x8ea4c8, 0.45);
+    this.moon = new THREE.DirectionalLight(0x8ea4c8, 0.14);
     this.moon.position.set(-90, 140, 70);
     this.scene.add(this.moon);
     this.scene.add(this.moon.target);
 
     // burning-city rim light from beyond the valley
-    this.rim = new THREE.DirectionalLight(0xff7038, 1.0);
+    this.rim = new THREE.DirectionalLight(0xff7038, 0.35);
     this.rim.position.set(30, 35, -400);
     this.rim.target.position.set(0, 0, 0);
     this.scene.add(this.rim);
@@ -308,11 +308,11 @@ export class Environment {
     fogUniforms.lbDawn.value = this.scene.fog.far;
     su.uHorizon.value.copy(fc);
     su.uZenith.value.setRGB(lerp(0.0025, 0.05, d), lerp(0.003, 0.055, d), lerp(0.0055, 0.068, d));
-    su.uGlowAmt.value = lerp(1, 0.35, d);
+    su.uGlowAmt.value = lerp(0.7, 0.35, d);
     su.uCloudLight.value = lerp(1, 9, d);
-    this.moon.intensity = lerp(0.45, 1.9, d);
+    this.moon.intensity = lerp(0.14, 1.9, d);
     this.moon.color.setRGB(lerp(0.56, 0.75, d), lerp(0.64, 0.74, d), lerp(0.78, 0.72, d));
-    this.rim.intensity = lerp(1.0, 0.25, d);
+    this.rim.intensity = lerp(0.35, 0.25, d);
     this.rainUniforms.uIntensity.value = lerp(0.32, 0.18, d);
     for (const s of this.lampSprites) s.visible = d < 0.6 && this.power > 0.5;
     void audio;
@@ -354,7 +354,8 @@ export class Environment {
     void d;
   }
 
-  baseHemi() { return lerp(0.9, 3.2, this.dawn); }
+  // a dark night: the wall lamps, searchlights and fires are what you see by
+  baseHemi() { return lerp(0.28, 3.2, this.dawn); }
 }
 
 const _flashCol = new THREE.Color();

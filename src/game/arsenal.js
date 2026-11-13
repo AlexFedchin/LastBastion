@@ -1,4 +1,4 @@
-// Everything that kills besides your own gun: artillery, napalm, flares,
+// Everything that kills besides your own gun: artillery, napalm,
 // grenades, danger-close, wall gunners, riflemen, claymores and wire.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -47,14 +47,12 @@ export class Arsenal {
     this.env = env;
     this.shells = [];   // artillery rounds in flight
     this.grenades = [];
-    this.flares = [];
     this.artyCd = 0;
     this.napalmCd = 0;
     this.napalmT = 0;
     this.napalmLights = [];
     this.napalmFires = [];
     this.napalmNext = WORLD.GATE_HALF + 1;
-    this.flaresLeft = 0;
     this.grenadesLeft = 0;
     this.grenadeCd = 0;
     this.dangerUsed = false;
@@ -96,14 +94,11 @@ export class Arsenal {
     this.artyCd = 6;
     this.napalmCd = 0;
     this.napalmT = 0;
-    this.flaresLeft = stats.flares;
     this.grenadesLeft = stats.grenades;
     this.grenadeCd = 0;
     this.dangerUsed = false;
     this.shells.length = 0;
     this.grenades.length = 0;
-    for (const f of this.flares) this.fx.lights.release(f.light);
-    this.flares.length = 0;
     this.releaseNapalmLights();
     this.clearNapalmFires();
     this.placeMines();
@@ -111,7 +106,6 @@ export class Arsenal {
     this.setWire(stats.wireBands, stats.wireHp);
     this.horde.ctx.fireAt = (x, dist) => this.fireAt(x, dist);
     this.horde.ctx.wireAt = (x, dist, w, dt) => this.wireAt(x, dist, w, dt);
-    this.horde.ctx.flares = this.flareZones = [];
   }
 
   endNight() {
@@ -119,9 +113,6 @@ export class Arsenal {
     this.releaseNapalmLights();
     this.clearNapalmFires();
     this.napalmT = 0;
-    for (const f of this.flares) this.fx.lights.release(f.light);
-    this.flares.length = 0;
-    this.flareZones.length = 0;
     for (const m of this.grenadeMeshes) m.visible = false;
     this.grenades.length = 0;
     this.shells.length = 0;
@@ -203,22 +194,6 @@ export class Arsenal {
     if (ax > 9 + this.napalmAge * 110) return 0;
     if (Math.abs(dist - 9) > 1.6) return 0;
     return this.stats.napalmDps;
-  }
-
-  // ── Flares ───────────────────────────────────────────────────────────────
-  launchFlare(target) {
-    if (this.flaresLeft <= 0) return false;
-    this.flaresLeft--;
-    const light = this.fx.lights.acquire();
-    const f = {
-      sx: 0, sy: WORLD.CAM.y + 1, sz: WORLD.CAM.z - 1.5,
-      tx: target.x, tz: target.z, x: 0, y: 0, z: 0, t: 0, rise: 2.3, life: ABILITY.flare.duration,
-      light, swayP: R() * 6,
-    };
-    if (light) { light.color.setRGB(1, 0.82, 0.68); light.distance = 280; light.decay = 1.25; light.intensity = 0; }
-    this.flares.push(f);
-    this.audio.flare();
-    return true;
   }
 
   // ── Grenades ─────────────────────────────────────────────────────────────
@@ -675,39 +650,6 @@ export class Arsenal {
         this.detonate(x, groundH(x, z), z, 1.05, G.radius, G.damage, 'grenade');
         this.grenades.splice(k, 1); k--;
       }
-    }
-
-    // flares
-    this.flareZones.length = 0;
-    for (let k = 0; k < this.flares.length; k++) {
-      const f = this.flares[k];
-      f.t += dt;
-      let x, y, z;
-      if (f.t < f.rise) {
-        const u = f.t / f.rise;
-        x = lerp(f.sx, f.tx, u); z = lerp(f.sz, f.tz, u);
-        y = lerp(f.sy, 72, Math.sin(u * Math.PI / 2));
-        fx.glowDot(x, y, z, 0.8, 6, 3, 1.5, 0.05);
-        fx.smokePuff(x, y, z, 0.6, 0.06, 2.5, 0);
-      } else {
-        const ht = f.t - f.rise;
-        f.swayP += dt;
-        x = f.tx + Math.sin(f.swayP * 0.8) * 3 + ht * 0.6; z = f.tz + Math.cos(f.swayP * 0.6) * 2;
-        y = Math.max(2, 72 - ht * 2.4);
-        const life = 1 - ht / f.life;
-        const flick = 0.82 + R() * 0.18;
-        if (f.light) { f.light.position.set(x, y, z); f.light.intensity = 480 * Math.min(1, ht * 2) * Math.min(1, life * 4) * flick; }
-        fx.glowDot(x, y, z, 1.8 * flick, 6, 4, 3, 0.05);
-        if (R() < 0.4) fx.smokePuff(x, y, z, 1.2, 0.07, 6, 0.5);
-        if (R() < 0.35) fx.spark(x, y, z, rand(-1, 1), rand(-2, 0), rand(-1, 1), 6, 4, 2, 1.2);
-        this.flareZones.push({ x, z, r2: ABILITY.flare.radius * ABILITY.flare.radius });
-        if (ht >= f.life) {
-          if (f.light) this.fx.lights.release(f.light);
-          this.flares.splice(k, 1); k--;
-          continue;
-        }
-      }
-      f.x = x; f.y = y; f.z = z;
     }
 
     // napalm trench

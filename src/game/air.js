@@ -275,19 +275,23 @@ export class AirSupport {
         this.markerMesh.position.set(m.tx, gy + 0.08, m.tz);
         this.markerMesh.rotation.set(Math.PI / 2, 0, R() * 6);
         m.light = fx.lights.acquire();
-        if (m.light) { m.light.color.setRGB(1, 0.1, 0.04); m.light.distance = 16; m.light.decay = 1.7; m.light.intensity = 0; }
+        if (m.light) { m.light.color.setRGB(1, 0.16, 0.06); m.light.distance = 34; m.light.decay = 1.5; m.light.intensity = 0; }
         this.audio.markerIgnite(m.tx, m.tz);
         m.callT = 1.6;
       }
       return;
     }
-    // burning on the ground: a hot little core, a red glow a few metres round, a thin plume of red smoke
+    // burning on the ground like a road flare: a blinding pink-white core, a hard red glow
+    // lighting the ground and the dead around it, sputtering sparks, a plume of red smoke
     const gy = groundH(m.tx, m.tz);
-    const flick = 0.75 + R() * 0.25;
-    if (m.light) { m.light.position.set(m.tx, gy + 1.4, m.tz); m.light.intensity = 22 * flick * Math.min(1, m.t * 3); }
-    fx.glowDot(m.tx, gy + 0.3, m.tz, 0.5 * flick, 7, 2.8, 1.4, 0.05);
-    fx.glowDot(m.tx, gy + 0.4, m.tz, 2.2 * flick, 1.6, 0.13, 0.05, 0.05);
-    if (R() < 0.45) fx.spark(m.tx, gy + 0.2, m.tz, rand(-1.5, 1.5), rand(1, 3.5), rand(-1.5, 1.5), 5, 1.2, 0.4, 0.4);
+    const flick = 0.88 + R() * 0.12;
+    const up = Math.min(1, m.t * 3);
+    if (m.light) { m.light.position.set(m.tx, gy + 1.2, m.tz); m.light.intensity = 140 * flick * up; }
+    fx.glowDot(m.tx, gy + 0.25, m.tz, 0.9 * flick, 14, 6, 5, 0.05);
+    fx.glowDot(m.tx, gy + 0.35, m.tz, 2.6 * flick, 6, 0.6, 0.25, 0.05);
+    fx.glowDot(m.tx, gy + 0.6, m.tz, 7 * flick, 1.1, 0.08, 0.03, 0.05);
+    if (R() < 0.5) fx.flame(m.tx, gy + 0.15, m.tz, 0.35, 1.6);
+    if (R() < 0.8) fx.spark(m.tx, gy + 0.2, m.tz, rand(-2, 2), rand(1.5, 4.5), rand(-2, 2), 8, 1.6, 0.6, 0.45);
     if (R() < dt * 9) {
       fx.smoke.spawn(m.tx, gy + 0.4, m.tz, rand(-0.3, 0.3) + 0.5, rand(1.2, 2.4), rand(-0.3, 0.3), rand(3.5, 6), 0.6, rand(3, 5), PF.SMOKE + ((R() * 4) | 0),
         0.55, 0.06, 0.04, 0.6, 0.14, 0.035, 0.03, -0.25, 0.4, 0, R() * 6, (R() - 0.5) * 0.3, 0.05);

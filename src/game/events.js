@@ -333,14 +333,13 @@ class SupplyDrop {
       // green smoke: recovered
       for (let k = 0; k < 12; k++) g.fx.smoke.spawn(c.x, c.y, c.z, rand(-1, 1), rand(1.5, 3), rand(-1, 1), rand(4, 7), 1, 6, PF.SMOKE + ((R() * 4) | 0), 0.05, 0.3, 0.08, 0.7, 0.02, 0.06, 0.02, -0.2, 0.4);
       const a = g.arsenal, run = g.run;
-      a.flaresLeft += P.reward.flares;
       a.grenadesLeft += P.reward.grenades;
       a.artyCd = 0;
       a.air.bomberCd = 0;
       const sup = Math.round(P.reward.supplies * (1 + 0.1 * (run.night - 1)));
       run.supplies += sup; g.ns.supplies += sup;
       E.say('drop', 'saved', true);
-      g.hud.alert(`RESUPPLY: +${P.reward.flares} FLARES · +${P.reward.grenades} GRENADES · BATTERY & BOMBER READY · +${sup} SUPPLIES`);
+      g.hud.alert(`RESUPPLY: +${P.reward.grenades} GRENADES · BATTERY & BOMBER READY · +${sup} SUPPLIES`);
       g.audio.uiBuy();
     } else {
       g.fx.explosion(c.x, c.y - 0.5, c.z, 0.5, { fires: false, scorch: false });
@@ -551,8 +550,7 @@ class Blackout {
     this.t = 0; this.restored = false; this.saidSpectre = false;
     g.audio.powerDown();
     this.E.say('blackout', 'start', true);
-    g.arsenal.flaresLeft += this.P.flares;
-    g.hud.alert(`GENERATOR DOWN — +${this.P.flares} FLARES ISSUED`, 'red');
+    g.hud.alert('GENERATOR DOWN — LIGHTS OUT', 'red');
   }
   power(p) {
     const g = this.E.g;

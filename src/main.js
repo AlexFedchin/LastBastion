@@ -466,7 +466,6 @@ class Game {
     this.newUnlocks = Object.keys(UNLOCKS).filter((k) => UNLOCKS[k] === run.night && !run.endless);
     (UNLOCK_LINES[run.night] && !run.endless ? UNLOCK_LINES[run.night] : []).forEach((l, i) => this.radioScript.push({ at: 10 + i * 7, who: l[0], text: l[1], done: false }));
     this.radioScript.sort((a, b) => a.at - b.at);
-    if (!isUnlocked('flares', run.night)) this.arsenal.flaresLeft = 0;
     if (!isUnlocked('grenades', run.night)) this.arsenal.grenadesLeft = 0;
     this.telemetry.startNight(run, this.plan, this.stats, Object.keys(UNLOCKS).filter((k) => isUnlocked(k, run.night)));
     this.audio.night = run.night;
@@ -743,7 +742,7 @@ class Game {
     u.uFlash.value = this.flashPulse + this.env.flash * 0.04;
     u.uRadial.value = this.radial;
     u.uDesat.value = this.state === 'fallen' ? Math.min(0.85, 0.28 + this.stateT * 0.15) : lerp(0.28, 0.4, this.env.dawn);
-    u.uExposure.value = lerp(1.65, 1.2, this.env.dawn);
+    u.uExposure.value = lerp(1.25, 1.2, this.env.dawn);
     u.uWarm.value = this.env.dawn * 0.3;
     u.uCA.value = 0.008 + this.player.trauma * 0.008 + this.radial * 0.015;
     this.post.updateDistortion(this.env.fire.heatSources, this.fx.shocks);
@@ -752,7 +751,7 @@ class Game {
     this.uniforms.uPixel.value = 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / h;
     this.uniforms.uEyeGlow.value = lerp(9, 1.2, this.env.dawn);
     this.uniforms.uEyeGlowBillboard.value = 1 - this.env.dawn;
-    this.uniforms.uRim.value.setRGB(0.075, 0.032, 0.014).multiplyScalar(1 - this.env.dawn * 0.8);
+    this.uniforms.uRim.value.setRGB(0.032, 0.014, 0.006).multiplyScalar(1 - this.env.dawn * 0.5);
     this.post.render(rdt, this.time);
     if (this.settings.showFps) {
       this.fps.acc += rdt; this.fps.n++;
@@ -832,7 +831,6 @@ class Game {
       const n = this.run.night, keys = ['LMB FIRE', 'RMB OPTICS'];
       if (isUnlocked('artillery', n)) keys.push('Q ARTILLERY');
       if (isUnlocked('napalm', n)) keys.push('E NAPALM');
-      if (isUnlocked('flares', n)) keys.push('F FLARE');
       if (isUnlocked('bomber', n)) keys.push('T BOMBER MARKER');
       if (isUnlocked('grenades', n)) keys.push('G GRENADES');
       this.hud.hint(keys.join(' · '));
@@ -864,11 +862,6 @@ class Game {
         T.ability('napalm', ok);
         if (ok) this.hud.alert('NAPALM TRENCH LIT');
         else this.hud.alert(this.arsenal.napalmT > 0 ? 'TRENCH ALREADY BURNING' : `TRENCH REFILLING — ${Math.ceil(this.arsenal.napalmCd)}s`, '', { key: 'napalm-cd', plain: true });
-      }
-      if (input.hit('KeyF') && can('flares')) {
-        const ok = this.arsenal.launchFlare(this.player.aimPoint(240));
-        T.ability('flare', ok);
-        if (!ok) this.hud.alert('NO FLARES LEFT');
       }
       if (input.hit('KeyT') && can('bomber')) {
         const air = this.arsenal.air;
@@ -964,7 +957,9 @@ class Game {
   }
 
   updateDawn(dt, rdt) {
-    this.env.dawn = Math.min(1, this.env.dawn + rdt / 6);
+    // first light: the dark lifts slowly, then the grey morning comes up over the valley
+    const u = Math.min(1, this.stateT / 10);
+    this.env.dawn = Math.max(this.env.dawn, u * u * (3 - 2 * u));
     // daylight reveals what the night left in the valley
     this.player.pitch = damp(this.player.pitch, -0.2, 0.7, rdt);
     this.player.yaw = damp(this.player.yaw, Math.sin(this.stateT * 0.12) * 0.35, 0.7, rdt);
@@ -974,7 +969,7 @@ class Game {
     this.audio.intensity = 0;
     this.audio.pressure = 0;
     this.hud.update(rdt, this);
-    if (this.stateT > 6.5) {
+    if (this.stateT > 11) {
       if (this.victory) {
         this.state = 'victory';
         this.hud.show(false);

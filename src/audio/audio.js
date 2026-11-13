@@ -645,11 +645,6 @@ export class AudioEngine {
     this.play(buf, { gain: gain * 1.6, rate: rand(0.85, 1.15), x, z, ref: 40, offset: rand(0, buf.duration - d - 0.1), duration: d, fadeIn: 0.15, fadeOut: 0.5, key: 'crackle', max: 4 });
   }
 
-  flare() {
-    this.play(this.B.flare_launch[0], { gain: 0.55, reverb: 0.4, force: true });
-    this.play(this.B.flare_ignite[0], { gain: 0.22, delay: 2.3, lowpass: 7000, pan: rand(-0.3, 0.3), reverb: 0.6, force: true });
-  }
-
   /** Heavy bomb: the crack, the sub-bass punch through the ground, the valley rolling it back. */
   bigBlast(x, z) {
     if (!this.ready) return;

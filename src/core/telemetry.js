@@ -112,7 +112,7 @@ export class Telemetry {
         alive: h.alive, queued: g.director.queue.length, survivors: g.run.survivors, kills: n.kills,
         maxPressure: round(maxP), pressure: Array.from({ length: 10 }, (_, s) => round(h.pressure(s), 2)),
         heat: round(g.player.heat), fps: Math.round(n.frames / Math.max(0.001, n.ftSum)),
-        flares: g.arsenal.flaresLeft, grenades: g.arsenal.grenadesLeft,
+        grenades: g.arsenal.grenadesLeft,
       });
     }
   }
