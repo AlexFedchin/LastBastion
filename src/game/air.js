@@ -1,6 +1,6 @@
 // Air support: a bomber on call (throw a red marker flare, get a 2000 lb bomb
 // on it) and an AC-130 gunship that circles the valley all night and works
-// the crowds with its 25 mm, 40 mm and 105 mm guns.
+// the crowds with its 25 mm GAU-12 Gatling.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { WORLD, ABILITY, GUNSHIP, wallZ, wallDist, WING_COS, CALL, COMMS, isUnlocked } from '../config.js';
@@ -12,6 +12,7 @@ const R = Math.random;
 const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
+const GAU_SPEED = 1000; // m/s, 25 mm rounds coming down
 
 // ── geometry helpers ─────────────────────────────────────────────────────────
 function clean(g) {
@@ -82,7 +83,7 @@ export function buildGunship() {
   }
   return {
     group: g, props,
-    muzzles: { 25: new THREE.Vector3(2.4, -0.3, 7.8), 40: new THREE.Vector3(2.4, -0.5, 1.8), 105: new THREE.Vector3(2.5, -0.7, -2.2) },
+    muzzle: new THREE.Vector3(2.4, -0.3, 7.8),
     lights: { port: new THREE.Vector3(20.5, 2.2, 2), stbd: new THREE.Vector3(-20.5, 2.2, 2), tail: new THREE.Vector3(0, 8.5, -18), belly: new THREE.Vector3(0, -2.3, 0) },
     exhausts: [-12.4, -6.6, 6.6, 12.4].map((x) => new THREE.Vector3(x, 1.9, 0.6)),
   };
@@ -174,7 +175,7 @@ export class AirSupport {
       vel: new THREE.Vector3(), loop: null, introDone: false, radioCd: 30,
     };
     gs.group.visible = false;
-    gs.group.scale.setScalar(1.5); // a touch larger than life so you can find it at night
+    gs.group.scale.setScalar(GUNSHIP.scale); // high and far: a small shape against the clouds
     this.scene.add(gs.group);
     this.inFlight = []; // gunship rounds on their way down
   }
@@ -473,62 +474,62 @@ export class AirSupport {
     }
     if (g.mode === 25) {
       g.burstT -= dt;
-      g.acc += dt * G.g25.rate;
-      while (g.acc >= 1) {
+      g.acc += dt * G.gau.rate;
+      while (g.acc >= 1 && g.burstT > -dt) {
         g.acc -= 1;
         // the burst walks across the target
-        const u = 1 - g.burstT / g.burstLen;
-        const tx = g.tx + g.wx * (u - 0.5) + rand(-1, 1) * G.g25.scatter, tz = g.tz + g.wz * (u - 0.5) + rand(-1, 1) * G.g25.scatter;
-        if (wallDist(tx, tz) > G.g25.minWall - 2) this.fire(25, tx, tz);
+        const u = clamp(1 - g.burstT / g.burstLen, 0, 1);
+        const tx = g.tx + g.wx * (u - 0.5) + rand(-1, 1) * G.gau.scatter, tz = g.tz + g.wz * (u - 0.5) + rand(-1, 1) * G.gau.scatter;
+        if (wallDist(tx, tz) > G.gau.minWall - 2) this.fire(tx, tz);
       }
-      if (g.burstT <= 0) this.endEngagement();
-    } else if (g.mode === 40) {
+      if (g.burstT <= 0) {
+        // another burst on the same crowd now and then
+        if (g.bursts-- > 0) this.startGau(true);
+        else this.endEngagement();
+      }
+    } else if (g.mode === -25) {
+      // between bursts: let the barrels stop, re-acquire (track the big one if it's out there)
       g.nextT -= dt;
       if (g.nextT <= 0) {
-        // re-acquire: track the crowd as it moves
         const pr = this.priority && this.priority();
-        const c = pr || this.horde.densest(G.g40.minWall, 240, 12, 6);
-        if (c && (pr || Math.hypot(c.x - g.tx, c.z - g.tz) < 60)) { g.tx = c.x; g.tz = c.z; }
-        this.fire(40, g.tx + rand(-1, 1) * G.g40.scatter, g.tz + rand(-1, 1) * G.g40.scatter);
-        g.rounds--;
-        g.nextT = G.g40.interval * rand(0.85, 1.25);
-        if (g.rounds <= 0) this.endEngagement();
-      }
-    } else if (g.mode === 105) {
-      g.nextT -= dt;
-      if (g.nextT <= 0) {
-        this.fire(105, g.tx + rand(-1.5, 1.5), g.tz + rand(-1.5, 1.5));
-        this.endEngagement();
+        const c = pr || this.horde.densest(G.gau.minWall, 240, 12, 7);
+        if (c && (pr || Math.hypot(c.x - g.tx, c.z - g.tz) < 70)) { g.tx = c.x; g.tz = c.z; }
+        this.startGau(false);
       }
     }
+  }
+
+  /** Open a GAU burst on (g.tx, g.tz); `pause` first waits a beat between bursts. */
+  startGau(pause) {
+    const g = this.gs, G = GUNSHIP.gau;
+    if (pause) { g.mode = -25; g.nextT = rand(0.5, 1.1); return; }
+    g.mode = 25;
+    g.take = (R() * G.bursts.length) | 0;
+    g.burstLen = g.burstT = G.bursts[g.take];
+    g.acc = 1;
+    const a = R() * Math.PI * 2, len = rand(10, 22);
+    g.wx = Math.cos(a) * len; g.wz = Math.sin(a) * len;
+    // the whole burst's sound, timed to the aircraft and to the impacts
+    _v.copy(g.muzzle).applyMatrix4(g.group.matrixWorld);
+    const flight = Math.hypot(g.tx - _v.x, groundH(g.tx, g.tz) - _v.y, g.tz - _v.z) / GAU_SPEED;
+    this.audio.gauBurst(g.take, _v.x, _v.y, _v.z, g.tx, g.tz, flight);
   }
 
   engage() {
     const g = this.gs, G = GUNSHIP;
     // something big on the field takes priority
     const pr = this.priority && this.priority();
-    if (pr && R() < 0.5 && wallDist(pr.x, pr.z) > G.g40.minWall) {
+    if (pr && R() < 0.6 && wallDist(pr.x, pr.z) > G.gau.minWall) {
       g.tx = pr.x; g.tz = pr.z;
-      if (R() < 0.4 && wallDist(pr.x, pr.z) > G.g105.minWall) { g.mode = 105; g.nextT = 0.6; } else { g.mode = 40; g.rounds = 5; g.nextT = 0.2; }
+      g.bursts = 1 + ((R() * 2) | 0);
+      this.startGau(false);
       return;
     }
-    const c = this.horde.densest(G.g25.minWall, 240, 44, 7);
+    const c = this.horde.densest(G.gau.minWall, 240, 44, 7);
     if (!c || c.count < 2) { g.engageT = 1.5; return; }
-    const wd = wallDist(c.x, c.z);
-    const r = R();
     g.tx = c.x; g.tz = c.z;
-    if (c.count >= G.g105.minCluster && wd >= G.g105.minWall && r < G.g105.chance) {
-      g.mode = 105; g.nextT = 0.8;
-      if (g.radioCd <= 0) { g.radioCd = 25; this.radio(COMMS.spectre105); }
-    } else if (r < 0.55 && wd >= G.g40.minWall) {
-      g.mode = 40; g.rounds = Math.round(rand(G.g40.rounds[0], G.g40.rounds[1])); g.nextT = 0.2;
-    } else {
-      g.mode = 25;
-      g.burstLen = g.burstT = rand(G.g25.burst[0], G.g25.burst[1]);
-      g.acc = 0;
-      const a = R() * Math.PI * 2, len = rand(8, 18);
-      g.wx = Math.cos(a) * len; g.wz = Math.sin(a) * len;
-    }
+    g.bursts = c.count >= 8 ? 1 + ((R() * 2) | 0) : (R() < 0.4 ? 1 : 0);
+    this.startGau(false);
     if (!g.introDone) {
       g.introDone = true;
       g.radioCd = 35;
@@ -555,30 +556,16 @@ export class AirSupport {
     g.engageT = rand(GUNSHIP.engageMin, GUNSHIP.engageMax);
   }
 
-  fire(kind, tx, tz) {
+  fire(tx, tz) {
     const g = this.gs, fx = this.fx;
-    _v.copy(g.muzzles[kind]).applyMatrix4(g.group.matrixWorld);
+    _v.copy(g.muzzle).applyMatrix4(g.group.matrixWorld);
     const gy = groundH(tx, tz);
     const dist = _w.set(tx - _v.x, gy - _v.y, tz - _v.z).length();
-    const speed = kind === 25 ? 1050 : kind === 40 ? 880 : 520;
     g.shots++;
-    if (kind === 25) {
-      if (g.shots % 2 === 0) fx.tracer(_v.x, _v.y, _v.z, tx, gy + 0.3, tz, speed, 1.6, 7, 3.4, 1.2);
-      fx.glowDot(_v.x, _v.y, _v.z, 3.2, 9, 6, 3, 0.04);
-      if (g.shots % 2 === 0) this.audio.gunshipShot(25, _v.x, _v.y, _v.z);
-    } else if (kind === 40) {
-      fx.tracer(_v.x, _v.y, _v.z, tx, gy + 0.3, tz, speed, 2.6, 7, 3.6, 1.2);
-      fx.glowDot(_v.x, _v.y, _v.z, 6, 10, 7, 3.5, 0.07);
-      fx.smokePuff(_v.x, _v.y, _v.z, 3, 0.05, 2, 0);
-      this.audio.gunshipShot(40, _v.x, _v.y, _v.z);
-    } else {
-      fx.tracer(_v.x, _v.y, _v.z, tx, gy + 0.3, tz, speed, 1.2, 6, 3, 1.2);
-      fx.glowDot(_v.x, _v.y, _v.z, 12, 12, 8, 4, 0.1);
-      fx.lights.flash(_v.x, _v.y, _v.z, 0xffb070, 1600, 120, 0.25);
-      fx.smokePuff(_v.x, _v.y, _v.z, 6, 0.05, 3, 0);
-      this.audio.gunshipShot(105, _v.x, _v.y, _v.z);
-    }
-    this.inFlight.push({ kind, x: tx, z: tz, gy, t: dist / speed });
+    // a stream of long red-orange streaks coming down out of the dark
+    if (g.shots % 2 === 0) fx.tracer(_v.x, _v.y, _v.z, tx, gy + 0.3, tz, GAU_SPEED, 2.4, 7, 2.4, 0.7, 0.22, 0.03);
+    fx.glowDot(_v.x, _v.y, _v.z, 3.5, 10, 6, 3, 0.03);
+    this.inFlight.push({ x: tx, z: tz, gy, t: dist / GAU_SPEED });
   }
 
   updateRounds(dt) {
@@ -588,22 +575,14 @@ export class AirSupport {
       r.t -= dt;
       if (r.t > 0) continue;
       this.inFlight.splice(k, 1); k--;
-      if (r.kind === 25) {
-        fx.glowDot(r.x, r.gy + 0.7, r.z, 2.4, 8, 4.5, 1.6, 0.08);
-        fx.groundHit(r.x, r.z, true);
-        if (R() < 0.4) fx.explosion(r.x, r.gy, r.z, 0.3, { scorch: R() < 0.4, light: R() < 0.15, fires: false });
-        const kills = this.horde.explode(r.x, r.gy + 0.5, r.z, G.g25.radius, G.g25.damage, 'gunship', { push: 0.5 });
-        if (R() < 0.55) this.audio.gunshipImpact(r.x, r.z);
-        if (kills && a.onExplosionKills) a.onExplosionKills(kills, r.x, r.z, 'gunship');
-      } else if (r.kind === 40) {
-        // no camera shake from the light guns — they're a long way off
-        fx.explosion(r.x, r.gy, r.z, 0.8, { fires: R() < 0.3 });
-        const kills = this.horde.explode(r.x, r.gy + 0.5, r.z, G.g40.radius, G.g40.damage, 'gunship', { push: 0.8 });
-        this.audio.explosion(r.x, r.z, 0.8);
-        if (a.onExplosionKills) a.onExplosionKills(kills, r.x, r.z, 'gunship');
-      } else {
-        a.detonate(r.x, r.gy, r.z, 1.75, G.g105.radius, G.g105.damage, 'gunship');
-      }
+      // 25 mm HE: a flash, a fountain of dirt, a small blast that throws bodies
+      fx.glowDot(r.x, r.gy + 0.7, r.z, 3.2, 9, 5, 1.8, 0.09);
+      fx.groundHit(r.x, r.z, true);
+      if (R() < 0.45) fx.explosion(r.x, r.gy, r.z, 0.42, { scorch: R() < 0.5, light: R() < 0.1, fires: false });
+      const kills = this.horde.explode(r.x, r.gy + 0.5, r.z, G.gau.radius, G.gau.damage, 'gunship', { push: 0.9 });
+      if (R() < 0.12) this.audio.gunshipImpact(r.x, r.z);
+      if (a.onShake) a.onShake(0.05, r.x, r.z);
+      if (kills && a.onExplosionKills) a.onExplosionKills(kills, r.x, r.z, 'gunship');
     }
   }
 

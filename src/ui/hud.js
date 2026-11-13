@@ -221,8 +221,7 @@ export class HUD {
     const hot = player.overheatT > 0;
     let state = 'READY';
     let cls = '';
-    if (player.swapT > 0) { state = 'CHANGING BARREL'; cls = 'warn'; }
-    else if (hot) { state = `OVERHEATED ${player.overheatT.toFixed(1)}s — [R] SWAP BARREL`; cls = 'danger'; }
+    if (hot) { state = `OVERHEATED — COOLING ${player.overheatT.toFixed(1)}s`; cls = 'danger'; }
     else if (heat > 0.75) { state = 'BARREL HOT'; cls = 'warn'; }
     else if (player.zoom > 0.5) state = 'OPTICS';
     this.set('gs', el.gunState, state);
@@ -261,7 +260,6 @@ export class HUD {
     const support = [];
     if (arsenal.air.gs.active && !arsenal.air.gs.leaving) support.push('SPECTRE OVERHEAD');
     if (stats.gunners) support.push(`GUNNERS ${stats.gunners}`);
-    if (stats.mortar) support.push(`MORTAR`);
     if (arsenal.mines.length) support.push(`CLAYMORES ${arsenal.mines.length}`);
     const wi = arsenal.wireIntegrity();
     if (wi >= 0) support.push(`WIRE ${Math.round(wi * 100)}%`);

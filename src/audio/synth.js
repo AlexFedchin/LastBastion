@@ -248,3 +248,81 @@ export function makePower(ctx, up) {
   normalize(out, 0.9);
   return toBuffer(ctx, [out, out]);
 }
+
+// ── AC-130 GAU-12 ──────────────────────────────────────────────────────────
+/**
+ * A burst from the gunship's 25 mm Gatling as heard from the ground, a few
+ * hundred metres off: the reports run together into one tearing BRRRRT
+ * (~70 rounds a second), a spin-up stutter at the head, a rolling tail.
+ * `dur` is the trigger time in seconds; the buffer runs on for the tail.
+ */
+export function makeGau(ctx, dur, seed = 1) {
+  const sr = ctx.sampleRate, tail = 1.1, n = Math.floor((dur + tail) * sr);
+  const chans = [];
+  for (let c = 0; c < 2; c++) {
+    const R = rng(seed * 6007 + c * 17 + 5);
+    const out = new Float32Array(n);
+    let ph = 0, pulseT = 1e9, amp = 0, l1 = 0, l2 = 0, r1 = 0, r2 = 0, b1 = 0, sph = 0;
+    const aTone = lpA(1500, sr), aRum = lpA(85, sr), aBody = lpA(380, sr);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const firing = t < dur;
+      // barrels spin up to speed in the first tenth of a second
+      const rate = 70 * (1 - 0.45 * Math.exp(-t / 0.05));
+      if (firing) {
+        ph += rate / sr;
+        if (ph >= 1) { ph -= 1 + R() * 0.04; pulseT = 0; amp = 0.85 + R() * 0.3; sph = 0; }
+      }
+      // each report: a hard noisy crack over a short low thump
+      let p = 0;
+      if (pulseT < 0.03) {
+        sph += TAU * 120 / sr;
+        p = amp * (R() * Math.exp(-pulseT / 0.0035) * 1.1 + Math.sin(sph) * Math.exp(-pulseT / 0.009) * 1.3);
+      }
+      pulseT += 1 / sr;
+      l1 += aTone * (p - l1); l2 += aTone * (l1 - l2);
+      b1 += aBody * (p - b1);
+      // rumble of the stream, ringing on after the trigger lets go
+      const w = R();
+      r1 += aRum * (w - r1); r2 += aRum * (r1 - r2);
+      const env = firing ? Math.min(1, t / 0.04) : Math.exp(-(t - dur) / 0.32);
+      out[i] = l2 * 1.6 + b1 * 1.2 + r2 * 26 * env;
+    }
+    for (let i = 0; i < n; i++) out[i] = Math.tanh(out[i] * 1.5);
+    chans.push(normalize(out, 0.95));
+  }
+  return toBuffer(ctx, chans);
+}
+
+/** 25 mm HE rounds walking across the ground: a dense, rolling crackle of small blasts. */
+export function makeGauImpacts(ctx, dur, seed = 1) {
+  const sr = ctx.sampleRate, tail = 1.2, n = Math.floor((dur + tail) * sr);
+  const chans = [];
+  for (let c = 0; c < 2; c++) {
+    const R = rng(seed * 3301 + c * 11 + 9);
+    const out = new Float32Array(n);
+    const hits = [];
+    for (let t = 0.02; t < dur; t += 0.012 + Math.abs(R()) * 0.03) hits.push([Math.floor(t * sr), 0.6 + Math.abs(R()) * 0.6, 40 + Math.abs(R()) * 35]);
+    for (const [s0, a, f] of hits) {
+      let lp = 0, sp = 0;
+      const aa = lpA(900, sr);
+      for (let k = 0, m = Math.floor(0.35 * sr); k < m && s0 + k < n; k++) {
+        const t = k / sr;
+        lp += aa * (R() - lp);
+        sp += TAU * (f + 60 * Math.exp(-t / 0.02)) / sr;
+        out[s0 + k] += a * (lp * 5 * Math.exp(-t / 0.03) + Math.sin(sp) * Math.exp(-t / 0.09) * 0.8);
+      }
+    }
+    // the ground keeps rumbling for a moment
+    let r1 = 0, r2 = 0;
+    const ar = lpA(70, sr);
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      r1 += ar * (R() - r1); r2 += ar * (r1 - r2);
+      out[i] += r2 * 22 * (t < dur ? Math.min(1, t / 0.1) : Math.exp(-(t - dur) / 0.4));
+    }
+    for (let i = 0; i < n; i++) out[i] = Math.tanh(out[i] * 0.9);
+    chans.push(normalize(out, 0.95));
+  }
+  return toBuffer(ctx, chans);
+}

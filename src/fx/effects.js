@@ -75,13 +75,13 @@ export class Effects {
   }
 
   // ── Bullets ───────────────────────────────────────────────────────────────
-  tracer(x0, y0, z0, x1, y1, z1, speed = 520, bright = 1, r = 6.5, g = 3.2, b = 1.2) {
+  tracer(x0, y0, z0, x1, y1, z1, speed = 520, bright = 1, r = 6.5, g = 3.2, b = 1.2, size = 0.07, stretch = 0.011) {
     const dx = x1 - x0, dy = y1 - y0, dz = z1 - z0;
     const d = Math.sqrt(dx * dx + dy * dy + dz * dz);
     if (d < 0.5) return;
     const life = d / speed;
     const vx = dx / d * speed, vy = dy / d * speed, vz = dz / d * speed;
-    this.glow.spawn(x0, y0, z0, vx, vy, vz, life, 0.07, 0.07, PF.GLOW, r * bright, g * bright, b * bright, 1, r * bright, g * bright, b * bright, 0, 0, 0.011, 0, 0, 0);
+    this.glow.spawn(x0, y0, z0, vx, vy, vz, life, size, size, PF.GLOW, r * bright, g * bright, b * bright, 1, r * bright, g * bright, b * bright, 0, 0, stretch, 0, 0, 0);
   }
 
   muzzle(x, y, z, dx, dy, dz, scale = 1) {

@@ -102,8 +102,10 @@ class Corpses {
       // convert feet position to body centre
       this.y[i] = y + 0.9 * scale;
       this.pitch[i] = (Math.random() - 0.5) * 0.6;
-      this.pv[i] = (Math.random() - 0.5) * 16;
-      this.rv[i] = (Math.random() - 0.5) * 10;
+      // cartwheel in proportion to how hard it was thrown (heavy bodies spin slower)
+      const spin = Math.min(1.6, 0.5 + Math.hypot(vx, vy, vz) / 22) / Math.sqrt(scale);
+      this.pv[i] = (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 9) * spin;
+      this.rv[i] = (Math.random() - 0.5) * 9 * spin;
     } else {
       this.mode[i] = 1;
       // fall backwards along the shot, sometimes crumple forwards
@@ -174,7 +176,15 @@ class Corpses {
         }
       } else if (mode === 2) {
         this.vy[i] -= 22 * dt;
+        const drag = Math.exp(-0.25 * dt);
+        this.vx[i] *= drag; this.vz[i] *= drag;
         this.x[i] += this.vx[i] * dt; this.y[i] += this.vy[i] * dt; this.z[i] += this.vz[i] * dt;
+        // the wall stops them: slap against the face and slide down
+        if (wallDist(this.x[i], this.z[i]) < 0.5 && Math.abs(this.x[i]) < WORLD.WING_END) {
+          const ax = Math.abs(this.x[i]);
+          this.z[i] = wallZ(this.x[i]) - (ax <= WORLD.GATE_HALF ? 0.5 : 0.5 / WING_COS);
+          this.vx[i] *= 0.2; this.vz[i] = Math.min(0, this.vz[i]) * 0.2 - 1; this.pv[i] *= 0.3;
+        }
         this.pitch[i] += this.pv[i] * dt;
         this.roll[i] += this.rv[i] * dt;
         const floor = 0.14 * s;
@@ -266,6 +276,7 @@ export class Horde {
     this.hitFrac = new Float32Array(16);
 
     this.pending = []; // delayed explosions (bloater chains)
+    this._gibChance = -1; // set by explode() for the kill it is about to cause
 
     // rendering: living — detailed mesh close to the wall, boxes far away
     const mat = createZombieMaterial(uniforms);
@@ -438,7 +449,8 @@ export class Horde {
       this.pending.push({ x, y: y + 0.8, z, r: 5.2, dmg: 150, cause: 'bloater', t: 0.08 });
       return;
     }
-    if (explosive && type !== ZT.GIANT && (overkill > this.maxHp[i] * 1.2 || Math.random() < 0.28)) {
+    const gibP = this._gibChance >= 0 ? this._gibChance : (overkill > this.maxHp[i] * 1.2 ? 1 : 0.28);
+    if (explosive && type !== ZT.GIANT && Math.random() < gibP) {
       this.fx.gibBurst(x, y, z, s, dx, dy, dz, type === ZT.BRUTE ? 14 : 8);
       return;
     }
@@ -474,6 +486,7 @@ export class Horde {
     const cnt = this.queryRadius(x, z, radius + 0.6, this._q);
     let kills = 0;
     const push = opts.push ?? 1;
+    const kick = Math.sqrt(push);
     for (let k = 0; k < cnt; k++) {
       const i = this._q[k];
       if (this.dead[i]) continue;
@@ -484,8 +497,15 @@ export class Horde {
       const f = 1 - 0.65 * (d / radius) * (d / radius);
       const amount = dmg * f;
       const hd = Math.sqrt(ddx * ddx + ddz * ddz) + 0.001;
-      const pw = (1 - d / radius) * 14 * push + 3;
-      const killed = this.damage(i, amount, cause, ddx / hd * pw, (1 - d / radius) * 12 * push + 4, ddz / hd * pw);
+      // the dead are thrown clear: hard and high near the core, a stumble-and-fall at the rim
+      const c = 1 - d / radius;
+      const jit = 0.8 + Math.random() * 0.45;
+      const pw = (3.5 + 13 * c) * kick * jit;
+      const up = Math.min(24, (4 + 9 * c * c + 3 * c) * Math.pow(push, 0.75) * jit);
+      // only what stood right on top of it comes apart; the rest go flying whole
+      this._gibChance = c > 0.8 ? 0.65 : c > 0.55 ? 0.15 : 0.03;
+      const killed = this.damage(i, amount, cause, ddx / hd * pw, up, ddz / hd * pw);
+      this._gibChance = -1;
       if (killed) kills++;
       else {
         // stagger survivors

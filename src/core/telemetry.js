@@ -85,7 +85,7 @@ export class Telemetry {
       difficulty: run.difficulty, endless: !!run.endless, survivors: run.survivors, supplies: Math.round(run.supplies),
       plan: { duration: plan.duration, total: plan.total, surges: plan.surges, hpMul: round(plan.hpMul), speedMul: round(plan.speedMul) },
       upgrades: { ...run.upgrades }, minesOwned: run.minesOwned, unlocked,
-      stats: { gunners: stats.gunners, mortar: stats.mortar, wireBands: stats.wireBands, hmgDamage: round(stats.hmgDamage), hmgRate: round(stats.hmgRate) },
+      stats: { gunners: stats.gunners, wireBands: stats.wireBands, hmgDamage: round(stats.hmgDamage), hmgRate: round(stats.hmgRate) },
     });
   }
 

@@ -587,8 +587,9 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
         float zRim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
         totalEmissiveRadiance += zRim * uRim * (1.0 - uCorpse * 0.7);
         totalEmissiveRadiance += vZState.x * vec3(1.6, 0.25, 0.15) * (1.0 - zEyeF);
-        float zFlick = 0.55 + 0.45 * sin(uTime * 31.0 + vZSeed * 40.0);
-        totalEmissiveRadiance += clamp(vZState.y, 0.0, 1.0) * vec3(1.4, 0.45, 0.08) * zFlick * (1.0 - uCorpse * 0.8) * (0.4 + zN1);
+        // burning (living only): a steady smoulder in patches of the charring skin — no strobing,
+        // the flames drawn over them carry the motion; the dead are just char
+        totalEmissiveRadiance += clamp(vZState.y, 0.0, 1.0) * (1.0 - uCorpse) * vec3(0.75, 0.24, 0.04) * smoothstep(0.5, 0.85, zN1);
         if (vZType > 2.5 && vZType < 3.5) totalEmissiveRadiance += step(3.5, vZMat) * step(vZMat, 4.5) * vec3(0.3, 0.6, 0.05) * (0.6 + 0.4 * sin(uTime * 4.0 + vZSeed * 9.0));`)
       .replace('#include <fog_fragment>', `
         #ifdef USE_FOG
@@ -597,7 +598,7 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
           gl_FragColor.rgb = mix(gl_FragColor.rgb, lbF.rgb, lbF.a);
         #endif`);
   };
-  mat.customProgramCacheKey = () => 'zombie-v3';
+  mat.customProgramCacheKey = () => 'zombie-v4';
   return mat;
 }
 

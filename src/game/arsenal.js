@@ -1,5 +1,5 @@
 // Everything that kills besides your own gun: artillery, napalm, flares,
-// grenades, danger-close, wall gunners, the mortar pit, claymores and wire.
+// grenades, danger-close, wall gunners, riflemen, claymores and wire.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { WORLD, wallZ, wallDist, WING_COS, WING_SIN, ABILITY, CLAYMORE } from '../config.js';
@@ -45,7 +45,7 @@ export class Arsenal {
     this.audio = audio;
     this.horde = horde;
     this.env = env;
-    this.shells = [];   // artillery & mortar rounds in flight
+    this.shells = [];   // artillery rounds in flight
     this.grenades = [];
     this.flares = [];
     this.artyCd = 0;
@@ -56,8 +56,8 @@ export class Arsenal {
     this.napalmNext = WORLD.GATE_HALF + 1;
     this.flaresLeft = 0;
     this.grenadesLeft = 0;
+    this.grenadeCd = 0;
     this.dangerUsed = false;
-    this.mortarT = 4;
     this.mines = [];
     this.minesOwned = 0;
     this.onExplosionKills = null; // (kills, x, z, source)
@@ -98,8 +98,8 @@ export class Arsenal {
     this.napalmT = 0;
     this.flaresLeft = stats.flares;
     this.grenadesLeft = stats.grenades;
+    this.grenadeCd = 0;
     this.dangerUsed = false;
-    this.mortarT = 5;
     this.shells.length = 0;
     this.grenades.length = 0;
     for (const f of this.flares) this.fx.lights.release(f.light);
@@ -133,12 +133,12 @@ export class Arsenal {
     if (this.artyCd > 0) return false;
     this.artyCd = s.artyCooldown;
     const n = s.artyShells;
-    const spreadR = 6 + n * 0.7;
+    const spreadR = 8 + n * 1.1;
     for (let k = 0; k < n; k++) {
       const a = R() * Math.PI * 2, r = Math.sqrt(R()) * spreadR;
       this.shells.push({
         kind: 'arty', x: target.x + Math.cos(a) * r, z: target.z + Math.sin(a) * r,
-        t: 2.4 + k * 0.2 + R() * 0.25, r: s.artyRadius, dmg: s.artyDamage, scale: 1.45, whistled: false, streak: false,
+        t: 2.4 + k * 0.22 + R() * 0.25, r: s.artyRadius, dmg: s.artyDamage, scale: 2.2, whistled: false, streak: false,
       });
     }
     // red marker smoke on the target
@@ -222,23 +222,25 @@ export class Arsenal {
   }
 
   // ── Grenades ─────────────────────────────────────────────────────────────
-  throwGrenades(target) {
-    if (this.grenadesLeft <= 0) return false;
-    this.grenadesLeft--;
-    this.audio.throwGrenade();
+  /** One grenade at the crosshair. 'empty' / 'rearm' / true. */
+  throwGrenade(target) {
+    if (this.grenadesLeft <= 0) return 'empty';
+    if (this.grenadeCd > 0) return 'rearm';
+    const mesh = this.grenadeMeshes.find((m) => !m.visible);
+    if (!mesh) return 'rearm';
     const G = ABILITY.grenade;
+    this.grenadesLeft--;
+    this.grenadeCd = G.rearm;
+    this.audio.throwGrenade();
     // clamp range
     const cx = WORLD.CAM.x, cz = WORLD.CAM.z;
     let dx = target.x - cx, dz = target.z - cz;
     const d = Math.hypot(dx, dz);
     if (d > G.maxRange) { dx *= G.maxRange / d; dz *= G.maxRange / d; }
-    for (let k = 0; k < G.count; k++) {
-      const mesh = this.grenadeMeshes.find((m) => !m.visible);
-      if (!mesh) break;
-      mesh.visible = true;
-      const tx = cx + dx + rand(-2.2, 2.2), tz = cz + dz + rand(-2.2, 2.2);
-      this.grenades.push({ mesh, sx: rand(-0.6, 0.6), sy: WORLD.CAM.y + 0.2, sz: WORLD.CAM.z - 0.8, tx, tz, t: -k * 0.12, dur: 0.9 + Math.min(d, G.maxRange) * 0.012 });
-    }
+    const dd = Math.min(d, G.maxRange);
+    mesh.visible = true;
+    const tx = cx + dx + rand(-0.8, 0.8), tz = cz + dz + rand(-0.8, 0.8);
+    this.grenades.push({ mesh, sx: rand(0.1, 0.5), sy: WORLD.CAM.y + 0.2, sz: WORLD.CAM.z - 0.8, tx, tz, t: 0, dur: 0.8 + dd * 0.014, arc: 4 + dd * 0.12 });
     return true;
   }
 
@@ -489,24 +491,6 @@ export class Arsenal {
     this.audio.rifle(ox, oz);
   }
 
-  // ── Mortar ───────────────────────────────────────────────────────────────
-  updateMortar(dt) {
-    const s = this.stats;
-    if (!s.mortar) return;
-    this.mortarT -= dt;
-    if (this.mortarT > 0) return;
-    this.mortarT = s.mortarInterval;
-    const c = this.horde.densest(14, 170, 40, 6);
-    if (!c || c.count < 4) { this.mortarT = 1; return; }
-    for (let k = 0; k < s.mortarShells; k++) {
-      this.shells.push({
-        kind: 'mortar', x: c.x + rand(-3, 3), z: c.z + rand(-3, 3), t: 3.0 + k * 0.4, flight: 3.0 + k * 0.4,
-        sx: rand(-4, 4), sy: 6, sz: 22, r: s.mortarRadius, dmg: s.mortarDamage, scale: 0.85, whistled: false, streak: true,
-      });
-    }
-    this.audio.mortarLaunch();
-  }
-
   // ── Claymores ────────────────────────────────────────────────────────────
   placeMines() {
     // keep untriggered ones, top up from stock
@@ -649,6 +633,7 @@ export class Arsenal {
   update(dt, time) {
     const fx = this.fx;
     this.artyCd = Math.max(0, this.artyCd - dt);
+    this.grenadeCd = Math.max(0, this.grenadeCd - dt);
     this.napalmCd = Math.max(0, this.napalmCd - (this.napalmT > 0 ? 0 : dt));
 
     // marker smoke
@@ -662,18 +647,10 @@ export class Arsenal {
     for (let k = 0; k < this.shells.length; k++) {
       const s = this.shells[k];
       s.t -= dt;
-      if (s.kind === 'mortar') {
-        const u = clamp(1 - s.t / s.flight, 0, 1);
-        const x = lerp(s.sx, s.x, u), z = lerp(s.sz, s.z, u);
-        const y = lerp(s.sy, groundH(s.x, s.z), u) + Math.sin(u * Math.PI) * 70;
-        fx.glowDot(x, y, z, 0.6, 5, 2.4, 0.8, 0.08);
-        if (!s.whistled && s.t < 1.2) { s.whistled = true; this.audio.whistle(s.x, s.z, s.t); }
-      } else {
-        if (!s.whistled && s.t < 1.9) { s.whistled = true; this.audio.whistle(s.x, s.z, s.t); }
-        if (!s.streak && s.t < 0.16) {
-          s.streak = true;
-          fx.tracer(s.x - 25, 140, s.z + 60, s.x, groundH(s.x, s.z) + 0.5, s.z, 900, 1.2, 4, 2.5, 1.2);
-        }
+      if (!s.whistled && s.t < 1.9) { s.whistled = true; this.audio.whistle(s.x, s.z, s.t); }
+      if (!s.streak && s.t < 0.16) {
+        s.streak = true;
+        fx.tracer(s.x - 25, 140, s.z + 60, s.x, groundH(s.x, s.z) + 0.5, s.z, 900, 1.2, 4, 2.5, 1.2);
       }
       if (s.t <= 0) {
         this.detonate(s.x, groundH(s.x, s.z), s.z, s.scale, s.r, s.dmg, s.kind);
@@ -688,14 +665,14 @@ export class Arsenal {
       if (g.t < 0) continue;
       const u = Math.min(1, g.t / g.dur);
       const x = lerp(g.sx, g.tx, u), z = lerp(g.sz, g.tz, u);
-      const y = lerp(g.sy, groundH(g.tx, g.tz) + 0.1, u) + Math.sin(u * Math.PI) * 6;
+      const y = lerp(g.sy, groundH(g.tx, g.tz) + 0.1, u) + Math.sin(u * Math.PI) * g.arc;
       g.mesh.position.set(x, y, z);
       g.mesh.rotation.x += dt * 12;
       if (R() < 0.5) fx.glowDot(x, y, z, 0.12, 3, 1.4, 0.4, 0.05);
       if (u >= 1) {
         g.mesh.visible = false;
         const G = ABILITY.grenade;
-        this.detonate(x, groundH(x, z), z, 0.75, G.radius, G.damage, 'grenade');
+        this.detonate(x, groundH(x, z), z, 1.05, G.radius, G.damage, 'grenade');
         this.grenades.splice(k, 1); k--;
       }
     }
@@ -771,7 +748,6 @@ export class Arsenal {
     this.air.update(dt);
     this.updateGunners(dt);
     this.updateRiflemen(dt);
-    this.updateMortar(dt);
     this.updateMines(dt);
     void time;
   }

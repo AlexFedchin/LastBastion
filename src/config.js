@@ -124,20 +124,18 @@ export function baseStats() {
   return {
     // M2HB .50 cal
     hmgDamage: 34, hmgRate: 10, hmgHeat: 0.033, hmgCool: 0.2, hmgCoolIdle: 0.55,
-    hmgPen: 0, hmgIncendiary: 0, hmgHE: 0, hmgSpread: 0.0075, swapTime: 2.0, overheatLock: 3.5,
+    hmgPen: 0, hmgIncendiary: 0, hmgHE: 0, hmgSpread: 0.0075, overheatLock: 3.5,
     // 105mm battery
-    artyShells: 4, artyCooldown: 30, artyRadius: 7.5, artyDamage: 340,
+    artyShells: 4, artyCooldown: 30, artyRadius: 13, artyDamage: 950,
     // Wall gunners
     // two crewed M240s are on the wall from the start; upgrades post the other two
     gunners: 2, gunnerRate: 2.4, gunnerDamage: 15, gunnerSpread: 0.034,
-    // Mortar pit
-    mortar: 0, mortarInterval: 99, mortarShells: 1, mortarRadius: 5.5, mortarDamage: 240,
     // Napalm trench
     napalmDuration: 7, napalmCooldown: 50, napalmDps: 85,
     // Wire
     wireBands: 0, wireHp: 450,
     // Consumables per night
-    flares: 2, grenades: 3,
+    flares: 2, grenades: 8,
   };
 }
 
@@ -161,8 +159,6 @@ export const UPGRADES = [
     apply: (s, r) => { s.hmgPen = r; } },
   { id: 'hmgInc', group: 'hmg', name: 'INCENDIARY BELT', desc: 'Rounds have a 12% chance per rank to set targets ablaze.', costs: [380, 760],
     apply: (s, r) => { s.hmgIncendiary = 0.12 * r; } },
-  { id: 'hmgSwap', group: 'hmg', name: 'QUICK-CHANGE KIT', desc: 'Barrel swaps take 0.5 s less per rank.', costs: [100, 220],
-    apply: (s, r) => { s.swapTime = 2.0 - 0.5 * r; } },
   { id: 'hmgHE', group: 'hmg', name: 'HE-I MIX', desc: 'Every hit detonates. Bodies come apart.', costs: [1500],
     apply: (s, r) => { s.hmgHE = r; } },
   // Artillery
@@ -182,12 +178,10 @@ export const UPGRADES = [
   { id: 'napalm', group: 'wall', unlock: 'napalm', name: 'NAPALM TRENCH', desc: 'Burns 3 s longer and refills 10 s faster per rank.', costs: [220, 480],
     apply: (s, r) => { s.napalmDuration += 3 * r; s.napalmCooldown -= 10 * r; s.napalmDps *= 1 + 0.25 * r; } },
   // Support
-  { id: 'mortar', group: 'support', unlock: 'mortar', name: 'MORTAR PIT', desc: 'An 81 mm crew shells the thickest crowds. Ranks: faster, then twin tubes.', costs: [320, 560, 900],
-    apply: (s, r) => { s.mortar = r; s.mortarInterval = [99, 6.5, 4.5, 3.4][r]; s.mortarShells = r >= 3 ? 2 : 1; } },
   { id: 'flares', group: 'support', unlock: 'flares', name: 'FLARE CACHE', desc: '+1 illumination flare per night. Lit targets take +25% damage.', costs: [90, 180, 300],
     apply: (s, r) => { s.flares += r; } },
-  { id: 'grenades', group: 'support', unlock: 'grenades', name: 'GRENADE CRATE', desc: '+2 grenade bundles per night.', costs: [110, 240],
-    apply: (s, r) => { s.grenades += 2 * r; } },
+  { id: 'grenades', group: 'support', unlock: 'grenades', name: 'GRENADE CRATE', desc: '+4 grenades per night.', costs: [110, 240],
+    apply: (s, r) => { s.grenades += 4 * r; } },
 ];
 
 // Consumable purchase
@@ -197,7 +191,8 @@ export const SUPPLY_BONUS = (night, survivors) => 200 + 30 * night + 4 * survivo
 
 // ── Abilities ────────────────────────────────────────────────────────────────
 export const ABILITY = {
-  grenade: { radius: 4.6, damage: 170, count: 3, maxRange: 70 },
+  // thrown one at a time (G), a short re-arm between throws
+  grenade: { radius: 7.5, damage: 320, maxRange: 90, rearm: 0.45 },
   dangerClose: { cost: 3, shells: 40, radius: 7.5, damage: 420 },
   flare: { duration: 26, radius: 48, exposeMult: 1.25 },
   // T: throw a red marker flare anywhere on the field; a bomber puts a 2000 lb bomb on it
@@ -207,12 +202,12 @@ export const ABILITY = {
 
 // ── AC-130 gunship: circles the valley all night and works the field ─────────
 export const GUNSHIP = {
-  center: { x: 0, z: -135 }, radius: 245, alt: 160, speed: 68,
+  // a wide, slow orbit high over the valley: small in the sky, unhurried
+  center: { x: 0, z: -170 }, radius: 360, alt: 220, speed: 46, scale: 0.75,
   // Spectre works the far field and leaves the wall to you (minWall = metres from the wall)
-  engageMin: 9, engageMax: 17,           // seconds between engagements
-  g25: { rate: 28, burst: [1.0, 1.7], scatter: 4.5, damage: 48, radius: 2.1, minWall: 45 },
-  g40: { rounds: [3, 5], interval: 0.55, scatter: 3.5, damage: 200, radius: 4.4, minWall: 45 },
-  g105: { damage: 520, radius: 8.5, minWall: 60, minCluster: 10, chance: 0.12 },
+  engageMin: 8, engageMax: 15,           // seconds between engagements
+  // GAU-12 25 mm Gatling: bursts of fixed length (one sound take each), rounds walked across the crowd
+  gau: { rate: 40, bursts: [1.1, 1.6, 2.2], scatter: 3.2, damage: 75, radius: 2.8, minWall: 45 },
 };
 
 // ── Radio. The story is told in fragments. ───────────────────────────────────
@@ -291,7 +286,6 @@ export const COMMS = {
   hammerOff: ['Bomb impact. Hammer one-one off target, re-arming.'],
   spectreIntro: 'Bastion-7, Spectre two-one on station overhead. We\'ll work the crowds in the field — you hold that wall.',
   spectreIntro2: 'Bastion-7, Spectre two-two on station. Two-one were friends of ours. Let\'s make them pay for it.',
-  spectre105: 'Rifle, one-oh-five. Big group — splash in five.',
   spectre: [
     'Good hits, good hits. Lot of movement down there, Bastion.',
     'Shifting fire. Keep that fifty talking.',
@@ -314,14 +308,14 @@ export const BARKS = {
 // (night 1 is the fifty and the two wall gunners)
 export const UNLOCKS = {
   napalm: 2, grenades: 2, claymores: 2,
-  artillery: 3, flares: 3, mortar: 3, gunship: 3,
+  artillery: 3, flares: 3, gunship: 3,
   bomber: 4,
   dangerClose: 5,
 };
 export const isUnlocked = (key, night) => night >= (UNLOCKS[key] ?? 1);
 export const UNLOCK_INFO = {
   napalm: 'NAPALM [E]', grenades: 'GRENADES [G]', claymores: 'CLAYMORES',
-  artillery: '105MM BATTERY [Q]', flares: 'FLARES [F]', mortar: 'MORTAR PIT', gunship: 'SPECTRE',
+  artillery: '105MM BATTERY [Q]', flares: 'FLARES [F]', gunship: 'SPECTRE',
   bomber: 'BOMBER [T]', dangerClose: 'DANGER CLOSE [B]',
 };
 export const UNLOCK_LINES = {
@@ -351,7 +345,7 @@ export const ENDLESS_EVENTS = ['giant', 'stampede', 'bloaters', 'drop', 'fog', '
 export const EVENTS = {
   patrol: { count: 4, speed: [4.5, 4.9], chasers: 16, catchR: 1.05, reward: { survivors: 1, supplies: 40 } },
   civilians: { count: 6, speed: [3.8, 4.3], chasers: 20, catchR: 1.05, reward: { survivors: 1, supplies: 20 } },
-  drop: { hold: 35, tear: 1.3, maxTearing: 6, pull: 32, reward: { flares: 2, grenades: 3, supplies: 150 } },
+  drop: { hold: 35, tear: 1.3, maxTearing: 6, pull: 32, reward: { flares: 2, grenades: 6, supplies: 150 } },
   giant: { name: 'GOLIATH', hpMul: 1, scale: 4.0, smash: 2.4 },
   behemoth: { name: 'BEHEMOTH', hpMul: 1.8, scale: 5.4, smash: 1.8 },
   stampede: { brutes: 14, speed: 1.75, runners: 20 },
@@ -430,8 +424,8 @@ export function allRadioLines() {
   add(CALL.kovac, COMMS.markerOut);
   add(CALL.kovac, COMMS.dangerClose);
   for (const t of [...COMMS.hammerIn, ...COMMS.hammerGood, ...COMMS.hammerOff]) add(CALL.hammer, t);
-  for (const t of [COMMS.spectreIntro, COMMS.spectre105, ...COMMS.spectre]) add(CALL.spectre, t);
-  for (const t of [COMMS.spectreIntro2, COMMS.spectre105, ...COMMS.spectre]) add(CALL.spectre2, t);
+  for (const t of [COMMS.spectreIntro, ...COMMS.spectre]) add(CALL.spectre, t);
+  for (const t of [COMMS.spectreIntro2, ...COMMS.spectre]) add(CALL.spectre2, t);
   for (const lines of Object.values(UNLOCK_LINES)) for (const [w, t] of lines) add(w, t);
   for (const ev of Object.values(EVENT_LINES)) {
     for (const lines of Object.values(ev)) {

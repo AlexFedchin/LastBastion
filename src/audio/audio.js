@@ -13,7 +13,8 @@
 //  rises with the pressure on the wall and the tide brings in the drums.
 // ─────────────────────────────────────────────────────────────────────────────
 import { clamp, rand } from '../core/util.js';
-import { makePunch, makeSizzle, makeTick, makeBlastSub, makeProp, makeJet, makePower } from './synth.js';
+import { makePunch, makeSizzle, makeTick, makeBlastSub, makeProp, makeJet, makePower, makeGau, makeGauImpacts } from './synth.js';
+import { GUNSHIP } from '../config.js';
 
 // name -> [variants (0 = single file), decode rate]
 const SFX = {
@@ -317,6 +318,9 @@ export class AudioEngine {
       this.B.jet = [makeJet(ctx)];
       this.B.power_down = [makePower(ctx, false)];
       this.B.power_up = [makePower(ctx, true)];
+      // one take per GAU burst length the gunship fires
+      this.B.gau = GUNSHIP.gau.bursts.map((d, k) => makeGau(ctx, d, k + 1));
+      this.B.gau_hits = GUNSHIP.gau.bursts.map((d, k) => makeGauImpacts(ctx, d, k + 1));
     } catch (err) { console.warn('[audio] synth', err); }
 
     this.ready = true;
@@ -599,14 +603,6 @@ export class AudioEngine {
     }
   }
 
-  barrelSwap(swapTime = 2) {
-    const B = this.B;
-    this.play(B.latch[0], { gain: 0.55, pan: 0.15, force: true });
-    this.play(B.steam[0], { gain: 0.3, rate: 1.1, pan: 0.2, delay: 0.14, force: true });
-    this.play(B.barrel_seat[0], { gain: 0.55, pan: 0.1, delay: swapTime * 0.55, force: true });
-    this.play(B.charge[0], { gain: 0.6, pan: 0.18, delay: Math.max(0.25, swapTime * 0.82), force: true });
-  }
-
   overheat() {
     this.play(this.B.steam[0], { gain: 0.5, force: true });
     this.play(this.B.steam_long[0], { gain: 0.45, delay: 0.25, force: true });
@@ -638,7 +634,6 @@ export class AudioEngine {
     this.play(buf, { gain: 0.5, rate, x, z, ref: 80, delay: Math.max(0, flight - dur), offset: Math.max(0, dur - flight) * rate, reverb: 0.2, force: true });
   }
 
-  mortarLaunch() { this.play(this.pickVar('mortar'), { gain: 0.5, rate: rand(0.95, 1.05), x: rand(-4, 4), z: 22, ref: 30, reverb: 0.55, force: true }); }
 
   napalm(x, z) { this.play(this.B.napalm[0], { gain: 1.0, x, z, ref: 40, reverb: 0.4, force: true }); }
 
@@ -682,23 +677,20 @@ export class AudioEngine {
     this.play(buf, { gain: 0.95, rate, x, z, ref: 140, delay: Math.max(0, flight - dur), offset: Math.max(0, dur - flight) * rate, reverb: 0.3, force: true });
   }
 
-  /** A gunship weapon report, heard from the aircraft after the light arrives. */
-  gunshipShot(kind, x, y, z) {
-    if (!this.ready) return;
-    const o = { x, y, z, sos: true, reverb: 0.55 };
-    if (kind === 25) this.play(this.pickVar('hmg'), { ...o, gain: 0.55, rate: rand(0.66, 0.74), ref: 140, lowpass: 2600, key: 'gs25', max: 16 });
-    else if (kind === 40) {
-      this.play(this.pickVar('mortar'), { ...o, gain: 1.2, rate: rand(1.15, 1.3), ref: 160, force: true });
-      this.play(this.pickVar('boom_far'), { ...o, gain: 0.7, rate: rand(1.0, 1.15), ref: 160, lowpass: 1800, force: true });
-    } else {
-      this.play(this.pickVar('boom'), { ...o, gain: 1.3, rate: rand(0.78, 0.86), ref: 180, lowpass: 1500, force: true });
-      if (this.B.boom_sub[0]) this.play(this.B.boom_sub[0], { ...o, gain: 1.0, ref: 180, force: true });
-    }
+  /**
+   * A whole GAU burst (take k): the BRRRT from the aircraft, and the rolling
+   * crackle of the rounds arriving at (tx, tz) — each reaches you at the speed of sound.
+   */
+  gauBurst(k, x, y, z, tx, tz, flight) {
+    if (!this.ready || !this.B.gau) return;
+    this.play(this.B.gau[k], { x, y, z, gain: 2.6, ref: 220, sos: true, reverb: 0.75, lowpass: 2400, force: true });
+    this.play(this.B.gau_hits[k], { x: tx, z: tz, gain: 1.5, ref: 70, sos: true, delay: flight, reverb: 0.5, force: true });
+    if (this.B.boom_sub[0]) this.play(this.B.boom_sub[0], { x: tx, z: tz, gain: 0.5, rate: rand(1.2, 1.4), ref: 80, sos: true, delay: flight + 0.1, force: true });
   }
 
-  /** 25 mm HE rounds bursting in the field. */
+  /** A heavier 25 mm HE round on the ground (layered on the burst's crackle now and then). */
   gunshipImpact(x, z) {
-    this.play(this.pickVar('boom'), { gain: 0.32, rate: rand(1.7, 2.2), x, z, ref: 50, sos: true, reverb: 0.25, key: 'gsi', max: 7 });
+    this.play(this.pickVar('boom'), { gain: 0.45, rate: rand(1.3, 1.7), x, z, ref: 55, sos: true, reverb: 0.3, key: 'gsi', max: 6 });
   }
 
   // ── night events ──────────────────────────────────────────────────────────

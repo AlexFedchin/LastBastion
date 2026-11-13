@@ -99,12 +99,11 @@ of a heavy night; *Settings ▸ Quality ▸ AUTO* runs it again.
 | 🖱️ **Mouse** | Traverse the gun |
 | **LMB** | Fire |
 | **RMB** | Optics: zoom and a tighter spread |
-| **R** | Swap barrel. Resets heat instantly; takes ~2 s |
 | **Q** | 105 mm fire mission on the crosshair |
 | **E** | Ignite the napalm trench in front of the wall |
 | **F** | Illumination flare. Lit zombies take **+25 % damage** |
 | **T** | Red marker flare anywhere on the field. A bomber puts a **2000 lb bomb** on it (75 s re-arm) |
-| **G** | Grenade bundle (short range, for the wall base) |
+| **G** | Throw a grenade at the crosshair (one per press) |
 | **B** | ☠️ **Danger close.** Carpet the wall line. Costs 3 survivors. Once per night. |
 | **Esc** | Pause |
 
@@ -132,14 +131,14 @@ night is **the tide**.
 ### ✈️ Support
 
 **Spectre**, an AC-130 gunship, circles the valley all night and works the crowds in the field
-with its 25 mm, 40 mm and 105 mm guns. It won't fire close to the wall. That part is still yours.
+with its GAU-12 Gatling, in long tearing bursts. It won't fire close to the wall. That part is still yours.
 
 Your arsenal grows over the radio:
 
 ```
 NIGHT 1 ─── the fifty + two crewed M240s on the wall
 NIGHT 2 ─── napalm · grenades · claymores
-NIGHT 3 ─── 105 mm battery · flares · mortar pit · Spectre
+NIGHT 3 ─── 105 mm battery · flares · Spectre
 NIGHT 4 ─── the bomber
 NIGHT 5 ─── danger close
 ```
@@ -166,7 +165,7 @@ Every night has its own event and its own radio traffic. Objectives, a boss bar 
 | **10** | 👹 **The Behemoth**, before the last tide |
 
 **Dawn.** Survive the night and clear the field. Every kill earns supplies: spend them on the gun, the
-artillery battery, wall gunners, wire, the mortar pit, claymores, flares and grenades. Ten nights to
+artillery battery, wall gunners, wire, claymores, flares and grenades. Ten nights to
 the end of the story, then **Endless**: keep holding for as long as you last (two random events a night).
 
 Difficulties: **Recruit**, **Veteran** *(intended)*, **Last Stand**.

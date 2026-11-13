@@ -42,7 +42,6 @@ export class Player {
 
     this.heat = 0;
     this.overheatT = 0;
-    this.swapT = 0;
     this.fireAcc = 0;
     this.sinceShot = 10;
     this.bloom = 0;
@@ -243,7 +242,7 @@ export class Player {
 
   reset() {
     this.yaw = 0; this.pitch = -9 * DEG;
-    this.heat = 0; this.overheatT = 0; this.swapT = 0; this.fireAcc = 0; this.wasFiring = false;
+    this.heat = 0; this.overheatT = 0; this.fireAcc = 0; this.wasFiring = false;
     this.recoilP = 0; this.recoilY = 0; this.trauma = 0; this.bloom = 0;
     this.shots = 0; this.hits = 0;
   }
@@ -291,20 +290,10 @@ export class Player {
     this.camera.position.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z);
     this.camera.updateMatrixWorld(true);
 
-    // barrel swap
-    if (this.swapT > 0) {
-      this.swapT -= dt;
-      if (this.swapT <= 0) { this.heat = 0; this.overheatT = 0; }
-    }
-    if (controlsActive && input.hit('KeyR') && this.swapT <= 0 && this.heat > 0.15) {
-      this.swapT = stats.swapTime;
-      this.audio.barrelSwap(stats.swapTime);
-      if (this.onSwap) this.onSwap(this.heat);
-    }
     if (this.overheatT > 0) this.overheatT -= dt;
 
     // firing
-    const canFire = controlsActive && this.swapT <= 0 && this.overheatT <= 0;
+    const canFire = controlsActive && this.overheatT <= 0;
     this.firing = canFire && input.mouse(0);
     if (this.firing) {
       this.fireAcc += dt * stats.hmgRate;
@@ -338,11 +327,10 @@ export class Player {
     // gun visuals: kickback, sway, glowing barrel, belt feed
     const kick = this.gunKick || 0;
     this.gunKick = damp(kick, 0, 18, dt);
-    const swapDip = this.swapT > 0 ? Math.sin(clamp(1 - this.swapT / stats.swapTime, 0, 1) * Math.PI) : 0;
     this.gun.position.set(this.gunBase.x + (Math.random() - 0.5) * kick * 0.15,
-      this.gunBase.y - swapDip * 0.25 + (Math.random() - 0.5) * kick * 0.1,
+      this.gunBase.y + (Math.random() - 0.5) * kick * 0.1,
       this.gunBase.z + kick);
-    this.gun.rotation.set(-swapDip * 0.5 + kick * 0.6, swapDip * 0.3, swapDip * 0.25);
+    this.gun.rotation.set(kick * 0.6, 0, 0);
     const h = this.heat;
     this.barrelMat.emissive.setRGB(h * h * 2.2, h * h * h * 0.55, h * h * h * h * 0.08);
     for (const r of this.belt.children) {

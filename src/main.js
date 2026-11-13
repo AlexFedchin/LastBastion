@@ -112,7 +112,7 @@ class Game {
 
     // compile shaders before the first visible frame
     await step('checking the wire…');
-    this.menuStats = { ...baseStats(), gunners: 4, mortar: 2, mortarInterval: 5, mortarShells: 1, wireBands: 1 };
+    this.menuStats = { ...baseStats(), gunners: 4, wireBands: 1 };
     this.arsenal.startNight(this.menuStats, true);
     for (let i = 0; i < 220; i++) this.spawnMenuZombie(rand(-170, -30));
     this.horde.update(0.016, 0);
@@ -298,7 +298,6 @@ class Game {
     h.onBloaterWall = (sec, x, z) => this.onBloaterWall(sec, x, z);
     this.player.onHit = (killed, head) => { this.hud.hitmarker(killed, head); };
     this.player.onOverheat = () => { this.bark('overheat', 0.5); this.telemetry.overheat(); };
-    this.player.onSwap = (heat) => this.telemetry.swap(heat);
     this.arsenal.onExplosionKills = (kills, x, z, cause) => this.onExplosionKills(kills, x, z, cause);
     this.arsenal.air.onRadio = (who, text) => { if (this.inPlay()) this.hud.radio(who, text, true); };
     this.arsenal.onShake = (scale, x, z) => {
@@ -836,7 +835,6 @@ class Game {
       if (isUnlocked('flares', n)) keys.push('F FLARE');
       if (isUnlocked('bomber', n)) keys.push('T BOMBER MARKER');
       if (isUnlocked('grenades', n)) keys.push('G GRENADES');
-      keys.push('R SWAP BARREL');
       this.hud.hint(keys.join(' · '));
       for (const k of this.newUnlocks || []) this.hud.alert('', '', { key: 'new', item: UNLOCK_INFO[k], life: 7, priority: 1.5, format: (s) => `NEW — ${s.join(' · ')}` });
       setTimeout(() => this.hud.hint(''), 9000);
@@ -882,9 +880,9 @@ class Game {
         } else this.hud.alert(air.bomberBusy ? 'BOMBER ALREADY ON ITS RUN' : `BOMBER RE-ARMING — ${Math.ceil(air.bomberCd)}s`, '', { key: 'bomber-cd', plain: true });
       }
       if (input.hit('KeyG') && can('grenades')) {
-        const ok = this.arsenal.throwGrenades(this.player.aimPoint(ABILITY.grenade.maxRange));
-        T.ability('grenades', ok);
-        if (!ok) this.hud.alert('NO GRENADES LEFT');
+        const r = this.arsenal.throwGrenade(this.player.aimPoint(ABILITY.grenade.maxRange));
+        if (r !== 'rearm') T.ability('grenades', r === true);
+        if (r === 'empty') this.hud.alert('NO GRENADES LEFT');
       }
       if (input.hit('KeyB') && can('dangerClose')) {
         T.ability('dangerClose', !this.arsenal.dangerUsed && run.survivors > ABILITY.dangerClose.cost, { survivors: run.survivors });
