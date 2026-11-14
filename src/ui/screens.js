@@ -154,7 +154,7 @@ export class Screens {
         const btn = cost === null
           ? `<button class="buy maxed" disabled>MAXED</button>`
           : `<button class="buy" data-act="buy" data-id="${u.id}" ${run.supplies < cost ? 'disabled' : ''}>${formatInt(cost)}</button>`;
-        html += `<div class="card"><div class="nm">${u.name}</div>${btn}<div class="ds">${u.desc}</div><div class="pips">${pips}</div></div>`;
+        html += `<div class="card"><div class="nm">${u.name}</div>${btn}<div class="ds">${u.desc}<br><span class="tot">${cost === null ? 'TOTAL' : 'AFTER UPGRADE'}: ${u.total(cost === null ? rank : rank + 1)}</span></div><div class="pips">${pips}</div></div>`;
       }
       if (mines) {
         const canBuy = run.minesOwned + CLAYMORE.perBuy <= CLAYMORE.max;
