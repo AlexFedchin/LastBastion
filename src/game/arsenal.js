@@ -737,7 +737,7 @@ export class Arsenal {
     for (let k = 0; k < this.shells.length; k++) {
       const s = this.shells[k];
       s.t -= dt;
-      if (!s.whistled && s.t < 1.9) { s.whistled = true; this.audio.whistle(s.x, s.z, s.t); }
+      if (!s.whistled && s.t < 5.5) { s.whistled = true; this.audio.whistle(s.x, s.z, s.t); }
       if (!s.streak && s.t < 0.16) {
         s.streak = true;
         fx.tracer(s.x - 25, 140, s.z + 60, s.x, groundH(s.x, s.z) + 0.5, s.z, 900, 1.2, 4, 2.5, 1.2);

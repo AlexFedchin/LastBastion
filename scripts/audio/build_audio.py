@@ -147,6 +147,7 @@ def chain(src_label, o, sr):
     f.append(f'afade=t=in:d={fi}')
     f.append(f'afade=t=out:st={max(0, dur - fo):.4f}:d={fo:.4f}')
     if o.get('vol'): f.append(f'volume={o["vol"]}dB')
+    f += o.get('af', [])  # any extra ffmpeg filters (compression, EQ)
     if o.get('delay'): f.append(f'adelay={int(o["delay"] * 1000)}:all=1')
     return f'[{src_label}]' + ','.join(f)
 
@@ -272,6 +273,7 @@ def write_credits():
         m = meta.get(sid, {})
         lines.append(f'| [{m.get("title", sid)}]({m.get("url", "https://freesound.org/s/" + sid)}) | {m.get("user", "?")} | '
                      f'{", ".join(sorted(used[sid]))} |')
+    lines += ['', '"50cal.mp3" (the M2HB take-two report, hmg2) was recorded and supplied by the developer.']
     lines += [''] + ['## Radio voice-over', '', 'Every radio line is performed by [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign)', '(Qwen team, Alibaba Cloud; 1.7B VoiceDesign model and 12 Hz tokenizer), released under the', '[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), each line directed from a written', 'character description and delivery note. Some takes were re-voiced onto one reference voice per', 'character with the voice-conversion model of [Chatterbox](https://github.com/resemble-ai/chatterbox)', '(Resemble AI, MIT). The takes were processed into radio transmissions for the game by', '`scripts/audio/build_voice.py`.']
     open(os.path.join(OUT, 'CREDITS.md'), 'w', encoding='utf8').write('\n'.join(lines) + '\n')
 
@@ -304,6 +306,22 @@ for k, (body, rate) in enumerate([
 clip('sfx/hmg_tail_1', 160355, 3.36, 0.95, ch=2, fi=0.03, fo=0.55, lp=4000, target=-20, sr=32000)
 clip('sfx/hmg_tail_2', M2, 1.80, 0.9, ch=2, fi=0.03, fo=0.5, lp=1800, target=-20, sr=32000)
 
+# ── M2HB, take two: the developer's own .50 cal recording ────────────────────
+# (scripts/audio/user/50cal.mp3: one shot and its valley tail, 24 kHz). Made punchier: a slow-attack
+# compressor lets the first 12 ms through and clamps the bloom behind it, the chest thump at 70 Hz and
+# the bark at 2.6 kHz come up, and a sliver of the close BMG crack puts back the snap the recording
+# lost above 12 kHz. The game switches between hmg_* and hmg2_* (Settings → MACHINE GUN).
+U50 = os.path.join(HERE, 'user', '50cal.mp3')
+PUNCH = ['acompressor=threshold=0.025:ratio=8:attack=9:release=70:makeup=1.6:knee=2',
+         'equalizer=f=70:t=q:w=0.9:g=3.5', 'equalizer=f=2600:t=q:w=1.3:g=3', 'equalizer=f=400:t=q:w=1.5:g=-2']
+for k, (rate, fo) in enumerate([(1.0, 0.35), (0.965, 0.3), (1.035, 0.38), (0.985, 0.28)]):
+    oneshot(f'sfx/hmg2_{k + 1}', [
+        dict(src=U50, ss=0.045, t=0.85, rate=rate, fo=fo, af=PUNCH),
+        dict(src=CRACK, ss=0.0154, t=0.25, rate=rate, hp=1500, vol=-6, fo=0.1, delay=0.007),
+    ], sr=44100, ch=2, target=-11, limit=5, q=6)
+clip('sfx/hmg2_tail_1', U50, 0.3, 3.0, ch=2, fi=0.04, fo=1.6, hp=70, target=-24, sr=32000)
+clip('sfx/hmg2_tail_2', U50, 0.42, 2.8, ch=2, fi=0.04, fo=1.5, hp=70, lp=2500, rate=0.94, target=-24, sr=32000)
+
 # ── M240 wall gunners ────────────────────────────────────────────────────────
 for k, (ss, t) in enumerate([(0.5509, 0.2), (0.7789, 0.2), (1.4728, 0.2), (1.6979, 0.25), (2.0968, 0.5)]):
     clip(f'sfx/mg_{k + 1}', 238916, ss, t, sr=32000, lp=7000, fo=t * 0.5, target=-13, limit=5)
@@ -324,8 +342,14 @@ clip('sfx/boom_sub', 255111, 0, 7.7, sr=22050, lp=180, fo=3, target=-10)
 # artillery & mortar
 for k, (src, ss, t, fo) in enumerate([(529239, 0.28, 3.0, 1.6), (184382, 0.985, 1.4, 0.7), (187542, 1.98, 1.6, 0.8)]):
     clip(f'sfx/mortar_{k + 1}', src, ss, t, fo=fo, target=-14)
-for k, sid in enumerate([241837, 241838, 241839, 241840]):
-    clip(f'sfx/incoming_{k + 1}', sid, 0, 2.2, sr=32000, fi=0.08, fo=0.06, target=-14)
+# incoming: the falling shriek before the boom ("uuuuuuuu—BOOM"). The game plays the end of each
+# take so it finishes exactly when the blast reaches the ear, swelling and opening up as it drops.
+# 1-2: a long bomb whistle with the rush of air building under it (cut just before its own impact),
+# 3: a clean falling whistle, 4-5: short shell shrieks from a war-sound library.
+for k, (src, ss, t, rate) in enumerate([(398255, 0.0, 5.2, 1.0), (398255, 0.0, 5.2, 1.12), (506313, 0.0, 2.85, 1.0),
+                                        (438513, 10.25, 1.0, 1.0), (438513, 14.55, 1.0, 1.0)]):
+    oneshot(f'sfx/incoming_{k + 1}', [dict(src=src, ss=ss, t=t, rate=rate, hp=120, fi=0.3 if t > 2 else 0.05, fo=0.03)],
+            sr=32000, target=-14)
 
 # ── Molotov cocktails ───────────────────────────────────────────────────────
 # lighting the rag: a Zippo strike, then the soaked cloth catches

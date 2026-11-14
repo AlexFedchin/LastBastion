@@ -299,7 +299,7 @@ class Game {
   applySetting(k, v) {
     this.settings[k] = v;
     saveSettings(this.settings);
-    if (['master', 'music', 'sfx'].includes(k)) this.audio.applySettings(this.settings);
+    if (['master', 'music', 'sfx', 'gunSound'].includes(k)) this.audio.applySettings(this.settings);
     if (['sensitivity', 'invertY', 'fov'].includes(k)) this.applyPlayerSettings();
     if (k === 'showFps') document.getElementById('fps').textContent = '';
   }

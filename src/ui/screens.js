@@ -66,6 +66,7 @@ export class Screens {
       <label>MASTER</label>${slider('master', 0, 1, 0.01, pct)}
       <label>MUSIC</label>${slider('music', 0, 1, 0.01, pct)}
       <label>EFFECTS</label>${slider('sfx', 0, 1, 0.01, pct)}
+      <label>MACHINE GUN</label>${seg('gunSound', [['new', 'NEW'], ['classic', 'CLASSIC']])}
       <label>SHOW FPS</label>${seg('showFps', [[false, 'OFF'], [true, 'ON']])}
       ${window.bastion ? `<label>FULLSCREEN</label>${seg('fullscreen', [['toggle', 'TOGGLE (F11)']])}` : ''}
     `;

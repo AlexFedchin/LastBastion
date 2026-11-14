@@ -21,7 +21,7 @@ export const QUALITY = {
 
 export const DEFAULT_SETTINGS = {
   quality: 'high', sensitivity: 1, invertY: false, fov: 64,
-  master: 0.8, music: 0.55, sfx: 0.9, showFps: false,
+  master: 0.8, music: 0.55, sfx: 0.9, showFps: false, gunSound: 'new',
 };
 
 const SETTINGS_KEY = 'lastbastion.settings.v1';

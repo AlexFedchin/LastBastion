@@ -63,10 +63,6 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Steam/hiss](https://freesound.org/people/wubitog/sounds/234782/) | wubitog | steam |
 | [Rifle Shooting](https://freesound.org/people/qubodup/sounds/238916/) | qubodup | mg |
 | [50 Cal MG](https://freesound.org/people/qubodup/sounds/239138/) | qubodup | hmg, hmg_tail |
-| [Incoming mortar 4](https://freesound.org/people/Zagge28/sounds/241837/) | Zagge28 | incoming |
-| [Incoming mortar 3](https://freesound.org/people/Zagge28/sounds/241838/) | Zagge28 | incoming |
-| [Incoming mortar 2](https://freesound.org/people/Zagge28/sounds/241839/) | Zagge28 | incoming |
-| [Incoming mortar 1](https://freesound.org/people/Zagge28/sounds/241840/) | Zagge28 | incoming |
 | [burning air](https://freesound.org/people/sergeeo/sounds/242721/) | sergeeo | molotov_flight, molotov_whoosh |
 | [zombie sounds](https://freesound.org/people/Thanra/sounds/245466/) | Thanra | groan |
 | [Cinematic_Boom_Rhapsodize.wav](https://freesound.org/people/rhapsodize/sounds/255111/) | rhapsodize | boom_sub |
@@ -87,6 +83,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Machine_Gun_Reload.wav](https://freesound.org/people/ken788/sounds/386777/) | ken788 | latch |
 | [Fire -massive no cracking.wav](https://freesound.org/people/Aegersum/sounds/387924/) | Aegersum | fire_roar |
 | [Mutant Scream](https://freesound.org/people/scorpion67890/sounds/396797/) | scorpion67890 | shriek |
+| [Bomb Dropping.wav](https://freesound.org/people/morganpurkis/sounds/398255/) | morganpurkis | incoming |
 | [Bottle Smash](https://freesound.org/people/Roxis_Boy/sounds/401619/) | Roxis_Boy | molotov |
 | [Hooded crow.wav](https://freesound.org/people/straget/sounds/404687/) | straget | crow |
 | [bottle break.wav](https://freesound.org/people/DeezSoundzTho/sounds/407431/) | DeezSoundzTho | glass |
@@ -95,6 +92,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Zombie Moan.wav](https://freesound.org/people/mrh4hn/sounds/426628/) | mrh4hn | groan |
 | [Air Tone - School Yard - Dawn Empty City Air - Faint Bird Chirps](https://freesound.org/people/leonelmail/sounds/427840/) | leonelmail | dawn |
 | [Zombie Demon Scream](https://freesound.org/people/Wakerone/sounds/435651/) | Wakerone | shriek |
+| [G33-07-Bomb Whistle and Hit Debris.wav](https://freesound.org/people/craigsmith/sounds/438513/) | craigsmith | incoming |
 | [Angry big dog barking - Far [d15].wav](https://freesound.org/people/v23/sounds/440865/) | v23 | dog |
 | [glass - baby food jar - smashed on concrete.wav](https://freesound.org/people/Anthousai/sounds/447699/) | Anthousai | glass |
 | [Fuze Switch Flick](https://freesound.org/people/LordForklift/sounds/448394/) | LordForklift | ui_click |
@@ -106,6 +104,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [thunder.rumble.ogg](https://freesound.org/people/xUMR/sounds/486557/) | xUMR | thunder |
 | [Wet Splat 1.mp3](https://freesound.org/people/nebulasnails/sounds/495118/) | nebulasnails | gib |
 | [BODY FALL - V HVY - DIRT](https://freesound.org/people/leonelmail/sounds/504626/) | leonelmail | bodyfall |
+| [Falling Bomb.wav](https://freesound.org/people/Daleonfire/sounds/506313/) | Daleonfire | incoming |
 | [Heavy Rain Sound - Inu Etc.mp3](https://freesound.org/people/inuetc/sounds/507902/) | inuetc | rain_near |
 | [Headshot.wav](https://freesound.org/people/Pablobd/sounds/511194/) | Pablobd | headshot |
 | [Hard Swing 1](https://freesound.org/people/magnuswaker/sounds/523230/) | magnuswaker | throw |
@@ -145,6 +144,8 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Pulling and Releasing Barrett M82A1 Charging Handle to Load Round 2](https://freesound.org/people/qubodup/sounds/855599/) | qubodup | charge |
 | [torturedscream](https://freesound.org/people/mr-str4nger.d4nger/sounds/863442/) | mr-str4nger.d4nger | burn |
 | [Anguished Zombie Moans 02](https://freesound.org/people/MalikArsYasakani/sounds/876576/) | MalikArsYasakani | burn |
+
+"50cal.mp3" (the M2HB take-two report, hmg2) was recorded and supplied by the developer.
 
 ## Radio voice-over
 

@@ -18,8 +18,8 @@ import { GUNSHIP } from '../config.js';
 
 // name -> [variants (0 = single file), decode rate]
 const SFX = {
-  hmg: [4, 44100], hmg_tail: [2, 32000], mg: [5, 32000], casing: [6, 44100],
-  boom: [5, 44100], boom_far: [3, 22050], boom_sub: [0, 22050], mortar: [3, 44100], incoming: [4, 32000],
+  hmg: [4, 44100], hmg_tail: [2, 32000], hmg2: [4, 44100], hmg2_tail: [2, 32000], mg: [5, 32000], casing: [6, 44100],
+  boom: [5, 44100], boom_far: [3, 22050], boom_sub: [0, 22050], mortar: [3, 44100], incoming: [5, 32000],
   molotov: [4, 44100], molotov_light: [0, 44100], molotov_flight: [0, 32000], ignite: [0, 32000], burn: [12, 32000], flesh: [5, 32000], headshot: [3, 32000], gib: [4, 32000], bloater: [0, 32000],
   acid: [0, 32000], bodyfall: [0, 32000], groan: [27, 32000], brute: [5, 32000], shriek: [3, 32000],
   death: [4, 32000], thunder: [7, 22050], siren: [0, 32000], klaxon: [0, 32000], radio_in: [0, 22050],
@@ -448,6 +448,9 @@ export class AudioEngine {
     return { src, gain: g };
   }
 
+  /** Which M2 recording the gun uses (Settings → MACHINE GUN): 'hmg2' (new, default) or 'hmg' (classic). */
+  gunSet() { return this.settings.gunSound === 'classic' || !this.B.hmg2 ? 'hmg' : 'hmg2'; }
+
   setListener(x, z, yaw, y) { this.listenerX = x; this.listenerZ = z; this.listenerYaw = yaw; if (y !== undefined) this.listenerY = y; }
 
   /**
@@ -545,7 +548,9 @@ export class AudioEngine {
     }
     const pan = rand(-0.04, 0.04);
     // recorded report through the heavy chain
-    const report = this.play(this.pickVar('hmg'), { gain: 0.95, rate: rand(0.97, 1.03), pan, reverb: 0.2, bus: 'hmg', force: true });
+    const set = this.gunSet();
+    // the new take is mastered tighter (less bloom): lifted so its attack lands as hard as the classic's
+    const report = this.play(this.pickVar(set), { gain: set === 'hmg2' ? 1.24 : 0.95, rate: rand(0.97, 1.03), pan, reverb: 0.2, bus: 'hmg', force: true });
     // the recorded slices hold their level for ~150 ms (they're cut from continuous
     // fire), so shape each into a round: full crack, then a quick fall to a low body
     // that the next round chokes, or that rings on if this was the last one
@@ -628,12 +633,48 @@ export class AudioEngine {
     if (dist < 24 && size >= 1.2) this.ringEars(clamp(1.2 - dist / 30, 0.4, 1));
   }
 
-  /** Incoming shell: the rush of air ends on impact. */
-  whistle(x, z, flight) {
+  /**
+   * Incoming shell: the falling shriek over the base, "uuuuuuuu—BOOM". It comes from overhead
+   * (our battery fires from behind), swells and opens up as it drops, swings towards the impact,
+   * and is cut by the blast at the moment the blast reaches the ear (impact + distance / c).
+   * flight: seconds until impact. Up to four at once, so a salvo stays readable.
+   */
+  whistle(x, z, flight, { gain = 1, rate = rand(0.94, 1.06), ref = 180 } = {}) {
+    if (!this.ready) return;
+    if ((this._active.whistle || 0) >= 4) return;
     const buf = this.pickVar('incoming');
     if (!buf) return;
-    const rate = rand(0.94, 1.06), dur = buf.duration / rate;
-    this.play(buf, { gain: 0.5, rate, x, z, ref: 80, delay: Math.max(0, flight - dur), offset: Math.max(0, dur - flight) * rate, reverb: 0.2, force: true });
+    const ctx = this.ctx;
+    const dx = x - this.listenerX, dz = z - this.listenerZ, dist = Math.hypot(dx, dz);
+    const heard = flight + dist / 343;                    // when the boom arrives here
+    const dur = buf.duration / rate;
+    const play = Math.min(dur, heard);                    // how much of the clip we hear
+    const t0 = ctx.currentTime + Math.max(0, heard - dur), t1 = t0 + play;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.playbackRate.value = rate;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    const end = clamp(22000 * Math.exp(-dist / 260), 2500, 16000);
+    lp.frequency.setValueAtTime(end * 0.35, t0);
+    lp.frequency.exponentialRampToValueAtTime(end, t1);
+    const g = ctx.createGain();
+    const peak = 1.5 * gain / (1 + dist / ref);
+    g.gain.setValueAtTime(0.0001, t0);
+    g.gain.linearRampToValueAtTime(peak * 0.22, t0 + Math.min(0.25, play * 0.2));
+    g.gain.exponentialRampToValueAtTime(peak, t1 - 0.02);
+    g.gain.linearRampToValueAtTime(0, t1);                 // the blast takes over
+    const p = ctx.createStereoPanner();
+    const az = Math.atan2(dx, -dz) - this.listenerYaw;
+    p.pan.setValueAtTime(0, t0);
+    p.pan.linearRampToValueAtTime(clamp(Math.sin(az) * 0.8, -0.9, 0.9), t1);
+    src.connect(lp); lp.connect(g); g.connect(p); p.connect(this.sfx);
+    const rs = ctx.createGain(); rs.gain.value = 0.25;
+    p.connect(rs); rs.connect(this.reverbSend);
+    this.voices++;
+    this._active.whistle = (this._active.whistle || 0) + 1;
+    src.onended = () => { this.voices--; this._active.whistle--; try { p.disconnect(); } catch { /* noop */ } };
+    src.start(t0, Math.max(0, dur - play) * rate, play * rate);
   }
 
 
@@ -709,12 +750,7 @@ export class AudioEngine {
   }
 
   /** Falling bomb: a long, deep shriek that ends on impact. */
-  bombWhistle(x, z, flight) {
-    const buf = this.pickVar('incoming');
-    if (!buf) return;
-    const rate = 0.7, dur = buf.duration / rate;
-    this.play(buf, { gain: 0.95, rate, x, z, ref: 140, delay: Math.max(0, flight - dur), offset: Math.max(0, dur - flight) * rate, reverb: 0.3, force: true });
-  }
+  bombWhistle(x, z, flight) { this.whistle(x, z, flight, { gain: 1.3, rate: 0.72, ref: 220 }); }
 
   /**
    * A whole GAU burst (take k): the BRRRT from the aircraft, and the rolling
@@ -1006,7 +1042,7 @@ export class AudioEngine {
     // the valley throws the end of a burst back at you
     if (this._hmgCount > 0 && now - this._hmgLast > 0.13) {
       const k = Math.min(1, this._hmgCount / 12);
-      this.play(this.pickVar('hmg_tail'), { gain: 0.24 + 0.32 * k, rate: rand(0.86, 0.94), reverb: 0.35, bus: 'hmg', force: true });
+      this.play(this.pickVar(this.gunSet() + '_tail'), { gain: 0.24 + 0.32 * k, rate: rand(0.86, 0.94), reverb: 0.35, bus: 'hmg', force: true });
       // a long burst comes back off the hills like distant thunder
       if (this._hmgCount >= 5) this.play(this.pickVar('boom_far'), { gain: 0.12 + 0.2 * k, rate: rand(0.5, 0.6), pan: rand(-0.4, 0.4), lowpass: 900, delay: rand(0.15, 0.3), reverb: 0.8, force: true });
       this._hmgCount = 0;
