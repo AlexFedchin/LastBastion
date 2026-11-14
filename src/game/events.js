@@ -1097,10 +1097,33 @@ class Convoy {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// They find the way round: down over the rocks at the end of a wing, right onto
-// the last section of wall, where nobody was looking.
+// They find the way round: down the mountain at the end of a wing, right onto the
+// last section of wall, where nobody was looking. They show up high on the open
+// slope, pick their way down to the foot of the rocks (slowly where it is steep,
+// kicking stones loose), then run for the end of the wall.
+const wallLine = (ax) => wallZ(Math.min(ax, WORLD.WING_END)); // z of the wall line, carried on past the wing end
 class Cliffs {
   constructor(E) { this.E = E; this.P = EVENTS.cliffs; this.blocking = false; }
+
+  /** A spot on the open mountainside, P.high[0]..P.high[1] m up. */
+  slopePoint() {
+    const { P } = this;
+    for (let k = 0; k < 40; k++) {
+      const ax = rand(P.spawnX[0], P.spawnX[1]), z = wallLine(ax) - rand(P.spawnOut[0], P.spawnOut[1]);
+      const y = groundH(this.side * ax, z);
+      if (y > P.high[0] && y < P.high[1]) return [this.side * ax, z];
+    }
+    return [this.side * 110, wallLine(110) - 35];
+  }
+
+  /** Where the slope meets the valley floor, clear of the boulders at the foot of the face. */
+  footPoint() {
+    for (let k = 0; k < 30; k++) {
+      const ax = rand(82, 94), z = wallLine(ax) - rand(20, 34);
+      if (groundH(this.side * ax, z) < 1.2) return [this.side * ax, z];
+    }
+    return [this.side * 86, wallLine(86) - 28];
+  }
 
   start() {
     const { E, P } = this, g = E.g;
@@ -1109,6 +1132,7 @@ class Cliffs {
     this.total = this.left;
     this.t = 0; this.acc = 0;
     this.ids = new Set();
+    this.walk = new Map(); // id -> { foot: [x, z], base: speed, down: still on the mountain }
     E.say('cliffs', this.side < 0 ? 'left' : 'right', true);
     g.hud.alert(`THEY'RE COMING OVER THE ROCKS — ${this.side < 0 ? 'LEFT' : 'RIGHT'} WING`, 'red');
   }
@@ -1119,18 +1143,36 @@ class Cliffs {
     this.acc += dt * this.total / P.over;
     while (this.acc >= 1 && this.left > 0) {
       this.acc -= 1; this.left--;
-      const x = this.side * rand(73, 88), z = wallZ(Math.min(Math.abs(x), 72) * this.side) - rand(3, 18);
+      const [x, z] = this.slopePoint();
       const i = h.spawn(R() < 0.7 ? ZT.RUNNER : ZT.SHAMBLER, x, z, plan.hpMul, plan.speedMul);
       if (i >= 0) {
         this.ids.add(h.id[i]);
-        h.fadeIn[i] = 0;
-        // straight for the end of the wall
-        h.tgtX[i] = this.side * rand(58, 70); h.tgtZ[i] = wallZ(h.tgtX[i]) + 0.5;
-        if (R() < 0.15) g.fx.groundHit(x, z);
+        // (spawn() leaves them emerging out of the dark, not popping in)
+        const foot = this.footPoint();
+        this.walk.set(h.id[i], { foot, base: h.speed[i], down: true });
+        h.tgtX[i] = foot[0]; h.tgtZ[i] = foot[1];
       }
     }
     let alive = 0;
-    for (let i = 0; i < h.n; i++) if (!h.dead[i] && this.ids.has(h.id[i])) alive++;
+    for (let i = 0; i < h.n; i++) {
+      if (h.dead[i] || !this.ids.has(h.id[i])) continue;
+      alive++;
+      const w = this.walk.get(h.id[i]);
+      if (!w || !w.down) continue;
+      const x = h.x[i], z = h.z[i], y = groundH(x, z);
+      if (y < 1.5 || Math.hypot(w.foot[0] - x, w.foot[1] - z) < 3) {
+        // off the mountain: now for the end of the wall
+        w.down = false; h.speed[i] = w.base;
+        h.tgtX[i] = this.side * rand(58, 70); h.tgtZ[i] = wallZ(h.tgtX[i]) + 0.5;
+        continue;
+      }
+      // how steep it is where they're going: a scramble, not a sprint, down the steep parts
+      const dx = w.foot[0] - x, dz = w.foot[1] - z, d = Math.hypot(dx, dz) || 1;
+      const drop = (y - groundH(x + dx / d * 1.5, z + dz / d * 1.5)) / 1.5;
+      h.speed[i] = w.base * clamp(1.05 - Math.abs(drop) * P.steepSlow, 0.55, 1);
+      // loose stones and dust where they slip
+      if (Math.abs(drop) > 0.6 && R() < dt * 0.35) g.fx.groundHit(x, z);
+    }
     this.alive = alive;
     if (this.left === 0 && (alive === 0 || this.t > P.over + 60)) { E.report('cliffs', 'end', { total: this.total, left: alive }); return true; }
     return false;

@@ -11,6 +11,7 @@ import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js
 import { Input } from './core/input.js';
 import { QUALITY, loadSettings, saveSettings, loadSave, writeSave, clearSave } from './core/storage.js';
 import { Environment } from './world/environment.js';
+import { groundH } from './world/terrain.js';
 import { makeParticleAtlas, makeDecalAtlas } from './world/textures.js';
 import { Effects } from './fx/effects.js';
 import { Horde } from './game/horde.js';
@@ -1101,6 +1102,7 @@ class Game {
       event: (kind) => { this.events.trigger(kind); },
       freeze: (on = true) => { this.frozen = !!on; },
       radioLines: () => allRadioLines(),
+      ground: (x, z) => groundH(x, z),
       state: () => ({ state: this.state, n: this.horde.n, kills: this.run?.kills, surv: this.run?.survivors, pile: Array.from(this.horde.pileH).map((v) => +v.toFixed(2)), t: this.director.t }),
     };
     void formatInt; void sectionCenterX; void wallZ;

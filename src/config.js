@@ -372,7 +372,9 @@ export const EVENTS = {
   // survivors' truck running the road: speed m/s, slowed by the dead in front, torn by the dead on it
   convoy: { speed: 6.5, blockers: 40, chasers: 24, tear: 2.2, maxTearing: 8, reward: { survivors: 3, supplies: 120 } },
   // the dead coming down over the rocks at the end of a wing, over `over` seconds
-  cliffs: { count: 60, over: 22 },
+  // high on the mountain past the wing end (|x|, metres out from the wall line, height up the slope);
+  // steepSlow: how much a steep descent slows them (speed × 1.05 − drop·steepSlow, floor 0.55)
+  cliffs: { count: 60, over: 22, spawnX: [98, 135], spawnOut: [15, 55], high: [14, 45], steepSlow: 0.45 },
   blackout: { duration: 45 },
 };
 // '@spectre' is whichever gunship crew is up that night
