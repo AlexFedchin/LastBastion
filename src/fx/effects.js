@@ -14,6 +14,7 @@ const R = Math.random;
 export class Effects {
   constructor(scene, textures, fogUniforms, quality) {
     this.scene = scene;
+    this.fogU = fogUniforms;
     const pcap = quality.particles;
     this.glow = new ParticleSystem(scene, { capacity: pcap, additive: true, atlas: textures.particles, fogUniforms, renderOrder: 12 });
     this.smoke = new ParticleSystem(scene, { capacity: Math.floor(pcap * 0.7), additive: false, atlas: textures.particles, fogUniforms, renderOrder: 11 });
@@ -200,6 +201,12 @@ export class Effects {
     // white-hot flash
     this.glow.spawn(x, y + 1 * s, z, 0, 0, 0, 0.14, 6 * s, 14 * s, PF.GLOW, 9, 7, 5, 1, 6, 3, 1);
     this.glow.spawn(x, y + 0.5 * s, z, 0, 0, 0, 0.32, 3 * s, 16 * s, PF.RING, 3, 2.2, 1.4, 0.6, 1, 0.5, 0.2);
+    // in the fog bank: the murk itself lights up around the blast, a big soft glow you can place it by
+    const bank = this.fogU ? Math.min(1, Math.max(0, this.fogU.lbDawn.value - 2)) : 0;
+    if (bank > 0.05 && color === 0) {
+      this.glow.spawn(x, y + 3 * s, z, 0, 0, 0, 0.9, 14 * s, 30 * s, PF.GLOW, 4.2 * bank, 2.0 * bank, 0.7 * bank, 0.55, 1.6, 0.6, 0.15);
+      this.glow.spawn(x, y + 6 * s, z, 0, 1.5, 0, 2.6, 18 * s, 26 * s, PF.GLOW, 2.0 * bank, 0.8 * bank, 0.25 * bank, 0.3, 1.5, 0.5, 0.1);
+    }
     // fireball
     const nf = Math.round(16 * Math.min(1.5, s));
     for (let k = 0; k < nf; k++) {

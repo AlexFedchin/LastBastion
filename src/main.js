@@ -590,7 +590,7 @@ class Game {
   onBloaterWall(sec, x, z) {
     if (!this.inPlay()) return;
     this.damagePulse = Math.max(this.damagePulse, 0.35);
-    this.hud.alert('', 'red', { key: 'acid', item: SECTION_LABELS[sec], format: (s) => `ACID ON ${s.join(' · ')} — THE WALL IS MELTING` });
+    this.hud.alert('', 'red', { key: 'acid', item: SECTION_LABELS[sec], format: (s) => `ACID ON ${s.join(' · ')} — A RAMP IS MELTING INTO THE WALL` });
     this.fx.explosion(x, 1.5, z, 0.6, { dirt: false, scorch: false, color: 1 });
     this.audio.acid(x, z);
     this.ns.acid = (this.ns.acid || 0) + 1;

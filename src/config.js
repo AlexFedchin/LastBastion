@@ -76,13 +76,23 @@ export const HEADSHOT_FRAC = 0.83;
 export const HEADSHOT_MULT = 2.4;
 
 // Pile-up / breach
+// Piles are mounds against the wall face: a half-cone whose base widens as it grows
+// (radius R0 + SLOPE per metre of height). Height goes with the square root of the weight on it,
+// so each metre costs more bodies than the last, and the crowd drifts toward a pile that has started.
 export const PILE = {
-  HEIGHT_PER_WEIGHT: 0.18, // metres of pile per unit of zombie weight in a section
-  ZONE_BASE: 2.2,          // zombies this close to the wall count toward the pile
-  ZONE_PER_M: 0.9,         // ...plus this much per metre of pile height
+  K: 0.74,                 // height = K * sqrt(weight on the mound)  -> ~90 bodies to reach the top
+  R0: 2.6,                 // base radius of a fresh mound (m)
+  SLOPE: 1.35,             // ...plus this much per metre of height (a wide, low pyramid)
+  MIN_X: 24,               // no piles closer than this to the tower (|x|): the gunner has to see their feet
+  SEED_D: 1.3,             // a zombie this close to the wall with no mound around starts one
+  SPACING: 11,             // ...unless another mound's centre is this close along the wall
+  MAX: 24,                 // mounds at once
+  SEEK_D: 45,              // within this of the wall the crowd looks for a mound to join
+  SEEK_RANGE: 30,          // ...up to this far along the wall from where it was heading
+  RISE: 0.14,              // m/s at most: bodies have to clamber on (a mound takes ~50 s to top out)
   CLIMB_TIME: [1.6, 2.8],  // seconds on top of the pile before going over (shoot them!)
   MAX_CLIMBERS: 1,         // per section at once
-  KNOCKDOWN: 2.2,          // each breach costs a life but knocks that pile down (m)
+  KNOCKDOWN: 3.0,          // each breach costs a life but knocks that pile down (m)
   ACID_PER_BLOATER: 1.6,   // a bloater bursting on the wall melts a climbable ramp (m)
   ACID_MAX: 4.0,
   ACID_DECAY: 0.07,        // m/s

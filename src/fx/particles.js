@@ -49,6 +49,10 @@ void main() {
   float d = -p.z;
   vec4 lf = lbFog(iPos, cameraPosition, lbFogColor, lbTime, lbDawn);
   vFog = lf.a;
+  // fire is a light source: in the fog bank a blast still burns through and lights the murk,
+  // so the hottest particles (colours well above 1) shed most of the bank's veil
+  float hot = smoothstep(1.5, 4.0, max(iColor.r, max(iColor.g, iColor.b)));
+  vFog *= 1.0 - 0.75 * hot * clamp(lbDawn - 2.0, 0.0, 1.0);
   vFogCol = lf.rgb;
   // fade particles that are right in the camera's face
   vColor.a *= smoothstep(0.15, 1.2, d);

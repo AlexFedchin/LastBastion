@@ -589,7 +589,7 @@ class Giant {
     const wy = WORLD.WALL_H * 0.75;
     g.fx.explosion(x, wy, z + 0.6, 0.9, { fires: false, scorch: false });
     for (let k = 0; k < 8; k++) g.fx.gibs.spawn(x, wy, z + 0.6, rand(-5, 5), rand(4, 10), rand(1, 6), 0.3, 0.25, 0.3, 0.3, 0.29, 0.27, rand(3, 6), 0.2, 0);
-    h.acid[sec] = Math.min(h.acid[sec] + 2.2, 7.6); // smashed concrete: a ramp the others climb
+    h.addRamp(x, 2.2, 7.6); // smashed concrete: a ramp the others climb
     g.audio.giantSmash(x, z);
     g.player.addTrauma(0.4);
     g.hud.alert('', 'red', { key: 'wallbreak', item: ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'][sec], format: (s) => `${s.join(' · ')} — THE WALL IS BREAKING` });

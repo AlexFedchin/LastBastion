@@ -21,6 +21,9 @@ const SHIRTS = [
   [0.2, 0.19, 0.12], [0.14, 0.1, 0.12],
 ];
 
+const PILE_S_MIN = (PILE.MIN_X - WORLD.GATE_HALF) / WING_COS;     // nearest mound centre to the tower (m along the wall)
+const PILE_S_MAX = (WORLD.WING_END - WORLD.GATE_HALF) / WING_COS - 2;
+
 const EXPLOSIVE = { arty: 1, mortar: 1, grenade: 1, mine: 1, bloater: 1, danger: 1, he: 1, bomb: 1, gunship: 1 };
 
 const _q = new THREE.Quaternion();
@@ -253,18 +256,24 @@ export class Horde {
     this.type = new Uint8Array(N); this.dead = new Uint8Array(N);
     this.pileJit = F();
     this.fadeIn = F();
-    this._arrays = [this.id, this.x, this.y, this.z, this.yaw, this.hp, this.maxHp, this.speed, this.rate, this.phase, this.lean,
+    this.seek = F(); // countdown to looking for a mound to join (99 = already heading to one)
+    this._arrays = [this.seek, this.id, this.x, this.y, this.z, this.yaw, this.hp, this.maxHp, this.speed, this.rate, this.phase, this.lean,
       this.scale, this.radius, this.weight, this.tgtX, this.tgtZ, this.flash, this.burn, this.burnDps, this.atk, this.climb,
       this.climbDur, this.slow, this.tr, this.tg, this.tb, this.type, this.dead, this.pileJit, this.fadeIn];
 
-    // sections
-    this.secW = new Float32Array(WORLD.SECTIONS);
-    this.secCount = new Int32Array(WORLD.SECTIONS);
+    // mounds against the wall (see PILE): position along the wall (m from the tower corner) per side
+    const P = PILE.MAX;
+    this.pAct = new Uint8Array(P); this.pSide = new Int8Array(P);
+    this.pS = new Float32Array(P); this.pX = new Float32Array(P);
+    this.pH = new Float32Array(P);                                  // height (m)
+    this.pW = new Float32Array(P); this.pWn = new Float32Array(P);  // weight on it: last frame / this frame
+    this.pTop = new Float32Array(P); this.pTopN = new Float32Array(P); // highest body on it
+    this.pAcid = new Float32Array(P);                               // melted ramp under it (bloaters, giants)
+    this.pClimb = new Int32Array(P); this.pIdle = new Float32Array(P);
+    // per wall section, for the HUD / wall blood / telemetry: the worst mound in it
     this.pileH = new Float32Array(WORLD.SECTIONS);
-    this.climbers = new Int32Array(WORLD.SECTIONS);
-    this.acid = new Float32Array(WORLD.SECTIONS); // bloater acid ramps
-    this.secTop = new Float32Array(WORLD.SECTIONS);  // highest zombie on each pile (this frame / last frame)
     this.pileTop = new Float32Array(WORLD.SECTIONS);
+    this.acid = new Float32Array(WORLD.SECTIONS);
 
     // spatial grid
     this.cellStart = new Int32Array(NCELLS + 1);
@@ -343,7 +352,8 @@ export class Horde {
   clear() {
     this.n = 0; this.alive = 0;
     this.pending.length = 0;
-    this.secW.fill(0); this.pileH.fill(0); this.secCount.fill(0); this.acid.fill(0); this.secTop.fill(0); this.pileTop.fill(0);
+    this.pileH.fill(0); this.acid.fill(0); this.pileTop.fill(0);
+    this.pAct.fill(0); this.pH.fill(0); this.pW.fill(0); this.pWn.fill(0); this.pAcid.fill(0); this.pTop.fill(0); this.pTopN.fill(0);
     this.corpses.clear();
     for (const L of this.lods) L.mesh.count = 0;
     this.eyes.count = 0;
@@ -382,9 +392,10 @@ export class Horde {
     this.lean[i] = rand(T.lean[0], T.lean[1]);
     // pick a lane on the wall, mostly on the near wing
     let side = laneSide !== 0 ? laneSide : (Math.random() < 0.72 ? Math.sign(x || 1) : -Math.sign(x || 1));
-    const lx = side * rand(WORLD.GATE_HALF + 2.5, WORLD.WING_END - 3);
+    const lx = side * rand(PILE.MIN_X - 3, WORLD.WING_END - 3);
     this.tgtX[i] = lx;
     this.tgtZ[i] = wallZ(lx) - 0.2;
+    this.seek[i] = Math.random();
     this.yaw[i] = Math.atan2(lx - x, this.tgtZ[i] - z);
     this.flash[i] = 0; this.burn[i] = 0; this.burnDps[i] = 0; this.atk[i] = 0;
     this.climb[i] = 0; this.climbDur[i] = rand(PILE.CLIMB_TIME[0], PILE.CLIMB_TIME[1]);
@@ -403,9 +414,73 @@ export class Horde {
   resetLane(i, side = 0) {
     const x = this.x[i];
     const s = side || (Math.random() < 0.72 ? Math.sign(x || 1) : -Math.sign(x || 1));
-    const lx = s * rand(WORLD.GATE_HALF + 2.5, WORLD.WING_END - 3);
+    const lx = s * rand(PILE.MIN_X - 3, WORLD.WING_END - 3);
     this.tgtX[i] = lx;
     this.tgtZ[i] = wallZ(lx) - 0.2;
+    this.seek[i] = Math.random();
+  }
+
+  // ── mounds ───────────────────────────────────────────────────────────────
+  /** The mound on this side whose centre is nearest `al` (m along the wall), within `within`; -1 if none. */
+  nearestPile(side, al, within = 1e9) {
+    let best = -1, bd = within;
+    for (let p = 0; p < PILE.MAX; p++) {
+      if (!this.pAct[p] || this.pSide[p] !== side) continue;
+      const d = Math.abs(this.pS[p] - al);
+      if (d < bd) { bd = d; best = p; }
+    }
+    return best;
+  }
+
+  /** Start a mound at `al` along the wall (clamped clear of the tower). Returns its index or -1. */
+  seedPile(side, al) {
+    al = Math.min(Math.max(al, PILE_S_MIN), PILE_S_MAX);
+    for (let p = 0; p < PILE.MAX; p++) {
+      if (this.pAct[p]) continue;
+      this.pAct[p] = 1; this.pSide[p] = side; this.pS[p] = al;
+      this.pX[p] = side * (WORLD.GATE_HALF + al * WING_COS);
+      this.pH[p] = 0; this.pW[p] = 0; this.pWn[p] = 0; this.pTop[p] = 0; this.pTopN[p] = 0;
+      this.pAcid[p] = 0; this.pClimb[p] = 0; this.pIdle[p] = 0;
+      return p;
+    }
+    return -1;
+  }
+
+  /** Something broke the wall face at x (bloater acid, a giant's blows): a ramp the others climb. */
+  addRamp(x, amount, max) {
+    const ax = Math.abs(x), side = x < 0 ? -1 : 1;
+    const al = Math.min(Math.max((ax - WORLD.GATE_HALF) / WING_COS, PILE_S_MIN), PILE_S_MAX);
+    let p = this.nearestPile(side, al, PILE.SPACING);
+    if (p < 0) p = this.seedPile(side, al);
+    if (p < 0) return;
+    this.pAcid[p] = Math.min(max, this.pAcid[p] + amount);
+    const s = sectionOf(this.pX[p]);
+    if (s >= 0) this.acid[s] = Math.max(this.acid[s], this.pAcid[p]);
+  }
+
+  /** A zombie heading for the wall picks a mound that has started near its lane and goes to help. */
+  seekPile(i) {
+    const tx = this.tgtX[i], side = tx < 0 ? -1 : 1;
+    const tal = (Math.abs(tx) - WORLD.GATE_HALF) / WING_COS;
+    let best = -1, bs = 0;
+    for (let p = 0; p < PILE.MAX; p++) {
+      if (!this.pAct[p] || this.pSide[p] !== side || this.pH[p] < 0.6) continue;
+      const du = Math.abs(this.pS[p] - tal);
+      if (du > PILE.SEEK_RANGE) continue;
+      const sc = this.pH[p] + 1 - du * 0.1;
+      if (sc > bs) { bs = sc; best = p; }
+    }
+    if (best < 0) return;
+    // the bigger it is, the harder it is to ignore
+    if (Math.random() > Math.min(0.9, 0.25 + this.pH[best] / 4)) return;
+    // somewhere on the slope of what it will become, not all against the face: that's the wide base
+    const R = (PILE.R0 + Math.max(this.pH[best], 4) * PILE.SLOPE) * 0.8;
+    const du = (Math.random() * 2 - 1) * R, out = Math.random() * Math.random() * Math.sqrt(Math.max(0, R * R - du * du));
+    const al = Math.min(Math.max(this.pS[best] + du, PILE_S_MIN - 4), PILE_S_MAX);
+    const lx = side * (WORLD.GATE_HALF + al * WING_COS);
+    this.tgtX[i] = lx;
+    this.tgtZ[i] = wallZ(lx) - 0.2 - out / WING_COS;
+    this.seek[i] = 99;
   }
 
   /** Index of a zombie by id, or -1 (indices move every frame as the dead are compacted). */
@@ -479,8 +554,11 @@ export class Horde {
     this.dead[i] = 1;
     this.alive--;
     // the men on the walkway fight back and shove the pile down before they fall
-    const s = sectionOf(this.x[i]);
-    if (s >= 0) this.pileH[s] = Math.max(0, this.pileH[s] - PILE.KNOCKDOWN);
+    const ax = Math.abs(this.x[i]);
+    if (ax > WORLD.GATE_HALF) {
+      const p = this.nearestPile(this.x[i] < 0 ? -1 : 1, (ax - WORLD.GATE_HALF) / WING_COS, 14);
+      if (p >= 0) { this.pH[p] = Math.max(0, this.pH[p] - PILE.KNOCKDOWN); this.pAcid[p] *= 0.5; }
+    }
     if (this.onBreach) this.onBreach(sectionOf(this.x[i]), this.x[i], this.y[i], this.z[i]);
   }
 
@@ -629,18 +707,46 @@ export class Horde {
       }
     }
 
-    // pile heights from last frame's crowd weight
-    for (let s = 0; s < WORLD.SECTIONS; s++) {
-      this.acid[s] = Math.max(0, this.acid[s] - dt * PILE.ACID_DECAY);
-      const target = Math.min(this.secW[s] * PILE.HEIGHT_PER_WEIGHT * this.pileMul + (this.secW[s] > 0 ? this.acid[s] : 0), WORLD.WALL_H + 0.4);
-      const h = this.pileH[s];
-      const rate = target > h ? 0.7 : 2.0;
-      this.pileH[s] = h + (target - h) * (1 - Math.exp(-rate * dt));
-      this.secW[s] = 0;
-      this.secCount[s] = 0;
-      this.pileTop[s] = this.secTop[s];
-      this.secTop[s] = 0;
-      this.climbers[s] = 0;
+    // mound heights from last frame's weight on them
+    this.pileH.fill(0); this.pileTop.fill(0); this.acid.fill(0);
+    // two mounds that have grown into each other are one: the smaller folds into the bigger
+    for (let a = 0; a < PILE.MAX; a++) {
+      if (!this.pAct[a]) continue;
+      for (let b = a + 1; b < PILE.MAX; b++) {
+        if (!this.pAct[b] || this.pSide[b] !== this.pSide[a]) continue;
+        const Ra = PILE.R0 + this.pH[a] * PILE.SLOPE, Rb = PILE.R0 + this.pH[b] * PILE.SLOPE;
+        if (Math.abs(this.pS[a] - this.pS[b]) > Math.max(Ra, Rb) * 0.7) continue;
+        const [big, small] = this.pW[a] + this.pH[a] >= this.pW[b] + this.pH[b] ? [a, b] : [b, a];
+        this.pAcid[big] = Math.max(this.pAcid[big], this.pAcid[small]);
+        this.pWn[big] += this.pWn[small];
+        this.pAct[small] = 0;
+        if (small === a) break;
+      }
+    }
+    for (let p = 0; p < PILE.MAX; p++) {
+      if (!this.pAct[p]) continue;
+      this.pAcid[p] = Math.max(0, this.pAcid[p] - dt * PILE.ACID_DECAY);
+      const w = this.pWn[p];
+      const target = Math.min(PILE.K * Math.sqrt(w * this.pileMul) + (w > 0 ? this.pAcid[p] : 0), WORLD.WALL_H + 0.4);
+      const h = this.pH[p];
+      this.pH[p] = target > h ? h + Math.min((target - h) * (1 - Math.exp(-0.7 * dt)), PILE.RISE * dt) : h + (target - h) * (1 - Math.exp(-2.0 * dt));
+      this.pW[p] = w; this.pWn[p] = 0;
+      this.pTop[p] = this.pTopN[p]; this.pTopN[p] = 0;
+      this.pClimb[p] = 0;
+      if (w === 0 && this.pH[p] < 0.05 && this.pAcid[p] < 0.05) {
+        if ((this.pIdle[p] += dt) > 2) this.pAct[p] = 0;
+      } else this.pIdle[p] = 0;
+      // a melted ramp steams
+      if (this.pAcid[p] > 0.3 && this.fx && Math.random() < dt * this.pAcid[p] * 2.5) {
+        const px = this.pX[p] + rand(-1.5, 1.5);
+        this.fx.smoke.spawn(px, rand(0.3, this.pAcid[p] + 0.8), wallZ(px) - 0.5, rand(-0.3, 0.3), rand(0.4, 1.0), -0.3,
+          rand(2.5, 4), 0.8, 3.2, 2 + ((Math.random() * 4) | 0), 0.16, 0.2, 0.08, 0.35, 0.07, 0.08, 0.05, -0.15, 0.6, 0, Math.random() * 6, 0.2, 0.15);
+      }
+      const s = sectionOf(this.pX[p]);
+      if (s < 0) continue;
+      if (this.pH[p] > this.pileH[s]) this.pileH[s] = this.pH[p];
+      if (this.pTop[p] > this.pileTop[s]) this.pileTop[s] = this.pTop[p];
+      if (this.pAcid[p] > this.acid[s]) this.acid[s] = this.pAcid[p];
     }
 
     const n = this.n;
@@ -691,11 +797,35 @@ export class Horde {
       // keep off the central tower base
       if (x > -9.5 && x < 9.5 && z > -11) vx += (x >= 0 ? 2.2 : -2.2);
 
-      // separation (uses last frame's grid)
+      // which mound (if any) this one is on: the one it stands highest on
       const sec = sectionOf(x);
-      const zone = sec >= 0 ? PILE.ZONE_BASE + this.pileH[sec] * PILE.ZONE_PER_M : 0;
       const giant = type === ZT.GIANT;
-      const inPile = !giant && sec >= 0 && dist < zone;
+      const axi = x < 0 ? -x : x, side = x < 0 ? -1 : 1;
+      let pile = -1, pr = 0, pR = 1;
+      if (!giant && axi > WORLD.GATE_HALF && dist < 16) {
+        const al = (axi - WORLD.GATE_HALF) / WING_COS;
+        let best = -1;
+        for (let p = 0; p < PILE.MAX; p++) {
+          if (!this.pAct[p] || this.pSide[p] !== side) continue;
+          const du = al - this.pS[p], R = PILE.R0 + this.pH[p] * PILE.SLOPE;
+          const r = Math.sqrt(du * du + dist * dist);
+          if (r >= R) continue;
+          const sc = this.pH[p] * (1 - r / R) + 0.01 * R;
+          if (sc > best) { best = sc; pile = p; pr = r; pR = R; }
+        }
+        // at the wall with no mound around: start one (never right under the tower)
+        if (pile < 0 && dist < PILE.SEED_D && al >= PILE_S_MIN - 0.5 && this.nearestPile(side, al, PILE.SPACING) < 0) {
+          pile = this.seedPile(side, al);
+          if (pile >= 0) { pr = Math.abs(al - this.pS[pile]) + dist; pR = PILE.R0; }
+        }
+      }
+      const inPile = pile >= 0;
+      // the crowd drifts toward a mound that has started near its lane
+      if (!inPile && !giant && dist < PILE.SEEK_D && (this.seek[i] -= dt) <= 0) {
+        this.seek[i] = rand(0.8, 1.8);
+        this.seekPile(i);
+      }
+      const pS0 = inPile ? this.pS[pile] : 0;
       const ri = this.radius[i] * (inPile ? 0.62 : 1);
       let pxs = 0, pzs = 0, checks = 0;
       // on the pile a zombie stands on someone: the highest body within reach that is
@@ -712,7 +842,11 @@ export class Horde {
             if (j === i || j >= n || this.dead[j]) continue;
             const ox = x - X[j], oz = z - Z[j];
             const d2 = ox * ox + oz * oz;
-            if (inPile && d2 < 1.21 && Y[j] + 1.2 * this.scale[j] > sup && wallDist(X[j], Z[j]) > dist + 0.08) sup = Y[j] + 1.2 * this.scale[j];
+            if (inPile && d2 < 1.21 && Y[j] + 1.2 * this.scale[j] > sup && X[j] * side > WORLD.GATE_HALF) {
+              // only someone further down the mound's slope can hold this one up
+              const duj = ((X[j] < 0 ? -X[j] : X[j]) - WORLD.GATE_HALF) / WING_COS - pS0, dj = wallDist(X[j], Z[j]);
+              if (duj * duj + dj * dj > (pr + 0.08) * (pr + 0.08)) sup = Y[j] + 1.2 * this.scale[j];
+            }
             const md = ri + this.radius[j] * (inPile ? 0.62 : 1);
             if (d2 < md * md && d2 > 1e-6) {
               const d = Math.sqrt(d2);
@@ -743,7 +877,7 @@ export class Horde {
 
       // bloater reaching the wall detonates
       if (type === ZT.BLOATER && dist < 0.9 && sec >= 0) {
-        this.acid[sec] = Math.min(PILE.ACID_MAX, this.acid[sec] + PILE.ACID_PER_BLOATER);
+        this.addRamp(x, PILE.ACID_PER_BLOATER, PILE.ACID_MAX);
         if (this.onBloaterWall) this.onBloaterWall(sec, x, z);
         this.kill(i, 'wall', 0, 1, -1, false, 999);
         continue;
@@ -752,15 +886,14 @@ export class Horde {
       // pile & climbing
       let ty = 0;
       if (inPile) {
-        this.secW[sec] += this.weight[i];
-        this.secCount[sec]++;
-        const ph = this.pileH[sec];
-        const k = 1 - dist / zone;
-        ty = Math.min(ph * Math.pow(k > 0 ? k : 0, 0.75) * (0.82 + 0.18 * this.pileJit[i]), sup);
-        if (Y[i] > this.secTop[sec]) this.secTop[sec] = Y[i];
-        // only one that has really reached the top of the pile goes over
-        if (ph >= WALL_H - 0.5 && Y[i] >= WALL_H - 2.6 && dist < 1.3 + ph * 0.08 && (this.climb[i] > 0 || this.climbers[sec] < PILE.MAX_CLIMBERS)) {
-          this.climbers[sec]++;
+        this.pWn[pile] += this.weight[i];
+        const ph = this.pH[pile];
+        const k = 1 - pr / pR;
+        ty = Math.min(ph * Math.pow(k > 0 ? k : 0, 0.85) * (0.85 + 0.15 * this.pileJit[i]), sup);
+        if (Y[i] > this.pTopN[pile]) this.pTopN[pile] = Y[i];
+        // only one that has really reached the top of the mound (at the wall, at its peak) goes over
+        if (ph >= WALL_H - 0.5 && Y[i] >= WALL_H - 2.6 && pr < 1.4 + ph * 0.08 && (this.climb[i] > 0 || this.pClimb[pile] < PILE.MAX_CLIMBERS)) {
+          this.pClimb[pile]++;
           this.climb[i] += dt;
           const c = this.climb[i] / this.climbDur[i];
           ty = ty + (WALL_H + 0.9 - ty) * Math.min(1, c);
@@ -781,7 +914,7 @@ export class Horde {
       dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       this.yaw[i] += dy * (1 - Math.exp(-6 * dt));
 
-      const wantAtk = (dist < 1.6 + this.pileH[sec >= 0 ? sec : 0] * 0.12 || Y[i] > 1.0 || (giant && dist < 2.8)) ? 1 : 0;
+      const wantAtk = (dist < 1.6 + (inPile ? this.pH[pile] * 0.12 : 0) || Y[i] > 1.0 || (giant && dist < 2.8)) ? 1 : 0;
       this.atk[i] += (wantAtk - this.atk[i]) * (1 - Math.exp(-5 * dt));
     }
 
