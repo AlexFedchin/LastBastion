@@ -26,7 +26,7 @@ function offsetZ(x, d) {
 // ── people: a small articulated runner (soldier or civilian) ────────────────
 const box = (w, h, d, y = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(0, y, 0); return g; };
 
-function buildPerson() {
+export function buildPerson() {
   const mats = {
     cloth: new THREE.MeshStandardMaterial({ color: 0x3c4230, roughness: 0.9 }),
     pants: new THREE.MeshStandardMaterial({ color: 0x2f3326, roughness: 0.9 }),
@@ -55,7 +55,7 @@ function buildPerson() {
   return { root, body, torso, helmet, pack, rifle, legL, legR, armL, armR, mats };
 }
 
-const CIV_COLORS = [0x5b2a24, 0x2b3550, 0x6a6458, 0x3b4a3a, 0x7a5a2a, 0x2a2a2e, 0x6b3d5a];
+export const CIV_COLORS = [0x5b2a24, 0x2b3550, 0x6a6458, 0x3b4a3a, 0x7a5a2a, 0x2a2a2e, 0x6b3d5a];
 
 /** Dress a person as a soldier (or ready a Soldier model). */
 function dressSoldier(f) {

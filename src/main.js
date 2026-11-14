@@ -9,7 +9,7 @@ import {
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
-import { QUALITY, loadSettings, saveSettings, loadSave, writeSave, clearSave } from './core/storage.js';
+import { QUALITY, loadSettings, saveSettings, loadSave, writeSave, clearSave, loadBest, recordBest } from './core/storage.js';
 import { Environment } from './world/environment.js';
 import { groundH } from './world/terrain.js';
 import { makeParticleAtlas, makeDecalAtlas } from './world/textures.js';
@@ -28,6 +28,7 @@ import { Loader } from './ui/loader.js';
 import { loadModels, modelMesh } from './world/models.js';
 import { setSoldierLamps } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
+import { Ending } from './game/ending.js';
 
 const SECTION_LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
 const params = new URLSearchParams(location.search);
@@ -117,6 +118,7 @@ class Game {
     this.hud = new HUD();
     this.screens = new Screens(this);
     this.chronicle = new Chronicle(this);
+    this.ending = new Ending(this);
     this.input = new Input(canvas);
 
     this.wireEvents();
@@ -338,6 +340,7 @@ class Game {
     document.addEventListener('keydown', (e) => {
       this.audio.init();
       if (this.chronicle.active && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.chronicle.advance(); return; }
+      if (this.state === 'ending' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.ending.skipPress(); return; }
       if (e.code === 'Escape') {
         if (this.state === 'paused' && performance.now() - (this.pausedAt || 0) > 350) this.resume();
         else if (this.screens.current === 'settings' || this.screens.current === 'howto') this.onAction('back');
@@ -368,6 +371,7 @@ class Game {
     this.letterboxTarget = 0;
     if (this.events) this.events.reset();
     if (this.chronicle) this.chronicle.stop();
+    if (this.ending) this.ending.stop();
     this.audio.stopVoice();
     this.arsenal.startNight(this.menuStats, true);
     this.env.setStory(1);
@@ -407,7 +411,9 @@ class Game {
       case 'shop-menu': writeSave(this.run); this.enterMenu(); break;
       case 'retry': { const s = loadSave(); if (s) this.deploy(s, () => this.startRun(s)); break; }
       case 'menu': this.enterMenu(); break;
-      case 'endless': this.run.endless = true; writeSave(this.run); this.openShop(); break;
+      case 'endless': this.run.endless = true; writeSave(this.run); this.audio.setMusicMode('dawn'); this.openShop(); break;
+      case 'ending-skip': this.ending.skipPress(); break;
+      case 'victory-new': this.enterMenu(); this.screens.show('new'); break;
       case 'chronicle-next': this.chronicle.advance(); break;
       default: break;
     }
@@ -428,6 +434,7 @@ class Game {
 
   startRun(save) {
     this.run = JSON.parse(JSON.stringify(save));
+    this.newRecord = false;
     this.run.totals = this.run.totals || { shots: 0, hits: 0, headshots: 0 };
     this.run.log = this.run.log || [];
     // saves from before the Molotovs: the napalm upgrade carries over to the bottles
@@ -653,6 +660,8 @@ class Game {
     run.minesOwned = this.arsenal.minesOwned;
     run.atShop = true;
     writeSave(run);
+    // endless: every dawn past the seventy-second hour counts toward the record
+    if (run.endless && survived > FINAL_NIGHT) this.newRecord = recordBest(survived - FINAL_NIGHT, run.kills, run.difficulty) || this.newRecord;
     this.telemetry.endNight('survived');
     this.hud.announce('DAWN', `NIGHT ${String(survived).padStart(2, '0')} SURVIVED · ${run.survivors} ALIVE`, 5);
     this.hud.radio(CALL.kovac, pick(BARKS.dawn), true);
@@ -748,6 +757,7 @@ class Game {
       case 'dawn': this.updateDawn(dt, rdt); break;
       case 'shop': this.updateShop(dt, rdt); break;
       case 'fallen': this.updateFallen(dt, rdt); break;
+      case 'ending': this.ending.update(dt, rdt); break;
       case 'victory': this.updateShop(dt, rdt); break;
       default: break;
     }
@@ -1039,14 +1049,27 @@ class Game {
     if (this.chronicle.active) this.chronicle.update(rdt);
     else this.hud.update(rdt, this);
     if (this.stateT > 11 && !this.chronicle.active) {
-      if (this.victory) {
-        this.state = 'victory';
-        this.hud.show(false);
-        this.screens.buildVictory(this.run);
-        this.screens.show('victory');
-        this.audio.setMusicMode('victory');
-      } else this.openShop();
+      if (this.victory) this.playEnding();
+      else this.openShop();
     }
+  }
+
+  /** The seventy-second hour is over: the ending, then the choice of endless nights or a new campaign. */
+  playEnding() {
+    this.state = 'ending';
+    this.stateT = 0;
+    this.ending.start();
+  }
+
+  onEndingDone() {
+    this.state = 'victory';
+    this.stateT = 0;
+    this.hud.show(false);
+    this.letterboxTarget = 0;
+    this.player.gun.visible = true;
+    this.screens.buildVictory(this.run, loadBest());
+    this.screens.show('victory');
+    this.audio.setMusicMode('victory');
   }
 
   updateShop(dt, rdt) {
@@ -1074,7 +1097,7 @@ class Game {
       this.hud.show(false);
       this.hud.radioQueue.length = 0;
       const epitaph = pick(CHRONICLE.fallen);
-      this.screens.buildGameOver(this.run, !!loadSave(), epitaph);
+      this.screens.buildGameOver(this.run, !!loadSave(), epitaph, this.run.endless ? { best: loadBest(), fresh: this.newRecord } : null);
       this.screens.show('over');
       this.audio.narrate(CALL.narrator, epitaph, 1.2);
     }
@@ -1100,6 +1123,8 @@ class Game {
         if (!render) this.render(stepDt);
       },
       event: (kind) => { this.events.trigger(kind); },
+      ending: (seek = 0) => { this.victory = true; if (this.state !== 'ending') this.playEnding(); this.ending.t = seek; for (const c of this.ending.cues) c.done = c.at < seek; },
+      endingInfo: () => ({ t: this.ending.t, end: this.ending.end, shots: this.ending.shots, cues: this.ending.cues.map((c) => [c.at, c.dur, c.shot || '']) }),
       freeze: (on = true) => { this.frozen = !!on; },
       radioLines: () => allRadioLines(),
       ground: (x, z) => groundH(x, z),

@@ -1,9 +1,15 @@
 // Menus, settings, the dawn resupply shop and the end screens.
-import { DIFFICULTY, UPGRADES, UPGRADE_GROUPS, CLAYMORE, FINAL_NIGHT, isUnlocked } from '../config.js';
+import { DIFFICULTY, UPGRADES, UPGRADE_GROUPS, CLAYMORE, FINAL_NIGHT, UNLOCKS, isUnlocked } from '../config.js';
 import { QUALITY } from '../core/storage.js';
 import { formatInt } from '../core/util.js';
 
 const $ = (id) => document.getElementById(id);
+
+/** The endless record, as a line for the end screens. */
+function recordText(b) {
+  if (!b) return 'NO RECORD YET';
+  return `RECORD <b>${b.nights} ${b.nights === 1 ? 'NIGHT' : 'NIGHTS'}</b> · ${formatInt(b.kills)} KILLS${DIFFICULTY[b.difficulty] ? ` · ${DIFFICULTY[b.difficulty].label}` : ''}`;
+}
 
 // What an upgrade gives: the next level's total in gold after the current one ("+20% → +40%
 // bullet damage"). When the two read the same apart from their numbers, only the numbers that
@@ -158,14 +164,21 @@ export class Screens {
     // upgrades
     const wrap = $('shop-upgrades');
     let html = '';
-    // only what's in play by the coming night (see UNLOCKS)
-    const avail = (u) => !u.unlock || isUnlocked(u.unlock, n);
+    // everything is listed; a tool's upgrades open at the first dawn after you have had it for a
+    // night (see UNLOCKS), until then the card is greyed out with the night it arrives
+    const had = (key) => !key || isUnlocked(key, n - 1);
+    const arrives = (key) => (UNLOCKS[key] === n ? 'ARRIVES TONIGHT · UPGRADES FROM THE NEXT DAWN' : `ARRIVES ON NIGHT ${UNLOCKS[key]}`);
     for (const grp of UPGRADE_GROUPS) {
-      const items = UPGRADES.filter((x) => x.group === grp.id && avail(x));
-      const mines = grp.id === 'support' && isUnlocked('claymores', n);
+      const items = UPGRADES.filter((x) => x.group === grp.id);
+      const mines = grp.id === 'support';
       if (!items.length && !mines) continue;
       html += `<div class="ugroup"><h3>${grp.title}</h3><div class="gsub">${grp.sub}</div>`;
       for (const u of items) {
+        if (!had(u.unlock)) {
+          const pips = u.costs.map(() => '<i></i>').join('');
+          html += `<div class="card locked"><div class="nm">${u.name}</div><button class="buy" disabled>LOCKED</button><div class="ds">${u.desc}<br><span class="lock">${arrives(u.unlock)}</span></div><div class="pips">${pips}</div></div>`;
+          continue;
+        }
         const rank = run.upgrades[u.id] || 0;
         const max = u.costs.length;
         const cost = rank < max ? u.costs[rank] : null;
@@ -175,7 +188,11 @@ export class Screens {
           : `<button class="buy" data-act="buy" data-id="${u.id}" ${run.supplies < cost ? 'disabled' : ''}>${formatInt(cost)}</button>`;
         html += `<div class="card"><div class="nm">${u.name}</div>${btn}<div class="ds">${u.desc}<br><span class="tot">${upgradeTotal(u, rank, cost === null)}</span></div><div class="pips">${pips}</div></div>`;
       }
-      if (mines) {
+      // claymores are bought, not upgraded: on sale the dawn before the night they arrive
+      if (mines && !isUnlocked('claymores', n)) {
+        html += `<div class="card locked"><div class="nm">CLAYMORES ×${CLAYMORE.perBuy}</div><button class="buy" disabled>LOCKED</button>
+          <div class="ds">Buried in the approach. Detonate on contact. Persist until used.<br><span class="lock">ON SALE THE DAWN BEFORE NIGHT ${UNLOCKS.claymores}</span></div><div class="pips"></div></div>`;
+      } else if (mines) {
         const canBuy = run.minesOwned + CLAYMORE.perBuy <= CLAYMORE.max;
         html += `<div class="card"><div class="nm">CLAYMORES ×${CLAYMORE.perBuy}</div>
           <button class="buy" data-act="buy-mines" ${!canBuy || run.supplies < CLAYMORE.cost ? 'disabled' : ''}>${CLAYMORE.cost}</button>
@@ -188,17 +205,23 @@ export class Screens {
   }
 
   // ── End screens ──────────────────────────────────────────────────────────
-  buildGameOver(run, hasSave, epitaph) {
+  buildGameOver(run, hasSave, epitaph, endless = null) {
     // the narrator's last words over the wall (voiced), or the old epitaph
     $('over-text').textContent = epitaph || `${formatInt(run.kills)} of them will never walk again. It was not enough. On night ${run.night}, the last of Bastion-7 went quiet, and the valley belonged to the dead.`;
     $('over-stats').innerHTML = this.statsHtml(run);
     $('btn-retry').disabled = !hasSave;
+    // endless: how far past the seventy-second hour, against the record
+    const held = Math.max(0, run.night - 1 - FINAL_NIGHT);
+    $('over-record').innerHTML = endless
+      ? `ENDLESS · ${held} ${held === 1 ? 'NIGHT' : 'NIGHTS'} PAST THE SEVENTY-SECOND HOUR · ${endless.fresh ? '<b>NEW RECORD</b>' : recordText(endless.best)}`
+      : '';
   }
 
-  buildVictory(run) {
-    $('victory-pre').textContent = `DAY ${run.night} · 0614 HOURS · ${DIFFICULTY[run.difficulty].label}`;
-    $('victory-text').textContent = `Seventy-two hours. ${run.survivors} souls still breathing behind the wall. The relief column never came. The city has stopped burning — there is nothing left in it to burn. The radio is silent. Tonight, they will come down the valley again.`;
+  buildVictory(run, best) {
+    $('victory-pre').textContent = `THE END · SEVENTY-TWO HOURS · ${DIFFICULTY[run.difficulty].label}`;
+    $('victory-text').textContent = `${run.survivors} of the garrison lived to see the seventy-second hour. ${formatInt(run.kills)} of the dead never walked again. The wall is still standing.`;
     $('victory-stats').innerHTML = this.statsHtml(run);
+    $('victory-record').innerHTML = best ? recordText(best) : '';
   }
 
   statsHtml(run) {

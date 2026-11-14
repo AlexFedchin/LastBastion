@@ -356,3 +356,35 @@ table.keys td:first-child { font-family: var(--mono); color: var(--amber); width
 @keyframes chrPulse { 50% { opacity: 0.35; } }
 .report .chron { margin-top: 20px; }
 .report .chron p { font-family: Georgia, "Palatino Linotype", "Times New Roman", serif; font-style: italic; font-size: 14px; line-height: 1.6; color: var(--bone-dim); margin-bottom: 8px; }
+
+/* ── the ending (src/game/ending.js) ─────────────────────────────────────── */
+.cine-screen { background: transparent; cursor: default; animation: none !important; }
+.cine-sub { position: absolute; left: 50%; bottom: 4.5vh; transform: translateX(-50%); width: min(900px, 86vw); text-align: center;
+  opacity: 0; transition: opacity 0.9s ease; }
+.cine-sub.on { opacity: 1; }
+.cine-sub .who { font-family: var(--mono); font-size: 12px; letter-spacing: 0.35em; color: var(--amber); margin-bottom: 8px; }
+.cine-sub p { font-size: clamp(16px, 1.45vw, 21px); line-height: 1.5; color: var(--bone); text-shadow: 0 1px 10px rgba(0,0,0,0.95), 0 0 2px #000; }
+.cine-sub.narr p { font-family: Georgia, "Palatino Linotype", "Book Antiqua", "Times New Roman", serif; font-style: italic; }
+.cine-title { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; pointer-events: none;
+  opacity: 0; filter: blur(8px); transform: scale(1.04); transition: opacity 3.2s ease, filter 3.2s ease, transform 9s ease-out; }
+.cine-title.on { opacity: 1; filter: none; transform: none; }
+.cine-title h1 { font-size: clamp(56px, 8.5vw, 132px); font-weight: 700; letter-spacing: 0.16em; line-height: 1; color: var(--bone);
+  text-shadow: 0 0 50px rgba(255,140,50,0.28), 0 4px 0 rgba(0,0,0,0.6); }
+.cine-rule { width: 220px; height: 1px; margin-top: 22px; background: linear-gradient(90deg, transparent, var(--amber), transparent); }
+.cine-skip { position: absolute; right: 36px; bottom: 30px; font-size: 12px; letter-spacing: 0.35em; color: var(--bone-dim); opacity: 0; transition: opacity 0.4s; }
+.cine-skip.on { opacity: 0.85; }
+.end-screen h1.gold { color: var(--bone); text-shadow: 0 0 34px rgba(224,165,66,0.35); }
+.endless-pitch { margin: 18px auto 6px; max-width: 520px; font-size: 15px; line-height: 1.5; color: var(--bone-dim); }
+.end-screen .record { font-family: var(--mono); font-size: 12px; letter-spacing: 0.25em; color: var(--amber); margin: 10px 0 4px; min-height: 1em; }
+.end-screen .record b { color: #ffcf4a; }
+.card.locked { opacity: 0.42; filter: grayscale(0.85); }
+.card.locked .buy { border-style: dashed; }
+.card .ds .lock { color: var(--bone-dim); font-family: var(--mono); font-size: 11px; letter-spacing: 0.12em; }
+/* short windows: the end panels shrink to fit instead of losing their buttons */
+.end-screen .panel { max-height: 96vh; overflow-y: auto; }
+@media (max-height: 760px) {
+  .end-screen h1 { font-size: 44px; margin: 4px 0 10px; }
+  .end-screen .epitaph { margin-bottom: 12px !important; font-size: 13px !important; }
+  .end-screen .stats { margin-bottom: 8px; }
+  .endless-pitch { margin: 8px auto 2px; font-size: 13px; }
+}

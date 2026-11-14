@@ -112,6 +112,20 @@ export class Soldier {
     this.body.position.y = Math.abs(c) * (carry ? 0.03 : 0.06) - 0.04;
   }
 
+  /** An unhurried walk, rifle slung low; ph is the stride phase. */
+  walk(ph) {
+    this.reset();
+    const s = Math.sin(ph), c = Math.cos(ph);
+    this.turn('LeftUpLeg', X, -s * 0.36 - 0.04);
+    this.turn('RightUpLeg', X, s * 0.36 - 0.04);
+    this.turn('LeftLeg', X, Math.max(0, -c) * 0.6 + 0.06);
+    this.turn('RightLeg', X, Math.max(0, c) * 0.6 + 0.06);
+    const bend = 0.1 // upright: the rifle hangs muzzle-down on its sling;
+    for (const sp of ['Spine', 'Spine1', 'Spine2']) this.turn(sp, X, bend / 3);
+    this.turn('Spine', Y, s * 0.06);
+    this.body.position.y = Math.abs(c) * 0.025 - 0.02;
+  }
+
   /** Bent over the crate, working the straps. */
   work(t) {
     this.reset();

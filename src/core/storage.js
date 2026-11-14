@@ -60,3 +60,14 @@ export function writeSave(run) {
   });
 }
 export function clearSave() { try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ } }
+
+// The endless record: the most nights held past the seventy-second hour (kills break ties).
+const BEST_KEY = 'lastbastion.best.v1';
+export function loadBest() { return read(BEST_KEY); }
+/** Record an endless run's progress; returns true if it is a new record. */
+export function recordBest(nights, kills, difficulty) {
+  const b = read(BEST_KEY);
+  if (b && (b.nights > nights || (b.nights === nights && b.kills >= kills))) return false;
+  write(BEST_KEY, { nights, kills, difficulty, at: Date.now() });
+  return true;
+}

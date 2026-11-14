@@ -275,7 +275,7 @@ export const RADIO = {
 export const CALL = {
   kovac: 'SGT. KOVAC', aran: 'PVT. ARAN', command: 'COMMAND', unknown: 'UNKNOWN', battery: 'BATTERY',
   hammer: 'HAMMER 1-1', spectre: 'SPECTRE 2-1', spectre2: 'SPECTRE 2-2', hollis: 'LT. HOLLIS', reach: 'REACH 3-1', survivor: 'SURVIVOR',
-  narrator: 'NARRATOR',
+  narrator: 'NARRATOR', ridge: 'THE RIDGE', quarry: 'THE QUARRY',
 };
 export const COMMS = {
   battery: {
@@ -628,6 +628,23 @@ export const CHRONICLE = {
   ],
 };
 
+// ── The ending: after the seventy-second hour (src/game/ending.js stages it) ──
+// Each cue is one voiced line; `radio` lines come over the set, the rest is the
+// narrator. `shot` names the camera shot that starts with the cue, `gap` the
+// silence before it, `title` brings up the title card as the line ends.
+export const ENDING = [
+  { shot: 'gun', who: CALL.narrator, gap: 3, text: 'Seventy-two hours, Command had said. Now the hours had run out, and the radio stayed silent. There was no one left on the other end.' },
+  { shot: 'radio', who: CALL.narrator, text: 'Kovac kept broadcasting anyway. Every hour, on every channel the set could reach, the same four words.' },
+  { who: CALL.kovac, radio: true, text: 'This is Bastion-7. Bastion-7 is holding.' },
+  { shot: 'field', who: CALL.ridge, radio: true, gap: 2.4, text: "Bastion-7... we hear you. We can see your lights from the ridge. Please don't shoot. We're coming down." },
+  { who: CALL.quarry, radio: true, text: 'Bastion-7, there are forty of us at the old quarry. Is it true? Is the wall still standing?' },
+  { who: CALL.kovac, radio: true, text: "It's standing. Keep to the road and come in slow. We've got you covered." },
+  { shot: 'road', who: CALL.narrator, gap: 1.4, text: 'They came all through that morning. Out of the hills, up the road, out of the dead city. Families. Stragglers. Soldiers with no unit left to go back to. The gate that had stayed shut for ten nights stood open until noon.' },
+  { shot: 'gate', who: CALL.narrator, text: 'Command had called us Bastion-7, one light in a line of many. But there was no line anymore. There were no other lights.' },
+  { shot: 'crane', who: CALL.narrator, gap: 1.2, text: 'By the time the dead came down the valley again, nobody called it Bastion-7. They called it the Last Bastion.', title: true },
+  { who: CALL.narrator, gap: 2.2, text: 'And for as long as there was anyone left to man the wall... it held.' },
+];
+
 /** Every chronicle fragment, flat. */
 export function chronicleLines() {
   const C = CHRONICLE, out = [];
@@ -657,5 +674,6 @@ export function allRadioLines() {
     }
   }
   for (const t of chronicleLines()) add(CALL.narrator, t);
+  for (const c of ENDING) add(c.who, c.text);
   return out;
 }

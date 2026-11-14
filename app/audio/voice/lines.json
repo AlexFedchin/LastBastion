@@ -120,6 +120,11 @@
   "file": "narrator_a22efb7df9.ogg",
   "sr": 24000
  },
+ "NARRATOR|And for as long as there was anyone left to man the wall... it held.": {
+  "dur": 5.18,
+  "file": "narrator_2c7eb57b6d.ogg",
+  "sr": 24000
+ },
  "NARRATOR|And then it came — the biggest of them all. It reached our wall, and for a long moment I thought the whole line would come down with it. It didn't. It fell.": {
   "dur": 13.7,
   "file": "narrator_1cafff97fd.ogg",
@@ -185,6 +190,16 @@
   "file": "narrator_247ed528aa.ogg",
   "sr": 24000
  },
+ "NARRATOR|By the time the dead came down the valley again, nobody called it Bastion-7. They called it the Last Bastion.": {
+  "dur": 8.38,
+  "file": "narrator_60c79aa5e2.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Command had called us Bastion-7, one light in a line of many. But there was no line anymore. There were no other lights.": {
+  "dur": 10.036,
+  "file": "narrator_9de8f4b4b9.ogg",
+  "sr": 24000
+ },
  "NARRATOR|Dawn. We counted the living, then the dead, and then we stopped counting.": {
   "dur": 7.02,
   "file": "narrator_d46968dfe0.ogg",
@@ -228,6 +243,11 @@
  "NARRATOR|In the fog, we only knew a man was gone when he stopped answering. We called their names until dawn.": {
   "dur": 6.7,
   "file": "narrator_9a77ca344e.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Kovac kept broadcasting anyway. Every hour, on every channel the set could reach, the same four words.": {
+  "dur": 9.663,
+  "file": "narrator_fa27bb56bc.ogg",
   "sr": 24000
  },
  "NARRATOR|No one was left to write it down. The gun fell silent before the dawn, and in the morning, the valley belonged to the dead.": {
@@ -313,6 +333,11 @@
  "NARRATOR|Recon Two ran the last mile under our guns. Not all of them reached the gate, and the ones who did never spoke of the others.": {
   "dur": 8.468,
   "file": "narrator_3b2bf21e2a.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Seventy-two hours, Command had said. Now the hours had run out, and the radio stayed silent. There was no one left on the other end.": {
+  "dur": 10.879,
+  "file": "narrator_be1acc4207.ogg",
   "sr": 24000
  },
  "NARRATOR|Some of the men who went down under the stampede never got back up. We heard the brutes long after they had stopped.": {
@@ -473,6 +498,11 @@
  "NARRATOR|There were no more orders and no more promises. Only the wall, the night, and the gun.": {
   "dur": 8.919,
   "file": "narrator_c6cfd049fb.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|They came all through that morning. Out of the hills, up the road, out of the dead city. Families. Stragglers. Soldiers with no unit left to go back to. The gate that had stayed shut for ten nights stood open until noon.": {
+  "dur": 19.098,
+  "file": "narrator_c67a7a1669.ogg",
   "sr": 24000
  },
  "NARRATOR|They came out of the fog in columns, and the gun cut them down before they ever saw the wall.": {
@@ -711,6 +741,10 @@
   "dur": 4.72,
   "file": "sgt_kovac_130448e432.ogg"
  },
+ "SGT. KOVAC|It's standing. Keep to the road and come in slow. We've got you covered.": {
+  "dur": 5.88,
+  "file": "sgt_kovac_fa4663dcfd.ogg"
+ },
  "SGT. KOVAC|Keep it up!": {
   "dur": 1.0,
   "file": "sgt_kovac_0f3cf8545b.ogg"
@@ -859,6 +893,10 @@
   "dur": 4.28,
   "file": "sgt_kovac_bcf07e797c.ogg"
  },
+ "SGT. KOVAC|This is Bastion-7. Bastion-7 is holding.": {
+  "dur": 3.76,
+  "file": "sgt_kovac_a80ca14966.ogg"
+ },
  "SGT. KOVAC|Truck on the road! Clear a path for it — shoot whatever is in front of it!": {
   "dur": 4.8,
   "file": "sgt_kovac_fae0c8aac3.ogg"
@@ -966,6 +1004,14 @@
  "SURVIVOR|No! No, not him — keep running!": {
   "dur": 3.249,
   "file": "survivor_b7eb732e0c.ogg"
+ },
+ "THE QUARRY|Bastion-7, there are forty of us at the old quarry. Is it true? Is the wall still standing?": {
+  "dur": 7.32,
+  "file": "the_quarry_3d820a9524.ogg"
+ },
+ "THE RIDGE|Bastion-7... we hear you. We can see your lights from the ridge. Please don't shoot. We're coming down.": {
+  "dur": 9.1,
+  "file": "the_ridge_7c692398e5.ogg"
  },
  "UNKNOWN|...anyone on this frequency... we're at the overpass, we have children with us, please—": {
   "dur": 6.022,

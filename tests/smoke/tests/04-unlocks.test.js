@@ -19,14 +19,19 @@ module.exports = {
       t.eq(s.rows, expect[n], `night ${n} ability bar`);
       t.eq(s.gunship, n >= 3, `night ${n} gunship on station`);
     }
-    // the shop only offers what the coming night has
+    // the shop lists everything; a tool's upgrades open the dawn after the first night you had it
     const shop = await t.get(`(() => {
-      const G = __LB, run = { ...G.run, night: 3, supplies: 0, upgrades: {}, log: [] };
-      G.screens.buildShop(run, {}); const a = [...document.querySelectorAll('#shop-upgrades .ugroup h3')].map((e) => e.textContent);
-      run.night = 2; G.screens.buildShop(run, {}); const b = [...document.querySelectorAll('#shop-upgrades .ugroup h3')].map((e) => e.textContent);
-      return { before3: a, before2: b };
+      const G = __LB, run = { ...G.run, supplies: 99999, upgrades: {}, log: [] };
+      const at = (n) => { run.night = n; G.screens.buildShop(run, {}); return [...document.querySelectorAll('#shop-upgrades .card')].map((c) => [c.querySelector('.nm').textContent, c.classList.contains('locked')]); };
+      return { 2: at(2), 3: at(3), 4: at(4) };
     })()`);
-    t.assert(shop.before3.some((h) => h.includes('105MM')), 'battery upgrades on sale before night 3');
-    t.assert(!shop.before2.some((h) => h.includes('105MM')), 'not before night 2');
+    const locked = (n, name) => (shop[n].find((c) => c[0].includes(name)) || [0, null])[1];
+    t.eq(locked(2, 'MOLOTOV CRATE'), true, 'molotov upgrades locked the dawn before you first get them');
+    t.eq(locked(3, 'MOLOTOV CRATE'), false, 'molotov upgrades open after night 2');
+    t.eq(locked(3, 'SECOND GUN SECTION'), true, 'battery upgrades locked before night 3');
+    t.eq(locked(4, 'SECOND GUN SECTION'), false, 'battery upgrades open after night 3');
+    t.eq(locked(2, 'MATCH-GRADE BARREL'), false, 'the fifty is always open');
+    t.eq(locked(2, 'CLAYMORES'), false, 'claymores on sale the dawn before night 2');
+    t.assert(shop[2].some((c) => c[0].includes('SECOND GUN SECTION')), 'locked upgrades are still listed');
   },
 };

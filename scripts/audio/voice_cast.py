@@ -28,6 +28,11 @@ PERSONA = {
                   "a little breathy through an oxygen mask.",
     'LT. HOLLIS': "Male, early thirties, an American recon lieutenant: firm, athletic voice, out of breath from running.",
     'REACH 3-1': "Male, forties, a British transport aircraft pilot: steady, warm, calm professional voice, northern English accent.",
+    # the ending: strangers answering Kovac's broadcast on the morning after the last night
+    'THE RIDGE': "Female, mid-forties, a hardened survivor on a weak handheld radio: low, hoarse, steady alto, "
+                 "tired to the bone, Scottish accent, careful and wary.",
+    'THE QUARRY': "Male, about sixty, a farmer leading a group of refugees, on an old CB radio: slow, warm, rough bass voice, "
+                  "Irish accent, cautious hope.",
     # the chronicle at every dawn: not on the radio, told years later
     'NARRATOR': "Male, about seventy, an old soldier telling the story of the siege decades later: a deep, warm, weathered "
                 "baritone with soft gravel, slow and measured, intimate and haunted, a storyteller by a fire; clear, unhurried diction.",
@@ -47,6 +52,8 @@ REF_TEXT = {
     'HAMMER 1-1': "Hammer flight, check in. Fuel is good, systems are good. Proceeding to the holding point, angels twelve.",
     'LT. HOLLIS': "Okay, listen up. We move fast and we move quiet. Stay on my six and nobody stops for anything.",
     'REACH 3-1': "Good evening, this is Reach. We're established on the approach, cargo is rigged, and the crew is ready back there.",
+    'THE RIDGE': "We're about twelve of us. We've been in the hills since the city went. We've got water for a day, maybe two.",
+    'THE QUARRY': "This is the quarry. We've a tractor, a trailer and forty souls. The road down's clear as far as the old mill.",
     'NARRATOR': "It was a long time ago now. But some nights, when the wind comes down the valley, I can still hear the gun.",
 }
 
@@ -67,6 +74,8 @@ DEFAULT = {
     'SPECTRE 2-2': ("Steady, serious, professional radio call.", 0.35),
     'HAMMER 1-1': ("Crisp, fast, confident pilot radio call.", 0.45),
     'LT. HOLLIS': ("Urgent and out of breath, running.", 0.7),
+    'THE RIDGE': ("Wary and quiet, worn out, holding back hope.", 0.35),
+    'THE QUARRY': ("Slow and cautious, an old man daring to hope.", 0.35),
     'REACH 3-1': ("Calm, warm, professional pilot radio call.", 0.3),
     'NARRATOR': ("Slow, low and measured, an old man remembering; quiet gravity, unhurried pauses between the sentences.", 0.22),
 }
@@ -467,6 +476,27 @@ DIRECTION = {
         ('Grim and sorrowful.', 0.3),
     'We threw every bottle we had. The foot of the wall was one long fire, and still they kept walking into it.':
         ('Building, intense, then hollow at the end.', 0.4),
+    # the ending
+    'Seventy-two hours, Command had said. Now the hours had run out, and the radio stayed silent. There was no one left on the other end.':
+        ('Slow and quiet, a bitter echo of an old promise; plain and heavy, the last sentence lands flat and final.', 0.2),
+    'Kovac kept broadcasting anyway. Every hour, on every channel the set could reach, the same four words.':
+        ('Warm, a faint smile of affection for a stubborn old friend, slow.', 0.25),
+    'This is Bastion-7. Bastion-7 is holding.':
+        ('Tired, hoarse and steady, a routine he has repeated a hundred times, quiet stubborn pride.', 0.3),
+    "Bastion-7... we hear you. We can see your lights from the ridge. Please don't shoot. We're coming down.":
+        ('Breathless with disbelief, hushed at first, then pleading and close to tears.', 0.5),
+    'Bastion-7, there are forty of us at the old quarry. Is it true? Is the wall still standing?':
+        ('Cautious, then a crack of desperate hope on the question.', 0.45),
+    "It's standing. Keep to the road and come in slow. We've got you covered.":
+        ('Firm and warm, a soldier who finally has good news to give; steady, reassuring.', 0.4),
+    'They came all through that morning. Out of the hills, up the road, out of the dead city. Families. Stragglers. Soldiers with no unit left to go back to. The gate that had stayed shut for ten nights stood open until noon.':
+        ('Rising wonder, a slow list told with growing warmth; gentle pride and emotion on the gate standing open.', 0.35),
+    'Command had called us Bastion-7, one light in a line of many. But there was no line anymore. There were no other lights.':
+        ('Reflective and quiet, sombre on the last sentence.', 0.2),
+    'By the time the dead came down the valley again, nobody called it Bastion-7. They called it the Last Bastion.':
+        ('Slow, building to quiet pride; a pause before the Last Bastion, spoken with weight, like a name.', 0.35),
+    'And for as long as there was anyone left to man the wall... it held.':
+        ('Very slow and hushed, the final words of the story; a long pause before it held, then soft and certain.', 0.25),
     'On the last night we set the valley floor alight, and it burned the way the city once had.':
         ('Slow, solemn and bitter.', 0.3),
     "There's a fuel tanker stalled out on the road. Let them crowd around it, then put a burst through the tank.":
