@@ -251,7 +251,7 @@ Every recipe is in that one file.
 ```bash
 cd scripts/models && npm i                    # gltf-transform, meshoptimizer, sharp
 node scripts/models/build_models.mjs          # everything (from the repo root)
-node scripts/models/build_models.mjs m2hb     # only the gun (or ac130, b36)
+node scripts/models/build_models.mjs m2hb     # only the gun (or ac130, b36, soldier, grenade, molotov, crate, sandbags)
 ```
 
 The downloaded sources go in `scripts/models/source/` (git-ignored). The script reorients and scales
@@ -259,6 +259,19 @@ each model to the game's axes, removes parts that are never seen, simplifies, re
 WebP and writes meshopt-compressed GLBs to `app/models/`. The game loads them at boot
 (`src/world/models.js`). `scripts/models/preview.cjs` renders a GLB from six angles to a PNG
 for checking orientation.
+
+**Loading-screen art** (Python, GPU):
+
+```bash
+python -m venv scripts/art/.cache/venv  # then: torch (CUDA), diffusers, transformers, accelerate, opencv-python-headless
+scripts/art/.cache/venv/Scripts/python scripts/art/download.py                # RealVisXL V5.0 + SDXL base, Depth Anything V2 Small
+scripts/art/.cache/venv/Scripts/python scripts/art/generate.py realvis nest --seeds 4
+scripts/art/.cache/venv/Scripts/python scripts/art/layers.py scripts/art/.cache/out/realvis/nest_22.png nest
+```
+
+`generate.py` writes candidates to `scripts/art/.cache/out/`; `layers.py` turns the chosen one into
+`app/art/<name>.webp` and `<name>-near.webp`, split by depth, which drift against each other in CSS
+on the loading screen. See `app/art/CREDITS.md`.
 
 **Radio voice-over** (Python 3 + Node; an NVIDIA GPU for recording):
 

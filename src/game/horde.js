@@ -263,6 +263,8 @@ export class Horde {
     this.pileH = new Float32Array(WORLD.SECTIONS);
     this.climbers = new Int32Array(WORLD.SECTIONS);
     this.acid = new Float32Array(WORLD.SECTIONS); // bloater acid ramps
+    this.secTop = new Float32Array(WORLD.SECTIONS);  // highest zombie on each pile (this frame / last frame)
+    this.pileTop = new Float32Array(WORLD.SECTIONS);
 
     // spatial grid
     this.cellStart = new Int32Array(NCELLS + 1);
@@ -341,7 +343,7 @@ export class Horde {
   clear() {
     this.n = 0; this.alive = 0;
     this.pending.length = 0;
-    this.secW.fill(0); this.pileH.fill(0); this.secCount.fill(0); this.acid.fill(0);
+    this.secW.fill(0); this.pileH.fill(0); this.secCount.fill(0); this.acid.fill(0); this.secTop.fill(0); this.pileTop.fill(0);
     this.corpses.clear();
     for (const L of this.lods) L.mesh.count = 0;
     this.eyes.count = 0;
@@ -636,6 +638,8 @@ export class Horde {
       this.pileH[s] = h + (target - h) * (1 - Math.exp(-rate * dt));
       this.secW[s] = 0;
       this.secCount[s] = 0;
+      this.pileTop[s] = this.secTop[s];
+      this.secTop[s] = 0;
       this.climbers[s] = 0;
     }
 
@@ -694,6 +698,9 @@ export class Horde {
       const inPile = !giant && sec >= 0 && dist < zone;
       const ri = this.radius[i] * (inPile ? 0.62 : 1);
       let pxs = 0, pzs = 0, checks = 0;
+      // on the pile a zombie stands on someone: the highest body within reach that is
+      // further out from the wall (so a pile grows from the ground up, never on air)
+      let sup = 0;
       const gx = Math.floor((x - GX0) / CELL), gz = Math.floor((z - GZ0) / CELL);
       for (let rz = gz - 1; rz <= gz + 1 && checks < 30; rz++) {
         if (rz < 0 || rz >= GH) continue;
@@ -705,6 +712,7 @@ export class Horde {
             if (j === i || j >= n || this.dead[j]) continue;
             const ox = x - X[j], oz = z - Z[j];
             const d2 = ox * ox + oz * oz;
+            if (inPile && d2 < 1.21 && Y[j] + 1.2 * this.scale[j] > sup && wallDist(X[j], Z[j]) > dist + 0.08) sup = Y[j] + 1.2 * this.scale[j];
             const md = ri + this.radius[j] * (inPile ? 0.62 : 1);
             if (d2 < md * md && d2 > 1e-6) {
               const d = Math.sqrt(d2);
@@ -748,12 +756,14 @@ export class Horde {
         this.secCount[sec]++;
         const ph = this.pileH[sec];
         const k = 1 - dist / zone;
-        ty = ph * Math.pow(k > 0 ? k : 0, 0.75) * (0.82 + 0.18 * this.pileJit[i]);
-        if (ph >= WALL_H - 0.5 && dist < 1.3 + ph * 0.08 && (this.climb[i] > 0 || this.climbers[sec] < PILE.MAX_CLIMBERS)) {
+        ty = Math.min(ph * Math.pow(k > 0 ? k : 0, 0.75) * (0.82 + 0.18 * this.pileJit[i]), sup);
+        if (Y[i] > this.secTop[sec]) this.secTop[sec] = Y[i];
+        // only one that has really reached the top of the pile goes over
+        if (ph >= WALL_H - 0.5 && Y[i] >= WALL_H - 2.6 && dist < 1.3 + ph * 0.08 && (this.climb[i] > 0 || this.climbers[sec] < PILE.MAX_CLIMBERS)) {
           this.climbers[sec]++;
           this.climb[i] += dt;
           const c = this.climb[i] / this.climbDur[i];
-          ty = ph + (WALL_H + 0.9 - ph) * Math.min(1, c);
+          ty = ty + (WALL_H + 0.9 - ty) * Math.min(1, c);
           if (c >= 1) { Y[i] = ty; this.breach(i); continue; }
         } else if (this.climb[i] > 0) this.climb[i] = Math.max(0, this.climb[i] - dt);
       } else if (this.climb[i] > 0) this.climb[i] = 0;
@@ -873,7 +883,8 @@ export class Horde {
   }
 
   /** 0..1 pressure per section for the HUD */
-  pressure(s) { return Math.min(1, this.pileH[s] / WORLD.WALL_H); }
+  /** How close a section is to being overrun: the pile as it actually stands. */
+  pressure(s) { return Math.min(1, Math.min(this.pileH[s], this.pileTop[s] + 1.2) / WORLD.WALL_H); }
 }
 
 function isExplosive(cause) { return EXPLOSIVE[cause] === 1; }

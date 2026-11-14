@@ -1,35 +1,37 @@
 // Everything that kills besides your own gun: artillery, Molotovs,
 // grenades, danger-close, wall gunners, riflemen, claymores and wire.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { WORLD, wallZ, wallDist, WING_COS, WING_SIN, ABILITY, CLAYMORE } from '../config.js';
-import { clamp, rand, lerp } from '../core/util.js';
+import { clamp, rand } from '../core/util.js';
 import { PF, DF } from '../world/textures.js';
 import { groundH, raycastGround } from '../world/terrain.js';
 import { AirSupport } from './air.js';
+import { cloneModel } from '../world/models.js';
+import { Soldier } from './soldier.js';
 
 const R = Math.random;
 const _v = new THREE.Vector3();
+const G_THROW = 9.8;
+
+/**
+ * A thrown object's flight from the hand to the ground at (tx, tz): a real
+ * ballistic arc, flat enough to stay in view as it leaves the hand.
+ */
+function throwFlight(from, tx, tz, ty) {
+  const sx = from ? from.x : WORLD.CAM.x, sy = from ? from.y : WORLD.CAM.y - 0.3, sz = from ? from.z : WORLD.CAM.z - 0.6;
+  const d = Math.hypot(tx - sx, tz - sz);
+  const dur = 0.55 + d * 0.018;
+  return { sx, sy, sz, tx, ty, tz, dur, vx: (tx - sx) / dur, vz: (tz - sz) / dur, vy: (ty - sy + 0.5 * G_THROW * dur * dur) / dur };
+}
+/** Position along a throwFlight at time t, into v. */
+function flightAt(f, t, v) {
+  return v.set(f.sx + f.vx * t, f.sy + f.vy * t - 0.5 * G_THROW * t * t, f.sz + f.vz * t);
+}
 
 /** Point at perpendicular distance d in front of the wall at x. */
 function offsetZ(x, d) {
   const ax = Math.abs(x);
   return wallZ(x) - (ax <= WORLD.GATE_HALF ? d : d / WING_COS);
-}
-
-/** Tapered limb segment from a to b. */
-function segGeo(r0, r1, a, b) {
-  const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b);
-  const len = A.distanceTo(Bv);
-  const g = new THREE.CylinderGeometry(r1, r0, len, 8);
-  g.translate(0, len / 2, 0);
-  g.applyQuaternion(new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), Bv.clone().sub(A).normalize()));
-  g.translate(A.x, A.y, A.z);
-  return g;
-}
-function boxGeo(w, h, d, x, y, z, rx = 0, ry = 0, rz = 0) { const g = new THREE.BoxGeometry(w, h, d); g.rotateX(rx); g.rotateY(ry); g.rotateZ(rz); g.translate(x, y, z); return g; }
-function mergeCrew(list) {
-  return mergeGeometries(list.map((g) => (g.index ? g.toNonIndexed() : g)).map((g) => { for (const k of Object.keys(g.attributes)) if (!['position', 'normal'].includes(k)) g.deleteAttribute(k); return g; }));
 }
 
 const GUNNER_POSTS = [-27, 27, -52, 52];
@@ -61,36 +63,31 @@ export class Arsenal {
     this.onShake = null;          // (amount, x, z)
     this.onMessage = null;        // (text, kind)
 
-    // grenade meshes
-    const gGeo = new THREE.SphereGeometry(0.09, 8, 6);
-    const gMat = new THREE.MeshStandardMaterial({ color: 0x2f3324, roughness: 0.7 });
+    // grenades (the M67-style model, a touch over life size so it reads in flight)
     this.grenadeMeshes = [];
     for (let k = 0; k < 12; k++) {
-      const m = new THREE.Mesh(gGeo, gMat);
+      const m = cloneModel('grenade');
+      m.scale.setScalar(1.4);
+      m.traverse((o) => { if (o.isMesh) o.castShadow = false; });
       m.visible = false;
       scene.add(m);
       this.grenadeMeshes.push(m);
     }
 
-    // Molotovs: a dark glass bottle, the rag stuffed in its neck burning
-    const prof = [[0, 0], [0.043, 0], [0.046, 0.01], [0.046, 0.15], [0.04, 0.18], [0.017, 0.205], [0.016, 0.27], [0.019, 0.275], [0, 0.275]]
-      .map(([r, y]) => new THREE.Vector2(r, y - 0.13));
-    const bottleGeo = new THREE.LatheGeometry(prof, 10);
-    const glassMat = new THREE.MeshStandardMaterial({ color: 0x2c3a22, roughness: 0.12, metalness: 0.2, emissive: 0x2a0d02, emissiveIntensity: 0.6 });
-    const ragGeo = new THREE.CylinderGeometry(0.022, 0.03, 0.09, 6);
-    ragGeo.translate(0, 0.17, 0);
-    ragGeo.rotateZ(0.25);
-    const ragMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.6, 1.0, 0.25) });
+    // Molotovs: the bottle model, spun about its middle, the rag in its neck burning
     this.bottleMeshes = [];
     for (let k = 0; k < 6; k++) {
       const g = new THREE.Group();
-      g.add(new THREE.Mesh(bottleGeo, glassMat), new THREE.Mesh(ragGeo, ragMat));
+      const b = cloneModel('molotov');
+      b.position.y = -0.17; // base at -0.17, rag at the top (+0.17)
+      b.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.material.emissive.setRGB(0.12, 0.04, 0.01); } });
+      g.add(b);
       g.scale.setScalar(1.5); // read from the gun at 60 m
       g.visible = false;
       scene.add(g);
       this.bottleMeshes.push(g);
     }
-    this._rag = new THREE.Vector3(0, 0.2, 0);
+    this._rag = new THREE.Vector3(0, 0.16, 0);
 
     // claymores
     const mineGeo = new THREE.BoxGeometry(0.24, 0.16, 0.06);
@@ -175,7 +172,7 @@ export class Arsenal {
    * Light the rag and throw a bottle at the crosshair. 'empty' / 'rearm' / true.
    * The Zippo goes first; the bottle leaves the hand a beat later.
    */
-  throwMolotov(target) {
+  throwMolotov(target, from = null) {
     if (this.molotovsLeft <= 0) return 'empty';
     if (this.molotovCd > 0) return 'rearm';
     const mesh = this.bottleMeshes.find((m) => !m.visible && !this.molotovs.some((b) => b.mesh === m));
@@ -189,12 +186,12 @@ export class Arsenal {
     const d = Math.hypot(dx, dz) || 1;
     if (d > M.maxRange) { dx *= M.maxRange / d; dz *= M.maxRange / d; }
     const dd = Math.min(d, M.maxRange);
-    const tx = cx + dx + rand(-0.7, 0.7), tz = cz + dz + rand(-0.7, 0.7);
+    const tx = cx + dx + rand(-0.5, 0.5), tz = cz + dz + rand(-0.5, 0.5);
+    void dd;
     // thrown from the left hand, past the gun
     this.molotovs.push({
-      mesh, t: -M.light, launched: false, light: null,
-      sx: cx - 0.45, sy: WORLD.CAM.y + 0.15, sz: cz - 0.7, tx, tz,
-      dur: 0.85 + dd * 0.015, arc: 3.5 + dd * 0.11, spin: rand(-7, 7), dirx: dx / d, dirz: dz / d,
+      mesh, t: -M.light, launched: false, light: null, from: from && from.clone(), tx, tz,
+      spin: rand(-7, 7), dirx: dx / d, dirz: dz / d,
     });
     return true;
   }
@@ -221,15 +218,14 @@ export class Arsenal {
       const m = b.mesh;
       if (!b.launched) {
         b.launched = true;
+        b.f = throwFlight(b.from, b.tx, b.tz, groundH(b.tx, b.tz) + 0.15);
         m.visible = true;
         this.audio.molotovThrow();
         b.light = fx.lights.acquire();
         if (b.light) { b.light.color.setRGB(1, 0.55, 0.2); b.light.distance = 16; b.light.decay = 1.8; }
       }
-      const u = Math.min(1, b.t / b.dur);
-      const x = lerp(b.sx, b.tx, u), z = lerp(b.sz, b.tz, u);
-      const y = lerp(b.sy, groundH(b.tx, b.tz) + 0.15, u) + Math.sin(u * Math.PI) * b.arc;
-      m.position.set(x, y, z);
+      const u = Math.min(1, b.t / b.f.dur);
+      flightAt(b.f, Math.min(b.t, b.f.dur), m.position);
       m.rotation.x += dt * 9;
       m.rotation.z += dt * b.spin;
       m.updateMatrixWorld();
@@ -277,22 +273,35 @@ export class Arsenal {
     fx.lights.flash(x, gy + 2.2, z, 0xff8a3c, 420, 36, 0.55, 0.3);
     fx.decals.add(x + dirx * r * 0.3, z + dirz * r * 0.3, r * 2.3, DF.SCORCH + ((R() * 2) | 0), 1, 1, 1);
     // the pool: one big fire, smaller ones spread forward and to the sides
-    const life = s.molotovBurn * rand(0.92, 1.08);
-    const cx = x + dirx * r * 0.3, cz = z + dirz * r * 0.3;
-    const pool = { cx, cz, gy, r, r2: r * r, dps: s.molotovDps, t: 0, life, k: 0, fires: [], light: null, snd: null, acc: 0 };
-    const fire = fx.fire, sc = r / 4.2;
+    this.firePool(x, z, r, s.molotovBurn * rand(0.92, 1.08), dirx, dirz, s.molotovDps);
+  }
+
+  /**
+   * A pool of burning fuel at (x, z), radius r, for `life` seconds: what a bottle leaves,
+   * and what a fuel tanker or a truck leaves when it goes up. dir: the way it was thrown.
+   */
+  firePool(x, z, r, life, dirx = 0, dirz = 0, dps = this.stats ? this.stats.molotovDps : 70) {
+    const fx = this.fx, M = ABILITY.molotov;
+    if (!dirx && !dirz) { const a = R() * 6.28; dirx = Math.cos(a) * 0.2; dirz = Math.sin(a) * 0.2; }
+    const dl = Math.hypot(dirx, dirz) || 1;
+    const ux = dirx / dl, uz = dirz / dl, fwd = dl > 0.5 ? 0.3 : 0;
+    const cx = x + ux * r * fwd, cz = z + uz * r * fwd, gy = groundH(cx, cz);
+    const pool = { cx, cz, gy, r, r2: r * r, dps, t: 0, life, k: 0, fires: [], light: null, snd: null, acc: 0 };
+    // wider pools spread wider, more and lower flames, rather than taller ones
+    const fire = fx.fire, sc = r / 4.2, sh = Math.sqrt(sc);
     if (fire) {
       const add = (px, pz, w, h, fade) => {
         const id = fire.add(px, groundH(px, pz) - 0.05, pz, w, h, 0.95, { smoke: 0.6, embers: 2.2, life: life + rand(-1, 1.2), fadeIn: fade });
         if (id >= 0) pool.fires.push(id);
       };
-      add(cx, cz, 3.0 * sc, 4.8 * sc, 0.08);
-      const px = -dirz, pz = dirx; // across the throw
-      for (let k = 0; k < 9; k++) {
-        const along = rand(-0.55, 1.05) * r, across = (R() - 0.5) * 1.3 * r * (1 - Math.abs(along) / (r * 1.6));
+      add(cx, cz, 3.0 * sh, 4.8 * sh, 0.08);
+      const px = -uz, pz = ux; // across the throw
+      const nf = Math.min(40, Math.round(9 * sc * sc));
+      for (let k = 0; k < nf; k++) {
+        const along = (fwd ? rand(-0.55, 1.05) : rand(-1, 1)) * r, across = (R() - 0.5) * 1.3 * r * (1 - Math.abs(along) / (r * 1.6));
         // the middle of the splash burns tallest, the fringes lick low
-        const edge = Math.min(1, Math.hypot(along - r * 0.3, across) / r);
-        add(x + dirx * along + px * across, z + dirz * along + pz * across, rand(1.4, 2.3) * sc, rand(2.6, 4.4) * sc * (1 - 0.45 * edge), rand(0.05, 0.4));
+        const edge = Math.min(1, Math.hypot(along - r * fwd, across) / r);
+        add(x + ux * along + px * across, z + uz * along + pz * across, rand(1.4, 2.3) * sh, rand(2.6, 4.4) * sh * (1 - 0.45 * edge), rand(0.05, 0.4));
       }
     }
     pool.light = fx.lights.acquire();
@@ -307,6 +316,7 @@ export class Arsenal {
       h.ignite(i, M.igniteSeconds + 1, M.igniteDps);
       h.damage(i, 12, 'fire', 0, 1, 0);
     }
+    return pool;
   }
 
   updatePools(dt) {
@@ -361,71 +371,42 @@ export class Arsenal {
 
   // ── Grenades ─────────────────────────────────────────────────────────────
   /** One grenade at the crosshair. 'empty' / 'rearm' / true. */
-  throwGrenade(target) {
+  throwGrenade(target, from = null) {
     if (this.grenadesLeft <= 0) return 'empty';
     if (this.grenadeCd > 0) return 'rearm';
-    const mesh = this.grenadeMeshes.find((m) => !m.visible);
+    const mesh = this.grenadeMeshes.find((m) => !m.visible && !this.grenades.some((g) => g.mesh === m));
     if (!mesh) return 'rearm';
     const G = ABILITY.grenade;
     this.grenadesLeft--;
     this.grenadeCd = G.rearm;
-    this.audio.throwGrenade();
+    this.audio.grenadePin();
     // clamp range
     const cx = WORLD.CAM.x, cz = WORLD.CAM.z;
     let dx = target.x - cx, dz = target.z - cz;
     const d = Math.hypot(dx, dz);
     if (d > G.maxRange) { dx *= G.maxRange / d; dz *= G.maxRange / d; }
-    const dd = Math.min(d, G.maxRange);
-    mesh.visible = true;
-    const tx = cx + dx + rand(-0.8, 0.8), tz = cz + dz + rand(-0.8, 0.8);
-    this.grenades.push({ mesh, sx: rand(0.1, 0.5), sy: WORLD.CAM.y + 0.2, sz: WORLD.CAM.z - 0.8, tx, tz, t: 0, dur: 0.8 + dd * 0.014, arc: 4 + dd * 0.12 });
+    const tx = cx + dx + rand(-0.6, 0.6), tz = cz + dz + rand(-0.6, 0.6);
+    // the pin comes out, the spoon flies, and the arm comes over a beat later
+    this.grenades.push({ mesh, from: from && from.clone(), tx, tz, t: -0.28, f: null });
     return true;
   }
 
   // ── Gunners ──────────────────────────────────────────────────────────────
   buildGunners() {
     this.gunners = [];
-    const body = new THREE.MeshStandardMaterial({ color: 0x3a3f2c, roughness: 0.92 });
-    const gear = new THREE.MeshStandardMaterial({ color: 0x2b3022, roughness: 0.8 });
-    const helm = new THREE.MeshStandardMaterial({ color: 0x353b2a, roughness: 0.6, metalness: 0.15 });
-    const skin = new THREE.MeshStandardMaterial({ color: 0x5a4a3e, roughness: 0.7 });
-    const gunM = new THREE.MeshStandardMaterial({ color: 0x1a1b1c, roughness: 0.5, metalness: 0.7 });
-    const seg = segGeo, bx = boxGeo, mg = mergeCrew;
-    this.crewMats = { body, gear, helm, skin, gunM };
-    // leaning into the parapet, shouldering a light machine gun
-    const bodyGeo = mg([
-      seg(0.075, 0.065, [0.12, 0.0, 0.25], [0.12, 0.48, 0.12]), seg(0.065, 0.055, [0.12, 0.48, 0.12], [0.11, 0.9, 0.1]),
-      seg(0.075, 0.065, [-0.12, 0.0, 0.35], [-0.12, 0.45, 0.3]), seg(0.065, 0.055, [-0.12, 0.45, 0.3], [-0.11, 0.9, 0.12]),
-      seg(0.17, 0.2, [0, 0.88, 0.12], [0, 1.3, -0.02]),
-      seg(0.05, 0.045, [0.2, 1.28, -0.02], [0.2, 1.08, -0.25]), seg(0.045, 0.04, [0.2, 1.08, -0.25], [0.12, 1.14, -0.45]),
-      seg(0.05, 0.045, [-0.2, 1.28, -0.02], [-0.16, 1.1, -0.2]), seg(0.045, 0.04, [-0.16, 1.1, -0.2], [0.08, 1.12, -0.12]),
-    ]);
-    const gearGeo = mg([
-      bx(0.42, 0.34, 0.3, 0, 1.12, 0.04, -0.3), bx(0.08, 0.09, 0.05, -0.1, 1.0, -0.12, -0.3), bx(0.08, 0.09, 0.05, 0.0, 1.0, -0.13, -0.3), bx(0.08, 0.09, 0.05, 0.1, 1.0, -0.12, -0.3),
-      bx(0.32, 0.38, 0.16, 0, 1.2, 0.26, -0.3), bx(0.12, 0.08, 0.26, 0, 0.3, 0.28),
-      bx(0.1, 0.05, 0.24, 0.12, 0.03, 0.29), bx(0.1, 0.05, 0.24, -0.12, 0.03, 0.39),
-    ]);
-    const helmGeo = mg([
-      (() => { const g = new THREE.SphereGeometry(0.15, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2); g.scale(1, 0.85, 1.12); g.translate(0, 1.43, -0.06); return g; })(),
-      bx(0.06, 0.05, 0.04, 0, 1.5, -0.2), bx(0.05, 0.05, 0.08, 0, 1.45, -0.24),
-    ]);
-    const headGeo = mg([(() => { const g = new THREE.SphereGeometry(0.11, 10, 8); g.translate(0, 1.38, -0.07); return g; })()]);
-    const lmgGeo = mg([
-      bx(0.07, 0.11, 0.42, 0.12, 1.16, -0.42), bx(0.05, 0.12, 0.22, 0.12, 1.12, -0.05, 0.25),
-      seg(0.016, 0.016, [0.12, 1.17, -0.62], [0.12, 1.17, -1.15]), seg(0.022, 0.018, [0.12, 1.17, -1.08], [0.12, 1.17, -1.15]),
-      bx(0.1, 0.07, 0.14, 0.05, 1.11, -0.42), bx(0.02, 0.05, 0.02, 0.12, 1.24, -0.55),
-      seg(0.008, 0.008, [0.12, 1.12, -0.9], [0.06, 0.92, -1.0]), seg(0.008, 0.008, [0.12, 1.12, -0.9], [0.18, 0.92, -1.0]),
-    ]);
     for (const px of GUNNER_POSTS) {
       const g = new THREE.Group();
-      for (const [geo, m] of [[bodyGeo, body], [gearGeo, gear], [helmGeo, helm], [headGeo, skin], [lmgGeo, gunM]]) g.add(new THREE.Mesh(geo, m));
+      // a soldier at the parapet, his M240 over it (the model's rifle stands in for it)
+      const sol = new Soldier();
+      sol.root.visible = true;
+      sol.root.rotation.y = Math.PI; // the model faces +z; the group's forward is -z
+      g.add(sol.root);
       const x = px, z = wallZ(px);
       const nx = px > 0 ? 0.482 : -0.482;
-      g.position.set(x + nx * 1.35, WORLD.WALL_H - 0.08, z + 0.876 * 1.35);
+      g.position.set(x + nx * 1.35, WORLD.WALL_H - 0.55, z + 0.876 * 1.35);
       g.visible = false;
       this.scene.add(g);
-      const muzzle = new THREE.Object3D(); muzzle.position.set(0.12, 1.15, -1.15); g.add(muzzle);
-      this.gunners.push({ group: g, muzzle, x, z, active: false, target: -1, targetId: 0, retarget: 0, burst: 0, pause: 0, acc: 0, shots: 0, yaw: Math.atan2(-nx, -0.876) });
+      this.gunners.push({ group: g, soldier: sol, muzzle: sol.muzzle, x, z, active: false, target: -1, targetId: 0, retarget: 0, burst: 0, pause: 0, acc: 0, shots: 0, kick: 0, elev: -0.2, yaw: Math.atan2(-nx, -0.876) });
     }
   }
 
@@ -462,6 +443,10 @@ export class Arsenal {
       let dy = want - g.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
       g.yaw += dy * Math.min(1, dt * 10);
       g.group.rotation.y = g.yaw;
+      const dh = Math.hypot(tx - g.group.position.x, tz - g.group.position.z);
+      g.elev += (Math.atan2(h.y[i] + h.scale[i] - (g.group.position.y + 1.5), dh) - g.elev) * Math.min(1, dt * 8);
+      g.kick = Math.max(0, g.kick - dt * 10);
+      g.soldier.aim(g.elev, 0, g.kick);
       // bursts
       if (g.pause > 0) { g.pause -= dt; continue; }
       g.acc += dt * s.gunnerRate;
@@ -499,6 +484,7 @@ export class Arsenal {
       fx.groundHit(ox + dx * endT, oz + dz * endT);
     }
     g.shots++;
+    g.kick = 1;
     if (g.shots % 2 === 0) fx.tracer(ox, oy, oz, ox + dx * endT, oy + dy * endT, oz + dz * endT, 480, 0.9, 6.5, 1.4, 0.6);
     fx.muzzle(ox, oy, oz, dx, dy, dz, 0.6);
     if (g.shots % 2 === 0) this.audio.wallGun(ox, oz);
@@ -507,55 +493,22 @@ export class Arsenal {
   // ── Riflemen ─────────────────────────────────────────────────────────────
   buildRiflemen() {
     this.riflemen = [];
-    const { body, gear, helm, skin, gunM } = this.crewMats;
-    const seg = segGeo, bx = boxGeo, mg = mergeCrew;
-    const SH = 1.36; // shoulder pivot: arms and rifle swing about it
-    // standing at the parapet, left foot forward
-    const bodyGeo = mg([
-      seg(0.08, 0.075, [0.1, 0.0, 0.18], [0.1, 0.47, 0.1]), seg(0.08, 0.095, [0.1, 0.47, 0.1], [0.1, 0.92, 0.06]),
-      seg(0.08, 0.075, [-0.1, 0.0, -0.16], [-0.1, 0.47, -0.08]), seg(0.08, 0.095, [-0.1, 0.47, -0.08], [-0.1, 0.92, 0.04]),
-      seg(0.16, 0.19, [0, 0.9, 0.05], [0, 1.4, -0.03]),
-      bx(0.1, 0.05, 0.24, 0.1, 0.03, 0.12), bx(0.1, 0.05, 0.24, -0.1, 0.03, -0.2),
-    ]);
-    const gearGeo = mg([
-      bx(0.4, 0.36, 0.3, 0, 1.18, 0.0, -0.1),
-      bx(0.08, 0.1, 0.05, -0.1, 1.06, -0.16, -0.1), bx(0.08, 0.1, 0.05, 0.0, 1.06, -0.16, -0.1), bx(0.08, 0.1, 0.05, 0.1, 1.06, -0.16, -0.1),
-      bx(0.3, 0.34, 0.15, 0, 1.2, 0.22, -0.1), bx(0.38, 0.06, 0.28, 0, 0.92, 0.04),
-    ]);
-    const helmGeo = mg([
-      (() => { const g = new THREE.SphereGeometry(0.145, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2); g.scale(1, 0.85, 1.1); g.translate(0, 1.64, -0.04); return g; })(),
-      bx(0.06, 0.05, 0.04, 0, 1.71, -0.18),
-    ]);
-    const headGeo = mg([(() => { const g = new THREE.SphereGeometry(0.105, 10, 8); g.translate(0, 1.59, -0.05); return g; })()]);
-    // arms + rifle, modelled around the shoulder pivot (y = 0 at the shoulder)
-    const armsGeo = mg([
-      seg(0.05, 0.045, [0.2, 0, 0.02], [0.24, -0.16, -0.14]), seg(0.045, 0.04, [0.24, -0.16, -0.14], [0.08, 0.0, -0.22]),
-      seg(0.05, 0.045, [-0.2, 0, 0.02], [-0.16, -0.17, -0.28]), seg(0.045, 0.04, [-0.16, -0.17, -0.28], [0.02, 0.02, -0.46]),
-    ]);
-    const rifleGeo = mg([
-      bx(0.05, 0.08, 0.36, 0.05, 0.06, -0.3), bx(0.045, 0.07, 0.22, 0.05, 0.03, 0.0), bx(0.03, 0.05, 0.03, 0.05, 0.13, -0.24),
-      bx(0.03, 0.15, 0.06, 0.05, -0.05, -0.3, 0.25), bx(0.03, 0.09, 0.04, 0.05, -0.02, -0.15, -0.3),
-      bx(0.055, 0.06, 0.22, 0.05, 0.06, -0.58),
-      seg(0.011, 0.011, [0.05, 0.065, -0.69], [0.05, 0.065, -0.92]),
-    ]);
     const deckY = WORLD.WALL_H - 0.9;
     for (const px of RIFLE_POSTS) {
       const g = new THREE.Group();
-      for (const [geo, m] of [[bodyGeo, body], [gearGeo, gear], [helmGeo, helm], [headGeo, skin]]) g.add(new THREE.Mesh(geo, m));
-      const arms = new THREE.Group();
-      arms.position.set(0, SH, 0);
-      arms.add(new THREE.Mesh(armsGeo, body), new THREE.Mesh(rifleGeo, gunM));
-      const muzzle = new THREE.Object3D(); muzzle.position.set(0.05, 0.065, -0.93); arms.add(muzzle);
-      g.add(arms);
+      const sol = new Soldier();
+      sol.root.visible = true;
+      sol.root.rotation.y = Math.PI; // model forward +z -> group forward -z
+      g.add(sol.root);
       const nx = px > 0 ? WING_SIN : -WING_SIN, nz = WING_COS; // inward wall normal
       const x = px + nx * 1.0, z = wallZ(px) + nz * 1.0;
       g.position.set(x, deckY, z);
-      g.scale.setScalar(rand(0.95, 1.05));
+      g.scale.setScalar(rand(0.96, 1.04));
       const home = Math.atan2(nx, nz); // facing out over the wall
       g.rotation.y = home;
       this.scene.add(g);
       this.riflemen.push({
-        group: g, arms, muzzle, x, z, home, yaw: home, pitch: -0.25, target: -1, targetId: 0,
+        group: g, soldier: sol, muzzle: sol.muzzle, x, z, home, yaw: home, pitch: -0.25, target: -1, targetId: 0,
         retarget: rand(0, 1), shotT: rand(0.5, 2), burst: 0, ammo: 5 + ((RIFLE.mag * R()) | 0), reload: 0, kick: 0,
       });
     }
@@ -591,8 +544,7 @@ export class Arsenal {
       r.yaw += (wantYaw - r.yaw) * Math.min(1, dt * 4);
       r.pitch += (wantPitch - r.pitch) * Math.min(1, dt * (r.reload > 0 ? 5 : 7));
       r.group.rotation.y = r.yaw;
-      r.arms.rotation.x = r.pitch + r.kick * 0.09;
-      r.arms.position.z = r.kick * 0.045;
+      r.soldier.aim(r.pitch, 0, r.kick);
       if (r.target < 0 || r.reload > 0) continue;
       r.shotT -= dt;
       if (r.shotT > 0) continue;
@@ -801,10 +753,13 @@ export class Arsenal {
       const g = this.grenades[k];
       g.t += dt;
       if (g.t < 0) continue;
-      const u = Math.min(1, g.t / g.dur);
-      const x = lerp(g.sx, g.tx, u), z = lerp(g.sz, g.tz, u);
-      const y = lerp(g.sy, groundH(g.tx, g.tz) + 0.1, u) + Math.sin(u * Math.PI) * g.arc;
-      g.mesh.position.set(x, y, z);
+      if (!g.f) {
+        g.f = throwFlight(g.from, g.tx, g.tz, groundH(g.tx, g.tz) + 0.1);
+        g.mesh.visible = true;
+        this.audio.throwGrenade();
+      }
+      const u = Math.min(1, g.t / g.f.dur);
+      const { x, y, z } = flightAt(g.f, Math.min(g.t, g.f.dur), g.mesh.position);
       g.mesh.rotation.x += dt * 12;
       if (R() < 0.5) fx.glowDot(x, y, z, 0.12, 3, 1.4, 0.4, 0.05);
       if (u >= 1) {

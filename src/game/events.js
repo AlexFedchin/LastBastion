@@ -11,6 +11,9 @@ import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
 import { groundH } from '../world/terrain.js';
 import { buildGunship } from './air.js';
+import { makeTruck, cylX } from '../world/kit.js';
+import { cloneModel } from '../world/models.js';
+import { Soldier } from './soldier.js';
 
 const R = Math.random;
 const pickOne = (a) => a[(R() * a.length) | 0];
@@ -54,6 +57,60 @@ function buildPerson() {
 
 const CIV_COLORS = [0x5b2a24, 0x2b3550, 0x6a6458, 0x3b4a3a, 0x7a5a2a, 0x2a2a2e, 0x6b3d5a];
 
+/** Dress a person as a soldier (or ready a Soldier model). */
+function dressSoldier(f) {
+  if (f.isSoldier) { f.reset(); f.root.scale.setScalar(rand(0.97, 1.03)); f.root.visible = true; return; }
+  f.helmet.visible = f.pack.visible = f.rifle.visible = true;
+  f.mats.cloth.color.setHex(0x3c4230);
+  f.mats.pants.color.setHex(0x2f3326);
+  f.root.scale.setScalar(rand(0.97, 1.05));
+  f.root.visible = true;
+  f.body.rotation.set(0, 0, 0);
+  f.body.position.y = 0;
+}
+
+/** A soldier on the move fires at the nearest of them within range. */
+function soldierFire(g, u, dt, range = 32, every = [0.18, 0.4]) {
+  const h = g.horde, fx = g.fx;
+  u.shootT -= dt;
+  if (u.shootT > 0) return;
+  u.shootT = rand(every[0], every[1]);
+  const n = h.queryRadius(u.x, u.z, range, h._q);
+  let best = -1, bd = 1e9;
+  for (let k = 0; k < n; k++) { const j = h._q[k]; const dd = (h.x[j] - u.x) ** 2 + (h.z[j] - u.z) ** 2; if (dd < bd) { bd = dd; best = j; } }
+  if (best < 0) return;
+  const gy = groundH(u.x, u.z);
+  const ox = u.x, oy = gy + 1.35, oz = u.z;
+  const tx = h.x[best], ty = groundH(tx, h.z[best]) + 1.2 * h.scale[best], tz = h.z[best];
+  const ddd = Math.sqrt(bd) || 1;
+  fx.tracer(ox, oy, oz, tx, ty, tz, 420, 0.8, 6.5, 1.4, 0.6);
+  fx.muzzle(ox, oy, oz, (tx - ox) / ddd, 0, (tz - oz) / ddd, 0.4);
+  if (R() < 0.6) {
+    h.damage(best, 26, 'gunner', (tx - ox) / ddd, 0, (tz - oz) / ddd, R() < 0.2);
+    fx.fleshHit(tx, ty, tz, (tx - ox) / ddd, 0, (tz - oz) / ddd, 0.7);
+  }
+  if (R() < 0.5) g.audio.wallGun(ox, oz);
+}
+
+/** Running (or, carrying, a heavy shuffle) pose for one step of the cycle. */
+function poseRun(f, ph, carry = false) {
+  if (f.isSoldier) { f.run(ph, carry); return; }
+  const s = Math.sin(ph), c = Math.cos(ph), a = carry ? 0.45 : 0.85;
+  f.legL.pivot.rotation.x = s * a; f.legR.pivot.rotation.x = -s * a;
+  f.legL.joint.rotation.x = -Math.max(0, c) * (carry ? 0.7 : 1.2) - 0.1; f.legR.joint.rotation.x = -Math.max(0, -c) * (carry ? 0.7 : 1.2) - 0.1;
+  if (carry) {
+    // both hands down on the crate's handles
+    f.armL.pivot.rotation.x = -0.35; f.armR.pivot.rotation.x = -0.35;
+    f.armL.joint.rotation.x = 0.2; f.armR.joint.rotation.x = 0.2;
+    f.torso.rotation.x = 0.4;
+  } else {
+    f.armL.pivot.rotation.x = -s * 0.7; f.armR.pivot.rotation.x = s * 0.7;
+    f.armL.joint.rotation.x = 1.1; f.armR.joint.rotation.x = 1.1;
+    f.torso.rotation.x = 0.28;
+  }
+  f.body.position.y = Math.abs(c) * (carry ? 0.03 : 0.06);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 class Escort {
   constructor(E, kind) {
@@ -66,8 +123,9 @@ class Escort {
     const x0 = rand(-12, 12), z0 = -178;
     this.units = [];
     for (let k = 0; k < P.count; k++) {
-      const f = E.people[k];
       const soldier = this.kind === 'patrol';
+      const f = soldier ? E.soldiers[k] : E.people[k];
+      if (soldier) { dressSoldier(f); this.units.push(this.unit(f, x0, z0, P, false)); continue; }
       f.helmet.visible = f.pack.visible = f.rifle.visible = soldier;
       const c = soldier ? 0x3c4230 : pickOne(CIV_COLORS);
       f.mats.cloth.color.setHex(c);
@@ -76,10 +134,7 @@ class Escort {
       f.root.scale.setScalar(small ? 0.68 : rand(0.97, 1.05));
       f.root.visible = true;
       f.body.rotation.set(0, 0, 0);
-      this.units.push({
-        f, x: x0 + rand(-3, 3), z: z0 + rand(-5, 5), sp: rand(P.speed[0], P.speed[1]) * (small ? 0.92 : 1), ph: R() * 6,
-        state: 'run', t: 0, shootT: rand(0.2, 0.6), light: soldier || k % 2 === 0, yaw: Math.PI,
-      });
+      this.units.push(this.unit(f, x0, z0, P, small, k % 2 === 0));
     }
     this.track = new Set();
     for (let k = 0; k < P.chasers; k++) {
@@ -91,6 +146,13 @@ class Escort {
     E.say(this.kind, 'start', true);
     E.say(this.kind, 'follow');
     E.g.hud.alert(this.kind === 'patrol' ? 'FRIENDLIES ON THE ROAD — COVER THEM' : 'CIVILIANS ON THE ROAD — COVER THEM');
+  }
+
+  unit(f, x0, z0, P, small, light = true) {
+    return {
+      f, x: x0 + rand(-3, 3), z: z0 + rand(-5, 5), sp: rand(P.speed[0], P.speed[1]) * (small ? 0.92 : 1), ph: R() * 6,
+      state: 'run', t: 0, shootT: rand(0.2, 0.6), light, yaw: Math.PI,
+    };
   }
 
   update(dt) {
@@ -140,44 +202,17 @@ class Escort {
           g.hud.alert(this.kind === 'patrol' ? 'ONE OF RECON TWO IS THROUGH THE GATE' : 'CIVILIAN THROUGH THE GATE');
         }
         // soldiers fight as they run
-        if (this.kind === 'patrol') {
-          u.shootT -= dt;
-          if (u.shootT <= 0) {
-            u.shootT = rand(0.18, 0.4);
-            const n = h.queryRadius(u.x, u.z, 32, h._q);
-            let best = -1, bd = 1e9;
-            for (let k = 0; k < n; k++) { const j = h._q[k]; const dd = (h.x[j] - u.x) ** 2 + (h.z[j] - u.z) ** 2; if (dd < bd) { bd = dd; best = j; } }
-            if (best >= 0) {
-              const gy = groundH(u.x, u.z);
-              const ox = u.x, oy = gy + 1.35, oz = u.z;
-              const tx = h.x[best], ty = groundH(tx, h.z[best]) + 1.2 * h.scale[best], tz = h.z[best];
-              fx.tracer(ox, oy, oz, tx, ty, tz, 420, 0.8, 6.5, 1.4, 0.6);
-              fx.muzzle(ox, oy, oz, (tx - ox) / Math.sqrt(bd), 0, (tz - oz) / Math.sqrt(bd), 0.4);
-              if (R() < 0.6) {
-                const ddd = Math.sqrt(bd) || 1;
-                h.damage(best, 26, 'gunner', (tx - ox) / ddd, 0, (tz - oz) / ddd, R() < 0.2);
-                fx.fleshHit(tx, ty, tz, (tx - ox) / ddd, 0, (tz - oz) / ddd, 0.7);
-              }
-              if (R() < 0.5) g.audio.wallGun(ox, oz);
-            }
-          }
-        }
+        if (this.kind === 'patrol') soldierFire(g, u, dt);
       } else u.t += dt;
       // pose
       const gy = groundH(u.x, u.z);
       f.root.position.set(u.x, gy, u.z);
       f.root.rotation.y = u.yaw;
       if (u.state === 'run') {
-        const s = Math.sin(u.ph), c = Math.cos(u.ph);
-        f.legL.pivot.rotation.x = s * 0.85; f.legR.pivot.rotation.x = -s * 0.85;
-        f.legL.joint.rotation.x = -Math.max(0, c) * 1.2 - 0.1; f.legR.joint.rotation.x = -Math.max(0, -c) * 1.2 - 0.1;
-        f.armL.pivot.rotation.x = -s * 0.7; f.armR.pivot.rotation.x = s * 0.7;
-        f.armL.joint.rotation.x = 1.1; f.armR.joint.rotation.x = 1.1;
-        f.torso.rotation.x = 0.28;
-        f.body.position.y = Math.abs(c) * 0.06;
+        poseRun(f, u.ph);
         if (u.light) {
           const sc = f.root.scale.x;
-          if (this.kind === 'patrol') fx.glowDot(u.x, gy + 1.45 * sc, u.z, 0.32, 0.4, 5, 0.8, 0.05);
+          if (this.kind === 'patrol') fx.glowDot(u.x, gy + 1.72 * sc, u.z, 0.32, 0.4, 5, 0.8, 0.05);
           else fx.glowDot(u.x + Math.sin(u.yaw) * 0.4, gy + 1.0 * sc, u.z + Math.cos(u.yaw) * 0.4, 0.35, 5, 4, 2.4, 0.05);
         }
       } else if (u.state === 'down') {
@@ -227,6 +262,10 @@ class Escort {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// The resupply: a C-130 drops a crate in the field, and a recovery team goes out
+// through the gate to bring it home. The dead go for the strobe, then for them.
+const TEAM = 4;          // soldiers[TEAM_AT..] are the recovery team (the patrol uses the first four)
+const TEAM_AT = 4;
 class SupplyDrop {
   constructor(E) { this.E = E; this.P = EVENTS.drop; this.blocking = true; }
 
@@ -234,20 +273,38 @@ class SupplyDrop {
     const E = this.E;
     const x = rand(-34, 34);
     this.tx = x; this.tz = offsetZ(x, rand(55, 85));
-    this.phase = 'inbound'; this.t = 0; this.integrity = 100; this.hold = this.P.hold; this.hurtSaid = false;
+    this.phase = 'inbound'; this.t = 0; this.integrity = 100; this.hurtSaid = false;
     // the C-130 comes in from behind the wall, low, across the drop zone
     const p = E.c130;
     p.group.visible = true;
     this.plane = { x: this.tx - 40, y: 110, z: 560, vx: 0, vz: -85, loop: null };
     this.plane.vx = (this.tx - this.plane.x) / ((this.plane.z - this.tz) / 85) * 0.3;
     this.crate = null;
+    this.team = [];
+    this.lost = 0;
     this.track = new Set();
     E.say('drop', 'start', true);
     E.g.hud.alert('RESUPPLY INBOUND — WATCH FOR THE STROBE');
   }
 
+  /** The recovery team comes out of the gate. */
+  sendTeam() {
+    const P = this.P;
+    this.team = [];
+    for (let k = 0; k < TEAM; k++) {
+      const f = this.E.soldiers[TEAM_AT + k];
+      dressSoldier(f);
+      this.team.push({
+        f, x: GATE.x + (k - 1.5) * 1.3, z: GATE.z - rand(0, 1.5), ph: R() * 6, yaw: Math.PI, state: 'out', t: 0,
+        sp: rand(P.teamSpeed[0], P.teamSpeed[1]), shootT: rand(0.3, 0.8), slot: k, carrying: false,
+      });
+    }
+    this.phase = 'out';
+    this.E.g.hud.alert('RECOVERY TEAM IS OUT — COVER THEM');
+  }
+
   update(dt) {
-    const E = this.E, g = E.g, h = g.horde, fx = g.fx;
+    const E = this.E, g = E.g, h = g.horde, fx = g.fx, P = this.P;
     this.t += dt;
     // aircraft
     const pl = this.plane;
@@ -264,7 +321,7 @@ class SupplyDrop {
       if (pl.loop) pl.loop.update(pl.x, pl.y, pl.z, pl.vx, 0, pl.vz, 3);
       if (this.phase === 'inbound' && pl.z <= this.tz + 85 * 1.2) {
         this.phase = 'fall';
-        this.crate = { x: pl.x, y: pl.y - 3, z: pl.z, vy: 0, t: 0, sx: pl.x, sz: pl.z };
+        this.crate = { x: pl.x, y: pl.y - 3, z: pl.z, vy: 0, t: 0, sx: pl.x, sz: pl.z, yaw: 0 };
         E.crate.visible = true;
         E.say('drop', 'away');
       }
@@ -284,36 +341,51 @@ class SupplyDrop {
       if (chute) { E.chute.position.set(c.x, c.y + 0.5, c.z); E.chute.scale.setScalar(Math.min(1, (c.t - 1.1) * 2.5)); E.chute.rotation.set(0, c.t * 0.2, 0); }
       if (c.y <= gy + 0.5) {
         c.y = gy + 0.5; this.phase = 'hold'; c.t = 0;
+        c.gx = c.x; c.gz = c.z;
         fx.groundHit(c.x, c.z, true);
         g.audio.giantStep(c.x, c.z, 0.4);
         E.say('drop', 'land', true);
-        g.hud.alert('CRATE DOWN — HOLD THE DROP ZONE');
+        g.hud.alert('CRATE DOWN — KEEP THEM OFF IT UNTIL THE RECOVERY TEAM GETS THERE');
       }
-    } else if (this.phase === 'hold') {
+    } else {
       c.t += dt;
       // the canopy collapses and drapes away
       if (E.chute.visible) {
         const k = Math.min(1, c.t / 2);
-        E.chute.position.set(c.x + k * 3, c.y + 0.5 - k * 5.5, c.z);
+        E.chute.position.set(c.gx + k * 3, groundH(c.gx, c.gz) + 1 - k * 5.5, c.gz);
         E.chute.rotation.set(k * 1.3, 0, 0);
         if (k >= 1) E.chute.visible = false;
       }
-      // the strobe draws them in
-      const near = h.queryRadius(c.x, c.z, this.P.pull, h._q);
+      if (this.phase === 'hold' && c.t >= P.teamDelay) this.sendTeam();
+      const r = this.updateTeam(dt);
+      if (r !== null) return r;
+      const onGround = this.phase !== 'carry';
+      // the strobe draws them in; once the team is out they go for the men
+      const near = h.queryRadius(c.x, c.z, P.pull, h._q);
       for (let k = 0; k < near; k++) this.track.add(h.id[h._q[k]]);
+      const up = this.team.filter((u) => u.state !== 'down');
+      for (const u of up) {
+        const n = h.queryRadius(u.x, u.z, 12, h._q);
+        for (let k = 0; k < n; k++) this.track.add(h.id[h._q[k]]);
+      }
       let tearing = 0;
       for (let i = 0; i < h.n; i++) {
         if (h.dead[i] || !this.track.has(h.id[i])) continue;
-        const a = (h.id[i] * 2.399) % 6.283;
-        h.tgtX[i] = c.x + Math.cos(a) * 1.4; h.tgtZ[i] = c.z + Math.sin(a) * 1.4;
-        if ((h.x[i] - c.x) ** 2 + (h.z[i] - c.z) ** 2 < 2.6 * 2.6) tearing++;
+        const dc = (h.x[i] - c.x) ** 2 + (h.z[i] - c.z) ** 2;
+        let best = null, bd = onGround ? dc * 0.8 : 1e9;
+        for (const u of up) { const d = (h.x[i] - u.x) ** 2 + (h.z[i] - u.z) ** 2; if (d < bd) { bd = d; best = u; } }
+        if (best) { h.tgtX[i] = best.x; h.tgtZ[i] = best.z; } else {
+          const a = (h.id[i] * 2.399) % 6.283;
+          h.tgtX[i] = c.x + Math.cos(a) * 1.4; h.tgtZ[i] = c.z + Math.sin(a) * 1.4;
+        }
+        if (onGround && dc < 2.6 * 2.6) tearing++;
       }
-      this.integrity -= Math.min(this.P.maxTearing, tearing) * this.P.tear * dt;
-      if (tearing && R() < dt * 6) fx.spark(c.x + rand(-0.6, 0.6), c.y + 0.4, c.z + rand(-0.6, 0.6), rand(-2, 2), rand(1, 3), rand(-2, 2), 4, 3, 2, 0.4);
-      if (!this.hurtSaid && this.integrity < 60) { this.hurtSaid = true; E.say('drop', 'hurt', true); }
-      this.hold -= dt;
-      if (this.integrity <= 0) return this.finish(false);
-      if (this.hold <= 0) return this.finish(true);
+      if (onGround) {
+        this.integrity -= Math.min(P.maxTearing, tearing) * P.tear * dt;
+        if (tearing && R() < dt * 6) fx.spark(c.x + rand(-0.6, 0.6), c.y + 0.4, c.z + rand(-0.6, 0.6), rand(-2, 2), rand(1, 3), rand(-2, 2), 4, 3, 2, 0.4);
+        if (!this.hurtSaid && this.integrity < 60) { this.hurtSaid = true; E.say('drop', 'hurt', true); }
+        if (this.integrity <= 0) return this.finish(false);
+      }
     }
     // crate + strobe
     E.crate.position.set(c.x, c.y, c.z);
@@ -324,11 +396,98 @@ class SupplyDrop {
     return false;
   }
 
+  /** Move, fight and pose the recovery team. Returns true/false to end the event, null to go on. */
+  updateTeam(dt) {
+    const E = this.E, g = E.g, h = g.horde, fx = g.fx, P = this.P, c = this.crate;
+    if (!this.team.length) return null;
+    const up = this.team.filter((u) => u.state !== 'down');
+    // carrying: the crate rides between the men, as fast as the men left can move it
+    if (this.phase === 'carry') {
+      let dx = GATE.x - c.x, dz = GATE.z - c.z;
+      const d = Math.hypot(dx, dz) || 1;
+      dx /= d; dz /= d;
+      const sp = P.carrySpeed[Math.min(up.length, TEAM)];
+      c.x += dx * sp * dt; c.z += dz * sp * dt;
+      c.y = groundH(c.x, c.z) + 0.75 + Math.abs(Math.sin(this.t * 4.5)) * 0.04;
+      c.yaw = Math.atan2(dx, dz);
+      E.crate.rotation.y = c.yaw;
+      if (c.z > GATE.z - 0.6 && Math.abs(c.x) < 6) return this.finish(true);
+    }
+    for (const u of this.team) {
+      const f = u.f;
+      u.t += dt;
+      if (u.state === 'down') {
+        f.body.rotation.x = -Math.min(1, u.t / 0.5) * Math.PI / 2;
+        f.body.position.y = 0.1 * Math.min(1, u.t / 0.5);
+        continue;
+      }
+      let gx, gz, sp = u.sp;
+      if (this.phase === 'out' || this.phase === 'rig') {
+        const a = u.slot * 1.57 + 0.6, r = this.phase === 'rig' ? 1.15 : 1.5;
+        gx = c.x + Math.cos(a) * r; gz = c.z + Math.sin(a) * r;
+        if (this.phase === 'rig') sp = 2;
+      } else {
+        // the first two still standing carry; the others walk point and the flank
+        const idx = up.indexOf(u);
+        const fx_ = Math.sin(c.yaw), fz_ = Math.cos(c.yaw);
+        const [side, ahead] = [[-0.95, 0], [0.95, 0], [0, 2.6], [1.8, -1.6]][idx];
+        gx = c.x + fz_ * side + fx_ * ahead; gz = c.z - fx_ * side + fz_ * ahead;
+        sp = 4;
+        u.carrying = idx < 2;
+      }
+      const dx = gx - u.x, dz = gz - u.z, dd = Math.hypot(dx, dz);
+      const moving = dd > 0.25;
+      if (moving) {
+        const st = Math.min(dd, sp * dt);
+        u.x += dx / dd * st; u.z += dz / dd * st;
+        u.yaw = this.phase === 'carry' ? c.yaw : Math.atan2(dx, dz);
+        u.ph += dt * Math.min(sp, 2 + dd * 4) * 2.1;
+      } else if (this.phase === 'carry') {
+        u.yaw = c.yaw;
+        u.ph += dt * P.carrySpeed[Math.min(up.length, TEAM)] * 2.1;
+      } else {
+        // at the crate: face it and work the straps
+        u.yaw = Math.atan2(c.x - u.x, c.z - u.z);
+      }
+      // the ones not carrying keep shooting
+      if (!u.carrying) soldierFire(g, u, dt, 28, this.phase === 'rig' ? [0.12, 0.3] : [0.2, 0.45]);
+      // caught
+      if (u.t > 1 && h.queryRadius(u.x, u.z, P.catchR * f.root.scale.x, h._q) > 0) {
+        u.state = 'down'; u.t = 0; u.carrying = false; this.lost++;
+        g.audio.scream2(u.x, u.z);
+        fx.headshot(u.x, groundH(u.x, u.z) + 1.3, u.z, 0, 0.3, 1);
+        fx.blood(u.x, u.z, 1.4);
+        if (g.run && g.inPlay()) { g.run.survivors = Math.max(0, g.run.survivors - 1); g.ns.lost++; }
+        const left = this.team.filter((v) => v.state !== 'down').length;
+        g.hud.alert(left ? `WE LOST ONE OF THE RECOVERY TEAM — ${left} LEFT` : 'THE RECOVERY TEAM IS GONE', 'red');
+        if (!left) return this.finish(false);
+        if (g.run && g.inPlay() && g.run.survivors <= 0) { const r = this.finish(false); g.fall(); return r; }
+        continue;
+      }
+      // pose
+      f.root.position.set(u.x, groundH(u.x, u.z), u.z);
+      f.root.rotation.y = u.yaw;
+      if (moving || this.phase === 'carry') poseRun(f, u.ph, u.carrying);
+      else f.work(u.t); // bent over the crate
+      fx.glowDot(u.x, groundH(u.x, u.z) + 1.72 * f.root.scale.x, u.z, 0.32, 0.4, 5, 0.8, 0.05);
+    }
+    if (this.phase === 'out' && up.every((u) => Math.hypot(u.x - c.x, u.z - c.z) < 2)) {
+      this.phase = 'rig'; this.rigT = P.rig;
+      g.hud.alert('RECOVERY TEAM AT THE CRATE — RIGGING IT');
+    } else if (this.phase === 'rig' && (this.rigT -= dt) <= 0) {
+      this.phase = 'carry';
+      c.yaw = Math.atan2(GATE.x - c.x, GATE.z - c.z);
+      g.hud.alert('THEY HAVE THE CRATE — BRING THEM HOME');
+    }
+    return null;
+  }
+
   finish(ok) {
     const E = this.E, g = E.g, h = g.horde, c = this.crate, P = this.P;
-    E.report('drop', 'end', { recovered: ok, integrity: Math.max(0, Math.round(this.integrity)), pulled: this.track.size });
+    E.report('drop', 'end', { recovered: ok, integrity: Math.max(0, Math.round(this.integrity)), pulled: this.track.size, teamLost: this.lost });
     for (let i = 0; i < h.n; i++) if (this.track.has(h.id[i])) h.resetLane(i);
     E.crate.visible = false; E.chute.visible = false;
+    for (const u of this.team) if (u.state !== 'down') u.f.root.visible = false;
     if (ok) {
       // green smoke: recovered
       for (let k = 0; k < 12; k++) g.fx.smoke.spawn(c.x, c.y, c.z, rand(-1, 1), rand(1.5, 3), rand(-1, 1), rand(4, 7), 1, 6, PF.SMOKE + ((R() * 4) | 0), 0.05, 0.3, 0.08, 0.7, 0.02, 0.06, 0.02, -0.2, 0.4);
@@ -343,23 +502,38 @@ class SupplyDrop {
       g.hud.alert(`RESUPPLY: +${P.reward.grenades} GRENADES · +${P.reward.molotovs} MOLOTOVS · BATTERY & BOMBER READY · +${sup} SUPPLIES`);
       g.audio.uiBuy();
     } else {
-      g.fx.explosion(c.x, c.y - 0.5, c.z, 0.5, { fires: false, scorch: false });
+      if (this.phase !== 'carry') g.fx.explosion(c.x, c.y - 0.5, c.z, 0.5, { fires: false, scorch: false });
       E.say('drop', 'lost', true);
-      g.hud.alert('THE CRATE IS GONE', 'red');
+      if (this.integrity <= 0) g.hud.alert('THE CRATE IS GONE', 'red');
     }
+    this.done = true;
     return true;
   }
 
   end() {
     const E = this.E;
     E.crate.visible = false; E.chute.visible = false;
+    E.crate.rotation.set(0, 0, 0);
     if (this.plane) { if (this.plane.loop) this.plane.loop.stop(1); this.plane = null; }
     E.c130.group.visible = false;
+    // the fallen lie where they fell until the night is over
+    for (const u of this.team) if (u.state !== 'down') u.f.root.visible = false;
   }
 
   objective() {
+    const c = this.crate, up = this.team.filter((u) => u.state !== 'down');
+    const integ = `CRATE ${Math.max(0, Math.round(this.integrity))}%`;
     if (this.phase === 'hold') {
-      return { title: 'HOLD THE DROP ZONE', text: `RECOVERY IN ${Math.ceil(this.hold)} S · CRATE ${Math.max(0, Math.round(this.integrity))}%`, progress: this.integrity / 100, cls: this.integrity < 50 ? 'danger' : '' };
+      return { title: 'HOLD THE DROP ZONE', text: `RECOVERY TEAM OUT IN ${Math.max(0, Math.ceil(this.P.teamDelay - c.t))} S · ${integ}`, progress: this.integrity / 100, cls: this.integrity < 50 ? 'danger' : '' };
+    }
+    if (this.phase === 'out' || this.phase === 'rig') {
+      const lead = up.reduce((m, u) => Math.min(m, Math.hypot(u.x - c.x, u.z - c.z)), 999);
+      return { title: 'COVER THE RECOVERY TEAM', text: `${up.length} OF ${TEAM} · ${this.phase === 'rig' ? 'RIGGING THE CRATE' : `${Math.round(lead)} M TO THE CRATE`} · ${integ}`,
+        progress: this.integrity / 100, cls: this.lost || this.integrity < 50 ? 'danger' : '' };
+    }
+    if (this.phase === 'carry') {
+      const d = Math.hypot(c.x - GATE.x, c.z - GATE.z);
+      return { title: 'BRING THEM HOME', text: `${up.length} OF ${TEAM} · ${Math.round(d)} M TO THE GATE`, progress: 1 - d / 95, cls: this.lost ? 'warn' : '' };
     }
     return { title: 'RESUPPLY INBOUND', text: this.phase === 'fall' ? 'CHUTE OPEN — WATCH WHERE IT LANDS' : 'C-130 ON APPROACH', progress: 1, cls: '' };
   }
@@ -367,7 +541,14 @@ class SupplyDrop {
   markers() {
     const c = this.crate;
     if (!c) return [];
-    return [{ x: c.x, y: c.y + 2.2, z: c.z, label: 'SUPPLY CRATE', cls: this.integrity < 50 ? 'danger' : 'objective' }];
+    const out = [{ x: c.x, y: c.y + 2.2, z: c.z, label: this.phase === 'carry' ? '' : 'SUPPLY CRATE', cls: this.integrity < 50 ? 'danger' : 'objective' }];
+    let first = true;
+    for (const u of this.team) {
+      if (u.state === 'down') continue;
+      out.push({ x: u.x, y: groundH(u.x, u.z) + 2.4, z: u.z, label: first ? 'RECOVERY TEAM' : '', cls: 'friend' });
+      first = false;
+    }
+    return out;
   }
 }
 
@@ -523,6 +704,268 @@ class Wave {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// A fuel tanker stalled on the road. The night's crowd comes down past it; a
+// burst through the tank turns it, and everyone around it, into a fireball.
+class Tanker {
+  constructor(E) { this.E = E; this.P = EVENTS.tanker; this.blocking = true; }
+
+  start() {
+    const { E, P } = this, g = E.g, h = g.horde, plan = g.plan;
+    const T = E.tanker;
+    this.x = rand(-6, 6); this.z = rand(P.z[0], P.z[1]);
+    this.yaw = rand(-0.5, 0.5) + Math.PI / 2;
+    T.position.set(this.x, groundH(this.x, this.z) - 0.05, this.z);
+    T.rotation.set(0, this.yaw, rand(-0.03, 0.03));
+    T.visible = true;
+    T.updateMatrixWorld(true);
+    this.box = new THREE.Box3().setFromObject(T);
+    this.hp = P.hp; this.t = 0; this.state = 'wait'; this.leak = 0;
+    // the crowd that will walk past it
+    this.ids = new Set();
+    const n = P.crowd + 6 * Math.max(0, g.run.night - 2);
+    for (let k = 0; k < n; k++) {
+      const i = h.spawn(R() < 0.85 ? ZT.SHAMBLER : ZT.RUNNER, this.x + rand(-14, 14), -205 - rand(0, 40), plan.hpMul, plan.speedMul);
+      if (i >= 0) this.ids.add(h.id[i]);
+    }
+    this.target = { test: (o, d, maxT) => (this.state === 'wait' ? rayBox(o, d, this.box, maxT) : -1), hit: (p) => this.hit(p) };
+    g.player.shootables.push(this.target);
+    E.say('tanker', 'start', true);
+    g.hud.alert('FUEL TANKER ON THE ROAD — SHOOT IT WHEN THEY CROWD AROUND IT');
+  }
+
+  hit(p) {
+    const g = this.E.g;
+    this.hp--;
+    g.fx.spark(p.x, p.y, p.z, rand(-2, 2), rand(1, 3), rand(-2, 2), 6, 4, 2, 0.4);
+    if (R() < 0.3) g.audio.wallGun && g.audio.crackle(p.x, p.z, 0.2);
+    // a punctured tank spits burning fuel before it goes
+    if (this.hp < this.P.hp * 0.6) this.leak = 1;
+    if (this.hp <= 0) this.explode();
+  }
+
+  explode() {
+    const { E, P } = this, g = E.g, a = g.arsenal;
+    this.state = 'boom';
+    const x = this.x, z = this.z, gy = groundH(x, z);
+    E.tanker.visible = false;
+    E.tankerWreck.position.copy(E.tanker.position); E.tankerWreck.rotation.copy(E.tanker.rotation); E.tankerWreck.visible = true;
+    g.fx.bigExplosion(x, gy + 2, z, 1.1);
+    g.audio.bigBlast(x, z);
+    const kills = a.detonate(x, gy + 1, z, 2.2, P.radius, P.damage, 'tanker');
+    // the fuel goes everywhere and burns
+    a.firePool(x, z, P.fireRadius, P.fireBurn);
+    for (const [dx, dz] of [[8, 3], [-7, 5], [3, -8], [-4, -6]]) a.firePool(x + dx, z + dz, P.fireRadius * 0.55, P.fireBurn * 0.8);
+    this.kills = kills;
+    E.say('tanker', 'boom', true);
+    g.hud.alert(`TANKER DETONATED — ${kills} KILLED`);
+    this.boomT = 0;
+  }
+
+  update(dt) {
+    const { E, P } = this, g = E.g, h = g.horde;
+    this.t += dt;
+    if (this.state === 'wait') {
+      if (this.leak) {
+        const gy = groundH(this.x, this.z);
+        if (R() < dt * 30) g.fx.flame(this.x + rand(-1.5, 1.5), gy + 1.5, this.z + rand(-1.5, 1.5), 0.9, 2.6);
+        this.hp -= dt * 0.8; // it will go on its own soon
+        if (this.hp <= 0) this.explode();
+      }
+      // the road crowd walks straight past it
+      for (let i = 0; i < h.n; i++) if (!h.dead[i] && this.ids.has(h.id[i]) && h.z[i] < this.z - 6) { h.tgtX[i] = this.x + ((h.id[i] * 1.618) % 1 - 0.5) * 16; h.tgtZ[i] = this.z + 30; }
+      if (this.t > P.timeout) {
+        this.E.report('tanker', 'end', { blown: false, kills: 0 });
+        E.say('tanker', 'wasted');
+        return true;
+      }
+      return false;
+    }
+    this.boomT += dt;
+    if (this.boomT > 2) {
+      this.E.report('tanker', 'end', { blown: true, kills: this.kills });
+      return true;
+    }
+    return false;
+  }
+
+  end() {
+    const g = this.E.g;
+    const k = g.player.shootables.indexOf(this.target);
+    if (k >= 0) g.player.shootables.splice(k, 1);
+    this.E.tanker.visible = false;
+    for (let i = 0; i < g.horde.n; i++) if (this.ids.has(g.horde.id[i])) g.horde.resetLane(i);
+  }
+
+  objective() {
+    if (this.state !== 'wait') return null;
+    const near = this.E.g.horde.countNear(this.x, this.z, this.P.radius);
+    return { title: 'FUEL TANKER', text: `${near} AROUND IT · ${this.leak ? 'IT IS LEAKING — ' : ''}SHOOT THE TANK`, progress: Math.max(0, this.hp / this.P.hp), cls: this.leak ? 'danger' : '' };
+  }
+
+  markers() {
+    if (this.state !== 'wait') return [];
+    return [{ x: this.x, y: groundH(this.x, this.z) + 4.5, z: this.z, label: 'FUEL TANKER', cls: 'objective' }];
+  }
+}
+
+/** Distance along a ray (o + d t) to an axis-aligned box, or -1. */
+function rayBox(o, d, b, maxT) {
+  let t0 = 0, t1 = maxT;
+  for (const k of ['x', 'y', 'z']) {
+    const inv = 1 / (d[k] || 1e-9);
+    let a = (b.min[k] - o[k]) * inv, c = (b.max[k] - o[k]) * inv;
+    if (a > c) { const s = a; a = c; c = s; }
+    t0 = Math.max(t0, a); t1 = Math.min(t1, c);
+    if (t0 > t1) return -1;
+  }
+  return t0;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// A truck full of survivors runs the road to the gate. The dead in front of it
+// slow it down; the ones that reach it tear at it. Clear the road.
+class Convoy {
+  constructor(E) { this.E = E; this.P = EVENTS.convoy; this.blocking = true; }
+
+  start() {
+    const { E, P } = this, g = E.g, h = g.horde, plan = g.plan;
+    this.x = rand(-3, 3); this.z = -235; this.hp = 100; this.t = 0; this.state = 'drive'; this.sp = P.speed;
+    const T = E.truck;
+    T.visible = true;
+    this.track = new Set();
+    // a crowd on the road ahead, runners behind
+    for (let k = 0; k < P.blockers + 4 * Math.max(0, g.run.night - 6); k++) {
+      const i = h.spawn(ZT.SHAMBLER, rand(-8, 8), rand(-170, -60), plan.hpMul, plan.speedMul * 0.8);
+      if (i >= 0) { h.fadeIn[i] = 0; }
+    }
+    for (let k = 0; k < P.chasers; k++) {
+      const i = h.spawn(ZT.RUNNER, this.x + rand(-10, 10), this.z - rand(15, 40), plan.hpMul, plan.speedMul);
+      if (i >= 0) { this.track.add(h.id[i]); h.fadeIn[i] = 0; }
+    }
+    this.loop = null;
+    E.say('convoy', 'start', true);
+    E.say('convoy', 'follow');
+    g.hud.alert('SURVIVOR TRUCK ON THE ROAD — CLEAR A PATH');
+  }
+
+  update(dt) {
+    const { E, P } = this, g = E.g, h = g.horde, fx = g.fx;
+    this.t += dt;
+    const T = E.truck;
+    if (this.state === 'drive') {
+      // what's on the road in front slows it; what's touching it tears at it
+      let ahead = 0, touching = 0;
+      const n = h.queryRadius(this.x, this.z + 4, 6, h._q);
+      for (let k = 0; k < n; k++) { const j = h._q[k]; if (h.z[j] > this.z + 1) ahead += h.weight[j]; }
+      const m = h.queryRadius(this.x, this.z, 3.4, h._q);
+      for (let k = 0; k < m; k++) { touching++; this.track.add(h.id[h._q[k]]); }
+      const want = P.speed / (1 + ahead * 0.45);
+      this.sp += (want - this.sp) * Math.min(1, dt * 2);
+      // ploughing through: the ones it hits go under the wheels
+      if (this.sp > 2) for (let k = 0; k < n; k++) { const j = h._q[k]; if (Math.abs(h.x[j] - this.x) < 1.4 && h.z[j] > this.z + 2.5 && h.z[j] < this.z + 4.2) h.damage(j, 400 * dt * this.sp, 'truck', 0, 0.3, 1); }
+      this.hp -= Math.min(P.maxTearing, touching) * P.tear * dt;
+      let dx = GATE.x - this.x, dz = GATE.z - this.z;
+      const d = Math.hypot(dx, dz) || 1;
+      this.x += dx / d * this.sp * dt; this.z += dz / d * this.sp * dt;
+      this.yaw = Math.atan2(dx, dz);
+      for (let i = 0; i < h.n; i++) if (!h.dead[i] && this.track.has(h.id[i])) { h.tgtX[i] = this.x; h.tgtZ[i] = this.z; }
+      if (touching && R() < dt * 5) fx.spark(this.x + rand(-1, 1), groundH(this.x, this.z) + 1.5, this.z + rand(-2, 2), rand(-2, 2), rand(1, 3), rand(-2, 2), 4, 3, 2, 0.4);
+      // headlights
+      const gy = groundH(this.x, this.z);
+      for (const s of [-0.75, 0.75]) fx.glowDot(this.x + Math.cos(this.yaw) * s + Math.sin(this.yaw) * 4.6, gy + 1.8, this.z - Math.sin(this.yaw) * s + Math.cos(this.yaw) * 4.6, 0.7, 6, 5.5, 4, 0.05);
+      if (!this.loop && g.audio.ready && g.audio.B.prop) this.loop = g.audio.loop(g.audio.B.prop[0], { ref: 30, rate: 0.45 });
+      if (this.loop) this.loop.update(this.x, gy + 1, this.z, 0, 0, this.sp, 1.2);
+      if (this.hp <= 0) return this.finish(false);
+      if (this.z > GATE.z - 1.5 && Math.abs(this.x) < 6) return this.finish(true);
+    }
+    T.position.set(this.x, groundH(this.x, this.z), this.z);
+    // the truck's nose is +x: face it down the road
+    T.rotation.set(0, this.yaw - Math.PI / 2, Math.sin(this.t * 9) * 0.01 * this.sp);
+    return false;
+  }
+
+  finish(ok) {
+    const { E, P } = this, g = E.g, h = g.horde;
+    E.report('convoy', 'end', { saved: ok, hp: Math.max(0, Math.round(this.hp)), seconds: Math.round(this.t) });
+    for (let i = 0; i < h.n; i++) if (this.track.has(h.id[i])) h.resetLane(i);
+    if (ok) {
+      const run = g.run;
+      run.survivors += P.reward.survivors;
+      const sup = P.reward.supplies;
+      run.supplies += sup; g.ns.supplies += sup;
+      E.say('convoy', 'saved', true);
+      g.hud.alert(`THE TRUCK IS IN · +${P.reward.survivors} ON THE WALL · +${sup} SUPPLIES`);
+      E.truck.visible = false;
+    } else {
+      // it stops where it died, and burns
+      g.fx.explosion(this.x, groundH(this.x, this.z) + 1.5, this.z, 0.7, { scorch: true });
+      g.arsenal.firePool(this.x, this.z, 3.5, 25);
+      E.say('convoy', 'lost', true);
+      g.hud.alert('THE TRUCK IS DOWN — THEY GOT THEM', 'red');
+    }
+    this.done = true;
+    return true;
+  }
+
+  end() {
+    if (this.loop) { this.loop.stop(1); this.loop = null; }
+    if (!this.done || this.hp > 0) this.E.truck.visible = false;
+  }
+
+  objective() {
+    const d = Math.hypot(this.x - GATE.x, this.z - GATE.z);
+    return { title: 'SURVIVOR TRUCK', text: `${Math.round(d)} M TO THE GATE · TRUCK ${Math.max(0, Math.round(this.hp))}%${this.sp < this.P.speed * 0.4 ? ' · ROAD BLOCKED' : ''}`,
+      progress: Math.max(0, this.hp) / 100, cls: this.hp < 50 ? 'danger' : '' };
+  }
+
+  markers() { return [{ x: this.x, y: groundH(this.x, this.z) + 4.2, z: this.z, label: 'TRUCK', cls: this.hp < 50 ? 'danger' : 'friend' }]; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// They find the way round: down over the rocks at the end of a wing, right onto
+// the last section of wall, where nobody was looking.
+class Cliffs {
+  constructor(E) { this.E = E; this.P = EVENTS.cliffs; this.blocking = false; }
+
+  start() {
+    const { E, P } = this, g = E.g;
+    this.side = R() < 0.5 ? -1 : 1;
+    this.left = P.count + 8 * Math.max(0, g.run.night - 3);
+    this.total = this.left;
+    this.t = 0; this.acc = 0;
+    this.ids = new Set();
+    E.say('cliffs', this.side < 0 ? 'left' : 'right', true);
+    g.hud.alert(`THEY'RE COMING OVER THE ROCKS — ${this.side < 0 ? 'LEFT' : 'RIGHT'} WING`, 'red');
+  }
+
+  update(dt) {
+    const { E, P } = this, g = E.g, h = g.horde, plan = g.plan;
+    this.t += dt;
+    this.acc += dt * this.total / P.over;
+    while (this.acc >= 1 && this.left > 0) {
+      this.acc -= 1; this.left--;
+      const x = this.side * rand(73, 88), z = wallZ(Math.min(Math.abs(x), 72) * this.side) - rand(3, 18);
+      const i = h.spawn(R() < 0.7 ? ZT.RUNNER : ZT.SHAMBLER, x, z, plan.hpMul, plan.speedMul);
+      if (i >= 0) {
+        this.ids.add(h.id[i]);
+        h.fadeIn[i] = 0;
+        // straight for the end of the wall
+        h.tgtX[i] = this.side * rand(58, 70); h.tgtZ[i] = wallZ(h.tgtX[i]) + 0.5;
+        if (R() < 0.15) g.fx.groundHit(x, z);
+      }
+    }
+    let alive = 0;
+    for (let i = 0; i < h.n; i++) if (!h.dead[i] && this.ids.has(h.id[i])) alive++;
+    this.alive = alive;
+    if (this.left === 0 && (alive === 0 || this.t > P.over + 60)) { E.report('cliffs', 'end', { total: this.total, left: alive }); return true; }
+    return false;
+  }
+
+  end() {}
+  objective() { return { title: `OVER THE ROCKS — ${this.side < 0 ? 'LEFT' : 'RIGHT'}`, text: `${this.alive ?? 0} ON THE FLANK${this.left ? ` · ${this.left} MORE COMING` : ''}`, progress: 1 - this.t / (this.P.over + 20), cls: 'warn' }; }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 class FogBank {
   constructor(E) { this.E = E; this.P = EVENTS.fog; this.blocking = false; }
   start() {
@@ -611,6 +1054,9 @@ export class NightEvents {
     const scene = game.scene;
     this.people = [];
     for (let k = 0; k < 8; k++) { const p = buildPerson(); scene.add(p.root); this.people.push(p); }
+    // our soldiers in the field: the patrol (0-3) and the recovery team (4-7)
+    this.soldiers = [];
+    for (let k = 0; k < 8; k++) { const s = new Soldier(); scene.add(s.root); this.soldiers.push(s); }
     // supply drop: aircraft, crate and parachute
     this.c130 = buildGunship();
     this.c130.group.scale.setScalar(1.5);
@@ -618,9 +1064,17 @@ export class NightEvents {
     scene.add(this.c130.group);
     const crateMat = new THREE.MeshStandardMaterial({ color: 0x4a4f36, roughness: 0.85 });
     const strap = new THREE.MeshStandardMaterial({ color: 0x1c1d18, roughness: 0.9 });
+    // the load: ammunition crates stacked two wide and three high on a pallet, strapped down
     this.crate = new THREE.Group();
-    this.crate.add(new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.1, 1.2), crateMat));
-    for (const x of [-0.45, 0.45]) { const s = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.14, 1.24), strap); s.position.x = x; this.crate.add(s); }
+    const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 1.15), crateMat); pallet.position.y = -0.5; this.crate.add(pallet);
+    for (let r = 0; r < 3; r++) for (const z of [-0.28, 0.28]) {
+      const c = cloneModel('crate');
+      c.scale.setScalar(1.6);
+      c.position.set((R() - 0.5) * 0.04, -0.45 + r * 0.335, z);
+      c.rotation.y = (R() - 0.5) * 0.04;
+      this.crate.add(c);
+    }
+    for (const x of [-0.45, 0.45]) { const s = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.12, 1.18), strap); s.position.set(x, 0.0, 0); this.crate.add(s); }
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 4, 5) }));
     lamp.position.y = 0.62; this.crate.add(lamp);
     this.crate.visible = false;
@@ -636,6 +1090,23 @@ export class NightEvents {
     this.chute.add(new THREE.LineSegments(lg, new THREE.LineBasicMaterial({ color: 0x2a2a24 })));
     this.chute.visible = false;
     scene.add(this.chute);
+    // the fuel tanker (and what is left of it) and the survivors' truck
+    const mats = game.env.mats;
+    const tankerParts = (burnt) => {
+      const t = makeTruck(mats, { body: burnt ? mats.burnt : mats.olive, burnt, seed: 5, covered: false });
+      t.add(new THREE.Mesh(cylX(1.05, 4.3, 18, -2.2, 2.45, 0), burnt ? mats.burnt : (mats.steel || mats.darkSteel)));
+      for (const x of [-4.35, -0.05]) t.add(new THREE.Mesh(cylX(1.08, 0.12, 18, x, 2.45, 0), mats.darkSteel));
+      t.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      t.visible = false;
+      scene.add(t);
+      return t;
+    };
+    this.tanker = tankerParts(false);
+    this.tankerWreck = tankerParts(true);
+    this.truck = makeTruck(mats, { body: mats.olive, seed: 9, covered: true });
+    this.truck.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    this.truck.visible = false;
+    scene.add(this.truck);
   }
 
   /** Schedule tonight's events. */
@@ -660,10 +1131,13 @@ export class NightEvents {
       case 'fog': e = new FogBank(this); break;
       case 'blackout': e = new Blackout(this); break;
       case 'gunshipDown': e = new GunshipDown(this); break;
+      case 'tanker': e = new Tanker(this); break;
+      case 'convoy': e = new Convoy(this); break;
+      case 'cliffs': e = new Cliffs(this); break;
       default: return null;
     }
     // one escort / one drop at a time: the props are shared
-    if (this.active.some((a) => a.constructor === e.constructor && (e instanceof Escort || e instanceof SupplyDrop))) return null;
+    if (this.active.some((a) => a.constructor === e.constructor && (e instanceof Escort || e instanceof SupplyDrop || e instanceof Tanker || e instanceof Convoy))) return null;
     e.kind = e.kind || kind;
     e.start();
     this.active.push(e);
@@ -674,6 +1148,8 @@ export class NightEvents {
   reset() {
     for (const e of this.active) e.end();
     this.active.length = 0;
+    for (const p of [...this.people, ...this.soldiers]) p.root.visible = false; // the fallen from last night
+    if (this.tankerWreck) { this.tankerWreck.visible = false; this.tanker.visible = false; this.truck.visible = false; }
     this.queue.length = 0;
     const g = this.g;
     g.env.power = 1; g.env.fogBank = 0;

@@ -392,7 +392,7 @@ def main():
         if f.endswith('.ogg') and f not in keep:
             os.remove(os.path.join(OUT, f))
     json.dump(manifest, open(man_path, 'w', encoding='utf-8'), indent=1, ensure_ascii=False, sort_keys=True)
-    print(f'{len(manifest)} lines, {total:.0f} s of speech → {os.path.relpath(OUT, ROOT)}')
+    print(f'{len(manifest)} lines, {total:.0f} s of speech -> {os.path.relpath(OUT, ROOT)}')
 
 
 if __name__ == '__main__':

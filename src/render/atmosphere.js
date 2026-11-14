@@ -39,17 +39,20 @@ vec4 lbFog(vec3 wp, vec3 cam, vec3 baseCol, float t, float dawn){
   float Db = mix(${f(NIGHT.Db)}, ${f(DAWN.Db)}, dawn);
   float D0 = mix(${f(NIGHT.D0)}, ${f(DAWN.D0)}, dawn);
   float b = mix(${f(NIGHT.b)}, ${f(DAWN.b)}, dawn);
-  // a real bank: the wall base still reads close in, the field is gone past ~40 m
-  Db *= 1.0 + bank * 38.0;
-  D0 *= 1.0 + bank * 9.0;
-  b = mix(b, 0.045, bank);
+  // a real bank lies out in the valley: the wall base and the first stretch of field stay
+  // clear, it thickens over the next tens of metres, and the far field is gone
+  float bankPath = max(d - 30.0, 0.0);
+  float bankFrac = bankPath / max(d, 1e-4);
+  float bankTau = bank * (0.0016 * 26.0) * bankPath * (0.6 + 0.4 * smoothstep(30.0, 90.0, d));
+  D0 *= 1.0 + bank * 6.0 * bankFrac;
+  b = mix(b, 0.05, bank * bankFrac);
   // drifting, patchy ground mist
   float m = lbNoise(wp.xz * 0.012 + t * vec2(0.010, 0.0035)) * 0.62 + lbNoise(wp.xz * 0.041 - t * vec2(0.004, 0.016)) * 0.38;
   m = 0.22 + 1.65 * m * m;
   float k = b * rd.y * d;
   float hi = abs(k) < 1e-3 ? d : (1.0 - exp(-k)) / (b * rd.y);
   float th = D0 * exp(-b * cam.y) * hi * m;
-  float tb = Db * d;
+  float tb = Db * d + bankTau;
   vec2 dxz = normalize(rd.xz + 1e-5);
   float toward = max(0.0, -dxz.y);
   float glow = toward * toward * exp(-max(rd.y, 0.0) * 13.0) * mix(0.5, 0.35, dawn);

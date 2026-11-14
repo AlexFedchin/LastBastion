@@ -2,7 +2,8 @@
 module.exports = {
   async run(t) {
     await t.start(2, { survivors: 999 });
-    await t.js('__LB.test.spawn(70, -48, -26, 0)');
+    // a pack right where the burst lands (~38 m out): test.spawn scatters over x ±70 m, too thin for a 2.5 s burst
+    await t.js('for (let i = 0; i < 60; i++) __LB.horde.spawn(0, -9 + Math.random() * 18, -44 + Math.random() * 10, 1, 1)');
     const s0 = await t.get(`({ shots: __LB.player.shots, hits: __LB.player.hits, kills: __LB.run.kills, decals: __LB.fx.decals.count })`);
     const r = await t.get(`(() => {
       const G = __LB; let paths = 0, tracers = 0, maxHeat = 0;

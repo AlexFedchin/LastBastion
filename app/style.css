@@ -240,47 +240,31 @@ table.keys td:first-child { font-family: var(--mono); color: var(--amber); width
 #loading.done { opacity: 0; pointer-events: none; }
 #loading.done .ld-scene *, #loading.done .ld-ui * { animation-play-state: paused; }
 
-/* the scene: a night at the wall, CSS-only so it keeps moving while the game builds */
+/* the scene: a painted night (app/art, see scripts/art) split into a far and a near layer that
+   drift against each other, with rain, mist, embers and lightning over it. Transforms and opacity
+   only: they run on the compositor, so it all keeps moving while the game builds on the main thread */
 .ld-scene { position: absolute; inset: 0; }
 .ld-scene > * { position: absolute; left: 0; right: 0; }
-.ld-sky { inset: 0; background:
-  radial-gradient(ellipse 70% 26% at 50% 60%, rgba(255,110,40,0.42), rgba(160,40,12,0.18) 45%, transparent 75%),
-  linear-gradient(180deg, #040406 0%, #0b0709 30%, #24100a 52%, #4a1a0b 59%, #1a0b07 63%, #070505 100%); }
-.ld-flash { inset: 0; background: radial-gradient(ellipse 60% 40% at 30% 18%, rgba(170,185,230,0.5), transparent 70%); opacity: 0; animation: ldFlash 11s infinite; mix-blend-mode: screen; }
-@keyframes ldFlash { 0%, 61%, 63%, 64.5%, 100% { opacity: 0; } 61.5% { opacity: 0.9; } 63.6% { opacity: 0.5; } }
-.ld-flak { inset: 0; }
-.ld-flak i { position: absolute; width: 60px; height: 60px; margin: -30px; border-radius: 50%; background: radial-gradient(circle, rgba(255,200,120,0.9), rgba(255,120,40,0.25) 35%, transparent 70%); opacity: 0; animation: ldFlak 7s infinite; }
-@keyframes ldFlak { 0%, 88%, 100% { opacity: 0; transform: scale(0.3); } 90% { opacity: 1; transform: scale(1); } 95% { opacity: 0.25; transform: scale(1.3); } }
-.ld-beam { top: auto; bottom: 30%; width: 7vw; height: 85vh; left: 4%; right: auto; transform-origin: 50% 100%;
-  background: linear-gradient(0deg, rgba(220,230,255,0.22), rgba(220,230,255,0.05) 60%, transparent);
-  clip-path: polygon(46% 100%, 54% 100%, 100% 0, 0 0); filter: blur(2px); animation: ldBeamL 13s ease-in-out infinite alternate; }
-.ld-beam.r { left: auto; right: 4%; animation-name: ldBeamR; animation-duration: 17s; }
-@keyframes ldBeamL { from { transform: rotate(14deg); } to { transform: rotate(58deg); } }
-@keyframes ldBeamR { from { transform: rotate(-10deg); } to { transform: rotate(-52deg); } }
-.ld-hills { top: 47%; height: 14%; width: 100%; fill: #0d0807; }
-.ld-city { top: 50%; height: 10.5%; width: 100%; fill: #080505; }
-.ld-city .ld-win { fill: #ff9a40; opacity: 0.55; animation: ldWin 4s steps(2) infinite; }
-@keyframes ldWin { 50% { opacity: 0.35; } }
-.ld-fires { top: 50%; height: 11%; }
-.ld-fires i { position: absolute; bottom: 0; width: var(--w); height: var(--h); margin-left: calc(var(--w) / -2); border-radius: 50% 50% 20% 20%;
-  background: radial-gradient(ellipse at 50% 85%, rgba(255,230,150,0.95), rgba(255,120,30,0.7) 35%, rgba(200,40,10,0.25) 60%, transparent 72%);
-  transform-origin: 50% 100%; animation: ldFire 1.3s ease-in-out infinite alternate; mix-blend-mode: screen; }
-@keyframes ldFire { from { transform: scale(0.85, 0.75); opacity: 0.75; } to { transform: scale(1.1, 1.25); opacity: 1; } }
-.ld-field { top: 58.5%; height: 42%; width: 100%; fill: #070504; }
-.ld-eyes { top: 63%; height: 15%; animation: ldHorde 24s ease-in-out infinite alternate; transform-origin: 50% 0; }
-.ld-eyes i { position: absolute; width: 2px; height: 1.4px; background: #ff9a3c; box-shadow: 3px 0 #ff9a3c, 0 0 4px rgba(255,140,40,0.9); opacity: var(--o); animation: ldBlink 5s infinite; }
-@keyframes ldBlink { 0%, 46%, 50%, 100% { opacity: var(--o); } 48% { opacity: 0; } }
-@keyframes ldHorde { from { transform: scale(1); } to { transform: scale(1.05) translateY(4px); } }
-.ld-mist { top: 58%; height: 26%; background: linear-gradient(180deg, transparent, rgba(60,40,32,0.28) 40%, rgba(30,22,18,0.4) 70%, transparent);
-  animation: ldMist 18s ease-in-out infinite alternate; }
-@keyframes ldMist { from { transform: translateX(-3%); opacity: 0.8; } to { transform: translateX(3%); opacity: 1; } }
-.ld-wall { bottom: 0; top: auto; height: 34%; width: 100%; }
-.ld-wall .ld-nest { animation: ldLamp 1.7s ease-in-out infinite alternate; }
-.ld-wall .ld-wire { fill: none; stroke: #120f0c; stroke-width: 1.4; }
-.ld-wall .ld-slabs { fill: #15110e; }
-.ld-wall .ld-seams { stroke: #050404; stroke-width: 2; }
-.ld-wall .ld-lamps circle:nth-child(2) { animation: ldLamp 3s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
-@keyframes ldLamp { from { opacity: 0.75; } to { opacity: 1; } }
+.ld-art { inset: 0; overflow: hidden; }
+.ld-art > div { position: absolute; inset: 0; background-position: center; background-size: cover; background-repeat: no-repeat; will-change: transform; }
+.ld-far { background-image: url("art/nest.webp"); animation: ldFar 46s ease-in-out infinite alternate; }
+.ld-near { background-image: url("art/nest-near.webp"); animation: ldNear 46s ease-in-out infinite alternate; }
+@keyframes ldFar { from { transform: scale(1.06) translate(-0.8%, 0.2%); } to { transform: scale(1.1) translate(0.8%, -0.4%); } }
+@keyframes ldNear { from { transform: scale(1.08) translate(-2.2%, 0.5%); } to { transform: scale(1.14) translate(2.2%, -0.3%); } }
+.ld-art.swap > div { animation: none; opacity: 0; }
+.ld-glow { inset: 0; background: radial-gradient(ellipse 90% 45% at 55% 100%, rgba(255,120,40,0.16), transparent 70%);
+  mix-blend-mode: screen; animation: ldGlow 2.3s ease-in-out infinite alternate; }
+@keyframes ldGlow { 0% { opacity: 0.55; } 40% { opacity: 0.9; } 55% { opacity: 0.65; } 100% { opacity: 1; } }
+.ld-flash { inset: 0; background: radial-gradient(ellipse 70% 50% at 35% 15%, rgba(170,185,230,0.55), transparent 70%); opacity: 0; animation: ldFlash 13s infinite; mix-blend-mode: screen; }
+@keyframes ldFlash { 0%, 61%, 63%, 64.5%, 100% { opacity: 0; } 61.5% { opacity: 0.8; } 63.6% { opacity: 0.45; } }
+.ld-mist { inset: 0; overflow: hidden; }
+.ld-mist i { position: absolute; left: -30%; width: 90%; height: 34%; border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(120,110,105,0.16), rgba(90,80,75,0.07) 45%, transparent 70%);
+  animation: ldMist 38s linear infinite; }
+.ld-mist i:nth-child(1) { top: 52%; }
+.ld-mist i:nth-child(2) { top: 64%; height: 40%; animation-duration: 52s; animation-delay: -20s; }
+.ld-mist i:nth-child(3) { top: 40%; height: 26%; animation-duration: 64s; animation-delay: -41s; opacity: 0.7; }
+@keyframes ldMist { from { transform: translateX(-20%); } to { transform: translateX(140%); } }
 .ld-rain { inset: 0; overflow: hidden; }
 .ld-rain > div { position: absolute; left: -10%; right: -10%; top: -300px; bottom: 0; background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300' stroke='rgb(185,195,215)' stroke-width='1' stroke-opacity='0.22' stroke-linecap='round'%3E%3Cline x1="71" y1="163" x2="68" y2="183"/%3E%3Cline x1="181" y1="188" x2="178" y2="203"/%3E%3Cline x1="4" y1="251" x2="1" y2="269"/%3E%3Cline x1="70" y1="299" x2="67" y2="320"/%3E%3Cline x1="251" y1="143" x2="248" y2="167"/%3E%3Cline x1="45" y1="190" x2="42" y2="218"/%3E%3Cline x1="157" y1="222" x2="154" y2="247"/%3E%3Cline x1="19" y1="227" x2="16" y2="251"/%3E%3Cline x1="90" y1="9" x2="87" y2="37"/%3E%3Cline x1="142" y1="216" x2="139" y2="244"/%3E%3Cline x1="214" y1="276" x2="211" y2="297"/%3E%3Cline x1="240" y1="133" x2="237" y2="162"/%3E%3Cline x1="264" y1="29" x2="261" y2="45"/%3E%3Cline x1="65" y1="290" x2="62" y2="311"/%3E%3Cline x1="188" y1="90" x2="185" y2="112"/%3E%3Cline x1="116" y1="105" x2="113" y2="129"/%3E%3Cline x1="175" y1="271" x2="172" y2="296"/%3E%3Cline x1="279" y1="257" x2="276" y2="287"/%3E%3Cline x1="201" y1="49" x2="198" y2="77"/%3E%3Cline x1="289" y1="271" x2="286" y2="295"/%3E%3Cline x1="214" y1="63" x2="211" y2="91"/%3E%3Cline x1="172" y1="85" x2="169" y2="101"/%3E%3Cline x1="256" y1="297" x2="253" y2="312"/%3E%3Cline x1="240" y1="123" x2="237" y2="140"/%3E%3Cline x1="88" y1="231" x2="85" y2="259"/%3E%3Cline x1="13" y1="184" x2="10" y2="199"/%3E%3Cline x1="216" y1="99" x2="213" y2="127"/%3E%3Cline x1="294" y1="152" x2="291" y2="182"/%3E%3Cline x1="93" y1="23" x2="90" y2="47"/%3E%3Cline x1="9" y1="59" x2="6" y2="80"/%3E%3Cline x1="183" y1="47" x2="180" y2="62"/%3E%3Cline x1="260" y1="94" x2="257" y2="123"/%3E%3Cline x1="269" y1="113" x2="266" y2="135"/%3E%3Cline x1="156" y1="193" x2="153" y2="217"/%3E%3C/svg%3E"); animation: ldRain 0.55s linear infinite; }
 .ld-rain > .b { background-image: url("data:image/svg+xml;utf8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' stroke='rgb(205,212,228)' stroke-width='1.4' stroke-opacity='0.28' stroke-linecap='round'%3E%3Cline x1="123" y1="136" x2="119" y2="179"/%3E%3Cline x1="112" y1="95" x2="108" y2="133"/%3E%3Cline x1="52" y1="66" x2="48" y2="110"/%3E%3Cline x1="115" y1="121" x2="111" y2="145"/%3E%3Cline x1="91" y1="128" x2="87" y2="152"/%3E%3Cline x1="135" y1="139" x2="131" y2="164"/%3E%3Cline x1="138" y1="103" x2="134" y2="140"/%3E%3Cline x1="78" y1="156" x2="74" y2="194"/%3E%3Cline x1="5" y1="13" x2="1" y2="51"/%3E%3Cline x1="212" y1="55" x2="208" y2="88"/%3E%3Cline x1="130" y1="70" x2="126" y2="102"/%3E%3Cline x1="69" y1="81" x2="65" y2="117"/%3E%3C/svg%3E"); top: -220px; animation-duration: 0.38s; animation-name: ldRainB; }

@@ -70,9 +70,26 @@ export class HUD {
     this.mapX = mapX; this.mapZ = mapZ;
   }
 
-  radio(who, text, prio = false) {
-    if (prio) this.radioQueue.unshift([who, text]); else this.radioQueue.push([who, text]);
+  /**
+   * Queue a radio call. prio: it is about something happening now (jumps the queue).
+   * opts.ttl: seconds it stays worth saying (prio calls default to 6, others 40);
+   * opts.valid: checked when its turn comes; false drops it (the bomb already fell...).
+   */
+  radio(who, text, prio = false, opts = {}) {
+    const m = { who, text, at: this.clock || 0, ttl: opts.ttl ?? (prio ? 6 : 40), valid: opts.valid || null };
+    if (prio) this.radioQueue.unshift(m); else this.radioQueue.push(m);
     if (this.radioQueue.length > 4) this.radioQueue.length = 4;
+  }
+
+  /** The next call still worth making, dropping the ones overtaken by events. */
+  nextRadio() {
+    while (this.radioQueue.length) {
+      const m = this.radioQueue.shift();
+      if ((this.clock || 0) - m.at > m.ttl) continue;
+      if (m.valid && !m.valid()) continue;
+      return m;
+    }
+    return null;
   }
 
   announce(big, small = '', dur = 3.2, cls = '') {
@@ -296,6 +313,7 @@ export class HUD {
     if (this.cache.view !== d) { this.cache.view = d; this.viewEl.setAttribute('d', d); }
 
     // radio ticker
+    this.clock = (this.clock || 0) + dt;
     if (this.radioT > 0) {
       this.radioT -= dt;
       const full = this.radioFull;
@@ -306,8 +324,8 @@ export class HUD {
         : Math.min(full.length, Math.floor(el2 * 55));
       this.set('rtext', el.radioText, full.slice(0, shown));
       if (this.radioT <= 0) el.radio.classList.remove('show');
-    } else if (this.radioQueue.length) {
-      const [who, text] = this.radioQueue.shift();
+    } else if (this.radioQueue.length && (this._rm = this.nextRadio())) {
+      const { who, text } = this._rm;
       this.radioFull = text;
       this.radioVoice = g.audio ? g.audio.radioVoice(who, text) : 0;
       this.radioDur = this.radioT = Math.max(4.5, text.length * 0.065 + 2.5, this.radioVoice + 1.4);

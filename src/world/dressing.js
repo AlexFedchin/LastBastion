@@ -282,7 +282,9 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   const top = WORLD.TOWER_TOP, z0 = WORLD.BASE_Z;
   const R = (x, z, ry = 0, y = top) => place(x, y, z, ry);
   // ready ammo for the fifty, stacked behind the nest
-  for (let k = 0; k < 3; k++) for (let r = 0; r < (k === 1 ? 3 : 2); r++) B.put(P.crate(), R(-4.6 + r * 0.03, -0.5 + k * 0.56, (rng() - 0.5) * 0.06, top + r * 0.43));
+  // (the crates themselves are model crates: env.roofCrates, placed in dressWithModels)
+  env.roofCrates = [];
+  for (let k = 0; k < 3; k++) for (let r = 0; r < (k === 1 ? 3 : 2); r++) env.roofCrates.push([-4.6 + r * 0.03, top + r * 0.21, -0.5 + k * 0.36, (rng() - 0.5) * 0.08]);
   for (let k = 0; k < 5; k++) B.put(P.can(), R(2.2 + (k % 3) * 0.34, -0.3 + Math.floor(k / 3) * 0.2, (rng() - 0.5) * 0.3, top + (k >= 3 ? 0.21 : 0)));
   B.put(P.barrelBag(), R(3.6, 0.4, 0.3));
   B.put(P.barrelBag(), R(3.65, 0.62, 0.25));
@@ -342,8 +344,8 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   env.scene.add(l);
   // the parts of the roof you see from the gun: either side of the nest
   // a spotter at the scope and a loader on the right, both watching the field
-  B.put(P.soldier(1), R(-6.55, -0.25, Math.PI + 0.15));
-  B.put(P.soldier(1), R(5.6, -0.7, Math.PI - 0.35));
+  // (soldier models, placed in env.dressWithModels)
+  env.roofSoldiers = [[-6.55, top, -0.25, Math.PI + 0.15, -0.12], [5.6, top, -0.7, Math.PI - 0.35, -0.2]];
   // expansion joints, a drain and tar patches in the roof slab
   for (let z = z0 + 0.1; z < z0 + 9; z += 3.0) B.add(M.rubber, box(16.2, 0.012, 0.06, 0, top + 0.006, z));
   for (const x of [-5.4, 5.4]) B.add(M.rubber, box(0.06, 0.012, 9, x, top + 0.006, z0 + 4.5));
@@ -352,7 +354,7 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   // right side: a sandbagged ready rack of ammo, crates, a cot
   for (let r = 0; r < 2; r++) for (let k = 0; k < 4; k++) bagMs.push(place(5.0 + k * 0.62 + (r % 2) * 0.3, top + 0.09 + r * 0.155, -1.2, (rng() - 0.5) * 0.15 + (rng() < 0.5 ? Math.PI : 0)));
   for (let k = 0; k < 6; k++) B.put(P.can(), R(5.1 + (k % 3) * 0.34, -0.9 + Math.floor(k / 3) * 0.17, (rng() - 0.5) * 0.15, top + 0.31));
-  B.put(P.crate(), R(7.3, 0.6, Math.PI / 2 + 0.05)); B.put(P.crate(), R(7.3, 0.6, Math.PI / 2 - 0.05, top + 0.43));
+  env.roofCrates.push([7.3, top, 0.6, 0.05], [7.3, top + 0.21, 0.62, -0.05], [7.3, top + 0.42, 0.58, 0.03]);
   B.put(P.crate(0.6, 0.3, 0.4), R(6.5, 1.3, 0.3));
   B.put(P.jerry(), R(7.4, 1.6, 0.2)); B.put(P.jerry(), R(7.4, 1.95, -0.1));
   // folding cot with a blanket, and a rolled tarp

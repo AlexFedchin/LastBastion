@@ -29,7 +29,10 @@ module.exports = {
 
     const arty = await t.get(`(() => {
       const G = __LB, a = G.arsenal;
-      G.test.spawn(250, -62, -42, 0); G.test.advance(0.1, 1 / 30, false);
+      // a crowd where the shells land (test.spawn scatters over x ±70 m and made this flaky)
+      const p = G.player.aimPoint(330);
+      for (let i = 0; i < 150; i++) G.horde.spawn(0, p.x - 12 + Math.random() * 24, p.z - 14 + Math.random() * 24, 1, 1);
+      G.test.advance(0.1, 1 / 30, false);
       const before = G.horde.alive;
       a.artyCd = 0; G.test.press('KeyQ'); G.test.advance(1 / 30, 1 / 30, false);
       let flyMax = 0;

@@ -75,6 +75,10 @@
   "dur": 3.92,
   "file": "hammer_1_1_cac7a97c07.ogg"
  },
+ "LT. HOLLIS|Bastion-7, Hollis! I've got a truck full of people from Halden and half the valley on my bumper. Open the gate!": {
+  "dur": 6.229,
+  "file": "lt_hollis_8453b48a1f.ogg"
+ },
  "LT. HOLLIS|Bastion-7, this is Hollis, Recon Two. Four of us coming in hot down the road — they're right behind us. Cover us!": {
   "dur": 7.947,
   "file": "lt_hollis_332db6f3d7.ogg"
@@ -82,6 +86,10 @@
  "LT. HOLLIS|Man down! Keep moving, keep moving!": {
   "dur": 3.042,
   "file": "lt_hollis_eefb9a9900.ogg"
+ },
+ "LT. HOLLIS|We're in! We're in. Bastion-7, I owe every one of you a drink.": {
+  "dur": 4.68,
+  "file": "lt_hollis_69309da3c0.ogg"
  },
  "LT. HOLLIS|We're through the gate. Thanks for the cover, Bastion. Recon Two will take a spot on the wall.": {
   "dur": 5.627,
@@ -92,9 +100,24 @@
   "file": "narrator_facbee4b92.ogg",
   "sr": 24000
  },
+ "NARRATOR|A fuel tanker stood abandoned on the road all night. The dead shuffled past it, and we never found the moment to light it.": {
+  "dur": 10.196,
+  "file": "narrator_f2d89cbfd0.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|A fuel tanker stood abandoned on the road. We waited until they crowded round it, and then we lit it, and for a moment it was day.": {
+  "dur": 10.301,
+  "file": "narrator_ac272753fc.ogg",
+  "sr": 24000
+ },
  "NARRATOR|A herd of brutes came down the flank in a stampede, and the wall shuddered under their weight. It held. Barely.": {
   "dur": 10.14,
   "file": "narrator_ec929eca39.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Against everything the valley had, not one man fell. Aran swore it would be the story he told his children.": {
+  "dur": 8.31,
+  "file": "narrator_a22efb7df9.ogg",
   "sr": 24000
  },
  "NARRATOR|And then it came — the biggest of them all. It reached our wall, and for a long moment I thought the whole line would come down with it. It didn't. It fell.": {
@@ -120,6 +143,11 @@
  "NARRATOR|Another night came, as they always did, and the dead came with it.": {
   "dur": 5.66,
   "file": "narrator_6f1664f6d1.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Around the strobe, the gun laid them down in a ring, row after row, like a fence made of the dead.": {
+  "dur": 8.34,
+  "file": "narrator_aed996d5ac.ogg",
   "sr": 24000
  },
  "NARRATOR|At dawn the gate was still shut. Whatever we had heard out there in the dark, we never opened it.": {
@@ -162,14 +190,64 @@
   "file": "narrator_d46968dfe0.ogg",
   "sr": 24000
  },
+ "NARRATOR|Even with the giant on the field, the gun never stopped talking. The smaller dead fell in heaps around its feet.": {
+  "dur": 7.324,
+  "file": "narrator_abf90fb082.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Every man came back from the fourth night. The crows went hungry, for once.": {
+  "dur": 5.32,
+  "file": "narrator_7c09846b47.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Everything we had, we gave. Some of us gave all of it. Their rifles stayed on the parapet where they fell.": {
+  "dur": 9.94,
+  "file": "narrator_95b852925a.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Hollis came back that night with a truck full of strangers from Halden. The dead stopped it on the road, short of the gate, and we could not clear them fast enough.": {
+  "dur": 11.246,
+  "file": "narrator_711fda2f87.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Hollis came back that night, driving a truck full of strangers from Halden. We cleared the road in front of him, and he drove it straight through the gate.": {
+  "dur": 9.22,
+  "file": "narrator_f12f9e7d33.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|In the blackout, our fires were the only light on the field. We could watch them burn, and that was all we could see.": {
+  "dur": 8.22,
+  "file": "narrator_2be95f01a1.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|In the dark, the gun was our only light. Every time it spoke, a dozen of them stopped coming.": {
+  "dur": 7.444,
+  "file": "narrator_b7a8317c58.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|In the fog, we only knew a man was gone when he stopped answering. We called their names until dawn.": {
+  "dur": 6.7,
+  "file": "narrator_9a77ca344e.ogg",
+  "sr": 24000
+ },
  "NARRATOR|No one was left to write it down. The gun fell silent before the dawn, and in the morning, the valley belonged to the dead.": {
   "dur": 10.98,
   "file": "narrator_e8f996f5c0.ogg",
   "sr": 24000
  },
+ "NARRATOR|Nobody was taken out of the fog that night. When it lifted, we counted heads twice to be sure.": {
+  "dur": 6.74,
+  "file": "narrator_92b404fa8a.ogg",
+  "sr": 24000
+ },
  "NARRATOR|Not one name was added to the list that night. On that wall, it was as close to a miracle as we ever came.": {
   "dur": 7.86,
   "file": "narrator_e7970c8e4e.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Not one of us fell on the giant's night. Afterwards we sat in the dark, too tired even to talk about it.": {
+  "dur": 8.1,
+  "file": "narrator_8fc598ef98.ogg",
   "sr": 24000
  },
  "NARRATOR|On the eighth night, a recorded voice told us that no one was listening anymore. We kept talking anyway.": {
@@ -190,6 +268,21 @@
  "NARRATOR|On the fourth night, Command promised us an airdrop. The bloaters came down the valley to meet it.": {
   "dur": 8.252,
   "file": "narrator_6d550860f4.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|On the last night the gun spoke for all of us, and whatever came down that valley did not go back up it.": {
+  "dur": 6.78,
+  "file": "narrator_78d057fe79.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|On the last night we set the valley floor alight, and it burned the way the city once had.": {
+  "dur": 5.978,
+  "file": "narrator_3a0f75f2bc.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|On the last night, every man who had made it this far made it to the end.": {
+  "dur": 6.78,
+  "file": "narrator_5bc9e62680.ogg",
   "sr": 24000
  },
  "NARRATOR|On the ninth night, the biggest horde we had ever seen filled the valley from the wall to the ridge. We gave it everything.": {
@@ -222,9 +315,29 @@
   "file": "narrator_3b2bf21e2a.ogg",
   "sr": 24000
  },
+ "NARRATOR|Some of the men who went down under the stampede never got back up. We heard the brutes long after they had stopped.": {
+  "dur": 7.54,
+  "file": "narrator_79f171a946.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Some of us came so close to the end. Seventy-one hours, and then the night took them anyway.": {
+  "dur": 7.5,
+  "file": "narrator_942d2e896f.ogg",
+  "sr": 24000
+ },
  "NARRATOR|Somewhere past midnight the gun found its rhythm, and the dead went down in rows, like wheat before the scythe.": {
   "dur": 8.38,
   "file": "narrator_3ecb28a090.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Somewhere past midnight the gun found its rhythm. Kovac said he had never seen a fifty worked like that.": {
+  "dur": 7.98,
+  "file": "narrator_d2a654b059.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Spectre was not the only loss that night. By dawn, the wall had names of its own to add to theirs.": {
+  "dur": 7.18,
+  "file": "narrator_8e57f51e32.ogg",
   "sr": 24000
  },
  "NARRATOR|Spectre went down that night. We watched it fall burning into the hills, and after that there was no one above us but God.": {
@@ -242,6 +355,21 @@
   "file": "narrator_4790dd0bca.ogg",
   "sr": 24000
  },
+ "NARRATOR|That night the gun fired until the belts ran out, and then we fed it more, and the valley went quiet in rows.": {
+  "dur": 7.553,
+  "file": "narrator_be49440e0d.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|That night they found the way round, down over the rocks at the end of the wall, where nobody had thought to look.": {
+  "dur": 8.552,
+  "file": "narrator_9fff523b87.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|The brutes came through the fire without slowing. They just burned as they came.": {
+  "dur": 6.38,
+  "file": "narrator_14ab15f139.ogg",
+  "sr": 24000
+ },
  "NARRATOR|The crate came down in the field, and the dead tore it open like a carcass. We watched our supplies scatter in the mud.": {
   "dur": 9.06,
   "file": "narrator_d01ea70395.ogg",
@@ -252,9 +380,24 @@
   "file": "narrator_5f83080b6c.ogg",
   "sr": 24000
  },
+ "NARRATOR|The first names went on the list that night. Kovac wrote them himself, in pencil, so the rain wouldn't run them.": {
+  "dur": 8.879,
+  "file": "narrator_16bdf4aa7d.ogg",
+  "sr": 24000
+ },
  "NARRATOR|The fourth dawn came up cold and red. The crows had learned where to find us.": {
   "dur": 5.703,
   "file": "narrator_63c05f11bc.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|The giant took men off the wall like a child takes toys from a shelf. We stopped looking at the empty places.": {
+  "dur": 8.3,
+  "file": "narrator_407d8d4819.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|The overpass road burned all night. Whatever walked it to reach us burned with it.": {
+  "dur": 7.38,
+  "file": "narrator_69ff9484a5.ogg",
   "sr": 24000
  },
  "NARRATOR|The people from the overpass ran for our lights. None of them reached the gate. Their voices stopped, one by one, out on the open road.": {
@@ -265,6 +408,11 @@
  "NARRATOR|The people from the overpass ran for our lights. Some of them made it inside. The mother would never say the names of the others.": {
   "dur": 7.78,
   "file": "narrator_3c44dba488.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|The stampede broke on the wall and never got over it. Every one of us was still there at roll call.": {
+  "dur": 7.7,
+  "file": "narrator_906b369924.ogg",
   "sr": 24000
  },
  "NARRATOR|The sun rose again. It did not care who was still alive to see it.": {
@@ -285,6 +433,11 @@
  "NARRATOR|The wall base burned all night. The dead walked into the flames screaming, and kept on walking, until they didn't.": {
   "dur": 6.7,
   "file": "narrator_5c7a7c9820.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|The wall base burned under the giant's feet. Even it screamed when the fuel caught.": {
+  "dur": 5.66,
+  "file": "narrator_755c48682f.ogg",
   "sr": 24000
  },
  "NARRATOR|The wall took a terrible toll that night. By morning there were empty places all along the walkway, and nobody spoke of them.": {
@@ -322,6 +475,31 @@
   "file": "narrator_c6cfd049fb.ogg",
   "sr": 24000
  },
+ "NARRATOR|They came out of the fog in columns, and the gun cut them down before they ever saw the wall.": {
+  "dur": 6.22,
+  "file": "narrator_d4bfd8da2a.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Under the stampede, the gun chewed through the runners until the barrel glowed like a stove.": {
+  "dur": 5.926,
+  "file": "narrator_3adbbb2111.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|We buried our own beside the road that night, facing the overpass, as if they could still keep watch for her.": {
+  "dur": 8.9,
+  "file": "narrator_d3f3fcc55a.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|We came through the dark without losing a soul. Kovac said it was the first good luck we'd had in a week.": {
+  "dur": 6.9,
+  "file": "narrator_4ab42123b5.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|We had all come through the first night alive. We thought, God help us, that it might always be like that.": {
+  "dur": 7.7,
+  "file": "narrator_e2b59e16cb.ogg",
+  "sr": 24000
+ },
  "NARRATOR|We had stopped counting the nights. The dead had not stopped coming.": {
   "dur": 5.58,
   "file": "narrator_1d49d6f50c.ogg",
@@ -330,6 +508,41 @@
  "NARRATOR|We lost good men on the walkway that night. We buried them at first light, beside the others.": {
   "dur": 7.311,
   "file": "narrator_a3fa01a810.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|We lost men in the dark that night, and in the dark we could not even see who. We found out at roll call.": {
+  "dur": 8.66,
+  "file": "narrator_1461a8f419.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|We lost no one on the wall that night. It didn't feel like a victory, with her voice still in our ears.": {
+  "dur": 8.58,
+  "file": "narrator_1ee265a8ea.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|We paid for the fourth night in men, not supplies. The crate came cheaper than they did.": {
+  "dur": 6.756,
+  "file": "narrator_2ad8165493.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|We ringed the drop zone with fire, and the dead walked into it rather than give up the crate.": {
+  "dur": 7.34,
+  "file": "narrator_bd86ee54e9.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|We set the fog itself on fire. The bottles burst in the white, and the dead walked out of it burning.": {
+  "dur": 8.841,
+  "file": "narrator_394b20ac87.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|We threw every bottle we had. The foot of the wall was one long fire, and still they kept walking into it.": {
+  "dur": 7.063,
+  "file": "narrator_8e0f63a7b5.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|When the column from the overpass road came for the wall, the fifty swept the road clean from end to end.": {
+  "dur": 8.012,
+  "file": "narrator_0f03272989.ogg",
   "sr": 24000
  },
  "NARRATOR|When the sun came up, the valley was grey with bodies. Seventy-two hours, Command had said. Sixty-four to go.": {
@@ -345,6 +558,21 @@
  "NARRATOR|When the wall was lost, we called the guns down on our own heads. Three of ours died in that fire. The wall held.": {
   "dur": 9.577,
   "file": "narrator_6ea69fdd38.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|With Spectre gone, the fire did its work for it. The foot of the wall burned from dusk until the sky went grey.": {
+  "dur": 8.78,
+  "file": "narrator_cbe1c82906.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|With Spectre gone, we lost no one else that night. It felt as if the dead were giving us a moment to mourn.": {
+  "dur": 7.06,
+  "file": "narrator_4ea021cc41.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|With no one above us any more, the fifty did Spectre's work as well as its own. The field was grey with them.": {
+  "dur": 7.46,
+  "file": "narrator_90cf2afa2c.ogg",
   "sr": 24000
  },
  "PVT. ARAN|I stopped writing their names down.": {
@@ -555,9 +783,25 @@
   "dur": 7.4,
   "file": "sgt_kovac_321e273ef5.ogg"
  },
+ "SGT. KOVAC|The tanker's gone up! Look at them burn!": {
+  "dur": 3.12,
+  "file": "sgt_kovac_ceafe0a492.ogg"
+ },
+ "SGT. KOVAC|The truck's stopped... they're all over it. God help them.": {
+  "dur": 4.96,
+  "file": "sgt_kovac_08f8d51c54.ogg"
+ },
  "SGT. KOVAC|Then we monitor it. Bastion-7 is holding. Say it.": {
   "dur": 5.04,
   "file": "sgt_kovac_91a8492aaa.ogg"
+ },
+ "SGT. KOVAC|There's a fuel tanker stalled out on the road. Let them crowd around it, then put a burst through the tank.": {
+  "dur": 6.76,
+  "file": "sgt_kovac_8d74ca31f3.ogg"
+ },
+ "SGT. KOVAC|They walked right past the tanker. Waste of good fuel.": {
+  "dur": 4.84,
+  "file": "sgt_kovac_a4fa31714d.ogg"
  },
  "SGT. KOVAC|They'll come again tomorrow. So will we.": {
   "dur": 3.4,
@@ -571,6 +815,14 @@
   "dur": 2.6,
   "file": "sgt_kovac_ef232f76f0.ogg"
  },
+ "SGT. KOVAC|They're coming over the rocks on the left! Swing that gun!": {
+  "dur": 3.6,
+  "file": "sgt_kovac_6cd0d8642d.ogg"
+ },
+ "SGT. KOVAC|They're coming over the rocks on the right! Swing that gun!": {
+  "dur": 3.6,
+  "file": "sgt_kovac_cd7ad9df10.ogg"
+ },
  "SGT. KOVAC|They're over the wall!": {
   "dur": 1.478,
   "file": "sgt_kovac_7f8552542f.ogg"
@@ -582,6 +834,10 @@
  "SGT. KOVAC|They've torn the crate apart. Damn it.": {
   "dur": 4.28,
   "file": "sgt_kovac_bcf07e797c.ogg"
+ },
+ "SGT. KOVAC|Truck on the road! Clear a path for it — shoot whatever is in front of it!": {
+  "dur": 4.8,
+  "file": "sgt_kovac_fae0c8aac3.ogg"
  },
  "SGT. KOVAC|Wall's going — shoot the pile!": {
   "dur": 3.44,

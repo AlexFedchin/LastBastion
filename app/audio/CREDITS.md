@@ -54,8 +54,10 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [thunder](https://freesound.org/people/netaj/sounds/193170/) | netaj | thunder |
 | [SZ_Zombies_06.wav](https://freesound.org/people/PaulMorek/sounds/196722/) | PaulMorek | groan |
 | [Acid Bubbling.wav](https://freesound.org/people/spookymodem/sounds/202094/) | spookymodem | acid, bloater |
+| [Tire gauge pin ringing and clicks](https://freesound.org/people/AnthonyChan0/sounds/209645/) | AnthonyChan0 | grenade_pin, grenade_spoon |
 | [Brass bullet shell casing drop onto concrete, multiple takes](https://freesound.org/people/GrayJoy/sounds/210102/) | GrayJoy | casing |
 | [Pressure Hiss](https://freesound.org/people/unfa/sounds/211096/) | unfa | steam_long |
+| [Breaking a glass bottle](https://freesound.org/people/dasebr/sounds/212698/) | dasebr | glass |
 | [Deep Monster Growl](https://freesound.org/people/uagadugu/sounds/222523/) | uagadugu | brute |
 | [Tank Explosion](https://freesound.org/people/unfa/sounds/231765/) | unfa | boom |
 | [Steam/hiss](https://freesound.org/people/wubitog/sounds/234782/) | wubitog | steam |
@@ -65,10 +67,11 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Incoming mortar 3](https://freesound.org/people/Zagge28/sounds/241838/) | Zagge28 | incoming |
 | [Incoming mortar 2](https://freesound.org/people/Zagge28/sounds/241839/) | Zagge28 | incoming |
 | [Incoming mortar 1](https://freesound.org/people/Zagge28/sounds/241840/) | Zagge28 | incoming |
-| [burning air](https://freesound.org/people/sergeeo/sounds/242721/) | sergeeo | molotov_flight |
+| [burning air](https://freesound.org/people/sergeeo/sounds/242721/) | sergeeo | molotov_flight, molotov_whoosh |
 | [zombie sounds](https://freesound.org/people/Thanra/sounds/245466/) | Thanra | groan |
 | [Cinematic_Boom_Rhapsodize.wav](https://freesound.org/people/rhapsodize/sounds/255111/) | rhapsodize | boom_sub |
 | [Click.wav](https://freesound.org/people/kwahmah_02/sounds/256116/) | kwahmah_02 | ui_hover |
+| [knife pulls.wav](https://freesound.org/people/nicktermer/sounds/259557/) | nicktermer | grenade_pin |
 | [Basic Fire whoosh](https://freesound.org/people/LookIMadeAThing/sounds/260554/) | LookIMadeAThing | ignite, molotov |
 | [Basic Fire Whoosh 2](https://freesound.org/people/LookIMadeAThing/sounds/260555/) | LookIMadeAThing | molotov |
 | [Real explosions Real gunshots.wav](https://freesound.org/people/The_Sound_Side/sounds/262436/) | The_Sound_Side | boom |
@@ -86,17 +89,19 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Mutant Scream](https://freesound.org/people/scorpion67890/sounds/396797/) | scorpion67890 | shriek |
 | [Bottle Smash](https://freesound.org/people/Roxis_Boy/sounds/401619/) | Roxis_Boy | molotov |
 | [Hooded crow.wav](https://freesound.org/people/straget/sounds/404687/) | straget | crow |
+| [bottle break.wav](https://freesound.org/people/DeezSoundzTho/sounds/407431/) | DeezSoundzTho | glass |
 | [goreSplat.wav](https://freesound.org/people/ThefitzyG/sounds/414296/) | ThefitzyG | bloater, gib |
 | [VisceralBulletImpacts.wav](https://freesound.org/people/u1769092/sounds/423301/) | u1769092 | flesh |
 | [Zombie Moan.wav](https://freesound.org/people/mrh4hn/sounds/426628/) | mrh4hn | groan |
 | [Air Tone - School Yard - Dawn Empty City Air - Faint Bird Chirps](https://freesound.org/people/leonelmail/sounds/427840/) | leonelmail | dawn |
 | [Zombie Demon Scream](https://freesound.org/people/Wakerone/sounds/435651/) | Wakerone | shriek |
 | [Angry big dog barking - Far [d15].wav](https://freesound.org/people/v23/sounds/440865/) | v23 | dog |
+| [glass - baby food jar - smashed on concrete.wav](https://freesound.org/people/Anthousai/sounds/447699/) | Anthousai | glass |
 | [Fuze Switch Flick](https://freesound.org/people/LordForklift/sounds/448394/) | LordForklift | ui_click |
 | [throw swish x12 HZA 07-03-2019.wav](https://freesound.org/people/hz37/sounds/463763/) | hz37 | flare_launch, throw |
 | [R22-07-Big Battle Ambience.wav](https://freesound.org/people/craigsmith/sounds/479568/) | craigsmith | war |
 | [R29-26-Molotov Cocktails through Windows and Explode.wav](https://freesound.org/people/craigsmith/sounds/483288/) | craigsmith | fire_pool |
-| [R28-08-Torch or Molotov Cocktail.wav](https://freesound.org/people/craigsmith/sounds/483322/) | craigsmith | molotov |
+| [R28-08-Torch or Molotov Cocktail.wav](https://freesound.org/people/craigsmith/sounds/483322/) | craigsmith | molotov, molotov_whoosh |
 | [Zombies](https://freesound.org/people/JossuTossu/sounds/483592/) | JossuTossu | horde_mid |
 | [thunder.rumble.ogg](https://freesound.org/people/xUMR/sounds/486557/) | xUMR | thunder |
 | [Wet Splat 1.mp3](https://freesound.org/people/nebulasnails/sounds/495118/) | nebulasnails | gib |

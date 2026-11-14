@@ -29,6 +29,7 @@ export class Player {
     this.baseFov = 62;
     this.fov = 62;
     this.zoom = 0;
+    this.shootables = []; // { test(origin, dir, maxT) -> t or -1, hit(point) }
     this.sens = 0.0022;
     this.invertY = false;
 
@@ -96,6 +97,28 @@ export class Player {
     }
     const h = Math.hypot(_d.x, _d.z) || 1;
     return new THREE.Vector3(o.x + (_d.x / h) * maxDist, 0, o.z + (_d.z / h) * maxDist);
+  }
+
+  /**
+   * Where a thrown grenade or bottle should land: the zombie under the crosshair
+   * (the ray would otherwise carry on to the ground well behind it), else the ground.
+   */
+  throwPoint(maxDist, horde) {
+    this.camera.getWorldDirection(_d);
+    const o = this.camera.position;
+    if (horde && _d.y < -0.01 && horde.raycast(o.x, o.y, o.z, _d.x, _d.y, _d.z, maxDist / Math.hypot(_d.x, _d.z) + 5, 1) > 0) {
+      const i = horde.hitIdx[0];
+      const p = new THREE.Vector3(horde.x[i], 0, horde.z[i]);
+      if (Math.hypot(p.x - o.x, p.z - o.z) <= maxDist) return p;
+    }
+    return this.aimPoint(maxDist);
+  }
+
+  /** The hand a throw leaves from: low and to one side of the view (side -1 left, 1 right). */
+  throwOrigin(side) {
+    const c = this.camera;
+    c.updateMatrixWorld();
+    return new THREE.Vector3(side * 0.34, -0.32, -0.55).applyMatrix4(c.matrixWorld);
   }
 
   update(dt, rdt, input, stats, controlsActive, time) {
@@ -192,8 +215,14 @@ export class Player {
     const maxHits = 1 + stats.hmgPen;
     const gt = raycastGround(o.x, o.y, o.z, _d.x, _d.y, _d.z, 600);
     const groundT = gt >= 0 ? gt : 600;
-    const cnt = horde.raycast(o.x, o.y, o.z, _d.x, _d.y, _d.z, Math.min(groundT, 600), maxHits);
     let endT = Math.min(groundT, 600);
+    // things on the field that can be shot (a fuel tanker...): the first one hit stops the round
+    let solid = null;
+    for (const sh of this.shootables) {
+      const t = sh.test(o, _d, endT);
+      if (t >= 0 && t < endT) { endT = t; solid = sh; }
+    }
+    const cnt = horde.raycast(o.x, o.y, o.z, _d.x, _d.y, _d.z, endT, maxHits);
     let stopped = false;
     let dmg = stats.hmgDamage;
     let anyHit = false;
@@ -219,6 +248,7 @@ export class Player {
       if (k === maxHits - 1) { endT = t; stopped = true; }
     }
     if (anyHit) this.hits++;
+    if (solid && !stopped) { solid.hit(new THREE.Vector3(o.x + _d.x * endT, o.y + _d.y * endT, o.z + _d.z * endT)); stopped = true; }
 
     // visuals
     this.muzzle.getWorldPosition(_m);

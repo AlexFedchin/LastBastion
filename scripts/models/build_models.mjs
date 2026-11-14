@@ -317,6 +317,266 @@ async function b36() {
   await finish(doc, 'b36.glb', { ratio: 0.12, error: 0.004 });
 }
 
+// ── small props ──────────────────────────────────────────────────────────────
+/** A normal map authored for DirectX (green = down) turned into glTF's OpenGL convention. */
+async function normalGL(file, size) {
+  const { data, info } = await sharp(file).resize(size, size, { fit: 'fill' }).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  for (let i = 1; i < data.length; i += info.channels) data[i] = 255 - data[i];
+  return sharp(data, { raw: { width: size, height: size, channels: info.channels } }).webp({ quality: 90 }).toBuffer();
+}
+
+/** Bake every node transform into its mesh, so the model is one rigid frame. */
+function bakeNodes(doc) {
+  for (const node of doc.getRoot().listNodes()) {
+    const mesh = node.getMesh(); if (!mesh) continue;
+    transformMesh(mesh, node.getWorldMatrix());
+    node.setTranslation([0, 0, 0]).setRotation([0, 0, 0, 1]).setScale([1, 1, 1]);
+  }
+}
+
+/** Scale a baked GLB so its height is `h` metres, centred on x/z, base at y = 0 (or centred: mid). */
+function fitHeight(doc, h, mid = false) {
+  const scene = doc.getRoot().listScenes()[0];
+  const b = getBounds(scene);
+  const s = h / (b.max[1] - b.min[1]);
+  const cx = (b.min[0] + b.max[0]) / 2, cz = (b.min[2] + b.max[2]) / 2;
+  const cy = mid ? (b.min[1] + b.max[1]) / 2 : b.min[1];
+  const m = [s, 0, 0, 0, 0, s, 0, 0, 0, 0, s, 0, -cx * s, -cy * s, -cz * s, 1];
+  for (const mesh of doc.getRoot().listMeshes()) transformMesh(mesh, m);
+  return s;
+}
+
+// Grenade (M67-style, with pin and ring) and Molotov bottle: tiny Sketchfab GLBs, re-scaled to life size.
+async function grenade() {
+  const doc = await io.read(path.join(SRC, 'props', 'granade.glb'));
+  await doc.transform(flatten());
+  bakeNodes(doc);
+  fitHeight(doc, 0.105, true);
+  for (const t of doc.getRoot().listTextures()) t.setImage(await sharp(Buffer.from(t.getImage())).webp({ quality: 90, alphaQuality: 90 }).toBuffer()).setMimeType('image/webp');
+  await finish(doc, 'grenade.glb');
+}
+async function molotov() {
+  const doc = await io.read(path.join(SRC, 'props', 'molotov.glb'));
+  await doc.transform(flatten());
+  bakeNodes(doc);
+  fitHeight(doc, 0.34); // bottle and the rag stuffed in its neck; base at y = 0
+  for (const t of doc.getRoot().listTextures()) t.setImage(await sharp(Buffer.from(t.getImage())).webp({ quality: 88 }).toBuffer()).setMimeType('image/webp');
+  await finish(doc, 'molotov.glb');
+}
+
+// Ammunition crate: an untextured FBX (centimetres). Painted olive drab here; 0.9 m long.
+async function crate() {
+  const fbx = await load(path.join(SRC, 'props', 'ammo-crate.fbx'));
+  fbx.updateMatrixWorld(true);
+  let mesh; fbx.traverse((o) => { if (o.isMesh) mesh = o; });
+  const g = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+  g.computeBoundingBox();
+  const b = g.boundingBox, s = 0.9 / (b.max.x - b.min.x);
+  g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2).scale(s, s, s);
+  if (!g.attributes.normal) g.computeVertexNormals();
+  const keep = new THREE.BufferGeometry();
+  for (const k of ['position', 'normal']) keep.setAttribute(k, g.attributes[k]);
+  const doc = new Document();
+  const buffer = doc.createBuffer();
+  const root = doc.createNode('crate');
+  doc.createScene('crate').addChild(root);
+  const mat = doc.createMaterial('olive').setBaseColorFactor([0.16, 0.17, 0.1, 1]).setRoughnessFactor(0.8).setMetallicFactor(0.05);
+  root.setMesh(doc.createMesh('crate').addPrimitive(prim(doc, buffer, keep, mat)));
+  await finish(doc, 'crate.glb');
+}
+
+// Sandbags: two photo-scanned piles (OBJ + PBR set), each its own node; real size about 1.6 m long.
+async function sandbags() {
+  const doc = new Document();
+  const buffer = doc.createBuffer();
+  const root = doc.createNode('sandbags');
+  doc.createScene('sandbags').addChild(root);
+  for (const [k, dir, obj, pre] of [[0, 'sandbag01', 's1-6k.obj', 's1'], [1, 'sandbag02', 's2-10k.obj', 's2']]) {
+    const o = await load(path.join(SRC, dir, obj));
+    o.updateMatrixWorld(true);
+    let mesh; o.traverse((m) => { if (m.isMesh) mesh = m; });
+    const g = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    g.computeBoundingBox();
+    const b = g.boundingBox, len = Math.max(b.max.x - b.min.x, b.max.z - b.min.z), s = 1.6 / len;
+    g.translate(-(b.min.x + b.max.x) / 2, -b.min.y, -(b.min.z + b.max.z) / 2).scale(s, s, s);
+    // lay the long side along x
+    if (b.max.z - b.min.z > b.max.x - b.min.x) g.rotateY(Math.PI / 2);
+    const keep = new THREE.BufferGeometry();
+    for (const a of ['position', 'normal', 'uv']) if (g.attributes[a]) keep.setAttribute(a, g.attributes[a]);
+    const T = (f) => path.join(SRC, dir, `${pre}_${f}.png`);
+    const mat = doc.createMaterial('burlap' + k).setMetallicFactor(0).setRoughnessFactor(1)
+      .setBaseColorTexture(tex(doc, 'burlap' + k + '_color', await webp(T('Base_Color'), 1024)))
+      .setNormalTexture(tex(doc, 'burlap' + k + '_normal', await normalGL(T('Normal_DirectX'), 1024)));
+    const ormTex = tex(doc, 'burlap' + k + '_orm', await orm(T('Mixed_AO'), T('Roughness'), null, 512));
+    mat.setMetallicRoughnessTexture(ormTex).setOcclusionTexture(ormTex);
+    root.addChild(doc.createNode('pile_' + k).setMesh(doc.createMesh('pile_' + k).addPrimitive(prim(doc, buffer, keep, mat))));
+    console.log('sandbag pile', k, 'size', ((b.max.x - b.min.x) * s).toFixed(2), ((b.max.y - b.min.y) * s).toFixed(2), ((b.max.z - b.min.z) * s).toFixed(2));
+  }
+  await finish(doc, 'sandbags.glb', { ratio: 0.3, error: 0.002 });
+}
+
+// ── Soldier ──────────────────────────────────────────────────────────────────
+// Source: a Mixamo-rigged contractor (FBX, centimetres, facing +z) in a rifle-ready pose,
+// 30 parts with their own 2K texture sets; the rifle, mags and pouches are loose meshes.
+// Game: ONE skinned mesh, ONE material on a 2048 atlas (4 x 4 cells of 512), the rifle and
+// mags riding the right hand and the pouches the chest, ~15k triangles; metres, feet at y = 0.
+// The skeleton keeps Mixamo's bone names; the game poses it procedurally.
+async function soldier() {
+  const D = path.join(SRC, 'soldier');
+  const T = (f) => path.join(D, 'textures', f);
+  const fbx = await load(path.join(D, 'soldier.fbx'));
+  fbx.updateMatrixWorld(true);
+  // material -> atlas cell and its texture set: [color, normal, roughness, metal]
+  const CELLS = {
+    body: [0, 'privage_military_contractor_body_BaseColor.jpg', 'privage_military_contractor_body_Normal.jpg', 'privage_military_contractor_body_Roughness.jpg'],
+    vest: [1, 'privage_military_contractor2_vest_BaseColo.jpg', 'privage_military_contractor2_vest_Normal.jpg', 'privage_military_contractor2_vest_Roughnes.jpg'],
+    'mag pouch': [2, 'privage_military_contractor_mag_pouch_Base.jpg', 'privage_military_contractor_mag_pouch_Norm.jpg', 'privage_military_contractor_mag_pouch_Roug.jpg'],
+    'l glove': [3, 'private_contractor1_gloves_BaseColor.jpg', 'private_contractor1_gloves_Normal.jpg', 'private_contractor1_gloves_Roughness.jpg'],
+    helmet: [4, 'scp_operator_helmet_BaseColor.jpg', 'scp_operator_helmet_Normal.jpg', 'scp_operator_helmet_Roughness.jpg'],
+    facemask: [5, 'scp_operator_mask_BaseColor.jpg', 'scp_operator_mask_Normal.jpg', 'scp_operator_mask_Roughness.jpg'],
+    face: [6, 'swat_face_BaseColor.jpg', 'swat_face_Normal.jpg', null],
+    googles: [7, 'googles_googles_BaseColor.png', 'googles_googles_Normal.jpg', 'googles_googles_Roughness.jpg', 'googles_googles_Metallic.jpg'],
+    kneepad: [8, 'kneepad_kneepad_BaseColor.jpg', 'kneepad_kneepad_Normal.jpg', 'kneepad_kneepad_Roughness.jpg'],
+    boots: [9, 'boot_color.jpg', 'army_boot_boot_lp_Normal.jpg', 'army_boot_boot_lp_Roughness.jpg'],
+    __DEFAULT: [10, 'blue_eye.png', null, null],
+  };
+  CELLS['r glove'] = CELLS['l glove'];
+  const FLAT = 11; // gunmetal: the rifle, magazines and rounds (their source texture tiles)
+  const N = 4, C = 512, A = N * C;
+
+  // bones: one list by name, from every skinned mesh
+  const bones = [], boneIx = new Map();
+  fbx.traverse((o) => { if (o.isBone && !boneIx.has(o.name)) { boneIx.set(o.name, bones.length); bones.push(o); } });
+  const RHAND = boneIx.get('mixamorigRightHand'), CHEST = boneIx.get('mixamorigSpine2');
+
+  const pos = [], nor = [], uvs = [], jnt = [], wts = [];
+  const v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
+  fbx.traverse((o) => {
+    if (!o.isMesh) return;
+    const mname = (Array.isArray(o.material) ? o.material[0] : o.material).name;
+    const rigid = !o.isSkinnedMesh;
+    if (rigid && !/^(Gun_Low|pouch)/.test(o.name)) return; // smoke cards, decals, loose rounds and spare mags
+    const cell = rigid && mname === 'scar' ? FLAT : (CELLS[mname] || [FLAT])[0];
+    const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry;
+    const P = g.attributes.position, Nn = g.attributes.normal, U = g.attributes.uv;
+    const SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
+    nm.getNormalMatrix(o.matrixWorld);
+    // a skinned part's own bone indices -> the shared list
+    const map = o.isSkinnedMesh ? o.skeleton.bones.map((b) => boneIx.get(b.name)) : null;
+    const rigidBone = /^pouch/.test(o.name) ? CHEST : RHAND;
+    const cx = cell % N, cy = (cell / N) | 0;
+    // skinned parts are stored in their rigging pose: bake the pose the scene is in (rifle
+    // ready, which is where the loose rifle was modelled) by skinning every vertex here
+    const skinMs = o.isSkinnedMesh ? o.skeleton.bones.map((b, k) => new THREE.Matrix4().multiplyMatrices(b.matrixWorld, o.skeleton.boneInverses[k])) : null;
+    const sm = new THREE.Matrix4(), tmp = new THREE.Matrix4();
+    for (let i = 0; i < P.count; i++) {
+      v.fromBufferAttribute(P, i);
+      n.fromBufferAttribute(Nn, i);
+      if (skinMs) {
+        sm.set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0);
+        for (const c of ['x', 'y', 'z', 'w']) {
+          const w = SW['get' + c.toUpperCase()](i); if (!w) continue;
+          tmp.copy(skinMs[SI['get' + c.toUpperCase()](i)]);
+          for (let e = 0; e < 16; e++) sm.elements[e] += tmp.elements[e] * w;
+        }
+        v.applyMatrix4(o.bindMatrix).applyMatrix4(sm);
+        n.transformDirection(o.bindMatrix).transformDirection(sm);
+      } else {
+        v.applyMatrix4(o.matrixWorld);
+        n.applyMatrix3(nm).normalize();
+      }
+      v.multiplyScalar(0.01);
+      pos.push(v.x, v.y, v.z);
+      nor.push(n.x, n.y, n.z);
+      // atlas uv (glTF's top-left origin)
+      let u = 0.5, w = 0.5;
+      if (cell !== FLAT && U) { u = THREE.MathUtils.clamp(U.getX(i), 0, 1); w = 1 - THREE.MathUtils.clamp(U.getY(i), 0, 1); }
+      uvs.push((cx + 0.004 + u * 0.992) / N, (cy + 0.004 + w * 0.992) / N);
+      if (rigid) { jnt.push(rigidBone, 0, 0, 0); wts.push(1, 0, 0, 0); continue; }
+      const ws = [SW.getX(i), SW.getY(i), SW.getZ(i), SW.getW(i)], s = ws.reduce((a, b) => a + b, 0) || 1;
+      jnt.push(map[SI.getX(i)] ?? 0, map[SI.getY(i)] ?? 0, map[SI.getZ(i)] ?? 0, map[SI.getW(i)] ?? 0);
+      wts.push(ws[0] / s, ws[1] / s, ws[2] / s, ws[3] / s);
+    }
+  });
+  // feet at y = 0
+  let minY = Infinity; for (let i = 1; i < pos.length; i += 3) minY = Math.min(minY, pos[i]);
+  // the muzzle: the rifle's (flat-cell, right-hand) vertex furthest forward; the game hangs tracers on it
+  let tip = null;
+  for (let i = 0, k = 0; i < pos.length; i += 3, k += 4) if (jnt[k] === RHAND && wts[k] === 1 && (!tip || pos[i + 2] > tip[2])) tip = [pos[i], pos[i + 1], pos[i + 2]];
+  console.log('soldier muzzle (m, feet at 0):', tip.map((x, j) => (j === 1 ? x - minY : x).toFixed(3)).join(', '));
+  for (let i = 1; i < pos.length; i += 3) pos[i] -= minY;
+
+  // atlases
+  const cellImg = async (file, fill, grey = false) => {
+    if (!file) return sharp({ create: { width: C, height: C, channels: 3, background: fill } }).png().toBuffer();
+    let s = sharp(T(file)).resize(C, C, { fit: 'fill' }).removeAlpha();
+    if (grey) s = s.greyscale().toColourspace('srgb');
+    return s.png().toBuffer();
+  };
+  const atlas = async (layer) => {
+    const comps = [];
+    const done = new Set();
+    for (const cell of Object.values(CELLS)) {
+      if (done.has(cell[0])) continue; done.add(cell[0]);
+      comps.push({ input: await layer(cell), left: (cell[0] % N) * C, top: ((cell[0] / N) | 0) * C });
+    }
+    return { comps };
+  };
+  const colorAt = await atlas((c) => cellImg(c[1], { r: 128, g: 128, b: 128 }));
+  colorAt.comps.push({ input: await cellImg(null, { r: 30, g: 31, b: 31 }), left: (FLAT % N) * C, top: ((FLAT / N) | 0) * C });
+  const normalAt = await atlas((c) => cellImg(c[2], { r: 128, g: 128, b: 255 }));
+  normalAt.comps.push({ input: await cellImg(null, { r: 128, g: 128, b: 255 }), left: (FLAT % N) * C, top: ((FLAT / N) | 0) * C });
+  // ORM: occlusion 255, roughness from the set, metal from the set (or 0)
+  const ormCell = async (c) => {
+    const r = c[3] ? await sharp(T(c[3])).resize(C, C, { fit: 'fill' }).greyscale().raw().toBuffer() : Buffer.alloc(C * C, 190);
+    const m = c[4] ? await sharp(T(c[4])).resize(C, C, { fit: 'fill' }).greyscale().raw().toBuffer() : Buffer.alloc(C * C, 0);
+    const px = Buffer.alloc(C * C * 3);
+    for (let i = 0; i < C * C; i++) { px[i * 3] = 255; px[i * 3 + 1] = r[i]; px[i * 3 + 2] = m[i]; }
+    return sharp(px, { raw: { width: C, height: C, channels: 3 } }).png().toBuffer();
+  };
+  const ormAt = await atlas(ormCell);
+  ormAt.comps.push({ input: await sharp({ create: { width: C, height: C, channels: 3, background: { r: 255, g: 110, b: 180 } } }).png().toBuffer(), left: (FLAT % N) * C, top: ((FLAT / N) | 0) * C });
+  const bake = async ({ comps }, bg, q) => sharp({ create: { width: A, height: A, channels: 3, background: bg } }).composite(comps).webp({ quality: q }).toBuffer();
+
+  const doc = new Document();
+  const buffer = doc.createBuffer();
+  const scene = doc.createScene('soldier');
+  const root = doc.createNode('soldier').setScale([0.01, 0.01, 0.01]);
+  scene.addChild(root);
+  // joints: the hips go under the root with their full bind transform; the rest keep their locals
+  const nodes = bones.map((b) => {
+    const m = bones.includes(b.parent) ? b.matrix : b.matrixWorld;
+    const t = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+    m.decompose(t, q, s);
+    if (!bones.includes(b.parent)) t.y -= minY * 100;
+    return doc.createNode(b.name).setTranslation(t.toArray()).setRotation(q.toArray()).setScale(s.toArray());
+  });
+  bones.forEach((b, i) => { const p = bones.indexOf(b.parent); (p >= 0 ? nodes[p] : root).addChild(nodes[i]); });
+  const S = new THREE.Matrix4().makeScale(0.01, 0.01, 0.01), lift = new THREE.Matrix4().makeTranslation(0, -minY, 0);
+  const ibm = new Float32Array(bones.length * 16);
+  bones.forEach((b, i) => new THREE.Matrix4().multiplyMatrices(lift, S).multiply(b.matrixWorld).invert().toArray(ibm, i * 16));
+  const skin = doc.createSkin('soldier').setSkeleton(nodes[0])
+    .setInverseBindMatrices(doc.createAccessor().setArray(ibm).setType('MAT4').setBuffer(buffer));
+  for (const nd of nodes) skin.addJoint(nd);
+
+  const mat = doc.createMaterial('soldier').setMetallicFactor(1).setRoughnessFactor(1)
+    .setBaseColorTexture(tex(doc, 'soldier_color', await bake(colorAt, { r: 60, g: 60, b: 60 }, 84)))
+    .setNormalTexture(tex(doc, 'soldier_normal', await bake(normalAt, { r: 128, g: 128, b: 255 }, 88)));
+  const ormTex = tex(doc, 'soldier_orm', await bake(ormAt, { r: 255, g: 200, b: 0 }, 88));
+  mat.setMetallicRoughnessTexture(ormTex).setOcclusionTexture(ormTex);
+  const acc = (arr, type) => doc.createAccessor().setArray(arr).setType(type).setBuffer(buffer);
+  const prm = doc.createPrimitive().setMaterial(mat)
+    .setAttribute('POSITION', acc(new Float32Array(pos), 'VEC3'))
+    .setAttribute('NORMAL', acc(new Float32Array(nor), 'VEC3'))
+    .setAttribute('TEXCOORD_0', acc(new Float32Array(uvs), 'VEC2'))
+    .setAttribute('JOINTS_0', acc(new Uint16Array(jnt), 'VEC4'))
+    .setAttribute('WEIGHTS_0', acc(new Float32Array(wts), 'VEC4'));
+  const meshNode = doc.createNode('body').setMesh(doc.createMesh('body').addPrimitive(prm)).setSkin(skin);
+  scene.addChild(meshNode);
+  console.log('soldier', bones.length, 'bones,', pos.length / 9, 'source triangles');
+  await finish(doc, 'soldier.glb', { ratio: 0.16, error: 0.004 });
+}
+
 const want = process.argv.slice(2);
-const all = { m2hb, ac130, b36 };
+const all = { m2hb, ac130, b36, grenade, molotov, crate, sandbags, soldier };
 for (const [k, f] of Object.entries(all)) if (!want.length || want.includes(k)) await f();

@@ -4,6 +4,7 @@
 // pieces live in terrain / structures / props / far / sky.
 import * as THREE from 'three';
 import { WORLD, wallZ } from '../config.js';
+import { Soldier } from '../game/soldier.js';
 import { makeGroundTextures, makeConcreteTextures, makeBurlapTexture, makeGlowTexture, makeFlagTexture } from './textures.js';
 import {
   makeMetalTextures, makePlasterTextures, makeSlabTextures, makeBarkTexture, makeHescoTextures,
@@ -42,7 +43,7 @@ export class Environment {
     this.onDistantBoom = null;
     this.onDistantGunfire = null;
 
-    this.nightFog = new THREE.Color(0.0055, 0.006, 0.0085);
+    this.nightFog = new THREE.Color(0.0038, 0.0042, 0.0062);
     this.dawnFog = new THREE.Color(0.075, 0.078, 0.085);
     scene.fog = createSceneFog(this.nightFog);
     this.fogUniforms = fogUniforms;
@@ -80,6 +81,8 @@ export class Environment {
     this.cityFires = [];
     this.skyBeams = [];
     this.combatSites = [];
+    // the story, as the valley shows it (see setStory)
+    this.burn = 1; this.war = 1; this.beams = 3;
 
     this.terrain = new Terrain(scene, quality, this.tex.ground);
     this.fire = new FireSystem(scene, quality);
@@ -99,19 +102,67 @@ export class Environment {
     buildEnvMap(this);
   }
 
+  /**
+   * What is built from the downloaded models once they have loaded (they load in
+   * parallel with the world): the scanned sandbag piles round the nest and the
+   * ammo crates on the roof. modelMesh: (name, node) -> a mesh to instance.
+   */
+  dressWithModels(modelMesh) {
+    const rnd = makeRngLocal(77);
+    // sandbag piles: as many 1.6 m piles as fit each run, alternating the two scans
+    const piles = [modelMesh('sandbags', 'pile_0'), modelMesh('sandbags', 'pile_1')];
+    const ms = [[], []];
+    const m = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3(), e = new THREE.Euler();
+    let k = 0;
+    for (const [x0, z0, x1, z1] of this.nestBagRuns || []) {
+      const len = Math.hypot(x1 - x0, z1 - z0), ang = Math.atan2(z1 - z0, x1 - x0);
+      const n = Math.max(1, Math.round(len / 1.35));
+      for (let i = 0; i < n; i++) {
+        const t = (i + 0.5) / n;
+        e.set(0, -ang + (rnd() < 0.5 ? Math.PI : 0) + (rnd() - 0.5) * 0.12, 0);
+        // squeeze each pile to its share of the run, keep it narrow so the nest stays open
+        m.compose(p.set(x0 + (x1 - x0) * t, WORLD.TOWER_TOP - 0.02, z0 + (z1 - z0) * t), q.setFromEuler(e), s.set(Math.min(1.15, (len / n) / 1.45), 0.95 + rnd() * 0.15, 0.62));
+        ms[k++ % 2].push(m.clone());
+      }
+    }
+    piles.forEach((src, i) => {
+      if (!src || !ms[i].length) return;
+      const im = new THREE.InstancedMesh(src.geometry, src.material, ms[i].length);
+      ms[i].forEach((mm, j) => im.setMatrixAt(j, mm));
+      im.castShadow = true; im.receiveShadow = true;
+      this.scene.add(im);
+    });
+    // a spotter and a loader on the roof either side of the nest, watching the field
+    this.roofMen = (this.roofSoldiers || []).map(([x, y, z, ry, elev]) => {
+      const s = new Soldier();
+      s.root.position.set(x, y, z); s.root.rotation.y = ry; s.root.visible = true;
+      s.aim(elev);
+      this.scene.add(s.root);
+      return s;
+    });
+    // ammo crates
+    const crate = modelMesh('crate');
+    if (crate && this.roofCrates && this.roofCrates.length) {
+      const im = new THREE.InstancedMesh(crate.geometry, crate.material, this.roofCrates.length);
+      this.roofCrates.forEach(([x, y, z, ry], j) => im.setMatrixAt(j, m.compose(p.set(x, y, z), q.setFromEuler(e.set(0, ry, 0)), s.set(1, 1, 1))));
+      im.castShadow = true; im.receiveShadow = true;
+      this.scene.add(im);
+    }
+  }
+
   // ── Lights ───────────────────────────────────────────────────────────────
   buildLights() {
     const q = this.quality;
-    this.hemi = new THREE.HemisphereLight(0x3a465e, 0x15110d, 0.28);
+    this.hemi = new THREE.HemisphereLight(0x3a465e, 0x15110d, 0.16);
     this.scene.add(this.hemi);
 
-    this.moon = new THREE.DirectionalLight(0x8ea4c8, 0.14);
+    this.moon = new THREE.DirectionalLight(0x8ea4c8, 0.08);
     this.moon.position.set(-90, 140, 70);
     this.scene.add(this.moon);
     this.scene.add(this.moon.target);
 
     // burning-city rim light from beyond the valley
-    this.rim = new THREE.DirectionalLight(0xff7038, 0.35);
+    this.rim = new THREE.DirectionalLight(0xff7038, 0.24);
     this.rim.position.set(30, 35, -400);
     this.rim.target.position.set(0, 0, 0);
     this.scene.add(this.rim);
@@ -242,11 +293,13 @@ export class Environment {
     const clear = 1 - (d < 0.01 ? this.fogBank : 0);
     for (const f of this.cityFires) {
       const k = 0.75 + 0.25 * Math.sin(time * 1.3 + f.ph) * Math.sin(time * 2.9 + f.ph * 2);
-      f.sprite.material.color.copy(f.base).multiplyScalar(k * (1 - d * 0.6) * clear * clear);
+      f.sprite.material.color.copy(f.base).multiplyScalar(k * (1 - d * 0.6) * clear * clear * this.burn);
     }
     for (const b of this.blinkers) b.sprite.visible = clear > 0.5 && Math.sin(time * b.rate * 3.1 + b.ph) > 0.55;
     for (const w of this.flickerWindows) w.material.color.setRGB(2.2, 1.2, 0.45).multiplyScalar(0.7 + 0.3 * Math.sin(time * 7 + w.id) * Math.sin(time * 3.3));
-    for (const b of this.skyBeams) {
+    for (let bi = 0; bi < this.skyBeams.length; bi++) {
+      const b = this.skyBeams[bi];
+      b.mesh.visible = bi < this.beams;
       b.mesh.rotation.z = Math.sin(time * b.sp + b.ph) * 0.4;
       b.mesh.rotation.x = -0.28 + Math.cos(time * b.sp * 0.7 + b.ph) * 0.12;
       b.mesh.material.uniforms.uI.value = 0.022 * (1 - d) * clear * clear;
@@ -310,11 +363,11 @@ export class Environment {
     fogUniforms.lbDawn.value = this.scene.fog.far;
     su.uHorizon.value.copy(fc);
     su.uZenith.value.setRGB(lerp(0.0025, 0.05, d), lerp(0.003, 0.055, d), lerp(0.0055, 0.068, d));
-    su.uGlowAmt.value = lerp(0.7, 0.35, d);
+    su.uGlowAmt.value = lerp(0.7, 0.35, d) * (0.3 + 0.7 * this.burn);
     su.uCloudLight.value = lerp(1, 9, d);
-    this.moon.intensity = lerp(0.14, 1.9, d);
+    this.moon.intensity = lerp(0.08, 1.9, d);
     this.moon.color.setRGB(lerp(0.56, 0.75, d), lerp(0.64, 0.74, d), lerp(0.78, 0.72, d));
-    this.rim.intensity = lerp(0.35, 0.25, d);
+    this.rim.intensity = lerp(0.24, 0.25, d) * (0.3 + 0.7 * this.burn);
     this.rainUniforms.uIntensity.value = lerp(0.32, 0.18, d);
     for (const s of this.lampSprites) s.visible = d < 0.6 && this.power > 0.5;
     void audio;
@@ -326,6 +379,7 @@ export class Environment {
       s.t -= dt;
       if (s.t > 0) continue;
       s.t = 0.8 + R() * 4.5;
+      if (R() > this.war) continue;
       const kind = R();
       if (kind < 0.55) {
         // a stream of tracers arcing up out of the streets
@@ -356,8 +410,33 @@ export class Environment {
     void d;
   }
 
+  /**
+   * The world keeps pace with the radio. The city burns and fights through the
+   * first nights; Bastion-3 falls on the fifth and the other bastions' searchlights
+   * go out; by the seventh "the city stopped burning" — embers and dark plumes only.
+   */
+  setStory(night, endless = false) {
+    const n = endless ? 99 : night;
+    this.burn = n <= 5 ? 1 : n === 6 ? 0.5 : n <= 10 ? 0.05 : 0.03;
+    this.war = n <= 4 ? 1 : n <= 6 ? 0.45 : 0;
+    this.beams = n <= 4 ? 3 : n <= 6 ? 1 : 0;
+    for (const f of this.cityFires) {
+      if (!f.args) continue;
+      // burning: the flames are there, as bright as the night calls for; burnt out: gone
+      if (this.burn > 0.2) {
+        if (f.fid < 0 || f.fid === undefined) f.fid = this.fire.add(...f.args);
+        this.fire.set(f.fid, f.fk * this.burn);
+      } else if (f.fid >= 0) { this.fire.remove(f.fid); f.fid = -1; }
+    }
+    if (this.plumeUniforms) this.plumeUniforms.uBurn.value = this.burn > 0.2 ? this.burn : 0;
+    if (this.cityUniforms) this.cityUniforms.uBurn.value = this.burn;
+  }
+
   // a dark night: the wall lamps, searchlights and fires are what you see by
-  baseHemi() { return lerp(0.28, 3.2, this.dawn); }
+  baseHemi() { return lerp(0.16, 3.2, this.dawn); }
 }
 
 const _flashCol = new THREE.Color();
+
+/** Small seeded RNG for placement. */
+function makeRngLocal(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }

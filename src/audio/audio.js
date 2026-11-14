@@ -26,6 +26,7 @@ const SFX = {
   radio_out: [2, 22050], latch: [0, 44100], barrel_seat: [0, 44100], charge: [0, 44100], steam: [0, 32000],
   steam_long: [0, 32000], ui_click: [0, 44100], ui_hover: [0, 44100], ui_buy: [0, 44100],
   flare_launch: [0, 44100], flare_ignite: [0, 32000], throw: [2, 32000], heartbeat: [0, 22050],
+  grenade_pin: [0, 44100], grenade_spoon: [0, 44100], glass: [3, 44100], molotov_whoosh: [0, 32000],
   tinnitus: [0, 32000], crow: [5, 32000], bell: [0, 32000], dog: [3, 22050], distant_mg: [4, 22050],
 };
 const BEDS = {
@@ -643,6 +644,7 @@ export class AudioEngine {
   /** The bottle leaves the hand: the arm, then the rag fluttering away. */
   molotovThrow() {
     this.play(this.pickVar('throw'), { gain: 0.5, rate: rand(0.9, 1.05), pan: -0.15, force: true });
+    this.play(this.B.molotov_whoosh[0], { gain: 0.6, rate: rand(0.92, 1.08), pan: -0.15, delay: 0.02, force: true });
     this.play(this.B.molotov_flight[0], { gain: 0.3, rate: rand(0.92, 1.08), pan: -0.05, delay: 0.04, force: true });
   }
 
@@ -650,7 +652,9 @@ export class AudioEngine {
   molotov(x, z) {
     if (!this.ready) return;
     const dist = Math.hypot(x - this.listenerX, z - this.listenerZ);
-    this.play(this.pickVar('molotov'), { gain: 1.15, rate: rand(0.94, 1.06), x, z, ref: 45, sos: true, reverb: 0.4, force: true });
+    this.play(this.pickVar('molotov'), { gain: 1.3, rate: rand(0.94, 1.06), x, z, ref: 60, sos: true, reverb: 0.4, force: true });
+    // the glass itself, bright enough to read across the field
+    this.play(this.pickVar('glass'), { gain: 1.0, rate: rand(0.92, 1.08), x, z, ref: 80, sos: true, reverb: 0.3, force: true });
     if (this.B.boom_sub[0]) this.play(this.B.boom_sub[0], { gain: 0.25, rate: rand(1.3, 1.5), x, z, ref: 50, sos: true, force: true });
     if (dist < 50) this.duck(0.15 * (1 - dist / 50), 0.15, 0.5);
   }
@@ -769,6 +773,12 @@ export class AudioEngine {
   }
 
   throwGrenade() { this.play(this.pickVar('throw'), { gain: 0.5, rate: rand(0.9, 1.1), pan: rand(-0.1, 0.2), force: true }); }
+
+  /** The pin out of a grenade; the spoon flies a beat later as it leaves the hand. */
+  grenadePin() {
+    this.play(this.B.grenade_pin[0], { gain: 0.75, rate: rand(0.95, 1.06), pan: 0.25, force: true });
+    this.play(this.B.grenade_spoon[0], { gain: 0.45, rate: rand(0.94, 1.08), pan: 0.3, delay: 0.3, force: true });
+  }
 
   // ── bodies ─────────────────────────────────────────────────────────────────
   flesh(x, z, headshot = false) {

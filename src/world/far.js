@@ -43,6 +43,7 @@ void main(){
 }`;
 const PLUME_FRAG = /* glsl */`
 uniform float uTime;
+uniform float uBurn;
 uniform float uDawn;
 varying vec2 vUv;
 varying float vSeed;
@@ -62,7 +63,7 @@ void main(){
   body *= smoothstep(0.0, 0.06, vUv.y) * (1.0 - smoothstep(0.7, 1.0, vUv.y));
   float a = clamp(body * (0.45 + n * 0.9), 0.0, 1.0) * 0.92;
   // lit from below by the fires, sooty above
-  float lit = exp(-vUv.y * 6.0) * vLit * (0.6 + n * 0.6) * (1.0 - uDawn * 0.7);
+  float lit = exp(-vUv.y * 6.0) * vLit * uBurn * (0.6 + n * 0.6) * (1.0 - uDawn * 0.7);
   vec3 col = mix(vec3(0.012, 0.011, 0.011), vec3(0.05, 0.048, 0.05), uDawn) * (0.7 + n * 0.6) + vec3(0.9, 0.28, 0.06) * lit;
   col = mix(col, vFogCol, vFog);
   gl_FragColor = vec4(col, a * (1.0 - vFog * 0.5));
@@ -380,13 +381,14 @@ function buildCity(env, rng) {
   cg.computeBoundingSphere();
   const mat = new THREE.MeshStandardMaterial({ color: 0x24221f, roughness: 0.9, metalness: 0.1, emissive: 0xffffff });
   mat.defines = { LB_FOG_SCALE: '0.5' };
-  env.cityUniforms = { uTime: { value: 0 }, uDawn: { value: 0 } };
+  env.cityUniforms = { uTime: { value: 0 }, uDawn: { value: 0 }, uBurn: { value: 1 } };
   mat.onBeforeCompile = (sh) => {
     sh.uniforms.uTime = env.cityUniforms.uTime;
     sh.uniforms.uDawn = env.cityUniforms.uDawn;
+    sh.uniforms.uBurn = env.cityUniforms.uBurn;
     sh.vertexShader = 'attribute float aBld;\nvarying float vBld;\nvarying vec3 vCW;\nvarying vec3 vCN;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
       vBld = aBld; vCW = (modelMatrix * vec4(transformed, 1.0)).xyz; vCN = normalize(mat3(modelMatrix) * objectNormal);`);
-    sh.fragmentShader = `uniform float uTime;\nuniform float uDawn;\nvarying float vBld;\nvarying vec3 vCW;\nvarying vec3 vCN;
+    sh.fragmentShader = `uniform float uTime;\nuniform float uDawn;\nuniform float uBurn;\nvarying float vBld;\nvarying vec3 vCW;\nvarying vec3 vCN;
       float cHash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
       float cNoise(float x){ float i = floor(x), f = fract(x); return mix(cHash(vec3(i, 1.0, 2.0)), cHash(vec3(i + 1.0, 1.0, 2.0)), f * f * (3.0 - 2.0 * f)); }
     ` + sh.fragmentShader.replace('#include <emissivemap_fragment>', `
@@ -402,10 +404,13 @@ function buildCity(env, rng) {
           float lit = step(0.982, r);
           float fireLit = step(0.985, r);
           float fl = 0.7 + 0.3 * sin(uTime * (3.0 + r * 9.0) + r * 40.0);
+          // once the city has stopped burning (env.setStory): no fire in the windows, no glow in
+          // the streets, and only the odd lamp left on
+          lit *= min(1.0, step(0.996, r) + step(0.3, uBurn));
           em += win * lit * mix(vec3(1.1, 0.55, 0.2), vec3(0.6, 0.65, 0.75), step(0.993, r)) * 0.6;
-          em += win * fireLit * vec3(4.0, 1.4, 0.3) * fl;
+          em += win * fireLit * vec3(4.0, 1.4, 0.3) * fl * uBurn;
           // burning districts light the facades from street level
-          float district = smoothstep(0.55, 0.85, cNoise(vCW.x * 0.006 + 3.0));
+          float district = smoothstep(0.55, 0.85, cNoise(vCW.x * 0.006 + 3.0)) * uBurn;
           em += vec3(1.0, 0.35, 0.08) * exp(-max(vCW.y, 0.0) / 28.0) * district * 0.55 * (0.85 + 0.15 * sin(uTime * 2.0 + vCW.x * 0.05));
         }
         totalEmissiveRadiance = em * (1.0 - uDawn * 0.85);
@@ -450,12 +455,14 @@ function buildCity(env, rng) {
     const x = (rng() - 0.5) * 1300, z = -995 - rng() * 230;
     const y = cityGround(x, z);
     const big = i < 7;
-    fire.add(x, y, z, big ? 50 + rng() * 40 : 22 + rng() * 20, big ? 70 + rng() * 60 : 30 + rng() * 25, big ? 7 : 5, { glow: false, fogScale: 0.42, fadeIn: 0 });
+    const fk = big ? 7 : 5;
+    const args = [x, y, z, big ? 50 + rng() * 40 : 22 + rng() * 20, big ? 70 + rng() * 60 : 30 + rng() * 25, fk, { glow: false, fogScale: 0.42, fadeIn: 0 }];
+    const fid = fire.add(...args);
     const g = env.makeGlowSprite(0xff5a14, big ? 260 + rng() * 140 : 120, big ? 0.32 : 0.2, false);
     g.position.set(x, y + 30, z + 20);
     g.renderOrder = -3;
     scene.add(g);
-    env.cityFires.push({ sprite: g, base: g.material.color.clone(), ph: rng() * 10 });
+    env.cityFires.push({ sprite: g, base: g.material.color.clone(), ph: rng() * 10, fid, fk, big, args });
     if (big) plumes.push([x, y + 20, z, 160 + rng() * 120, 520 + rng() * 380, 1]);
   }
   plumes.push([-640, cityGround(-640, -1100), -1100, 220, 700, 0.6]);
@@ -470,7 +477,7 @@ function buildCity(env, rng) {
   pg.setAttribute('iP', new THREE.InstancedBufferAttribute(IP, 4));
   pg.setAttribute('iS', new THREE.InstancedBufferAttribute(IS, 4));
   pg.instanceCount = plumes.length;
-  env.plumeUniforms = { uTime: { value: 0 }, uDawn: { value: 0 }, uWind: { value: new THREE.Vector2(0.55, 0.12) }, ...fogUniforms };
+  env.plumeUniforms = { uTime: { value: 0 }, uDawn: { value: 0 }, uBurn: { value: 1 }, uWind: { value: new THREE.Vector2(0.55, 0.12) }, ...fogUniforms };
   const plumeMesh = new THREE.Mesh(pg, new THREE.ShaderMaterial({
     uniforms: env.plumeUniforms, vertexShader: PLUME_VERT, fragmentShader: PLUME_FRAG,
     transparent: true, depthWrite: false,

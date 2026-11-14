@@ -379,6 +379,112 @@ DIRECTION = {
         ("Weary, hollow, slow.", 0.15),
     'Another morning on the wall. Tomorrow they would come again. So would we.':
         ("Tired but stubborn, a quiet resolve on 'So would we'.", 0.22),
+    'We had all come through the first night alive. We thought, God help us, that it might always be like that.':
+        ('Quiet and rueful, an old man smiling sadly at his younger self.', 0.2),
+    "The first names went on the list that night. Kovac wrote them himself, in pencil, so the rain wouldn't run them.":
+        ("Slow and tender, sorrow held in check, a small catch on 'in pencil'.", 0.2),
+    'Nobody was taken out of the fog that night. When it lifted, we counted heads twice to be sure.':
+        ('Hushed relief, a faint disbelieving smile at the end.', 0.2),
+    'In the fog, we only knew a man was gone when he stopped answering. We called their names until dawn.':
+        ('Haunted and low, slowing on the last sentence.', 0.2),
+    "We lost no one on the wall that night. It didn't feel like a victory, with her voice still in our ears.":
+        ('Heavy and conflicted, quiet guilt at the end.', 0.2),
+    'We buried our own beside the road that night, facing the overpass, as if they could still keep watch for her.':
+        ('Gentle and grieving, very slow at the end.', 0.18),
+    'Every man came back from the fourth night. The crows went hungry, for once.':
+        ("Dry, grim satisfaction, a wry beat before 'for once'.", 0.22),
+    'We paid for the fourth night in men, not supplies. The crate came cheaper than they did.':
+        ('Bitter and quiet, the last sentence cold.', 0.22),
+    "Not one of us fell on the giant's night. Afterwards we sat in the dark, too tired even to talk about it.":
+        ('Exhausted wonder, quiet and slow.', 0.18),
+    'The giant took men off the wall like a child takes toys from a shelf. We stopped looking at the empty places.':
+        ('Low and shaken, haunted, the last sentence flat.', 0.25),
+    'The stampede broke on the wall and never got over it. Every one of us was still there at roll call.':
+        ('Grim pride rising, warm on the last sentence.', 0.3),
+    'Some of the men who went down under the stampede never got back up. We heard the brutes long after they had stopped.':
+        ('Dark and haunted, slow and heavy.', 0.22),
+    "We came through the dark without losing a soul. Kovac said it was the first good luck we'd had in a week.":
+        ("Weary warmth, a soft smile on Kovac's words.", 0.2),
+    'We lost men in the dark that night, and in the dark we could not even see who. We found out at roll call.':
+        ('Hollow and quiet, very slow at the end.', 0.18),
+    'With Spectre gone, we lost no one else that night. It felt as if the dead were giving us a moment to mourn.':
+        ('Soft and sorrowful, reflective.', 0.18),
+    'Spectre was not the only loss that night. By dawn, the wall had names of its own to add to theirs.':
+        ('Sombre and dignified, slow.', 0.2),
+    'Against everything the valley had, not one man fell. Aran swore it would be the story he told his children.':
+        ("Proud and moved, warm, a smile on 'his children'.", 0.3),
+    'Everything we had, we gave. Some of us gave all of it. Their rifles stayed on the parapet where they fell.':
+        ('Solemn and proud through grief, slow, weighted.', 0.25),
+    'On the last night, every man who had made it this far made it to the end.':
+        ('Deeply moved, quiet triumph, slow.', 0.3),
+    'Some of us came so close to the end. Seventy-one hours, and then the night took them anyway.':
+        ('Broken-hearted and quiet, a long pause before the last words.', 0.2),
+    'Somewhere past midnight the gun found its rhythm. Kovac said he had never seen a fifty worked like that.':
+        ('Grim admiration, low and steady.', 0.3),
+    'They came out of the fog in columns, and the gun cut them down before they ever saw the wall.':
+        ('Tense and vivid, low and rhythmic.', 0.35),
+    'When the column from the overpass road came for the wall, the fifty swept the road clean from end to end.':
+        ('Hard and vivid, a grim rhythm.', 0.35),
+    'Around the strobe, the gun laid them down in a ring, row after row, like a fence made of the dead.':
+        ('Dark, vivid and steady, a terrible image.', 0.35),
+    'Even with the giant on the field, the gun never stopped talking. The smaller dead fell in heaps around its feet.':
+        ('Intense and proud, building.', 0.4),
+    'Under the stampede, the gun chewed through the runners until the barrel glowed like a stove.':
+        ('Vivid and fierce, quickening.', 0.4),
+    'In the dark, the gun was our only light. Every time it spoke, a dozen of them stopped coming.':
+        ('Low and grimly poetic.', 0.3),
+    "With no one above us any more, the fifty did Spectre's work as well as its own. The field was grey with them.":
+        ('Grim pride with grief underneath.', 0.3),
+    'That night the gun fired until the belts ran out, and then we fed it more, and the valley went quiet in rows.':
+        ('Building intensity, then hushed at the end.', 0.4),
+    'On the last night the gun spoke for all of us, and whatever came down that valley did not go back up it.':
+        ('Fierce, proud and final.', 0.4),
+    'We set the fog itself on fire. The bottles burst in the white, and the dead walked out of it burning.':
+        ('Eerie and vivid, slow.', 0.35),
+    'The overpass road burned all night. Whatever walked it to reach us burned with it.':
+        ('Dark and cold, measured.', 0.3),
+    'We ringed the drop zone with fire, and the dead walked into it rather than give up the crate.':
+        ('Grim and vivid.', 0.35),
+    "The wall base burned under the giant's feet. Even it screamed when the fuel caught.":
+        ("Dark awe, a cold edge on 'Even it screamed'.", 0.35),
+    'The brutes came through the fire without slowing. They just burned as they came.':
+        ('Flat, haunted, slow.', 0.3),
+    'In the blackout, our fires were the only light on the field. We could watch them burn, and that was all we could see.':
+        ('Hushed and haunted.', 0.3),
+    'With Spectre gone, the fire did its work for it. The foot of the wall burned from dusk until the sky went grey.':
+        ('Grim and sorrowful.', 0.3),
+    'We threw every bottle we had. The foot of the wall was one long fire, and still they kept walking into it.':
+        ('Building, intense, then hollow at the end.', 0.4),
+    'On the last night we set the valley floor alight, and it burned the way the city once had.':
+        ('Slow, solemn and bitter.', 0.3),
+    "There's a fuel tanker stalled out on the road. Let them crowd around it, then put a burst through the tank.":
+        ("Calm and crafty, a sergeant's sly plan, low and quick.", 0.45),
+    "The tanker's gone up! Look at them burn!":
+        ('Shouting with fierce, savage glee.', 0.9),
+    'They walked right past the tanker. Waste of good fuel.':
+        ('Dry and disgusted, a grumble.', 0.3),
+    "Bastion-7, Hollis! I've got a truck full of people from Halden and half the valley on my bumper. Open the gate!":
+        ('Shouting over an engine, breathless and desperate, urgent.', 0.95),
+    'Truck on the road! Clear a path for it — shoot whatever is in front of it!':
+        ('Shouting orders, urgent and commanding.', 0.85),
+    "We're in! We're in. Bastion-7, I owe every one of you a drink.":
+        ('Breathless, laughing relief, then warm and grateful.', 0.6),
+    "The truck's stopped... they're all over it. God help them.":
+        ('Horrified, quiet and shaken, trailing off.', 0.35),
+    "They're coming over the rocks on the left! Swing that gun!":
+        ('Shouting in alarm, urgent.', 0.9),
+    "They're coming over the rocks on the right! Swing that gun!":
+        ('Shouting in alarm, urgent.', 0.9),
+    'A fuel tanker stood abandoned on the road. We waited until they crowded round it, and then we lit it, and for a moment it was day.':
+        ("Vivid storytelling, building, awe on 'for a moment it was day'.", 0.4),
+    'A fuel tanker stood abandoned on the road all night. The dead shuffled past it, and we never found the moment to light it.':
+        ('Wry and regretful, slow.', 0.2),
+    'Hollis came back that night, driving a truck full of strangers from Halden. We cleared the road in front of him, and he drove it straight through the gate.':
+        ('Warm and lively, rising to pride at the end.', 0.4),
+    'Hollis came back that night with a truck full of strangers from Halden. The dead stopped it on the road, short of the gate, and we could not clear them fast enough.':
+        ('Heavy with guilt, slow, quiet at the end.', 0.2),
+    'That night they found the way round, down over the rocks at the end of the wall, where nobody had thought to look.':
+        ('Low and ominous, measured.', 0.3),
     'Bastion-7 went quiet that night. The dead came over the wall like water through a broken dam, and the last light on the line went out.':
         ("Mournful and grave, an elegy, slowing to a whisper at the end.", 0.25),
     'No one was left to write it down. The gun fell silent before the dawn, and in the morning, the valley belonged to the dead.':

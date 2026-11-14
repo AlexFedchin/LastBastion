@@ -3,7 +3,10 @@
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.js';
 
-const FILES = { m2hb: 'models/m2hb.glb', ac130: 'models/ac130.glb', b36: 'models/b36.glb' };
+const FILES = {
+  m2hb: 'models/m2hb.glb', ac130: 'models/ac130.glb', b36: 'models/b36.glb',
+  soldier: 'models/soldier.glb', grenade: 'models/grenade.glb', molotov: 'models/molotov.glb', crate: 'models/crate.glb', sandbags: 'models/sandbags.glb',
+};
 const scenes = {};
 let loading = null;
 
@@ -24,6 +27,21 @@ export function loadModels() {
  * A fresh copy of a loaded model. Geometry and textures are shared; materials
  * are cloned so each copy can be tinted on its own.
  */
+/** The loaded scene itself (for skinned models, which need SkeletonUtils.clone). */
+export function modelScene(name) {
+  if (!scenes[name]) throw new Error(`model ${name} not loaded`);
+  return scenes[name];
+}
+
+/** A loaded model's mesh by node name (or its first mesh): for instancing its geometry and material. */
+export function modelMesh(name, node = null) {
+  const src = scenes[name];
+  if (!src) throw new Error(`model ${name} not loaded`);
+  let found = null;
+  src.traverse((o) => { if (!found && o.isMesh && (!node || o.name === node || (o.parent && o.parent.name === node))) found = o; });
+  return found;
+}
+
 export function cloneModel(name) {
   const src = scenes[name];
   if (!src) throw new Error(`model ${name} not loaded`);

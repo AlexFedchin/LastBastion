@@ -8,3 +8,4 @@ scripts/audio/.cache/
 scripts/models/source/
 tests/smoke/out/
 __pycache__/
+scripts/art/.cache/

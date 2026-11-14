@@ -113,8 +113,8 @@ export function nightPlan(n, diff) {
     surges: Math.min(2 + Math.floor(n / 2), 8),
     tide: Math.min(0.36, 0.18 + 0.018 * k),
     hpMul: diff.hpMul * (1 + 0.085 * k + 0.009 * k * k + (n > FINAL_NIGHT ? 0.06 * (n - FINAL_NIGHT) : 0)),
-    // scavenging gets thinner as the nights go on
-    supplyMul: 1 / (1 + 0.1 * k),
+    // scavenging gets thinner as the nights go on: maxing everything out takes the whole siege
+    supplyMul: 0.85 / (1 + 0.3 * k),
     speedMul: 1 + Math.min(0.016 * k, 0.2),
   };
 }
@@ -131,7 +131,7 @@ export function baseStats() {
     // two crewed M240s are on the wall from the start; upgrades post the other two
     gunners: 2, gunnerRate: 2.4, gunnerDamage: 15, gunnerSpread: 0.034,
     // Molotovs: bottles per night, and the burning pool each one leaves
-    molotovs: 6, molotovBurn: 9, molotovRadius: 4.2, molotovDps: 70,
+    molotovs: 6, molotovBurn: 9, molotovRadius: 5.4, molotovDps: 70,
     // Wire
     wireBands: 0, wireHp: 450,
     // Consumables per night
@@ -175,17 +175,19 @@ export const UPGRADES = [
     apply: (s, r) => { s.gunnerRate *= 1 + 0.25 * r; s.gunnerSpread *= 1 - 0.25 * r; s.gunnerDamage *= 1 + 0.15 * r; } },
   { id: 'wire', group: 'wall', name: 'CONCERTINA WIRE', desc: 'Rank 1: wire band at 22 m. Rank 2: second band at 45 m. Rank 3: double strand.', costs: [160, 340, 560],
     apply: (s, r) => { s.wireBands = Math.min(r, 2); if (r >= 3) s.wireHp *= 2.2; } },
-  { id: 'molotov', group: 'wall', unlock: 'molotov', name: 'MOLOTOV CRATE', desc: '+3 bottles a night. The fires burn longer, wider and hotter per rank.', costs: [220, 480],
-    apply: (s, r) => { s.molotovs += 3 * r; s.molotovBurn += 3 * r; s.molotovRadius *= 1 + 0.15 * r; s.molotovDps *= 1 + 0.25 * r; } },
   // Support
   { id: 'grenades', group: 'support', unlock: 'grenades', name: 'GRENADE CRATE', desc: '+4 grenades per night.', costs: [110, 240],
     apply: (s, r) => { s.grenades += 4 * r; } },
+  { id: 'molotov', group: 'support', unlock: 'molotov', name: 'MOLOTOV CRATE', desc: '+3 bottles per night.', costs: [180, 400],
+    apply: (s, r) => { s.molotovs += 3 * r; } },
+  { id: 'molotovFuel', group: 'support', unlock: 'molotov', name: 'THICKENED FUEL', desc: 'Per rank: the fire spreads 25% wider, burns 3 s longer and 20% hotter.', costs: [240, 520, 880],
+    apply: (s, r) => { s.molotovRadius *= 1 + 0.25 * r; s.molotovBurn += 3 * r; s.molotovDps *= 1 + 0.2 * r; } },
 ];
 
 // Consumable purchase
 export const CLAYMORE = { cost: 150, perBuy: 6, max: 36, triggerR: 2.6, radius: 5.5, damage: 300 };
 
-export const SUPPLY_BONUS = (night, survivors) => 200 + 30 * night + 4 * survivors;
+export const SUPPLY_BONUS = (night, survivors) => 150 + 15 * night + 3 * survivors;
 
 // ── Abilities ────────────────────────────────────────────────────────────────
 export const ABILITY = {
@@ -329,27 +331,36 @@ export const UNLOCK_LINES = {
 // [event, when (fraction of the night's spawning window)]
 export const NIGHT_EVENTS = {
   1: [['patrol', 0.4]],
-  2: [['fog', 0.3]],
-  3: [['civilians', 0.55]],
+  2: [['fog', 0.3], ['tanker', 0.62]],
+  3: [['cliffs', 0.25], ['civilians', 0.55]],
   4: [['drop', 0.32]],
   5: [['giant', 0.42]],
-  6: [['stampede', 0.4]],
+  6: [['stampede', 0.4], ['cliffs', 0.72]],
   7: [['blackout', 0.3]],
-  8: [['gunshipDown', 0.28]],
+  8: [['gunshipDown', 0.28], ['convoy', 0.58]],
   9: [['drop', 0.18], ['bloaters', 0.5]],
   10: [['behemoth', 0.5]],
 };
-export const ENDLESS_EVENTS = ['giant', 'stampede', 'bloaters', 'drop', 'fog', 'blackout', 'civilians'];
+export const ENDLESS_EVENTS = ['giant', 'stampede', 'bloaters', 'drop', 'fog', 'blackout', 'civilians', 'tanker', 'convoy', 'cliffs'];
 
 export const EVENTS = {
   patrol: { count: 4, speed: [4.5, 4.9], chasers: 16, catchR: 1.05, reward: { survivors: 1, supplies: 40 } },
   civilians: { count: 6, speed: [3.8, 4.3], chasers: 20, catchR: 1.05, reward: { survivors: 1, supplies: 20 } },
-  drop: { hold: 35, tear: 1.3, maxTearing: 6, pull: 32, reward: { grenades: 6, molotovs: 3, supplies: 150 } },
+  // the recovery team leaves the gate teamDelay s after the crate lands, rigs it for rig s,
+  // and carries it home at carrySpeed[men still standing] m/s
+  drop: { teamDelay: 6, teamSpeed: [4.4, 4.8], rig: 3.5, carrySpeed: [0, 1.0, 1.7, 2.1, 2.4], catchR: 1.0,
+    tear: 1.3, maxTearing: 6, pull: 32, reward: { grenades: 6, molotovs: 3, supplies: 150 } },
   giant: { name: 'GOLIATH', hpMul: 1, scale: 4.0, smash: 2.4 },
   behemoth: { name: 'BEHEMOTH', hpMul: 1.8, scale: 5.4, smash: 1.8 },
   stampede: { brutes: 14, speed: 1.75, runners: 20 },
   bloaters: { count: 45 },
   fog: { duration: 55 },
+  // a fuel tanker on the road: hp = rounds through the tank before it goes up
+  tanker: { z: [-125, -95], hp: 14, crowd: 70, radius: 16, damage: 1500, fireRadius: 9, fireBurn: 22, timeout: 75 },
+  // survivors' truck running the road: speed m/s, slowed by the dead in front, torn by the dead on it
+  convoy: { speed: 6.5, blockers: 40, chasers: 24, tear: 2.2, maxTearing: 8, reward: { survivors: 3, supplies: 120 } },
+  // the dead coming down over the rocks at the end of a wing, over `over` seconds
+  cliffs: { count: 60, over: 22 },
   blackout: { duration: 45 },
 };
 // '@spectre' is whichever gunship crew is up that night
@@ -389,6 +400,21 @@ export const EVENT_LINES = {
     spectre: [['@spectre', 'We see it, Bastion. Putting everything we have on the big one.']],
     wall: [[CALL.kovac, 'It\'s at the wall! It\'s tearing the wall apart — kill it!']],
     down: [[CALL.kovac, 'It\'s down. Whatever that was, it\'s down.']],
+  },
+  tanker: {
+    start: [[CALL.kovac, "There's a fuel tanker stalled out on the road. Let them crowd around it, then put a burst through the tank."]],
+    boom: [[CALL.kovac, "The tanker's gone up! Look at them burn!"]],
+    wasted: [[CALL.kovac, 'They walked right past the tanker. Waste of good fuel.']],
+  },
+  convoy: {
+    start: [[CALL.hollis, "Bastion-7, Hollis! I've got a truck full of people from Halden and half the valley on my bumper. Open the gate!"]],
+    follow: [[CALL.kovac, 'Truck on the road! Clear a path for it — shoot whatever is in front of it!']],
+    saved: [[CALL.hollis, "We're in! We're in. Bastion-7, I owe every one of you a drink."]],
+    lost: [[CALL.kovac, "The truck's stopped... they're all over it. God help them."]],
+  },
+  cliffs: {
+    left: [[CALL.kovac, "They're coming over the rocks on the left! Swing that gun!"]],
+    right: [[CALL.kovac, "They're coming over the rocks on the right! Swing that gun!"]],
   },
   stampede: {
     left: [[CALL.kovac, 'Brutes! A whole herd of them — left flank!']],
@@ -464,6 +490,15 @@ export const CHRONICLE = {
       field: 'And then it came — the biggest of them all. We threw everything we had left at it, and somehow, out there in the field, it fell.',
       wall: 'And then it came — the biggest of them all. It reached our wall, and for a long moment I thought the whole line would come down with it. It didn\'t. It fell.',
     },
+    tanker: {
+      boom: 'A fuel tanker stood abandoned on the road. We waited until they crowded round it, and then we lit it, and for a moment it was day.',
+      wasted: 'A fuel tanker stood abandoned on the road all night. The dead shuffled past it, and we never found the moment to light it.',
+    },
+    convoy: {
+      saved: 'Hollis came back that night, driving a truck full of strangers from Halden. We cleared the road in front of him, and he drove it straight through the gate.',
+      lost: 'Hollis came back that night with a truck full of strangers from Halden. The dead stopped it on the road, short of the gate, and we could not clear them fast enough.',
+    },
+    cliffs: { held: 'That night they found the way round, down over the rocks at the end of the wall, where nobody had thought to look.' },
     stampede: { held: 'A herd of brutes came down the flank in a stampede, and the wall shuddered under their weight. It held. Barely.' },
     bloaters: { held: 'A column of bloaters walked down the road like a funeral procession. We burst them in the field, one after another, and the valley stank of it for days.' },
     fog: { held: 'Then the fog rolled up the valley, thick as wet wool, and the dead walked out of it close enough to touch. We fired at shadows.' },
@@ -475,6 +510,75 @@ export const CHRONICLE = {
     danger: 'When the wall was lost, we called the guns down on our own heads. Three of ours died in that fire. The wall held.',
     fire: 'The wall base burned all night. The dead walked into the flames screaming, and kept on walking, until they didn\'t.',
     massacre: 'Somewhere past midnight the gun found its rhythm, and the dead went down in rows, like wheat before the scythe.',
+  },
+  // the cost, told per night: 'none' when nobody was lost, 'lost' otherwise (toll.heavy past that)
+  tollNight: {
+    1: {
+      none: "We had all come through the first night alive. We thought, God help us, that it might always be like that.",
+      lost: "The first names went on the list that night. Kovac wrote them himself, in pencil, so the rain wouldn't run them.",
+    },
+    2: {
+      none: "Nobody was taken out of the fog that night. When it lifted, we counted heads twice to be sure.",
+      lost: "In the fog, we only knew a man was gone when he stopped answering. We called their names until dawn.",
+    },
+    3: {
+      none: "We lost no one on the wall that night. It didn't feel like a victory, with her voice still in our ears.",
+      lost: "We buried our own beside the road that night, facing the overpass, as if they could still keep watch for her.",
+    },
+    4: {
+      none: "Every man came back from the fourth night. The crows went hungry, for once.",
+      lost: "We paid for the fourth night in men, not supplies. The crate came cheaper than they did.",
+    },
+    5: {
+      none: "Not one of us fell on the giant's night. Afterwards we sat in the dark, too tired even to talk about it.",
+      lost: "The giant took men off the wall like a child takes toys from a shelf. We stopped looking at the empty places.",
+    },
+    6: {
+      none: "The stampede broke on the wall and never got over it. Every one of us was still there at roll call.",
+      lost: "Some of the men who went down under the stampede never got back up. We heard the brutes long after they had stopped.",
+    },
+    7: {
+      none: "We came through the dark without losing a soul. Kovac said it was the first good luck we'd had in a week.",
+      lost: "We lost men in the dark that night, and in the dark we could not even see who. We found out at roll call.",
+    },
+    8: {
+      none: "With Spectre gone, we lost no one else that night. It felt as if the dead were giving us a moment to mourn.",
+      lost: "Spectre was not the only loss that night. By dawn, the wall had names of its own to add to theirs.",
+    },
+    9: {
+      none: "Against everything the valley had, not one man fell. Aran swore it would be the story he told his children.",
+      lost: "Everything we had, we gave. Some of us gave all of it. Their rifles stayed on the parapet where they fell.",
+    },
+    10: {
+      none: "On the last night, every man who had made it this far made it to the end.",
+      lost: "Some of us came so close to the end. Seventy-one hours, and then the night took them anyway.",
+    },
+  },
+  // the night's deed, told per night (deeds.* for endless nights)
+  deedNight: {
+    massacre: {
+      1: "Somewhere past midnight the gun found its rhythm. Kovac said he had never seen a fifty worked like that.",
+      2: "They came out of the fog in columns, and the gun cut them down before they ever saw the wall.",
+      3: "When the column from the overpass road came for the wall, the fifty swept the road clean from end to end.",
+      4: "Around the strobe, the gun laid them down in a ring, row after row, like a fence made of the dead.",
+      5: "Even with the giant on the field, the gun never stopped talking. The smaller dead fell in heaps around its feet.",
+      6: "Under the stampede, the gun chewed through the runners until the barrel glowed like a stove.",
+      7: "In the dark, the gun was our only light. Every time it spoke, a dozen of them stopped coming.",
+      8: "With no one above us any more, the fifty did Spectre's work as well as its own. The field was grey with them.",
+      9: "That night the gun fired until the belts ran out, and then we fed it more, and the valley went quiet in rows.",
+      10: "On the last night the gun spoke for all of us, and whatever came down that valley did not go back up it.",
+    },
+    fire: {
+      2: "We set the fog itself on fire. The bottles burst in the white, and the dead walked out of it burning.",
+      3: "The overpass road burned all night. Whatever walked it to reach us burned with it.",
+      4: "We ringed the drop zone with fire, and the dead walked into it rather than give up the crate.",
+      5: "The wall base burned under the giant's feet. Even it screamed when the fuel caught.",
+      6: "The brutes came through the fire without slowing. They just burned as they came.",
+      7: "In the blackout, our fires were the only light on the field. We could watch them burn, and that was all we could see.",
+      8: "With Spectre gone, the fire did its work for it. The foot of the wall burned from dusk until the sky went grey.",
+      9: "We threw every bottle we had. The foot of the wall was one long fire, and still they kept walking into it.",
+      10: "On the last night we set the valley floor alight, and it burned the way the city once had.",
+    },
   },
   toll: {
     none: 'Not one name was added to the list that night. On that wall, it was as close to a miracle as we ever came.',
@@ -509,7 +613,7 @@ export const CHRONICLE = {
 export function chronicleLines() {
   const C = CHRONICLE, out = [];
   const flat = (v) => (typeof v === 'string' ? [v] : Array.isArray(v) ? v : Object.values(v).flatMap(flat));
-  for (const part of [C.open, C.events, C.deeds, C.toll, C.close, C.fallen]) out.push(...flat(part));
+  for (const part of [C.open, C.events, C.deeds, C.deedNight, C.toll, C.tollNight, C.close, C.fallen]) out.push(...flat(part));
   return out;
 }
 

@@ -251,7 +251,8 @@ export function buildFortification(env) {
       g.position.copy(_v);
       scene.add(g);
       env.lampSprites.push(g);
-      env.lightPools.push({ x: _v.x - w.nx * 4.5, z: _v.z - w.nz * 4.5, r: 9, color: [1.0, 0.5, 0.16], k: 0.11 });
+      (env.wallLamps || (env.wallLamps = [])).push(_v.clone());
+      env.lightPools.push({ x: _v.x - w.nx * 4.5, z: _v.z - w.nz * 4.5, r: 11, color: [1.0, 0.5, 0.16], k: 0.17 });
     }
   }
   const poles = new THREE.Mesh(merge([...poleGeos, ...headGeos]), mats.darkSteel);
@@ -335,8 +336,9 @@ function buildBunker(env) {
   deck.receiveShadow = true;
   scene.add(deck);
 
-  // sandbag ring, two staggered courses
-  const bagGeo = sandbagGeo();
+  // sandbag ring around the nest: the scanned piles go here once the models are in
+  // (env.dressWithModels); until then, nothing (the loading screen is up)
+  env.nestBagRuns = [[-2.75, -4.05, -0.85, -4.2], [0.85, -4.2, 2.75, -4.05], [-2.8, -3.7, -2.8, -1.1], [2.8, -3.7, 2.8, -1.1]];
   const rng = makeRng(404);
   const ms = [];
   const run = (x0, z0r, x1, z1, rows) => {
@@ -350,12 +352,9 @@ function buildBunker(env) {
       ms.push(_m.clone());
     }
   };
-  run(-2.75, -4.05, -0.85, -4.2, 3);
-  run(0.85, -4.2, 2.75, -4.05, 3);
-  run(-2.8, -3.7, -2.8, -1.1, 3);
-  run(2.8, -3.7, 2.8, -1.1, 3);
+  // under the barrel, a single low course of the old bags (a pile would block the view)
   run(-0.85, -4.2, 0.85, -4.2, 1);
-  const bags = new THREE.InstancedMesh(bagGeo, env.sandbagMat, ms.length);
+  const bags = new THREE.InstancedMesh(sandbagGeo(), env.sandbagMat, ms.length);
   ms.forEach((m, i) => bags.setMatrixAt(i, m));
   bags.castShadow = true;
   bags.receiveShadow = true;
@@ -421,7 +420,7 @@ function buildBunker(env) {
     _m.compose(_v.set(-2.4 + k * 0.62 + (r % 2) * 0.3, top + 0.09 + r * 0.155, z0 + 6.0), _q, new THREE.Vector3(1, 1, 1));
     S.push(_m.clone());
   }
-  const shelter = new THREE.InstancedMesh(bagGeo, env.sandbagMat, S.length);
+  const shelter = new THREE.InstancedMesh(sandbagGeo(), env.sandbagMat, S.length);
   S.forEach((m, i) => shelter.setMatrixAt(i, m));
   scene.add(shelter);
   const roof = new THREE.Mesh(box(5.2, 0.08, 3.2, -0.5, top + 1.18, z0 + 7.4, 0.05), weather(new THREE.MeshStandardMaterial({ map: tex.corr.map, normalMap: tex.corr.normalMap, color: 0x8a8578, roughness: 0.7, metalness: 0.5 }), { soot: 0.5, rust: 0.6, key: 'corr' }));

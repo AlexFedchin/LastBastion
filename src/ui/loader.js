@@ -1,6 +1,8 @@
-// The loading screen: a night at the wall drawn in CSS (it keeps moving while
-// the game builds the world on the main thread), a belt of .50 rounds for
-// progress, a radio-log of the steps and rotating field notes.
+// The loading screen: painted key art (app/art, made by scripts/art) split into
+// a far and a near layer that drift against each other, rain, mist and embers
+// over it, all in CSS so it keeps moving while the game builds the world on the
+// main thread; a belt of .50 rounds for progress, a radio-log of the steps and
+// rotating field notes.
 //
 // Used at boot, before a reload (graphics change), and as a short deployment
 // card when a run starts — while the shaders for things not yet seen compile.
@@ -25,6 +27,9 @@ const TIPS = [
   'If the radio goes quiet, keep firing.',
 ];
 
+// the paintings, and what each is for: nest (boot), wall / gunship / drop / giant (nights), dawn (resupply)
+export const ART = ['nest', 'wall', 'gunship', 'drop', 'giant', 'dawn'];
+
 export class Loader {
   constructor() {
     this.el = $('loading');
@@ -32,6 +37,8 @@ export class Loader {
       kicker: $('ld-kicker'), title: $('ld-title'), tag: $('ld-tag'),
       belt: $('ld-belt'), sub: $('ld-sub'), log: $('ld-log'), tip: $('ld-tip'),
     };
+    this.far = $('ld-far'); this.near = $('ld-near');
+    this.art = 'nest';
     this.lines = [];
     this.tipIdx = (Math.random() * TIPS.length) | 0;
     this.ui.tip.textContent = TIPS[this.tipIdx];
@@ -53,12 +60,23 @@ export class Loader {
     }, 6500);
   }
 
+  /** Which painting is behind the words (a name in ART). */
+  setArt(name) {
+    if (!ART.includes(name) || name === this.art) return;
+    this.art = name;
+    this.far.style.backgroundImage = `url("art/${name}.webp")`;
+    this.near.style.backgroundImage = `url("art/${name}-near.webp")`;
+    // start the slow drift over from the beginning
+    for (const e of [this.far, this.near]) { e.style.animation = 'none'; void e.offsetWidth; e.style.animation = ''; }
+  }
+
   /**
    * Bring the loading screen up. Resolves once it covers the screen.
-   * opts: { kicker, title (HTML), tag, sub }
+   * opts: { kicker, title (HTML), tag, sub, art }
    */
   show(opts = {}) {
     const u = this.ui;
+    if (opts.art) this.setArt(opts.art);
     if (opts.kicker) u.kicker.textContent = opts.kicker;
     if (opts.title) u.title.innerHTML = opts.title;
     if (opts.tag !== undefined) u.tag.textContent = opts.tag;

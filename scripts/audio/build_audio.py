@@ -346,6 +346,12 @@ for k, (glass, burst) in enumerate([
     oneshot(f'sfx/molotov_{k + 1}', [dict(glass, fo=0.4),
                                      dict(src=TORCH, ss=whoomph[0], t=whoomph[1], delay=0.03, fo=0.9),
                                      dict(burst, fo=0.8)], target=-10, limit=5)
+# the throw: the burning rag tearing through the air as the arm comes over
+oneshot('sfx/molotov_whoosh', [dict(src=TORCH, ss=4.68, t=1.1, rate=1.35, hp=250, fi=0.04, fo=0.6),
+                               dict(src=242721, ss=1.0, t=0.9, hp=300, vol=-4, delay=0.05, fo=0.5)], sr=32000, target=-17)
+# glass on its own, close and bright: carries the bottle bursting across the field
+for k, (src, ss, t) in enumerate([(212698, 0.45, 1.3), (447699, 0.16, 1.3), (407431, 0.0, 0.56)]):
+    clip(f'sfx/glass_{k + 1}', src, ss, t, hp=900, fo=t * 0.45, target=-13)
 # a body catching: a small, hungry whoof
 oneshot('sfx/ignite', [dict(src=637533, ss=0.03, t=0.6, fo=0.3),
                        dict(src=260554, ss=0.02, t=0.8, rate=1.4, vol=-6, fo=0.4)], sr=32000, target=-17)
@@ -420,6 +426,11 @@ oneshot('sfx/flare_launch', [dict(src=529239, ss=0.28, t=1.4, rate=1.5, fo=0.6),
                              dict(src=463763, ss=2.09, t=0.46, vol=-4, delay=0.05)], target=-14)
 oneshot('sfx/flare_ignite', [dict(src=348766, ss=0.72, t=0.4), dict(src=348766, ss=2.0, t=3.0, fi=0.2, fo=2.0, vol=-6)],
         sr=32000, target=-16)
+# grenade: the pin drawn out of the ring (a blade drawn short and small, with a clip's
+# metal ring), then the spoon flying off as it leaves the hand
+oneshot('sfx/grenade_pin', [dict(src=259557, ss=0.22, t=0.32, rate=1.3, hp=1200, fo=0.1),
+                            dict(src=209645, ss=1.41, t=0.42, rate=1.15, hp=800, vol=-5, delay=0.09, fo=0.25)], target=-15)
+clip('sfx/grenade_spoon', 209645, 6.27, 0.45, rate=1.35, hp=2000, fo=0.3, target=-19)
 clip('sfx/throw_1', 463763, 2.09, 0.46, sr=32000, target=-16)
 clip('sfx/throw_2', 523230, 0.0, 0.45, sr=32000, target=-16)
 clip('sfx/heartbeat', 22440, 0.0, 0.7, sr=22050, target=-12)

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
   nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, ABILITY, CALL, COMMS,
-  UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines, CHRONICLE,
+  UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines, CHRONICLE, NIGHT_EVENTS,
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
@@ -24,7 +24,8 @@ import { AudioEngine } from './audio/audio.js';
 import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { Loader } from './ui/loader.js';
-import { loadModels } from './world/models.js';
+import { loadModels, modelMesh } from './world/models.js';
+import { setSoldierLamps } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
 
 const SECTION_LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
@@ -89,6 +90,9 @@ class Game {
       uRim: { value: new THREE.Color(0.075, 0.032, 0.014) },
       uEyeGlowBillboard: { value: 1 },
       uPixel: { value: 0.001 },
+      // the sodium lamps on the wall light the dead beneath them
+      uLamps: { value: (this.env.wallLamps || []).slice(0, 10) },
+      uLampPow: { value: 1 },
     };
     await step('waking the dead…');
     this.horde = new Horde(this.scene, this.fx, {
@@ -99,6 +103,8 @@ class Game {
     this.audio.applySettings(this.settings);
     const soundLoaded = this.audio.preload();
     await modelsLoaded;
+    setSoldierLamps(this.uniforms);
+    this.env.dressWithModels(modelMesh);
     this.player = new Player(this.camera, this.scene, this.fx, this.audio, this.horde);
     this.applyPlayerSettings();
     this.arsenal = new Arsenal(this.scene, this.fx, this.audio, this.horde, this.env);
@@ -120,6 +126,7 @@ class Game {
     await step('checking the wire…');
     this.menuStats = { ...baseStats(), gunners: 4, wireBands: 1 };
     this.arsenal.startNight(this.menuStats, true);
+    this.env.setStory(1);
     for (let i = 0; i < 220; i++) this.spawnMenuZombie(rand(-170, -30));
     this.horde.update(0.016, 0);
     this.horde.syncRender();
@@ -254,6 +261,7 @@ class Game {
           : n > FINAL_NIGHT ? 'No relief is coming.'
             : fresh.length ? `New tonight: ${fresh.map((f) => f.replace(/ /g, '\u00a0')).join(' · ')}` : `${hours} hours until relief.`,
         sub: '',
+        art: shop ? 'dawn' : this.nightArt(n),
       });
       const t0 = performance.now();
       this.loader.step('issuing ammunition…', 0.2);
@@ -306,7 +314,7 @@ class Game {
     this.player.onHit = (killed, head) => { this.hud.hitmarker(killed, head); };
     this.player.onOverheat = () => { this.bark('overheat', 0.5); this.telemetry.overheat(); };
     this.arsenal.onExplosionKills = (kills, x, z, cause) => this.onExplosionKills(kills, x, z, cause);
-    this.arsenal.air.onRadio = (who, text) => { if (this.inPlay()) this.hud.radio(who, text, true); };
+    this.arsenal.air.onRadio = (who, text, opts) => { if (this.inPlay()) this.hud.radio(who, text, true, opts); };
     this.arsenal.onShake = (scale, x, z) => {
       const d = Math.hypot(x - WORLD.CAM.x, z - WORLD.CAM.z);
       this.player.addTrauma(clamp(scale * 22 / (d + 8), 0, 0.9));
@@ -361,6 +369,7 @@ class Game {
     if (this.chronicle) this.chronicle.stop();
     this.audio.stopVoice();
     this.arsenal.startNight(this.menuStats, true);
+    this.env.setStory(1);
     this.menuArtyT = 6;
     this.horde.pileMul = 0.6;
     this.horde.globalSpeed = 1;
@@ -463,6 +472,7 @@ class Game {
     this.arsenal.startNight(this.stats, false, run.night);
     this.director.start(this.plan);
     this.player.reset();
+    this.env.setStory(run.night, run.endless);
     this.env.dawn = 0;
     this.ns = { kills: 0, headshots: 0, lost: 0, shots: 0, hits: 0, bestStreak: 0, supplies: 0, bonus: 0, fireKills: 0 };
     this.killTimes.length = 0;
@@ -604,7 +614,7 @@ class Game {
   bark(kind, chance = 1) {
     if (this.barkCd > 0 || Math.random() > chance) return;
     this.barkCd = 12;
-    this.hud.radio(CALL.kovac, pick(BARKS[kind]), true);
+    this.hud.radio(CALL.kovac, pick(BARKS[kind]), true, { ttl: 4 });
   }
 
   // ── Night end / fall ─────────────────────────────────────────────────────
@@ -754,6 +764,15 @@ class Game {
     this.input.endFrame();
   }
 
+  /** The loading-screen painting for the deployment card of night n. */
+  nightArt(n) {
+    const ev = (NIGHT_EVENTS[n] || []).map((e) => e[0]);
+    if (ev.includes('drop')) return 'drop';
+    if (ev.includes('giant') || ev.includes('behemoth')) return 'giant';
+    if (ev.includes('gunshipDown') || n === UNLOCKS.gunship) return 'gunship';
+    return n % 2 ? 'wall' : 'nest';
+  }
+
   render(rdt) {
     const u = this.post.u;
     this.letterbox = damp(this.letterbox, this.letterboxTarget || 0, 3, rdt);
@@ -775,6 +794,7 @@ class Game {
     this.uniforms.uPixel.value = 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / h;
     this.uniforms.uEyeGlow.value = lerp(9, 1.2, this.env.dawn);
     this.uniforms.uEyeGlowBillboard.value = 1 - this.env.dawn;
+    this.uniforms.uLampPow.value = this.env.power * Math.max(0, 1 - this.env.dawn * 1.6);
     this.uniforms.uRim.value.setRGB(0.032, 0.014, 0.006).multiplyScalar(1 - this.env.dawn * 0.5);
     this.post.render(rdt, this.time);
     if (this.settings.showFps) {
@@ -878,11 +898,11 @@ class Game {
         T.ability('artillery', ok);
         if (ok) {
           this.hud.alert(`FIRE MISSION — ${this.stats.artyShells} ROUNDS — SPLASH IN 3`);
-          this.hud.radio(CALL.battery, COMMS.battery[this.stats.artyShells] || `Shot, over. ${this.stats.artyShells} rounds HE, splash in three.`, true);
+          this.hud.radio(CALL.battery, COMMS.battery[this.stats.artyShells] || `Shot, over. ${this.stats.artyShells} rounds HE, splash in three.`, true, { valid: () => this.arsenal.shells.some((s) => s.kind === 'arty' && s.t > 1.2) });
         } else this.hud.alert(`BATTERY RELOADING — ${Math.ceil(this.arsenal.artyCd)}s`, '', { key: 'arty-cd', plain: true });
       }
       if (input.hit('KeyE') && can('molotov')) {
-        const r = this.arsenal.throwMolotov(this.player.aimPoint(ABILITY.molotov.maxRange));
+        const r = this.arsenal.throwMolotov(this.player.throwPoint(ABILITY.molotov.maxRange, this.horde), this.player.throwOrigin(-1));
         if (r !== 'rearm') T.ability('molotov', r === true);
         if (r === 'empty') this.hud.alert('NO BOTTLES LEFT', '', { key: 'molotov-empty', plain: true });
       }
@@ -892,11 +912,11 @@ class Game {
         T.ability('bomber', ok);
         if (ok) {
           this.hud.alert('MARKER OUT — BOMBER INBOUND');
-          this.hud.radio(CALL.kovac, COMMS.markerOut, true);
+          this.hud.radio(CALL.kovac, COMMS.markerOut, true, { ttl: 3 });
         } else this.hud.alert(air.bomberBusy ? 'BOMBER ALREADY ON ITS RUN' : `BOMBER RE-ARMING — ${Math.ceil(air.bomberCd)}s`, '', { key: 'bomber-cd', plain: true });
       }
       if (input.hit('KeyG') && can('grenades')) {
-        const r = this.arsenal.throwGrenade(this.player.aimPoint(ABILITY.grenade.maxRange));
+        const r = this.arsenal.throwGrenade(this.player.throwPoint(ABILITY.grenade.maxRange, this.horde), this.player.throwOrigin(1));
         if (r !== 'rearm') T.ability('grenades', r === true);
         if (r === 'empty') this.hud.alert('NO GRENADES LEFT');
       }
@@ -908,7 +928,7 @@ class Game {
           run.survivors -= ABILITY.dangerClose.cost;
           this.ns.lost += ABILITY.dangerClose.cost;
           this.hud.announce('DANGER CLOSE', 'THREE OF OURS WERE STILL ON THE WALL', 3.5, 'red');
-          this.hud.radio(CALL.kovac, COMMS.dangerClose, true);
+          this.hud.radio(CALL.kovac, COMMS.dangerClose, true, { valid: () => this.arsenal.shells.some((s) => s.kind === 'danger') });
         }
       }
     }

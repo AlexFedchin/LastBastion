@@ -495,6 +495,8 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
     shader.uniforms.uEyeGlow = uniforms.uEyeGlow;
     shader.uniforms.uRim = uniforms.uRim;
     shader.uniforms.uCorpse = local.uCorpse;
+    shader.uniforms.uLamps = uniforms.uLamps;
+    shader.uniforms.uLampPow = uniforms.uLampPow;
     shader.vertexShader = POSE_HEADER + `
       varying float vZMat; varying vec3 vZTint; varying vec4 vZState; varying float vZType; varying float vZSeed; varying vec3 vZL; varying float vZPart;
     ` + shader.vertexShader
@@ -510,6 +512,7 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
 
     shader.fragmentShader = `
       uniform float uTime; uniform float uEyeGlow; uniform float uCorpse; uniform vec3 uRim;
+      uniform vec3 uLamps[10]; uniform float uLampPow;
       varying float vZMat; varying vec3 vZTint; varying vec4 vZState; varying float vZType; varying float vZSeed; varying vec3 vZL; varying float vZPart;
       float zh3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
       float zn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
@@ -586,7 +589,20 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
         totalEmissiveRadiance += zEyeF * vec3(1.0, 0.82, 0.5) * uEyeGlow * (1.0 - uCorpse);
         float zRim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
         totalEmissiveRadiance += zRim * uRim * (1.0 - uCorpse * 0.7);
-        totalEmissiveRadiance += vZState.x * vec3(1.6, 0.25, 0.15) * (1.0 - zEyeF);
+        #ifdef USE_FOG
+        if (uLampPow > 0.001) {
+          // sodium lamps on the wall: a warm wash on everything that reaches the wall
+          vec3 zWN = normalize(transpose(mat3(viewMatrix)) * normal);
+          float zLamp = 0.0;
+          for (int k = 0; k < 10; k++) {
+            vec3 L = uLamps[k] - vLbFogW;
+            float d = length(L);
+            float att = clamp(1.0 - d / 17.0, 0.0, 1.0);
+            zLamp += att * att * (0.25 + 0.75 * clamp(dot(zWN, L / max(d, 1e-3)), 0.0, 1.0));
+          }
+          totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.52, 0.18) * zLamp * uLampPow * 2.6 * (1.0 - zEyeF);
+        }
+        #endif
         // burning (living only): a steady smoulder in patches of the charring skin — no strobing,
         // the flames drawn over them carry the motion; the dead are just char
         totalEmissiveRadiance += clamp(vZState.y, 0.0, 1.0) * (1.0 - uCorpse) * vec3(0.75, 0.24, 0.04) * smoothstep(0.5, 0.85, zN1);
@@ -594,11 +610,11 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
       .replace('#include <fog_fragment>', `
         #ifdef USE_FOG
           vec4 lbF = lbFog(vLbFogW, cameraPosition, fogColor, fogNear, fogFar);
-          lbF.a *= 1.0 - 0.65 * zEyeF * (1.0 - uCorpse) * (1.0 - clamp(fogFar - 2.0, 0.0, 1.0));
+          lbF.a *= 1.0 - 0.65 * zEyeF * (1.0 - uCorpse) * (1.0 - 0.6 * clamp(fogFar - 2.0, 0.0, 1.0));
           gl_FragColor.rgb = mix(gl_FragColor.rgb, lbF.rgb, lbF.a);
         #endif`);
   };
-  mat.customProgramCacheKey = () => 'zombie-v5';
+  mat.customProgramCacheKey = () => 'zombie-v6';
   return mat;
 }
 
@@ -640,9 +656,9 @@ void main() {
   mv.xy += position.xy * size * vec2(1.7, 0.7);
   gl_Position = projectionMatrix * mv;
   vUv = position.xy * 2.0;
-  // eyes cut through ordinary haze, but a fog bank swallows them like everything else
+  // eyes cut through ordinary haze; in a fog bank they still show, dim and smeared
   float fogA = lbFog(world.xyz, cameraPosition, lbFogColor, lbTime, lbDawn).a;
-  float fog = mix(fogA * 0.55, min(1.0, fogA * 1.2), clamp(lbDawn - 2.0, 0.0, 1.0));
+  float fog = mix(fogA * 0.55, 0.45 + 0.4 * fogA, clamp(lbDawn - 2.0, 0.0, 1.0));
   vA = facing * (1.0 - step(0.5, aState.w)) * (1.0 + min(aState.w, 0.0)) * (1.0 - fog) * pow(worldSize / size, 0.55)
      * smoothstep(12.0, 30.0, dist) * uEyeGlow * (1.0 - clamp(aState.y, 0.0, 1.0))
      * (aAnim.z > 3.5 ? smoothstep(90.0, 150.0, dist) : 1.0);  // a giant's own eyes read up close; pin-pricks only far off

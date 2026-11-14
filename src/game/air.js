@@ -185,7 +185,7 @@ export class AirSupport {
     this.markerMesh.visible = false;
   }
 
-  radio(text, who = this.callsign) { if (this.onRadio) this.onRadio(who, text); }
+  radio(text, who = this.callsign, opts = {}) { if (this.onRadio) this.onRadio(who, text, opts); }
 
   get bomberBusy() { return !!(this.marker || this.bomber || this.bombs.length); }
 
@@ -258,7 +258,7 @@ export class AirSupport {
     if (m.callT > 0) {
       m.callT -= dt;
       if (m.callT <= 0) {
-        this.radio(pickLine(COMMS.hammerIn), CALL.hammer);
+        this.radio(pickLine(COMMS.hammerIn), CALL.hammer, { valid: () => !!this.bomber && !this.bomber.released });
         this.audio.radioStatic(0.6);
         this.launchBomber(m.tx, m.tz);
       }
@@ -355,7 +355,7 @@ export class AirSupport {
       this.marker = null;
       this.markerMesh.visible = false;
     }
-    setTimeout(() => this.radio(pickLine(kills > 25 ? COMMS.hammerGood : COMMS.hammerOff), CALL.hammer), 2500);
+    setTimeout(() => this.radio(pickLine(kills > 25 ? COMMS.hammerGood : COMMS.hammerOff), CALL.hammer, { ttl: 7 }), 2500);
   }
 
   // ── AC-130 ─────────────────────────────────────────────────────────────────
@@ -501,7 +501,7 @@ export class AirSupport {
       this.audio.radioStatic(0.8);
     } else if (g.radioCd <= 0 && R() < 0.35) {
       g.radioCd = 40;
-      this.radio(pickLine(COMMS.spectre));
+      this.radio(pickLine(COMMS.spectre), this.callsign, { ttl: 10 });
     }
   }
 

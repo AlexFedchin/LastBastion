@@ -20,7 +20,10 @@ module.exports = {
     await t.start(4, { survivors: 999 });
     await trigger('drop');
     t.assert(await until(`Number(__LB.events.active[0] && __LB.events.active[0].phase === 'hold')`, 40, 0.5), 'the crate lands');
-    t.assert(await until(done, 60), 'the drop resolves');
+    t.assert(await until(`Number(['out', 'rig', 'carry'].includes(__LB.events.active[0] && __LB.events.active[0].phase))`, 15, 0.5), 'the recovery team goes out');
+    t.assert(await until(done, 150), 'the drop resolves');
+    const drop = await t.get(`__LB.telemetry.recent.filter((r) => r.type === 'event' && r.kind === 'drop' && r.phase === 'end').pop()`);
+    t.log('drop', JSON.stringify(drop));
 
     // the giant: walks to the wall, smashes it, falls
     await t.start(5, { survivors: 999 });
