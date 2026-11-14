@@ -209,7 +209,8 @@ table.keys td:first-child { font-family: var(--mono); color: var(--amber); width
 .card:hover { border-color: rgba(211,201,174,0.28); }
 .card .nm { font-size: 16px; letter-spacing: 0.16em; color: var(--bone); }
 .card .ds { font-size: 13px; color: var(--bone-dim); grid-column: 1; line-height: 1.35; }
-.card .ds .tot { color: var(--amber); font-family: var(--mono); font-size: 12px; }
+.card .ds .tot { color: var(--bone-dim); font-family: var(--mono); font-size: 12px; }
+.card .ds .tot b { color: #ffcf4a; font-weight: 700; text-shadow: 0 0 6px rgba(255, 190, 60, 0.35); }
 .card .pips { grid-column: 1; margin-top: 4px; display: flex; gap: 4px; }
 .card .pips i { width: 16px; height: 4px; background: rgba(211,201,174,0.12); }
 .card .pips i.on { background: var(--amber); }

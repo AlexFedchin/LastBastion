@@ -165,7 +165,7 @@ export const UPGRADES = [
     apply: (s, r) => { s.hmgRate *= 1 + 0.12 * r; } },
   { id: 'hmgCool', group: 'hmg', name: 'WATER JACKET', desc: 'Water around the barrel carries the heat off.', total: (r) => `−${18 * r}% heat per shot, cools ${25 * r}% faster`, costs: [120, 260, 480],
     apply: (s, r) => { s.hmgHeat *= 1 - 0.18 * r; s.hmgCoolIdle *= 1 + 0.25 * r; } },
-  { id: 'hmgPen', group: 'hmg', name: 'AP-T ROUNDS', desc: 'Armour-piercing tracer.', total: (r) => `each round goes through ${r} more ${r > 1 ? 'bodies' : 'body'}`, costs: [220, 480, 900],
+  { id: 'hmgPen', group: 'hmg', name: 'AP-T ROUNDS', desc: 'Armour-piercing tracer.', total: (r) => `each round hits up to ${1 + r} bodies in a line`, costs: [220, 480, 900],
     apply: (s, r) => { s.hmgPen = r; } },
   { id: 'hmgInc', group: 'hmg', name: 'INCENDIARY BELT', desc: 'Incendiary rounds in the belt.', total: (r) => `${12 * r}% chance a hit sets the target ablaze`, costs: [380, 760],
     apply: (s, r) => { s.hmgIncendiary = 0.12 * r; } },

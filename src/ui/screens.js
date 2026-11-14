@@ -5,6 +5,24 @@ import { formatInt } from '../core/util.js';
 
 const $ = (id) => document.getElementById(id);
 
+// What an upgrade gives: the next level's total in gold after the current one ("+20% → +40%
+// bullet damage"). When the two read the same apart from their numbers, only the numbers that
+// change get an arrow; otherwise both whole lines are shown. First level or maxed: one value.
+const NUM = /((?<![A-Za-z\d])[+−-]?\d+(?:\.\d+)?%?)/; // not the 240 in "M240s"
+function upgradeTotal(u, rank, maxed) {
+  if (maxed) return u.total(rank);
+  const next = u.total(rank + 1);
+  if (rank === 0) {
+    const p = next.split(NUM);
+    return p.length > 1 ? p.map((t, i) => (i % 2 ? `<b>${t}</b>` : t)).join('') : `<b>${next}</b>`;
+  }
+  const now = u.total(rank);
+  const a = now.split(NUM), b = next.split(NUM);
+  const same = a.length === b.length && a.every((t, i) => i % 2 === 1 || t === b[i]);
+  if (!same) return `${now} → <b>${next}</b>`;
+  return a.map((t, i) => (i % 2 === 0 || t === b[i] ? t : `${t} → <b>${b[i]}</b>`)).join('');
+}
+
 export class Screens {
   constructor(game) {
     this.game = game;
@@ -155,7 +173,7 @@ export class Screens {
         const btn = cost === null
           ? `<button class="buy maxed" disabled>MAXED</button>`
           : `<button class="buy" data-act="buy" data-id="${u.id}" ${run.supplies < cost ? 'disabled' : ''}>${formatInt(cost)}</button>`;
-        html += `<div class="card"><div class="nm">${u.name}</div>${btn}<div class="ds">${u.desc}<br><span class="tot">${cost === null ? 'TOTAL' : 'AFTER UPGRADE'}: ${u.total(cost === null ? rank : rank + 1)}</span></div><div class="pips">${pips}</div></div>`;
+        html += `<div class="card"><div class="nm">${u.name}</div>${btn}<div class="ds">${u.desc}<br><span class="tot">${upgradeTotal(u, rank, cost === null)}</span></div><div class="pips">${pips}</div></div>`;
       }
       if (mines) {
         const canBuy = run.minesOwned + CLAYMORE.perBuy <= CLAYMORE.max;
