@@ -368,13 +368,13 @@ function buildBunker(env) {
     A.push(xf(new THREE.BoxGeometry(0.31, 0.03, 0.16), x, y + 0.2, z, 0, ry));
     A.push(xf(new THREE.BoxGeometry(0.12, 0.02, 0.03), x, y + 0.225, z, 0, ry));
   };
-  can(-1.95, -2.3, 0.2); can(-1.95, -2.3, 0.15, top + 0.22); can(-1.6, -2.35, -0.1); can(-1.75, -1.6, 1.4);
-  can(2.0, -1.9, 0.5); can(1.9, -1.5, 0.3); can(2.0, -1.9, 0.6, top + 0.22);
-  A.push(box(0.42, 0.3, 0.26, -2.2, top + 0.15, -1.4, 0, 0.3)); // radio
-  A.push(box(0.04, 0.9, 0.04, -2.3, top + 0.7, -1.45)); // radio whip
-  const ammo = new THREE.Mesh(merge(A), olive);
-  ammo.receiveShadow = true;
-  scene.add(ammo);
+  // (scanned kit: instanced once the models are in)
+  const K = (name, x, z, ry, y = top, s = 1) => env.addKit(name, new THREE.Matrix4().compose(_v.set(x, y, z), _q.setFromEuler(new THREE.Euler(0, ry, 0)), new THREE.Vector3(s, s, s)));
+  K('ammo', -1.95, -2.3, 0.2); K('ammo', -1.95, -2.3, 0.15, top + 0.23); K('ammo', -1.6, -2.35, -0.1); K('ammo', -1.75, -1.6, 1.4);
+  K('ammo', 2.0, -1.9, 0.5); K('ammo', 1.9, -1.5, 0.3); K('ammo', 2.0, -1.9, 0.6, top + 0.23);
+  K('radio', -2.2, -1.25, Math.PI + 0.3, top, 0.8);
+  K('binoculars', 1.98, -1.92, 0.9, top + 0.46); K('thermos', 2.25, -1.3, 0.4); K('flashlight', -1.55, -1.75, 2.0);
+  if (A.length) scene.add(new THREE.Mesh(merge(A), olive));
   const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.16, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), olive);
   helmet.position.set(2.1, top + 0.01, -2.6); helmet.scale.set(1.15, 0.85, 1.25);
   scene.add(helmet);
@@ -565,20 +565,16 @@ export function buildBase(env) {
   gen.castShadow = true;
   scene.add(gen);
   env.generator = { x: -9 + 0.9, y: 2.7, z: 16.3 };
-  const drumGeo = merge([cylY(0.29, 0.88, 14, 0, 0.44, 0), cylY(0.3, 0.03, 14, 0, 0.3, 0), cylY(0.3, 0.03, 14, 0, 0.6, 0)]);
-  const drumMs = [];
+  // fuel drums (scanned kit, instanced once the models are in): mostly blue steel, some red, a plastic one
   const drumCluster = (cx, cz, n) => {
     for (let k = 0; k < n; k++) {
-      const x = cx + (k % 3) * 0.62 + (rng() - 0.5) * 0.1, z = cz + Math.floor(k / 3) * 0.62;
+      const x = cx + (k % 3) * 0.66 + (rng() - 0.5) * 0.1, z = cz + Math.floor(k / 3) * 0.66;
+      const r = rng(), name = r < 0.6 ? 'drumBlue' : r < 0.88 ? 'drumRed' : 'drumPlastic';
       _m.compose(_v.set(x, groundH(x, z), z), _q.setFromEuler(new THREE.Euler(0, rng() * 6, 0)), new THREE.Vector3(1, 1, 1));
-      drumMs.push(_m.clone());
+      env.addKit(name, _m);
     }
   };
   drumCluster(-12, 18, 7); drumCluster(36, 6, 5); drumCluster(-46, 4, 6);
-  const drums = new THREE.InstancedMesh(drumGeo, mats.paintBlue, drumMs.length);
-  drumMs.forEach((m, i) => drums.setMatrixAt(i, m));
-  drums.castShadow = true; drums.receiveShadow = true;
-  scene.add(drums);
   // floodlight masts
   for (const [x, z] of [[-34, 22], [34, 24]]) {
     const mst = new THREE.Mesh(merge([cylY(0.12, 9, 8, 0, 4.5, 0), box(2.4, 0.15, 0.15, 0, 9, 0), box(0.5, 0.35, 0.3, -0.9, 9.3, 0), box(0.5, 0.35, 0.3, 0.9, 9.3, 0)]), mats.darkSteel);

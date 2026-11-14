@@ -7,6 +7,16 @@ const FILES = {
   m2hb: 'models/m2hb.glb', ac130: 'models/ac130.glb', b36: 'models/b36.glb',
   soldier: 'models/soldier.glb', grenade: 'models/grenade.glb', molotov: 'models/molotov.glb', crate: 'models/crate.glb', sandbags: 'models/sandbags.glb',
 };
+// set dressing for the bastion: Poly Haven CC0 scans (scripts/models/build_kit.mjs), loaded as 'kit/<name>'
+export const KIT = [
+  'aircon', 'ammo', 'barrier', 'barrierTall', 'binoculars', 'car', 'cardboard', 'cement', 'compressor',
+  'crateLong', 'crateSmall', 'crateWood', 'crowbar', 'drumBlue', 'drumPlastic', 'drumRed', 'flashlight',
+  'foldstool', 'foodCans', 'gasmask', 'generator', 'handtruck', 'jerry', 'jerryPlastic', 'jerrySteel',
+  'ladder', 'lpg', 'medbox', 'pick', 'picnic', 'propane', 'rack', 'radio', 'rations', 'rifle', 'searchlight',
+  'sledge', 'spade', 'stool', 'stove', 'thermos', 'toolbox', 'toolcart', 'trashbag', 'trashcans',
+  'tyre', 'utility', 'welder',
+];
+for (const k of KIT) FILES['kit/' + k] = `models/kit/${k}.glb`;
 const scenes = {};
 let loading = null;
 

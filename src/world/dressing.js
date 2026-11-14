@@ -40,6 +40,9 @@ class Batch {
   }
 }
 
+// kit props (Poly Haven scans) go through env.addKit and are instanced once the models load
+let kit = () => {};
+
 const place = (x, y, z, ry = 0, rx = 0, rz = 0, s = 1) => {
   _e.set(rx, ry, rz);
   return new THREE.Matrix4().compose(_p.set(x, y, z), _q.setFromEuler(_e), _s.set(s, s, s));
@@ -174,6 +177,7 @@ function materials(env) {
 export function buildDressing(env, wingMatrix) {
   const M = materials(env);
   const P = prefabs(M);
+  kit = (name, m) => env.addKit(name, m);
   const B = new Batch();
   const bagMs = [];
   const rng = makeRng(5150);
@@ -194,6 +198,8 @@ function dressWall(env, wingMatrix, M, P, B, bagMs, rng) {
   for (const w of env.wings) {
     const toWorld = wingMatrix(w, 0, 0, 0, new THREE.Matrix4());
     const at = (u, y, ww, ry = 0) => wingMatrix(w, u, y, ww, new THREE.Matrix4(), 1, 1, 1, ry);
+    // scaled, and tipped about the wall axis (rx > 0 leans the top towards the yard rail)
+    const atS = (u, y, ww, ry = 0, s = 1, rx = 0) => wingMatrix(w, u, y, ww, new THREE.Matrix4(), s, s, s, ry, rx);
     const uOf = (x) => (x - w.A[0]) / w.tx;
     const L = w.len;
     // where people stand and things already are: keep the walkway clear there
@@ -253,25 +259,40 @@ function dressWall(env, wingMatrix, M, P, B, bagMs, rng) {
     let u = 2.5 + rng() * 2;
     while (u < L - 2) {
       if (!free(u, 1.0)) { u += 0.7; continue; }
-      const kind = (rng() * 7) | 0;
+      const kind = (rng() * 9) | 0;
       const ww = 2.85;
       const ry = (rng() - 0.5) * 0.3;
-      if (kind === 0) { B.put(P.crate(), at(u, floor, ww, ry)); B.put(P.crate(), at(u + 0.05, floor + 0.44, ww, ry + 0.1)); B.put(P.can(), at(u - 0.75, floor, ww + 0.1, 0.3)); }
-      else if (kind === 1) { for (let k = 0; k < 3; k++) B.put(P.can(), at(u - 0.35 + k * 0.32, floor, ww + 0.05, (rng() - 0.5) * 0.3)); B.put(P.can(), at(u - 0.2, floor + 0.21, ww + 0.05, 0.2)); B.put(P.can(), at(u + 0.15, floor + 0.21, ww + 0.05, -0.1)); }
-      else if (kind === 2) { B.put(P.jerry(), at(u - 0.2, floor, ww + 0.05, Math.PI / 2 + ry)); B.put(P.jerry(), at(u + 0.2, floor, ww + 0.05, Math.PI / 2 - ry)); B.put(P.duffel(), at(u + 0.8, floor, ww - 0.05, ry)); }
-      else if (kind === 3) { B.put(P.stretcher(), at(u, floor, ww - 0.15, ry * 0.3)); B.put(P.roll(), at(u - 1.4, floor, ww, ry)); }
+      const jerry = () => (rng() < 0.7 ? 'jerry' : 'jerrySteel');
+      if (kind === 0) { kit('crateWood', atS(u, floor, ww, ry, 0.8)); kit('crateWood', atS(u + 0.05, floor + 0.37, ww, ry + 0.1, 0.8)); kit('ammo', at(u - 0.75, floor, ww + 0.1, 0.3)); }
+      else if (kind === 1) { for (let k = 0; k < 3; k++) kit('ammo', at(u - 0.35 + k * 0.36, floor, ww + 0.05, (rng() - 0.5) * 0.3)); kit('ammo', at(u - 0.2, floor + 0.23, ww + 0.05, 0.2)); kit('ammo', at(u + 0.15, floor + 0.23, ww + 0.05, -0.1)); }
+      else if (kind === 2) { kit(jerry(), at(u - 0.2, floor, ww + 0.05, Math.PI / 2 + ry)); kit(jerry(), at(u + 0.2, floor, ww + 0.05, Math.PI / 2 - ry)); B.put(P.duffel(), at(u + 0.8, floor, ww - 0.05, ry)); }
+      else if (kind === 3) { B.put(P.stretcher(), at(u, floor, ww - 0.15, ry * 0.3)); B.put(P.roll(), at(u - 1.4, floor, ww, ry)); kit('medbox', at(u + 1.35, floor, ww, ry)); }
       else if (kind === 4) {
-        // sandbags waiting to be laid
+        // sandbags waiting to be laid, cement for the posts, a spade against the rail
         for (let r = 0; r < 3; r++) for (let c = 0; c < 3 - r; c++) bagMs.push(at(u - 0.6 + c * 0.6 + r * 0.3, floor + 0.09 + r * 0.155, ww, (rng() - 0.5) * 0.2 + (rng() < 0.5 ? Math.PI : 0)));
-      } else if (kind === 5) { B.put(P.barrelBag(), at(u, floor, ww, ry)); B.put(P.extinguisher(), at(u + 0.9, floor, ww + 0.1)); B.put(P.lantern(), at(u - 0.6, floor, ww + 0.15)); }
-      else { B.put(P.crate(0.6, 0.3, 0.4), at(u, floor, ww, ry)); B.put(P.phone(), at(u + 0.05, floor + 0.32, ww, ry)); B.put(P.reel(), at(u + 0.7, floor, ww, Math.PI / 2)); }
+        kit('cement', at(u + 1.2, floor, ww - 0.1, Math.PI / 2 + ry)); kit('cement', at(u + 1.22, floor + 0.17, ww - 0.1, Math.PI / 2 - ry));
+        kit(rng() < 0.5 ? 'spade' : 'pick', atS(u - 1.2, floor, 2.95, ry, 1, 0.22));
+      } else if (kind === 5) { B.put(P.barrelBag(), at(u, floor, ww, ry)); B.put(P.extinguisher(), at(u + 0.9, floor, ww + 0.1)); B.put(P.lantern(), at(u - 0.6, floor, ww + 0.15)); kit('toolbox', at(u - 1.2, floor, ww, ry)); }
+      else if (kind === 6) { kit('crateWood', atS(u, floor, ww, ry, 0.8)); kit('radio', atS(u + 0.05, floor + 0.37, ww, ry + Math.PI, 0.8)); B.put(P.reel(), at(u + 0.85, floor, ww, Math.PI / 2)); }
+      else if (kind === 7) {
+        // somebody's meal break: a crate for a table, rations, a thermos, a torch
+        kit('crateSmall', at(u, floor, ww, Math.PI / 2 + ry));
+        kit('rations', at(u - 0.2, floor + 0.46, ww, ry)); kit('thermos', at(u + 0.3, floor + 0.46, ww - 0.05, rng() * 6));
+        kit('foodCans', at(u + 0.1, floor + 0.46, ww + 0.1, rng() * 6)); kit('flashlight', at(u + 0.45, floor + 0.46, ww + 0.1, rng() * 6));
+        kit(jerry(), at(u + 0.9, floor, ww + 0.05, Math.PI / 2));
+      } else {
+        // tools leaning on the rail, a gas mask hung on a post, rubbish
+        kit('pick', atS(u - 0.4, floor, 2.96, ry, 1, 0.2)); kit('sledge', atS(u - 0.1, floor, 2.98, ry + 0.4, 1, 0.18)); kit('crowbar', atS(u + 0.15, floor, 3.0, ry, 1, 0.16));
+        kit('gasmask', atS(u + 0.5, floor, 3.05, Math.PI / 2, 1, 0.1));
+        kit('trashbag', at(u + 1.0, floor, ww, rng() * 6)); kit('cardboard', at(u + 1.6, floor, ww, ry));
+      }
       u += 4.5 + rng() * 5;
     }
     // each wall gunner keeps his ammo and a spare barrel behind him
     for (const px of GUNNER_POSTS) {
       if (Math.sign(px) !== w.side) continue;
       const ug = uOf(px);
-      B.put(P.can(), at(ug - 0.3, floor, 2.6, 0.2)); B.put(P.can(), at(ug + 0.05, floor, 2.65, -0.1)); B.put(P.can(), at(ug - 0.12, floor + 0.21, 2.62, 0.1));
+      kit('ammo', at(ug - 0.3, floor, 2.6, 0.2)); kit('ammo', at(ug + 0.05, floor, 2.65, -0.1)); kit('ammo', at(ug - 0.12, floor + 0.23, 2.62, 0.1));
       B.put(P.barrelBag(), at(ug + 0.9, floor, 2.75, 0.1));
     }
   }
@@ -285,7 +306,7 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   // (the crates themselves are model crates: env.roofCrates, placed in dressWithModels)
   env.roofCrates = [];
   for (let k = 0; k < 3; k++) for (let r = 0; r < (k === 1 ? 3 : 2); r++) env.roofCrates.push([-4.6 + r * 0.03, top + r * 0.21, -0.5 + k * 0.36, (rng() - 0.5) * 0.08]);
-  for (let k = 0; k < 5; k++) B.put(P.can(), R(2.2 + (k % 3) * 0.34, -0.3 + Math.floor(k / 3) * 0.2, (rng() - 0.5) * 0.3, top + (k >= 3 ? 0.21 : 0)));
+  for (let k = 0; k < 5; k++) kit('ammo', R(2.2 + (k % 3) * 0.36, -0.3 + Math.floor(k / 3) * 0.2, (rng() - 0.5) * 0.3, top + (k >= 3 ? 0.23 : 0)));
   B.put(P.barrelBag(), R(3.6, 0.4, 0.3));
   B.put(P.barrelBag(), R(3.65, 0.62, 0.25));
   // duckboard path from the nest back to the shelter
@@ -310,10 +331,13 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   B.add(M.dark, cylZ(0.05, 0.5, 10, -6.6, top + 1.35, -0.9));
   for (let k = 0; k < 3; k++) { const a = k * 2.1 + 0.4; B.add(M.dark, box(0.03, 1.35, 0.03, -6.6 + Math.cos(a) * 0.22, top + 0.66, -0.9 + Math.sin(a) * 0.22, Math.sin(a) * 0.2, 0, -Math.cos(a) * 0.2)); }
   // jerrycans, kit and a stretcher by the shelter
-  for (let k = 0; k < 4; k++) B.put(P.jerry(k === 3 ? M.red : M.olive), R(2.0 + k * 0.22, 3.9, (rng() - 0.5) * 0.2));
+  for (let k = 0; k < 4; k++) kit(k === 3 ? 'jerrySteel' : 'jerry', R(2.0 + k * 0.22, 3.9, (rng() - 0.5) * 0.2));
+  // the generator that runs the lamps and the radio
+  kit('generator', R(3.5, 5.0, 0.25)); kit('jerryPlastic', R(4.3, 5.6, 0.6));
   B.put(P.stretcher(), R(-4.6, 3.6, 0.1));
   B.put(P.duffel(), R(-3.2, 3.9, 0.3)); B.put(P.duffel(), R(-3.0, 3.5, -0.2));
-  B.put(P.phone(), R(-1.9, 4.0, 0.2)); B.put(P.reel(), R(-2.5, 3.6, 0.6));
+  kit('radio', R(-1.9, 4.1, Math.PI + 0.2)); B.put(P.reel(), R(-2.5, 3.6, 0.6));
+  kit('medbox', R(-4.6, 2.8, 0.2)); kit('trashbag', R(7.2, 7.0, 1)); kit('trashbag', R(6.6, 7.3, 2.5)); kit('cardboard', R(-7.1, 7.1, 0.3));
   B.put(P.extinguisher(), R(0.4, 4.15));
   B.put(P.lantern(), R(-1.5, 4.2));
   // camouflage tarp sagging over the shelter roof
@@ -353,18 +377,24 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   for (const [x, z, s] of [[-3.6, 1.6, 1.2], [6.8, 2.6, 0.9], [-7.0, -1.0, 0.7]]) B.add(M.rubber, xf(new THREE.CircleGeometry(s, 10), x, top + 0.004, z, -Math.PI / 2, 0, 0, 1, 0.6, 1));
   // right side: a sandbagged ready rack of ammo, crates, a cot
   for (let r = 0; r < 2; r++) for (let k = 0; k < 4; k++) bagMs.push(place(5.0 + k * 0.62 + (r % 2) * 0.3, top + 0.09 + r * 0.155, -1.2, (rng() - 0.5) * 0.15 + (rng() < 0.5 ? Math.PI : 0)));
-  for (let k = 0; k < 6; k++) B.put(P.can(), R(5.1 + (k % 3) * 0.34, -0.9 + Math.floor(k / 3) * 0.17, (rng() - 0.5) * 0.15, top + 0.31));
+  for (let k = 0; k < 6; k++) kit('ammo', R(5.1 + (k % 3) * 0.36, -0.9 + Math.floor(k / 3) * 0.13, (rng() - 0.5) * 0.15, top + 0.31));
+  // a hand searchlight on the crate stack, for when the towers can't reach
+  kit('searchlight', R(7.3, 0.6, Math.PI + 0.3, top + 0.63));
   env.roofCrates.push([7.3, top, 0.6, 0.05], [7.3, top + 0.21, 0.62, -0.05], [7.3, top + 0.42, 0.58, 0.03]);
-  B.put(P.crate(0.6, 0.3, 0.4), R(6.5, 1.3, 0.3));
-  B.put(P.jerry(), R(7.4, 1.6, 0.2)); B.put(P.jerry(), R(7.4, 1.95, -0.1));
+  kit('crateSmall', R(6.5, 1.5, Math.PI / 2 + 0.3));
+  kit('rations', R(6.4, 1.4, 0.4, top + 0.46)); kit('foodCans', R(6.75, 1.65, 1.2, top + 0.46));
+  kit('jerry', R(7.55, 2.3, 0.2)); kit('jerry', R(7.55, 2.68, -0.1));
   // folding cot with a blanket, and a rolled tarp
   for (const sx of [-0.33, 0.33]) B.add(M.dark, cylZ(0.02, 1.9, 6, 3.0 + sx, top + 0.38, 2.0));
   for (const z of [1.2, 2.8]) for (const sx of [-0.33, 0.33]) B.add(M.dark, box(0.03, 0.4, 0.03, 3.0 + sx, top + 0.19, z));
   B.add(M.canvasDark, box(0.66, 0.04, 1.85, 3.0, top + 0.4, 2.0));
   B.add(M.canvas, xf(pillow(0.62, 0.1, 1.1, 0.5, 10, 6), 3.0, top + 0.45, 2.3));
+  kit('rifle', R(3.05, 1.6, Math.PI / 2 + 0.08, top + 0.43));
+  kit('thermos', R(3.75, 1.1, 0.5));
   B.put(P.roll(), R(-6.9, 2.6, 0.4));
   // left side: empty ammo boxes thrown aside, a sandbag pile, a lantern
-  for (const [x, z, ry] of [[-3.4, -0.6, 0.6], [-3.5, 0.0, -0.4], [-3.2, 0.4, 1.4]]) B.put(P.can(), R(x, z, ry));
+  kit('ammo', R(-3.4, -0.6, 0.6)); kit('ammo', R(-3.5, 0.0, -0.4));
+  kit('ammo', place(-3.2, top + 0.055, 0.45, 1.4, 0, Math.PI / 2)); // knocked over
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3 - r; c++) bagMs.push(place(-6.9 + r * 0.3 + c * 0.6 - 0.6, top + 0.09 + r * 0.155, 3.6, Math.PI / 2 + (rng() - 0.5) * 0.2));
   B.put(P.lantern(), R(-5.7, 0.9));
   // ladder down the back of the bunker
@@ -380,16 +410,23 @@ function dressYard(env, M, P, B, bagMs, rng) {
   for (const side of [-1, 1]) {
     const S = (x) => side * x;
     // jersey barriers lining the track from the gate into the yard
-    for (let k = 0; k < 6; k++) B.put(P.jersey(), at(S(7), 9.5 + k * 3.05, (rng() - 0.5) * 0.04));
-    for (let k = 0; k < 3; k++) B.put(P.jersey(), at(S(9 + k * 3.05), 28.5, Math.PI / 2 + (rng() - 0.5) * 0.04));
+    for (let k = 0; k < 12; k++) { const z = 8.4 + k * 1.58; kit(k % 5 === 3 ? 'barrier' : 'barrierTall', at(S(7), z, Math.PI / 2 + (rng() - 0.5) * 0.05)); }
+    for (let k = 0; k < 6; k++) kit('barrierTall', at(S(8.6 + k * 1.58), 28.5, (rng() - 0.5) * 0.05));
     // supply dump: pallets under tarps, loose crates
     for (let k = 0; k < 5; k++) B.put(P.load(), at(S(22 + (k % 3) * 1.5), 6 + Math.floor(k / 3) * 1.4, (rng() - 0.5) * 0.15));
-    for (let k = 0; k < 4; k++) B.put(P.crate(), at(S(26.5 + (rng() - 0.5) * 0.4), 6 + k * 0.6, (rng() - 0.5) * 0.4));
-    B.put(P.crate(), at(S(26.5), 6.3, 0.1, 0.42));
+    for (let k = 0; k < 4; k++) kit('crateWood', at(S(26.6 + (rng() - 0.5) * 0.3), 5.6 + k * 0.62, Math.PI / 2 + (rng() - 0.5) * 0.2));
+    kit('crateWood', at(S(26.6), 5.9, Math.PI / 2 + 0.1, 0.46));
+    kit('crateLong', at(S(24), 9.2, 0.2 * side));
+    kit('crateSmall', at(S(28.2), 6.2, 0.3)); kit('crateSmall', at(S(28.25), 6.25, 0.25, 0.46));
     B.put(P.pallet(), at(S(20), 9, 0.3));
+    kit('handtruck', at(S(20.4), 9.3, 0.3 + Math.PI, 0.15));
+    kit('cardboard', at(S(21.5), 9.4, 0.5)); kit('cardboard', at(S(21.6), 9.45, 0.2, 0.34));
     // burn barrel with men warming up around it
     const bx = S(side < 0 ? 19 : 21), bz = side < 0 ? 14 : 15;
-    B.put(P.burnBarrel(), at(bx, bz));
+    kit('stove', at(bx, bz, rng() * 6));
+    B.add(M.ember, cylY(0.25, 0.02, 12, bx, G(bx, bz) + 0.8, bz));
+    // something to sit on round the fire
+    kit('foldstool', at(bx + 1.6, bz + 0.9, 0.7)); kit('crateSmall', at(bx - 1.5, bz - 1.1, 0.9));
     if (fire) fire.add(bx, G(bx, bz) + 0.85, bz, 0.5, 0.85, 1.7, { smoke: 0.5, embers: 1.0, fadeIn: 0 });
     env.lightPools.push({ x: bx, z: bz, r: 6, color: [1, 0.48, 0.15], k: 0.14 });
     const nMen = side < 0 ? 3 : 2;
@@ -414,6 +451,30 @@ function dressYard(env, M, P, B, bagMs, rng) {
     env.scene.add(win);
     env.lightPools.push({ x: cx - Math.sin(ry) * 3, z: cz - Math.cos(ry) * 3, r: 4, color: [1, 0.55, 0.2], k: 0.07 });
   }
+  // ── the rest of the yard: the scanned kit ──
+  // covered cars nobody has the fuel to drive
+  kit('car', at(-34, 6, 0.4)); kit('car', at(32, 3, -0.15));
+  // tyre stacks by the motor pool
+  const tyres = (x, z, n) => { for (let k = 0; k < n; k++) kit('tyre', place(x + (rng() - 0.5) * 0.06, G(x, z) + 0.085 + k * 0.17, z - 0.3, rng() * 0.3, Math.PI / 2)); };
+  tyres(-52, 20.5, 4); tyres(-51.3, 21.3, 3); tyres(53.5, 19, 5);
+  kit('tyre', at(-50.5, 20.3, 1.2)); kit('tyre', at(54.4, 18.4, 0.3));
+  // workshop corner by the containers: compressor, welding cart, tool cart, a rack, a ladder
+  kit('compressor', at(-24.5, 18.5, 1.3)); kit('welder', at(-22.6, 19.2, 0.9)); kit('toolcart', at(-23.4, 16.8, 0.2));
+  kit('rack', at(-26.2, 17.0, 1.2)); kit('ladder', at(-21.5, 17.4, -0.6)); kit('toolbox', at(-23.3, 16.85, 0.4, 0.96));
+  kit('stool', at(-22.4, 17.8, 0)); kit('drumRed', at(-25.6, 19.8, 0.4)); kit('lpg', at(-21.8, 20.3, 0));
+  // gas cylinders and water by the cook tent
+  for (let k = 0; k < 3; k++) kit('propane', at(12.6 + k * 0.38, 14.4, rng() * 6));
+  kit('lpg', at(12.8, 14.9, 1)); kit('lpg', at(13.3, 15.0, 2));
+  for (let k = 0; k < 4; k++) kit('jerryPlastic', at(11.2 + k * 0.3, 15.2, (rng() - 0.5) * 0.4));
+  kit('picnic', at(-12.5, 22.5, 0.3)); kit('foldstool', at(-10.6, 23.6, 1.9)); kit('thermos', at(-12.6, 22.45, 0.4, 0.75)); kit('foodCans', at(-12.2, 22.9, 1.0, 0.75));
+  // power: utility boxes by the generator, aircon on the containers
+  kit('utility', at(-7.4, 15.0, -Math.PI / 2)); kit('utility', at(-7.4, 15.6, -Math.PI / 2));
+  for (const side of [-1, 1]) kit('aircon', place(side * 18, G(side * 18, 24) + 2.59, 24.4, side * 0.1 + Math.PI));
+  // rubbish: trash cans by the latrines and the tents, bags piled up
+  kit('trashcans', at(-46.2, 20.4, 0.55 + Math.PI)); kit('trashcans', at(17.5, 6.2, -0.3));
+  for (const [x, z] of [[-45.4, 22.6], [-45.9, 23.2], [18.5, 5.6], [-14, 6.6]]) kit('trashbag', at(x, z, rng() * 6));
+  kit('generator', at(-10.6, 13.6, 0.4)); kit('jerry', at(-10, 13.2, 0.2));
+
   // portable toilets and water tanks; two more trucks
   for (let k = 0; k < 3; k++) B.put(P.loo(k === 1 ? M.greenLoo : M.blueLoo), at(-44 + k * 1.25, 21, 0.55 + Math.PI));
   B.put(P.tank(), at(46, 18, 0.2));

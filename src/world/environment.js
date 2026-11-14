@@ -5,6 +5,10 @@
 import * as THREE from 'three';
 import { WORLD, wallZ } from '../config.js';
 import { Soldier } from '../game/soldier.js';
+import { modelScene } from './models.js';
+
+// scans whose albedo is too clean for a sooty, rain-soaked base: darkened in place
+const KIT_TINT = { barrier: 0.55, barrierTall: 0.55, cement: 0.7, foodCans: 0.8, rations: 0.8 };
 import { makeGroundTextures, makeConcreteTextures, makeBurlapTexture, makeGlowTexture, makeFlagTexture } from './textures.js';
 import {
   makeMetalTextures, makePlasterTextures, makeSlabTextures, makeBarkTexture, makeHescoTextures,
@@ -66,6 +70,7 @@ export class Environment {
       rock: makeRockTextures(256),
     };
     this.mats = makeMaterials(this.tex);
+    this.kit = {}; // kit props asked for by the builders (addKit), placed in dressWithModels
     this.sandbagMat = weather(new THREE.MeshStandardMaterial({ map: this.tex.burlap, roughness: 1, color: 0x8a7d62 }), { soot: 0.45, key: 'bags' });
     this.rockMat = weather(new THREE.MeshStandardMaterial({ map: this.tex.rock.map, normalMap: this.tex.rock.normalMap, color: 0x857f77, roughness: 0.95 }), { soot: 0.3, key: 'rock' });
     this.wireMat = new THREE.MeshStandardMaterial({ color: 0x6b665e, metalness: 0.85, roughness: 0.42 });
@@ -148,6 +153,33 @@ export class Environment {
       im.castShadow = true; im.receiveShadow = true;
       this.scene.add(im);
     }
+    // the kit: everything the builders asked for in this.kit (name -> [Matrix4]), one instanced
+    // mesh per prop and material; only what is big enough to matter casts a shadow
+    const size = new THREE.Vector3();
+    for (const [name, list] of Object.entries(this.kit || {})) {
+      if (!list.length) continue;
+      const src = modelScene('kit/' + name);
+      src.updateMatrixWorld(true);
+      new THREE.Box3().setFromObject(src).getSize(size);
+      const cast = size.y > 0.4 || Math.max(size.x, size.z) > 0.9;
+      const tint = KIT_TINT[name];
+      src.traverse((o) => {
+        if (!o.isMesh) return;
+        let mat = o.material;
+        if (tint) { mat = mat.clone(); mat.color.multiplyScalar(tint); }
+        const im = new THREE.InstancedMesh(o.geometry, mat, list.length);
+        list.forEach((mm, j) => im.setMatrixAt(j, m.multiplyMatrices(mm, o.matrixWorld)));
+        im.castShadow = cast; im.receiveShadow = true;
+        im.computeBoundingSphere();
+        im.name = 'kit/' + name;
+        this.scene.add(im);
+      });
+    }
+  }
+
+  /** Ask for a kit prop at a placement matrix (instanced once the models are in). */
+  addKit(name, matrix) {
+    (this.kit[name] || (this.kit[name] = [])).push(matrix.clone());
   }
 
   // ── Lights ───────────────────────────────────────────────────────────────

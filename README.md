@@ -30,7 +30,8 @@ Hold until dawn. Spend what you scavenged. Do it again.
 > [!NOTE]
 > **The world is painted procedurally at startup.** No texture packs: the mud, the
 > T-wall concrete, the zombies' torn clothes and the burning skyline are all generated in code.
-> The exceptions are three downloaded models: your M2HB, the AC-130 and the B-36.
+> The exceptions are the downloaded models: your M2HB, the aircraft, the soldiers, and the
+> scanned kit that dresses the bastion (ammo cans, crates, drums, barriers, generators: CC0, Poly Haven).
 > The sound is the opposite: real field recordings, a real .50 BMG report and an adaptive score.
 
 ---
@@ -259,6 +260,18 @@ each model to the game's axes, removes parts that are never seen, simplifies, re
 WebP and writes meshopt-compressed GLBs to `app/models/`. The game loads them at boot
 (`src/world/models.js`). `scripts/models/preview.cjs` renders a GLB from six angles to a PNG
 for checking orientation.
+
+The bastion's set dressing comes from [Poly Haven](https://polyhaven.com/models) (CC0, glTF 1k) and
+has its own script:
+
+```bash
+node scripts/models/build_kit.mjs             # every kit prop into app/models/kit/ (or name some: ammo radio car)
+electron scripts/models/kit_sheet.cjs out.png ammo,radio,car   # contact sheet with sizes
+```
+
+The list of props, their Poly Haven ids, texture sizes and triangle budgets is at the top of
+`build_kit.mjs`; the sources go in `scripts/models/source/polyhaven/<id>/`. The world builders place
+them with `env.addKit(name, matrix)` and they are instanced once the models load.
 
 **Loading-screen art** (Python, GPU):
 

@@ -1,0 +1,43 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<script type="importmap">{ "imports": {
+  "three": "../../node_modules/three/build/three.module.js",
+  "three/addons/": "../../node_modules/three/examples/jsm/"
+} }</script>
+<style>html,body{margin:0;background:#556}#l{position:absolute;inset:0;pointer-events:none}#l div{position:absolute;color:#fff;font:13px monospace;text-shadow:0 0 3px #000}</style></head>
+<body><div id="l"></div>
+<script type="module">
+// Contact sheet of the kit: every prop in its own cell, 1 m grid on the floor.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+const q = new URLSearchParams(location.search);
+const names = q.get('n').split(','), C = 8, S = 230;
+const R = Math.ceil(names.length / C);
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(C * S, R * S); renderer.setScissorTest(true);
+document.body.prepend(renderer.domElement);
+const env = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture;
+const labels = [];
+const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
+window.onerror = (m) => console.log('ERR', m);
+for (let i = 0; i < names.length; i++) { console.log('load', names[i]);
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x6a7480); scene.environment = env;
+  const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(3, 5, 4); scene.add(sun);
+  const g = await loader.loadAsync('../../app/models/kit/' + names[i] + '.glb');
+  scene.add(g.scene);
+  const box = new THREE.Box3().setFromObject(g.scene), c = box.getCenter(new THREE.Vector3()), r = box.getSize(new THREE.Vector3()).length() / 2;
+  const grid = new THREE.GridHelper(Math.max(2, Math.ceil(r * 3)), Math.max(2, Math.ceil(r * 3))); scene.add(grid);
+  const cam = new THREE.PerspectiveCamera(35, 1, r * 0.01, r * 30);
+  cam.position.copy(c).add(new THREE.Vector3(1, 0.7, 1.3).normalize().multiplyScalar(r * 3.3)); cam.lookAt(c);
+  const x = (i % C) * S, y = (R - 1 - Math.floor(i / C)) * S;
+  renderer.setViewport(x, y, S, S); renderer.setScissor(x, y, S, S); renderer.render(scene, cam);
+  labels.push(names[i] + ' ' + box.getSize(new THREE.Vector3()).toArray().map((v) => v.toFixed(2)).join('x'));
+}
+const o = document.createElement('canvas'); o.id = 'out'; o.width = C * S; o.height = R * S;
+const x2 = o.getContext('2d'); x2.drawImage(renderer.domElement, 0, 0); x2.font = '13px monospace'; x2.fillStyle = '#fff';
+names.forEach((n, i) => x2.fillText(labels[i], (i % C) * S + 4, Math.floor(i / C) * S + 16));
+document.body.appendChild(o);
+window.__done = { w: C * S, h: R * S };
+</script></body></html>
