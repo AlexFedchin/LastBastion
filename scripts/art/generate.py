@@ -6,6 +6,7 @@ Two engines can be compared side by side (both CreativeML Open RAIL++-M, both SD
 
     python scripts/art/download.py sdxl realvis                 # fetch the models once
     python scripts/art/generate.py realvis nest wall --seeds 4  # candidates -> .cache/out/<engine>/
+    python scripts/art/generate.py realvis icons --seeds 6       # app icon candidates -> .cache/out/icon/
 Run with scripts/art/.cache/venv/Scripts/python.exe (torch + diffusers).
 """
 import argparse
@@ -31,6 +32,13 @@ SHOTS = {
     'giant': 'giant rotting human zombie, emaciated and grey, as tall as a building, walking toward a concrete fortress wall at night, searchlight beams on it, small zombies around its feet',
     'dawn': 'grey foggy dawn, concrete fortress wall with a lone soldier, muddy battlefield with bodies, smoke, crows',
 }
+# the app icon: square, one bold silhouette against the fire so it still reads at 32 px
+ICONS = {
+    'icon_gun': 'black silhouette of a heavy machine gun with spade grips on a tripod behind sandbags, on top of a massive concrete fortress wall, enormous wall of orange fire and black smoke behind it, centered symmetrical composition, strong rim light',
+    'icon_tower': 'massive fortified concrete bastion tower with a heavy machine gun and a searchlight on top, razor wire, black silhouette against an enormous orange fire and black smoke, centered symmetrical composition, low angle',
+    'icon_wall': 'low angle view up a towering concrete fortress wall at night, a lone heavy machine gun nest with sandbags on top, silhouetted against glowing orange fire sky and smoke, zombie hands reaching up the wall at the bottom, centered composition',
+}
+ICON_STYLE = 'dramatic video game key art, highly detailed, sharp focus, cinematic lighting, deep blacks, orange and teal'
 NEG = 'burning city skyline, text, watermark, logo, signature, cartoon, anime, illustration, bright daylight, oversaturated, blurry, lowres, deformed'
 
 
@@ -42,6 +50,23 @@ def load(engine):
     pipe.enable_model_cpu_offload()
     pipe.vae.enable_tiling()
     return pipe
+
+
+def run_icons(engine, shots, seeds, seed0):
+    pipe = load(engine)
+    os.makedirs(os.path.join(OUT, 'icon'), exist_ok=True)
+    for shot in shots:
+        prompt = ICONS[shot]
+        for k in range(seeds):
+            seed = seed0 + k
+            path = os.path.join(OUT, 'icon', f'{shot}_{seed}.png')
+            if os.path.exists(path):
+                continue
+            g = torch.Generator('cpu').manual_seed(seed)
+            img = pipe(prompt, prompt_2=prompt + ', ' + ICON_STYLE, negative_prompt=NEG, width=1024, height=1024, num_inference_steps=32,
+                       guidance_scale=5.0, generator=g).images[0]
+            img.save(path)
+            print(f'icon {shot} seed {seed}', flush=True)
 
 
 def run(engine, shots, seeds, seed0):
@@ -69,4 +94,7 @@ if __name__ == '__main__':
     ap.add_argument('--seeds', type=int, default=3)
     ap.add_argument('--seed', type=int, default=11)
     a = ap.parse_args()
-    run(a.engine, a.shots or list(SHOTS), a.seeds, a.seed)
+    if a.shots and a.shots[0] == 'icons':
+        run_icons(a.engine, a.shots[1:] or list(ICONS), a.seeds, a.seed)
+    else:
+        run(a.engine, a.shots or list(SHOTS), a.seeds, a.seed)

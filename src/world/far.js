@@ -1,7 +1,7 @@
 // Everything beyond the killing ground: forested hills, a dead village with
 // its church, a broken highway viaduct across the valley, power pylons, a
-// radio mast, the far mountains and the burning city with its smoke plumes,
-// searchlights and the war still going on inside it.
+// radio mast, the far mountains and the burning city with its smoke plumes
+// and the street fighting still going on inside it.
 import * as THREE from 'three';
 import { makeRng, lerp } from '../core/util.js';
 import { groundH, groundNormal, heightFn, roadX, valleyEdge, vnoise } from './terrain.js';
@@ -67,30 +67,6 @@ void main(){
   vec3 col = mix(vec3(0.012, 0.011, 0.011), vec3(0.05, 0.048, 0.05), uDawn) * (0.7 + n * 0.6) + vec3(0.9, 0.28, 0.06) * lit;
   col = mix(col, vFogCol, vFog);
   gl_FragColor = vec4(col, a * (1.0 - vFog * 0.5));
-}`;
-
-// ── searchlight beam pointing into the clouds ───────────────────────────────
-const SKYBEAM_VERT = /* glsl */`
-varying float vV;
-varying vec3 vN;
-varying vec3 vView;
-uniform float uLen;
-void main(){
-  vV = clamp(position.y / uLen, 0.0, 1.0);
-  vec4 w = modelMatrix * vec4(position, 1.0);
-  vN = normalize(mat3(modelMatrix) * normal);
-  vView = normalize(cameraPosition - w.xyz);
-  gl_Position = projectionMatrix * viewMatrix * w;
-}`;
-const SKYBEAM_FRAG = /* glsl */`
-uniform float uI;
-varying float vV;
-varying vec3 vN;
-varying vec3 vView;
-void main(){
-  float edge = pow(abs(dot(vN, vView)), 2.0);
-  float a = edge * pow(max(1.0 - vV, 0.0), 1.5) * smoothstep(0.0, 0.03, vV) * uI;
-  gl_FragColor = vec4(vec3(0.6, 0.65, 0.8) * a, 1.0);
 }`;
 
 export function buildFar(env) {
@@ -458,7 +434,7 @@ function buildCity(env, rng) {
     const fk = big ? 7 : 5;
     const args = [x, y, z, big ? 50 + rng() * 40 : 22 + rng() * 20, big ? 70 + rng() * 60 : 30 + rng() * 25, fk, { glow: false, fogScale: 0.42, fadeIn: 0 }];
     const fid = fire.add(...args);
-    const g = env.makeGlowSprite(0xff5a14, big ? 260 + rng() * 140 : 120, big ? 0.32 : 0.2, false);
+    const g = env.makeGlowSprite(0xff5a14, big ? 230 + rng() * 120 : 110, big ? 0.17 : 0.11, false);
     g.position.set(x, y + 30, z + 20);
     g.renderOrder = -3;
     scene.add(g);
@@ -486,21 +462,5 @@ function buildCity(env, rng) {
   plumeMesh.renderOrder = -1;
   scene.add(plumeMesh);
 
-  // searchlights sweeping the cloud deck above the city
-  env.skyBeams = [];
-  for (const [x, z] of [[-320, -1080], [120, -1200], [520, -1120]]) {
-    const len = 1100;
-    const g = new THREE.CylinderGeometry(9, 2, len, 16, 1, true);
-    g.translate(0, len / 2, 0);
-    const m = new THREE.Mesh(g, new THREE.ShaderMaterial({
-      uniforms: { uLen: { value: len }, uI: { value: 0.08 } }, vertexShader: SKYBEAM_VERT, fragmentShader: SKYBEAM_FRAG,
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-    }));
-    m.position.set(x, cityGround(x, z) + 5, z);
-    m.frustumCulled = false;
-    m.renderOrder = -2;
-    scene.add(m);
-    env.skyBeams.push({ mesh: m, ph: rng() * 6, sp: 0.06 + rng() * 0.05 });
-  }
   env.combatSites = [[-260, -1080], [80, -1130], [380, -1060], [-520, -1150], [600, -1200]].map(([x, z]) => ({ x, z, y: cityGround(x, z), t: rng() * 3 }));
 }

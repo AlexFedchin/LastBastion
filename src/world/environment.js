@@ -84,10 +84,9 @@ export class Environment {
     this.blinkers = [];
     this.flickerWindows = [];
     this.cityFires = [];
-    this.skyBeams = [];
     this.combatSites = [];
     // the story, as the valley shows it (see setStory)
-    this.burn = 1; this.war = 1; this.beams = 3;
+    this.burn = 1; this.war = 1;
 
     this.terrain = new Terrain(scene, quality, this.tex.ground);
     this.fire = new FireSystem(scene, quality);
@@ -317,7 +316,7 @@ export class Environment {
     this._hfi = (this._hfi || 0) * Math.exp(-dt * 7);
     hf.material.color.setRGB(1, 0.62, 0.35).multiplyScalar(this._hfi * (1 - d * 0.8));
 
-    // the war in the city: tracer streams, flak, ground flashes
+    // the war in the city: street fighting and explosions, all at ground level
     if (fx) this.updateCombat(dt, fx);
 
     // city fires flicker, aviation lights blink, a candle in a village window
@@ -329,13 +328,6 @@ export class Environment {
     }
     for (const b of this.blinkers) b.sprite.visible = clear > 0.5 && Math.sin(time * b.rate * 3.1 + b.ph) > 0.55;
     for (const w of this.flickerWindows) w.material.color.setRGB(2.2, 1.2, 0.45).multiplyScalar(0.7 + 0.3 * Math.sin(time * 7 + w.id) * Math.sin(time * 3.3));
-    for (let bi = 0; bi < this.skyBeams.length; bi++) {
-      const b = this.skyBeams[bi];
-      b.mesh.visible = bi < this.beams;
-      b.mesh.rotation.z = Math.sin(time * b.sp + b.ph) * 0.4;
-      b.mesh.rotation.x = -0.28 + Math.cos(time * b.sp * 0.7 + b.ph) * 0.12;
-      b.mesh.material.uniforms.uI.value = 0.022 * (1 - d) * clear * clear;
-    }
     this.beacon.material.opacity = Math.sin(time * 3) > 0.6 ? 1 : 0.05;
 
     // burning wreck
@@ -395,11 +387,11 @@ export class Environment {
     fogUniforms.lbDawn.value = this.scene.fog.far;
     su.uHorizon.value.copy(fc);
     su.uZenith.value.setRGB(lerp(0.0025, 0.05, d), lerp(0.003, 0.055, d), lerp(0.0055, 0.068, d));
-    su.uGlowAmt.value = lerp(0.7, 0.35, d) * (0.3 + 0.7 * this.burn);
+    su.uGlowAmt.value = lerp(0.36, 0.22, d) * (0.3 + 0.7 * this.burn);
     su.uCloudLight.value = lerp(1, 9, d);
     this.moon.intensity = lerp(0.08, 1.9, d);
     this.moon.color.setRGB(lerp(0.56, 0.75, d), lerp(0.64, 0.74, d), lerp(0.78, 0.72, d));
-    this.rim.intensity = lerp(0.24, 0.25, d) * (0.3 + 0.7 * this.burn);
+    this.rim.intensity = lerp(0.14, 0.2, d) * (0.3 + 0.7 * this.burn);
     this.rainUniforms.uIntensity.value = lerp(0.32, 0.18, d);
     for (const s of this.lampSprites) s.visible = d < 0.6 && this.power > 0.5;
     void audio;
@@ -407,32 +399,30 @@ export class Environment {
 
   updateCombat(dt, fx) {
     const d = this.dawn;
+    const Q = this._muzzleQ || (this._muzzleQ = []);
+    for (let i = Q.length - 1; i >= 0; i--) {
+      const m = Q[i];
+      if ((m.t -= dt) > 0) continue;
+      fx.glow.spawn(m.x, m.y, m.z, 0, 0, 0, 0.05 + R() * 0.04, 5, 9, PF.GLOW, 40, 26, 10, 1, 12, 6, 2);
+      Q[i] = Q[Q.length - 1]; Q.pop();
+    }
     for (const s of this.combatSites) {
       s.t -= dt;
       if (s.t > 0) continue;
       s.t = 0.8 + R() * 4.5;
       if (R() > this.war) continue;
       const kind = R();
-      if (kind < 0.55) {
-        // a stream of tracers arcing up out of the streets
-        const n = 5 + ((R() * 9) | 0);
-        const green = R() < 0.3;
-        // the city is a kilometre off: the burst arrives seconds after the tracers
-        if (this.onDistantGunfire && R() < 0.3) this.onDistantGunfire(3.2 + R() * 1.6);
-        const ax = (R() - 0.5) * 0.9, az = (R() - 0.5) * 0.4;
+      if (kind < 0.7) {
+        // a firefight in the streets: muzzle flashes flickering low between the blocks
+        const n = 3 + ((R() * 6) | 0);
+        const x = s.x + (R() - 0.5) * 60, z = s.z + (R() - 0.5) * 30;
+        let t = 0;
         for (let k = 0; k < n; k++) {
-          const sp = 260 + R() * 80;
-          const vx = (ax + (R() - 0.5) * 0.06) * sp, vy = (0.55 + R() * 0.2) * sp, vz = (az + (R() - 0.5) * 0.06) * sp;
-          const life = 1.2 + R() * 0.8;
-          const r = green ? 6 : 40, g = green ? 30 : 9, b = green ? 6 : 2;
-          fx.glow.spawn(s.x, s.y + 8 + k * 0.4, s.z, vx, vy, vz, life, 2.6, 2.2, PF.SPARK, r, g, b, 1, r * 0.6, g * 0.6, b * 0.6, 9.8, 0, 0.05, 0, 0, k * 0.03);
+          t += 0.05 + R() * 0.25;
+          this._muzzleQ.push({ t, x: x + (R() - 0.5) * 14, y: s.y + 2 + R() * 6, z: z + (R() - 0.5) * 8 });
         }
-      } else if (kind < 0.8) {
-        // flak bursts in the clouds
-        for (let k = 0; k < 3; k++) {
-          const x = s.x + (R() - 0.5) * 160, y = s.y + 160 + R() * 160, z = s.z + (R() - 0.5) * 80;
-          fx.glow.spawn(x, y, z, 0, 0, 0, 0.18 + R() * 0.1, 18, 34, PF.GLOW, 60, 34, 14, 1, 20, 8, 3);
-        }
+        // the city is a kilometre off: the burst arrives seconds after the flashes
+        if (this.onDistantGunfire && R() < 0.35) this.onDistantGunfire(3.2 + R() * 1.6);
       } else {
         // something big goes up in the streets
         fx.glow.spawn(s.x, s.y + 15, s.z, 0, 0, 0, 0.5, 60, 140, PF.GLOW, 70, 34, 10, 1, 25, 8, 2);
@@ -444,14 +434,13 @@ export class Environment {
 
   /**
    * The world keeps pace with the radio. The city burns and fights through the
-   * first nights; Bastion-3 falls on the fifth and the other bastions' searchlights
-   * go out; by the seventh "the city stopped burning" — embers and dark plumes only.
+   * first nights; Bastion-3 falls on the fifth and the fighting
+   * dies down; by the seventh "the city stopped burning" — embers and dark plumes only.
    */
   setStory(night, endless = false) {
     const n = endless ? 99 : night;
     this.burn = n <= 5 ? 1 : n === 6 ? 0.5 : n <= 10 ? 0.05 : 0.03;
     this.war = n <= 4 ? 1 : n <= 6 ? 0.45 : 0;
-    this.beams = n <= 4 ? 3 : n <= 6 ? 1 : 0;
     for (const f of this.cityFires) {
       if (!f.args) continue;
       // burning: the flames are there, as bright as the night calls for; burnt out: gone
