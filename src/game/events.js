@@ -112,6 +112,172 @@ function poseRun(f, ph, carry = false) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// The gate squad: when friendlies are coming in (an escort, the recovery team, the truck), four
+// men step a few metres out of the gate, take a knee in a line and shoot what is chasing them,
+// then go back in once everyone is through. Caught out there, a man is lost like any other.
+const COVER_AT = 8; // soldiers[COVER_AT..] are the gate squad
+class GateCover {
+  constructor(E) { this.E = E; this.P = EVENTS.cover; this.state = 'in'; this.men = []; this.quiet = 0; this.pick = 0; this.targets = []; }
+
+  reset() {
+    for (const m of this.men) m.f.root.visible = false;
+    this.men = []; this.state = 'in'; this.quiet = 0;
+    if (this.light) { this.E.g.fx.lights.release(this.light); this.light = null; }
+    this.lightK = 0;
+  }
+
+  /** The gate stands open while the squad is out: its floodlight spills onto the road. */
+  flood(dt) {
+    const fx = this.E.g.fx, on = this.state !== 'in';
+    this.lightK = Math.max(0, Math.min(1, (this.lightK || 0) + (on ? dt * 2 : -dt * 0.8)));
+    if (this.lightK > 0 && !this.light) {
+      this.light = fx.lights.acquire();
+      if (this.light) { this.light.color.setRGB(1, 0.78, 0.5); this.light.distance = 38; this.light.decay = 1.4; this.light.position.set(GATE.x, groundH(GATE.x, GATE.z) + 5.5, GATE.z - 2); }
+    }
+    if (this.light) {
+      this.light.intensity = 160 * this.lightK;
+      if (this.lightK <= 0) { fx.lights.release(this.light); this.light = null; }
+    }
+  }
+
+  call() {
+    const P = this.P, g = this.E.g;
+    this.men = [];
+    for (let k = 0; k < P.men; k++) {
+      const f = this.E.soldiers[COVER_AT + k];
+      dressSoldier(f);
+      // a shallow line across the road in front of the gate
+      const px = (k - (P.men - 1) / 2) * 3.4 + rand(-0.4, 0.4);
+      this.men.push({
+        f, x: GATE.x + (k - 1.5) * 0.8, z: GATE.z + 0.5, px, pz: GATE.z - rand(P.out[0], P.out[1]) + Math.abs(px) * 0.25,
+        state: 'out', ph: R() * 6, yaw: Math.PI, t: 0, shootT: rand(0.3, 0.9), elev: 0, kick: 0, tgt: -1,
+      });
+    }
+    this.state = 'out'; this.quiet = 0;
+    this.E.say('cover', 'out', true);
+    g.hud.alert('GATE SQUAD IS OUT');
+  }
+
+  /** friends: [{x, z}] of ours still coming in. */
+  update(dt, friends) {
+    const E = this.E, g = E.g, h = g.horde, fx = g.fx, P = this.P;
+    const coming = friends.filter((f) => Math.hypot(f.x - GATE.x, f.z - GATE.z) < P.callD);
+    this.flood(dt);
+    if (this.state === 'in') { if (coming.length) this.call(); else return; }
+    if (this.state === 'out' || this.state === 'hold') {
+      this.quiet = coming.length ? 0 : this.quiet + dt;
+      if (this.quiet > P.linger) this.back();
+    }
+    // what to shoot: the dead closest to whoever is coming in (or to the squad itself)
+    if ((this.pick -= dt) <= 0) {
+      this.pick = 0.3;
+      // everything in range, the ones nearest our people (or the squad itself) first
+      const c = [], sx = GATE.x, sz = GATE.z - 9;
+      const n = h.queryRadius(sx, sz, P.range, h._q);
+      for (let k = 0; k < n; k++) {
+        const j = h._q[k], x = h.x[j], z = h.z[j];
+        let s = Math.hypot(x - sx, z - sz) * 1.6;
+        for (const f of coming) s = Math.min(s, Math.hypot(x - f.x, z - f.z));
+        c.push({ id: h.id[j], s });
+      }
+      c.sort((a, b) => a.s - b.s);
+      this.targets = c.slice(0, 8).map((o) => o.id);
+    }
+    let alive = 0;
+    for (let k = 0; k < this.men.length; k++) {
+      const m = this.men[k], f = m.f;
+      m.t += dt;
+      if (m.state === 'down') {
+        f.fall(Math.min(1, m.t / 0.5));
+        continue;
+      }
+      if (m.state === 'gone') continue;
+      alive++;
+      const gy = groundH(m.x, m.z);
+      if (m.state === 'out' || m.state === 'back') {
+        const tx = m.state === 'out' ? m.px : GATE.x + (k - 1.5) * 0.8, tz = m.state === 'out' ? m.pz : GATE.z + 0.6;
+        const dx = tx - m.x, dz = tz - m.z, d = Math.hypot(dx, dz);
+        if (d < 0.25) {
+          if (m.state === 'out') { m.state = 'hold'; m.t = 0; }
+          else { m.state = 'gone'; f.root.visible = false; continue; }
+        } else {
+          const st = Math.min(d, P.speed * dt);
+          m.x += dx / d * st; m.z += dz / d * st;
+          m.yaw = Math.atan2(dx, dz);
+          m.ph += dt * P.speed * 2.1;
+          f.run(m.ph);
+        }
+      }
+      if (m.state === 'hold') {
+        // pick a target (spread across the squad) and fire
+        let j = -1;
+        if (this.targets.length) {
+          const id = this.targets[k % this.targets.length];
+          if (m.tgt !== id) m.tgt = id;
+          j = h.indexOf(id);
+        }
+        m.kick = Math.max(0, m.kick - dt * 6);
+        if (j >= 0) {
+          const ox = m.x, oz = m.z, tx = h.x[j], tz = h.z[j];
+          const dd = Math.hypot(tx - ox, tz - oz) || 1;
+          const want = Math.atan2(tx - ox, tz - oz);
+          let dy = want - m.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+          m.yaw += dy * Math.min(1, dt * 8);
+          const ty = groundH(tx, tz) + 1.2 * h.scale[j];
+          m.elev += (Math.atan2(ty - (gy + 1.45), dd) - m.elev) * Math.min(1, dt * 8);
+          if ((m.shootT -= dt) <= 0 && dd < P.range && Math.abs(dy) < 0.25) {
+            m.shootT = rand(P.every[0], P.every[1]);
+            m.kick = 1;
+            f.root.updateMatrixWorld(true);
+            f.muzzle.getWorldPosition(_v);
+            fx.tracer(_v.x, _v.y, _v.z, tx, ty, tz, 420, 0.8, 6.5, 1.4, 0.6);
+            fx.muzzle(_v.x, _v.y, _v.z, (tx - ox) / dd, 0, (tz - oz) / dd, 0.4);
+            if (R() < P.hit) {
+              h.damage(j, P.damage, 'gunner', (tx - ox) / dd, 0, (tz - oz) / dd, R() < 0.2);
+              fx.fleshHit(tx, ty, tz, (tx - ox) / dd, 0, (tz - oz) / dd, 0.7);
+            }
+            if (R() < 0.5) g.audio.wallGun(ox, oz);
+          }
+        } else {
+          // nothing to shoot: watch the road
+          let dy = Math.PI - m.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+          m.yaw += dy * Math.min(1, dt * 3);
+          m.elev *= 1 - Math.min(1, dt * 3);
+        }
+        f.aim(m.elev, 0, m.kick);
+        // too close: the squad falls back before it is overrun
+        if (h.queryRadius(m.x, m.z, P.fallBack, h._q) > 0 && this.state !== 'back') this.back();
+      }
+      // caught
+      if (m.t > 0.5 && h.queryRadius(m.x, m.z, P.catchR, h._q) > 0) {
+        m.state = 'down'; m.t = 0;
+        g.audio.scream2(m.x, m.z);
+        fx.headshot(m.x, gy + 1.3, m.z, 0, 0.3, 1);
+        fx.blood(m.x, m.z, 1.4);
+        if (g.run && g.inPlay()) { g.run.survivors = Math.max(0, g.run.survivors - 1); g.ns.lost++; }
+        g.hud.alert('WE LOST A MAN AT THE GATE', 'red');
+        E.say('cover', 'lost', true);
+        if (this.state !== 'back') this.back(true);
+        if (g.run && g.inPlay() && g.run.survivors <= 0) g.fall();
+        continue;
+      }
+      f.root.position.set(m.x, gy, m.z);
+      f.root.rotation.y = m.yaw;
+      fx.glowDot(m.x, gy + 1.72, m.z, 0.32, 0.4, 5, 0.8, 0.05);
+    }
+    if (this.state === 'back' && alive === 0) this.state = 'in';
+    if (this.state !== 'in' && this.men.every((m) => m.state === 'gone' || m.state === 'down') && this.state !== 'back') this.state = 'in';
+  }
+
+  back(quiet = false) {
+    if (this.state === 'back' || this.state === 'in') return;
+    this.state = 'back';
+    for (const m of this.men) if (m.state === 'out' || m.state === 'hold') { m.state = 'back'; m.t = 1; }
+    if (!quiet) this.E.say('cover', 'back');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 class Escort {
   constructor(E, kind) {
     this.E = E; this.kind = kind; this.P = EVENTS[kind]; this.blocking = true;
@@ -245,6 +411,8 @@ class Escort {
 
   end() { for (const u of this.units || []) u.f.root.visible = false; }
 
+  friendlies() { return (this.units || []).filter((u) => u.state === 'run'); }
+
   objective() {
     const run = this.units.filter((u) => u.state === 'run');
     const near = run.reduce((m, u) => Math.min(m, Math.hypot(u.x - GATE.x, u.z - GATE.z)), 999);
@@ -285,6 +453,11 @@ class SupplyDrop {
     this.track = new Set();
     E.say('drop', 'start', true);
     E.g.hud.alert('RESUPPLY INBOUND — WATCH FOR THE STROBE');
+  }
+
+  friendlies() {
+    if (this.phase !== 'carry' || !this.crate) return [];
+    return [{ x: this.crate.x, z: this.crate.z }];
   }
 
   /** The recovery team comes out of the gate. */
@@ -848,6 +1021,8 @@ class Convoy {
     g.hud.alert('SURVIVOR TRUCK ON THE ROAD — CLEAR A PATH');
   }
 
+  friendlies() { return this.state === 'drive' ? [{ x: this.x, z: this.z }] : []; }
+
   update(dt) {
     const { E, P } = this, g = E.g, h = g.horde, fx = g.fx;
     this.t += dt;
@@ -1054,9 +1229,10 @@ export class NightEvents {
     const scene = game.scene;
     this.people = [];
     for (let k = 0; k < 8; k++) { const p = buildPerson(); scene.add(p.root); this.people.push(p); }
-    // our soldiers in the field: the patrol (0-3) and the recovery team (4-7)
+    // our soldiers in the field: the patrol (0-3), the recovery team (4-7) and the gate squad (8-11)
     this.soldiers = [];
-    for (let k = 0; k < 8; k++) { const s = new Soldier(); scene.add(s.root); this.soldiers.push(s); }
+    for (let k = 0; k < 12; k++) { const s = new Soldier(); scene.add(s.root); this.soldiers.push(s); }
+    this.cover = new GateCover(this);
     // supply drop: aircraft, crate and parachute
     this.c130 = buildGunship();
     this.c130.group.scale.setScalar(1.5);
@@ -1149,6 +1325,7 @@ export class NightEvents {
     for (const e of this.active) e.end();
     this.active.length = 0;
     for (const p of [...this.people, ...this.soldiers]) p.root.visible = false; // the fallen from last night
+    if (this.cover) this.cover.reset();
     if (this.tankerWreck) { this.tankerWreck.visible = false; this.tanker.visible = false; this.truck.visible = false; }
     this.queue.length = 0;
     const g = this.g;
@@ -1170,6 +1347,10 @@ export class NightEvents {
       const e = this.active[k];
       if (e.done || e.update(dt)) { e.end(); this.active.splice(k, 1); k--; }
     }
+    // anyone of ours coming in gets the gate squad
+    const friends = [];
+    for (const e of this.active) if (e.friendlies) friends.push(...e.friendlies());
+    this.cover.update(dt, friends);
   }
 
   /** Play-test telemetry for an event (start / outcome). */

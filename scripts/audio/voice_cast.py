@@ -244,6 +244,18 @@ DIRECTION = {
         ("Calm, steady and friendly pilot radio call, engines loud.", 0.35),
     'Load away, load away. Good chute. Reach three-one is clear — good luck down there.':
         ("Calm and satisfied, then sincere and warm on 'good luck down there'.", 0.35),
+    'Gate squad, out! Cover them in!':
+        ("Barking an order down to the gate, loud and urgent over the gunfire.", 0.85),
+    'Open the gate — squad out, bring them home!':
+        ("Shouting the order, urgent and determined, rising on 'bring them home'.", 0.85),
+    'Second squad, out the gate! Covering fire!':
+        ("Loud, sharp command shouted over gunfire.", 0.85),
+    'Everybody in? Squad, back inside — shut the gate!':
+        ("Quick check, then a hard shouted order, relieved but still urgent.", 0.7),
+    "That's all of them. Gate squad, pull back!":
+        ("Relieved, then a firm shouted order to pull back.", 0.65),
+    'Man down at the gate! Pull back, pull back!':
+        ("Alarmed, shouting desperately, the repeat more frantic.", 0.95),
     "Crate's down in the field! Keep them off it until the recovery team gets out there!":
         ("Shouting urgent orders over the gunfire.", 0.85),
     "They're all over the crate — clear them off!":

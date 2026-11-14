@@ -358,6 +358,8 @@ export const EVENTS = {
   civilians: { count: 6, speed: [3.8, 4.3], chasers: 20, catchR: 1.05, reward: { survivors: 1, supplies: 20 } },
   // the recovery team leaves the gate teamDelay s after the crate lands, rigs it for rig s,
   // and carries it home at carrySpeed[men still standing] m/s
+  // the gate squad: four men step out of the gate to cover anyone of ours coming in
+  cover: { men: 4, callD: 95, out: [7, 11], speed: 4.6, every: [0.22, 0.45], range: 55, hit: 0.55, damage: 30, catchR: 1.0, fallBack: 4.5, linger: 3 },
   drop: { teamDelay: 6, teamSpeed: [4.4, 4.8], rig: 3.5, carrySpeed: [0, 1.0, 1.7, 2.1, 2.4], catchR: 1.0,
     tear: 1.3, maxTearing: 6, pull: 32, reward: { grenades: 6, molotovs: 3, supplies: 150 } },
   giant: { name: 'GOLIATH', hpMul: 1, scale: 4.0, smash: 2.4 },
@@ -375,6 +377,11 @@ export const EVENTS = {
 };
 // '@spectre' is whichever gunship crew is up that night
 export const EVENT_LINES = {
+  cover: {
+    out: [[CALL.kovac, 'Gate squad, out! Cover them in!'], [CALL.kovac, 'Open the gate — squad out, bring them home!'], [CALL.kovac, 'Second squad, out the gate! Covering fire!']],
+    back: [[CALL.kovac, 'Everybody in? Squad, back inside — shut the gate!'], [CALL.kovac, 'That\'s all of them. Gate squad, pull back!']],
+    lost: [[CALL.kovac, 'Man down at the gate! Pull back, pull back!']],
+  },
   patrol: {
     start: [[CALL.hollis, 'Bastion-7, this is Hollis, Recon Two. Four of us coming in hot down the road — they\'re right behind us. Cover us!']],
     follow: [[CALL.kovac, 'Friendlies on the road! Kill what\'s chasing them — and watch your fire!']],
