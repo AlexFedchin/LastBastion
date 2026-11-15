@@ -11,6 +11,10 @@ meshopt-compressed.
 | `ac130.glb` | AC-130 gunship (Spectre); also used for the resupply C-130 | _TODO_ | _TODO_ | _TODO_ |
 | `b36.glb` | B-36 bomber | _TODO_ | _TODO_ | _TODO_ |
 | `soldier.glb` | Rigged soldier (contractor kit, rifle): wall crews, the patrol, the recovery team, the men on the roof | _TODO_ | _TODO_ | _TODO_ |
+| `survivor_man.glb` | Civilian man (casual, vest): the escort, the ending's column | _TODO_ | _TODO_ | _TODO_ |
+| `survivor_woman.glb` | Civilian woman ("Alison", RenderPeople free rigged sample) | RenderPeople | RenderPeople free-model EULA (check) | renderpeople.com |
+| `survivor_man2.glb` | Civilian man ("Eric", RenderPeople free rigged sample) | RenderPeople | RenderPeople free-model EULA (check) | renderpeople.com |
+| `survivor_child.glb` | Child ("Leo") | _TODO_ | _TODO_ | _TODO_ |
 | `grenade.glb` | Hand grenade, pin and ring | _TODO_ (Sketchfab) | _TODO_ | _TODO_ |
 | `molotov.glb` | Molotov bottle with rag | _TODO_ (Sketchfab) | _TODO_ | _TODO_ |
 | `crate.glb` | Wooden ammunition crate | _TODO_ | _TODO_ | _TODO_ |
@@ -35,6 +39,10 @@ meshopt-compressed.
   two deaths, box carry, kneeling work), made on an auto-rigged copy of this mesh and retargeted
   onto its own skeleton at build time (scripts/models/retarget.mjs). Mixamo animations are
   royalty-free for use in games. The rifle rides its own joint so it can be slung on the back.
+- **Survivors**: each auto-rigged in Mixamo (from scripts/models/export_unrigged.mjs zips), merged
+  into one skinned mesh on one atlas and simplified to ~7k triangles (child ~9k). Animation: seven
+  Mixamo clips (sad walk, arm-injured walk, limp, two runs, sad idle, fall-forward death), made on
+  one character and retargeted onto each at build time.
 - **Grenade, Molotov**: re-scaled to life size (10.5 cm, 34 cm), textures to WebP.
 - **Ammo crate**: untextured source; scaled to 0.9 m and painted olive drab.
 - **Sandbags**: two piles, 1.6 m long, PBR set at 1024/512 px, DirectX normal map converted, ~6k triangles each.

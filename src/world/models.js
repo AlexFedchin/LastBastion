@@ -5,7 +5,8 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 
 const FILES = {
   m2hb: 'models/m2hb.glb', ac130: 'models/ac130.glb', b36: 'models/b36.glb',
-  soldier: 'models/soldier.glb', grenade: 'models/grenade.glb', molotov: 'models/molotov.glb', crate: 'models/crate.glb', sandbags: 'models/sandbags.glb',
+  soldier: 'models/soldier.glb', survivor_man: 'models/survivor_man.glb', survivor_woman: 'models/survivor_woman.glb',
+  survivor_man2: 'models/survivor_man2.glb', survivor_child: 'models/survivor_child.glb', grenade: 'models/grenade.glb', molotov: 'models/molotov.glb', crate: 'models/crate.glb', sandbags: 'models/sandbags.glb',
 };
 // set dressing for the bastion: Poly Haven CC0 scans (scripts/models/build_kit.mjs), loaded as 'kit/<name>'
 export const KIT = [

@@ -62,18 +62,19 @@ export function makeRetargeter(gameBones, bind) {
     }
     // 2. offsets
     const O = {}; for (const n of ANIMATED) if (rest[n] && G[n]) O[n] = rest[n].q.clone().invert().multiply(G[n].q);
+    const bonesOut = ANIMATED.filter((n) => O[n]); // the bones both rigs have
     // hips: scale by hip height over the toes
     const s = (T.Hips.p.y - T.LeftToeBase.p.y) / (rest.Hips.p.y - rest.LeftToeBase.p.y);
     // 3. sample
     const clip = a.animations[0];
     const mixer = new THREE.AnimationMixer(a);
-    mixer.clipAction(clip).play();
+    const action = mixer.clipAction(clip); action.setLoop(THREE.LoopOnce, 1); action.clampWhenFinished = true; action.play();
     const n = Math.max(2, Math.round(clip.duration * fps) + 1);
     const times = new Float32Array(n), rot = {}, hips = new Float32Array(n * 3);
-    for (const b of ANIMATED) rot[b] = new Float32Array(n * 4);
+    for (const b of bonesOut) rot[b] = new Float32Array(n * 4);
     const W = {}, q = new THREE.Quaternion(), hp = new THREE.Vector3();
     for (let i = 0; i < n; i++) {
-      const t = Math.min(clip.duration, i / fps);
+      const t = Math.min(clip.duration - 1e-4, i / fps); // (at exactly the end a mixer wraps to frame 0)
       times[i] = t;
       mixer.setTime(t);
       a.updateMatrixWorld(true);
@@ -82,7 +83,7 @@ export function makeRetargeter(gameBones, bind) {
         ab[b].getWorldQuaternion(q);
         W[b] = q.clone().multiply(O[b]);
       }
-      for (const b of ANIMATED) {
+      for (const b of bonesOut) {
         if (!W[b]) continue;
         const p = parent[b];
         // the hips hang off the glb's root directly, so their local rotation is the world one
@@ -95,7 +96,7 @@ export function makeRetargeter(gameBones, bind) {
       hips[i * 3 + 2] = T.Hips.p.z + (hp.z - rest.Hips.p.z) * s;
     }
     // keep quaternions on one hemisphere so interpolation takes the short way
-    for (const b of ANIMATED) { const v = rot[b]; for (let i = 4; i < v.length; i += 4) if (v[i] * v[i - 4] + v[i + 1] * v[i - 3] + v[i + 2] * v[i - 2] + v[i + 3] * v[i - 1] < 0) for (let k = 0; k < 4; k++) v[i + k] = -v[i + k]; }
+    for (const b of bonesOut) { const v = rot[b]; for (let i = 4; i < v.length; i += 4) if (v[i] * v[i - 4] + v[i + 1] * v[i - 3] + v[i + 2] * v[i - 2] + v[i + 3] * v[i - 1] < 0) for (let k = 0; k < 4; k++) v[i + k] = -v[i + k]; }
     return { duration: clip.duration, times, rot, hips };
   };
 }

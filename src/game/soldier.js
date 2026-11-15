@@ -23,6 +23,7 @@ const GAIT = { rifle_run: 3.2, rifle_walk: 1.1, box_walk: 1.4 };
 // the game clock the idles run on (set every frame by main.js)
 let clock = 0;
 export function setSoldierClock(t) { clock = t; }
+export function soldierClock() { return clock; }
 
 // clips: name -> { dur, times, tracks: [{ bone, pos, values }] }, built on first use
 let CLIPS = null;
@@ -45,6 +46,7 @@ let serial = 0;
 let lampUniforms = null;
 export function setSoldierLamps(u) { lampUniforms = u; }
 const patched = new WeakSet();
+export function lampify(mat) { patchLamps(mat); }
 function patchLamps(mat) {
   if (patched.has(mat) || !lampUniforms) return;
   patched.add(mat);

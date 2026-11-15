@@ -7,7 +7,7 @@ import * as THREE from 'three';
 import { WORLD, ENDING } from '../config.js';
 import { clamp, lerp, rand, fitFov } from '../core/util.js';
 import { groundH } from '../world/terrain.js';
-import { buildPerson, CIV_COLORS } from './events.js';
+import { Survivor, ADULTS, WALKS } from './survivor.js';
 import { Soldier } from './soldier.js';
 
 const $ = (id) => document.getElementById(id);
@@ -60,7 +60,11 @@ export class Ending {
     this.built = true;
     const scene = this.g.scene;
     this.people = [];
-    for (let k = 0; k < 46; k++) { const p = buildPerson(); scene.add(p.root); this.people.push(p); }
+    // families: about one in four a child
+    for (let k = 0; k < 46; k++) {
+      const p = new Survivor(k % 5 === 3 || k % 7 === 5 ? 'child' : ADULTS[k % ADULTS.length]);
+      scene.add(p.root); this.people.push(p);
+    }
     this.troops = [];
     for (let k = 0; k < 8; k++) { const s = new Soldier(); scene.add(s.root); this.troops.push(s); }
   }
@@ -157,14 +161,13 @@ export class Ending {
     for (const [kind, i] of order) {
       if (kind === 's') { const s = this.troops[i]; s.reset(); s.root.scale.setScalar(rand(0.97, 1.03)); place(s, true, false); continue; }
       const p = this.people[i];
-      const kid = i % 5 === 3 || i % 7 === 5;
-      p.helmet.visible = p.rifle.visible = false;
-      p.pack.visible = Math.random() < 0.6;
-      p.mats.cloth.color.setHex(pickOne(CIV_COLORS));
-      p.mats.pants.color.setHex(pickOne([0x1e2230, 0x2a2622, 0x3a3a3e, 0x4a4036]));
-      p.root.scale.setScalar(kid ? rand(0.62, 0.72) : rand(0.93, 1.05));
-      p.body.rotation.set(0, 0, 0);
+      const kid = p.child;
+      // most just tired; some nursing an arm, a few limping (and slower for it)
+      p.gait = kid ? 'walk_sad' : WALKS[Math.random() < 0.6 ? 0 : Math.random() < 0.6 ? 1 : 2];
+      p.reset();
+      p.root.scale.setScalar(kid ? rand(0.74, 0.86) : rand(0.95, 1.04));
       place(p, false, kid);
+      this.walkers[this.walkers.length - 1].sp *= p.pace;
     }
     for (const w of this.walkers) w.f.root.visible = false;
     // the quarry's tractor-trailer stand-in: the survivors' truck, crawling up behind them
@@ -199,7 +202,7 @@ export class Ending {
       if (w.z > ROAD_TO) { w.z -= ROAD_TO - ROAD_FROM; w.x = w.lane; }
       const f = w.f;
       w.ph += dt * w.sp * 3.1;
-      if (w.soldier) f.walk(w.ph / 3.1); else walkPose(f, w.ph); // 3.1 rad per metre
+      f.walk(w.ph / 3.1); // 3.1 rad per metre
       f.root.position.set(w.x, groundH(w.x, w.z), w.z);
       f.root.rotation.y = (w.lane - w.x) * 0.15;
     }
@@ -312,14 +315,4 @@ export class Ending {
   }
 }
 
-/** A civilian's unhurried walk (the box-built people from events.js). */
-function walkPose(f, ph) {
-  const s = Math.sin(ph), c = Math.cos(ph);
-  f.legL.pivot.rotation.x = s * 0.42; f.legR.pivot.rotation.x = -s * 0.42;
-  f.legL.joint.rotation.x = -Math.max(0, c) * 0.55 - 0.05; f.legR.joint.rotation.x = -Math.max(0, -c) * 0.55 - 0.05;
-  f.armL.pivot.rotation.x = -s * 0.32; f.armR.pivot.rotation.x = s * 0.32;
-  f.armL.joint.rotation.x = 0.25; f.armR.joint.rotation.x = 0.25;
-  f.torso.rotation.x = 0.06;
-  f.body.position.y = Math.abs(c) * 0.025;
-}
 

@@ -616,6 +616,155 @@ async function soldier() {
   await finish(doc, 'soldier.glb', { ratio: 0.16, error: 0.004 });
 }
 
+
+// ── Survivors: the civilians on the road ─────────────────────────────────────
+// Source: characters auto-rigged in Mixamo (source/survivors/<name>-t-pose.fbx, "With Skin",
+// T-pose; made from export_unrigged.mjs zips) and Mixamo clips made on one of them
+// (source/survivors/anims/*.fbx). Game: one skinned mesh per character on one atlas (its
+// texture sets packed into cells), ~7k triangles, metres, feet at 0, facing +z; every clip
+// retargeted onto its own skeleton (retarget.mjs) as a glTF animation.
+const SURVIVORS = { 'civilian-1': 'man', 'civilian-2': 'woman', 'civilian-4': 'man2', 'child-1': 'child' };
+const SURVIVOR_CLIPS = {
+  'sad-walk': 'walk_sad', 'arm-injured-walk': 'walk_arm', 'leg-injured-walk': 'walk_leg',
+  running: 'run_1', 'running-2': 'run_2', 'sad-idle': 'idle_sad', 'fall-farward-death': 'death', 'fall-forward-death': 'death',
+};
+async function survivors() {
+  const { resolveObjectURL } = await import('node:buffer');
+  const D = path.join(SRC, 'survivors');
+  const clipFiles = fs.readdirSync(path.join(D, 'anims')).filter((f) => /\.fbx$/i.test(f)).sort();
+  for (const [src, name] of Object.entries(SURVIVORS)) {
+    const fbx = await load(path.join(D, `${src}-t-pose.fbx`));
+    fbx.updateMatrixWorld(true);
+    const short = (s) => s.replace('mixamorig', '');
+    // bones (one list by name) and their bind matrices
+    const bones = [], ix = new Map();
+    fbx.traverse((o) => { if (o.isBone && !ix.has(o.name)) { ix.set(o.name, bones.length); bones.push(o); } });
+    const meshes = []; fbx.traverse((o) => { if (o.isSkinnedMesh) meshes.push(o); });
+    const bind = new Array(bones.length);
+    for (const m of meshes) m.skeleton.bones.forEach((b, j) => { const i = ix.get(b.name); if (i !== undefined && !bind[i]) bind[i] = m.skeleton.boneInverses[j].clone().invert(); });
+    for (let i = 0; i < bones.length; i++) if (!bind[i]) bind[i] = bones[i].matrixWorld.clone();
+
+    // materials -> atlas cells: a colour texture (embedded by Mixamo) or a flat colour
+    const cells = new Map();
+    const cellOf = (m) => {
+      const key = m.name || m.uuid;
+      if (!cells.has(key)) cells.set(key, { i: cells.size, m });
+      return cells.get(key).i;
+    };
+    const parts = [];
+    for (const o of meshes) {
+      let g0 = o.geometry;
+      if (!g0.attributes.normal) {
+        // the OBJ round trip through Mixamo drops normals: smooth ones, welded on position only
+        const w = new THREE.BufferGeometry().setAttribute('position', g0.attributes.position.clone());
+        if (g0.index) w.setIndex(g0.index.clone());
+        const m = mergeVertices(w.index ? w.toNonIndexed() : w, 1e-4);
+        m.computeVertexNormals();
+        const key = (x, y, z) => `${Math.round(x * 1e4)},${Math.round(y * 1e4)},${Math.round(z * 1e4)}`;
+        const byPos = new Map(), MP = m.attributes.position, MN = m.attributes.normal;
+        for (let i = 0; i < MP.count; i++) byPos.set(key(MP.getX(i), MP.getY(i), MP.getZ(i)), i);
+        const P0 = g0.attributes.position, nrm = new Float32Array(P0.count * 3);
+        for (let i = 0; i < P0.count; i++) { const j = byPos.get(key(P0.getX(i), P0.getY(i), P0.getZ(i))); if (j !== undefined) nrm.set([MN.getX(j), MN.getY(j), MN.getZ(j)], i * 3); else nrm[i * 3 + 1] = 1; }
+        g0 = g0.clone(); g0.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
+      }
+      const g = g0.index ? g0.toNonIndexed() : g0;
+      const mats = [].concat(o.material);
+      const groups = g.groups.length ? g.groups : [{ start: 0, count: g.attributes.position.count, materialIndex: 0 }];
+      for (const gr of groups) parts.push({ o, g, gr, cell: cellOf(mats[gr.materialIndex] || mats[0]) });
+    }
+    const nC = cells.size, N = Math.ceil(Math.sqrt(nC)), A = nC > 4 ? 2048 : 1024, C = Math.floor(A / N);
+
+    const pos = [], nor = [], uvs = [], jnt = [], wts = [];
+    const v = new THREE.Vector3(), n = new THREE.Vector3();
+    for (const { o, g, gr, cell } of parts) {
+      const P = g.attributes.position, Nn = g.attributes.normal, U = g.attributes.uv, SI = g.attributes.skinIndex, SW = g.attributes.skinWeight;
+      const map = o.skeleton.bones.map((b) => ix.get(b.name));
+      const cx = cell % N, cy = (cell / N) | 0;
+      for (let i = gr.start; i < gr.start + gr.count; i++) {
+        v.fromBufferAttribute(P, i).applyMatrix4(o.bindMatrix);
+        n.fromBufferAttribute(Nn, i).transformDirection(o.bindMatrix);
+        pos.push(v.x, v.y, v.z); nor.push(n.x, n.y, n.z);
+        let u = 0.5, w = 0.5;
+        if (U) { u = U.getX(i); w = U.getY(i); u -= Math.floor(u); w -= Math.floor(w); w = 1 - w; }
+        uvs.push((cx * C + 2 + u * (C - 4)) / A, (cy * C + 2 + w * (C - 4)) / A);
+        const ws = [SW.getX(i), SW.getY(i), SW.getZ(i), SW.getW(i)], s = ws.reduce((a, b) => a + b, 0) || 1;
+        jnt.push(map[SI.getX(i)] ?? 0, map[SI.getY(i)] ?? 0, map[SI.getZ(i)] ?? 0, map[SI.getW(i)] ?? 0);
+        wts.push(ws[0] / s, ws[1] / s, ws[2] / s, ws[3] / s);
+      }
+    }
+    let minY = Infinity, maxY = -Infinity;
+    for (let i = 1; i < pos.length; i += 3) { minY = Math.min(minY, pos[i]); maxY = Math.max(maxY, pos[i]); }
+    const k = maxY - minY > 10 ? 0.01 : 1; // centimetres -> metres
+    for (let i = 0; i < pos.length; i += 3) { pos[i] *= k; pos[i + 1] = (pos[i + 1] - minY) * k; pos[i + 2] *= k; }
+
+    // the atlas
+    const comps = [];
+    for (const { i, m } of cells.values()) {
+      let img = null;
+      const srcUrl = m.map && m.map.userData.src;
+      if (srcUrl && srcUrl.startsWith('blob:')) { const b = resolveObjectURL(srcUrl); if (b) img = Buffer.from(await b.arrayBuffer()); }
+      const c = m.color || new THREE.Color(0.6, 0.6, 0.6);
+      const input = img
+        ? await sharp(img).resize(C, C, { fit: 'fill' }).removeAlpha().png().toBuffer()
+        : await sharp({ create: { width: C, height: C, channels: 3, background: { r: Math.round(c.r * 255), g: Math.round(c.g * 255), b: Math.round(c.b * 255) } } }).png().toBuffer();
+      comps.push({ input, left: (i % N) * C, top: ((i / N) | 0) * C });
+    }
+    const atlas = await sharp({ create: { width: A, height: A, channels: 3, background: { r: 90, g: 90, b: 90 } } }).composite(comps).webp({ quality: 86 }).toBuffer();
+
+    const doc = new Document();
+    const buffer = doc.createBuffer();
+    const scene = doc.createScene('survivor');
+    const root = doc.createNode('survivor').setScale([k, k, k]);
+    scene.addChild(root);
+    const lift = new THREE.Matrix4().makeTranslation(0, -minY, 0);
+    const nodes = bones.map((b, i) => {
+      const p = bones.indexOf(b.parent);
+      const m = p >= 0 ? bind[p].clone().invert().multiply(bind[i]) : lift.clone().multiply(bind[i]);
+      const t = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3();
+      m.decompose(t, q, s);
+      return doc.createNode(b.name).setTranslation(t.toArray()).setRotation(q.toArray()).setScale(s.toArray());
+    });
+    bones.forEach((b, i) => { const p = bones.indexOf(b.parent); (p >= 0 ? nodes[p] : root).addChild(nodes[i]); });
+    const S = new THREE.Matrix4().makeScale(k, k, k);
+    const ibm = new Float32Array(bones.length * 16);
+    bones.forEach((b, i) => S.clone().multiply(lift).multiply(bind[i]).invert().toArray(ibm, i * 16));
+    const skin = doc.createSkin(name).setSkeleton(nodes[0]).setInverseBindMatrices(acc0(doc, buffer, ibm, 'MAT4'));
+    for (const nd of nodes) skin.addJoint(nd);
+    const mat = doc.createMaterial(name).setMetallicFactor(0).setRoughnessFactor(0.85).setBaseColorTexture(tex(doc, name + '_color', atlas));
+    const prm = doc.createPrimitive().setMaterial(mat)
+      .setAttribute('POSITION', acc0(doc, buffer, new Float32Array(pos), 'VEC3'))
+      .setAttribute('NORMAL', acc0(doc, buffer, new Float32Array(nor), 'VEC3'))
+      .setAttribute('TEXCOORD_0', acc0(doc, buffer, new Float32Array(uvs), 'VEC2'))
+      .setAttribute('JOINTS_0', acc0(doc, buffer, new Uint16Array(jnt), 'VEC4'))
+      .setAttribute('WEIGHTS_0', acc0(doc, buffer, new Float32Array(wts), 'VEC4'));
+    scene.addChild(doc.createNode('body').setMesh(doc.createMesh('body').addPrimitive(prm)).setSkin(skin));
+
+    // clips
+    const gameBones = {}, bindBy = {};
+    bones.forEach((b, i) => { gameBones[short(b.name)] = b; bindBy[short(b.name)] = bind[i]; });
+    const retarget = makeRetargeter(gameBones, bindBy);
+    const nodeOf = Object.fromEntries(bones.map((b, i) => [short(b.name), nodes[i]]));
+    for (const f of clipFiles) {
+      const base = f.replace(/\.fbx$/i, '').toLowerCase();
+      const clipName = SURVIVOR_CLIPS[base] || base.replace(/[^a-z0-9]+/g, '_');
+      const c = await retarget(path.join(D, 'anims', f));
+      const anim = doc.createAnimation(clipName);
+      const input = acc0(doc, buffer, c.times, 'SCALAR');
+      for (const [b, val] of Object.entries(c.rot)) {
+        if (!nodeOf[b]) continue;
+        const smp = doc.createAnimationSampler().setInput(input).setOutput(acc0(doc, buffer, val, 'VEC4')).setInterpolation('LINEAR');
+        anim.addSampler(smp).addChannel(doc.createAnimationChannel().setTargetNode(nodeOf[b]).setTargetPath('rotation').setSampler(smp));
+      }
+      const hp = c.hips.slice(); for (let i = 1; i < hp.length; i += 3) hp[i] -= minY;
+      const smp = doc.createAnimationSampler().setInput(input).setOutput(acc0(doc, buffer, hp, 'VEC3')).setInterpolation('LINEAR');
+      anim.addSampler(smp).addChannel(doc.createAnimationChannel().setTargetNode(nodeOf.Hips).setTargetPath('translation').setSampler(smp));
+    }
+    const tris = pos.length / 9;
+    console.log(`survivor ${name}: ${bones.length} bones, ${nC} materials (atlas ${A}, ${N}x${N}), ${tris} source triangles, ${((maxY - minY) * k).toFixed(2)} m tall, ${clipFiles.length} clips`);
+    await finish(doc, `survivor_${name}.glb`, { ratio: Math.min(1, 7000 / tris), error: 0.01 });
+  }
+}
+
 const want = process.argv.slice(2);
-const all = { m2hb, ac130, b36, grenade, molotov, crate, sandbags, soldier };
+const all = { m2hb, ac130, b36, grenade, molotov, crate, sandbags, soldier, survivors };
 for (const [k, f] of Object.entries(all)) if (!want.length || want.includes(k)) await f();

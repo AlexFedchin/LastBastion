@@ -14,6 +14,7 @@ import { buildGunship } from './air.js';
 import { makeTruck, cylX } from '../world/kit.js';
 import { cloneModel } from '../world/models.js';
 import { Soldier } from './soldier.js';
+import { Survivor } from './survivor.js';
 
 const R = Math.random;
 const pickOne = (a) => a[(R() * a.length) | 0];
@@ -23,50 +24,11 @@ function offsetZ(x, d) {
   return wallZ(x) - (Math.abs(x) <= WORLD.GATE_HALF ? d : d / WING_COS);
 }
 
-// ── people: a small articulated runner (soldier or civilian) ────────────────
-const box = (w, h, d, y = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(0, y, 0); return g; };
+// ── people: Soldier models (soldier.js) and Survivors (survivor.js) ──────────
 
-export function buildPerson() {
-  const mats = {
-    cloth: new THREE.MeshStandardMaterial({ color: 0x3c4230, roughness: 0.9 }),
-    pants: new THREE.MeshStandardMaterial({ color: 0x2f3326, roughness: 0.9 }),
-    skin: new THREE.MeshStandardMaterial({ color: 0x8a6a55, roughness: 0.75 }),
-    gear: new THREE.MeshStandardMaterial({ color: 0x23261c, roughness: 0.8 }),
-    gun: new THREE.MeshStandardMaterial({ color: 0x151617, roughness: 0.5, metalness: 0.6 }),
-  };
-  const root = new THREE.Group();
-  const body = new THREE.Group();
-  root.add(body);
-  const torso = new THREE.Mesh(box(0.42, 0.58, 0.25, 0.29), mats.cloth); torso.position.y = 0.9; body.add(torso);
-  const head = new THREE.Mesh(new THREE.SphereGeometry(0.12, 10, 8), mats.skin); head.position.y = 0.73; torso.add(head);
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.145, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2), mats.gear); helmet.position.y = 0.77; torso.add(helmet);
-  const pack = new THREE.Mesh(box(0.34, 0.4, 0.18, 0.28), mats.gear); pack.position.set(0, 0.05, 0.2); torso.add(pack);
-  const rifle = new THREE.Mesh(box(0.06, 0.09, 0.85), mats.gun); rifle.position.set(-0.05, 0.3, -0.25); rifle.rotation.set(0.25, 0.35, 0); torso.add(rifle);
-  const limb = (x, y, parent, w, len, mat) => {
-    const pivot = new THREE.Group(); pivot.position.set(x, y, 0); parent.add(pivot);
-    const upper = new THREE.Mesh(box(w, len, w, -len / 2), mat); pivot.add(upper);
-    const joint = new THREE.Group(); joint.position.y = -len; pivot.add(joint);
-    const lower = new THREE.Mesh(box(w * 0.9, len, w * 0.9, -len / 2), mat); joint.add(lower);
-    return { pivot, joint };
-  };
-  const legL = limb(0.11, 0.92, body, 0.15, 0.45, mats.pants), legR = limb(-0.11, 0.92, body, 0.15, 0.45, mats.pants);
-  const armL = limb(0.27, 0.54, torso, 0.1, 0.3, mats.cloth), armR = limb(-0.27, 0.54, torso, 0.1, 0.3, mats.cloth);
-  root.visible = false;
-  return { root, body, torso, helmet, pack, rifle, legL, legR, armL, armR, mats };
-}
-
-export const CIV_COLORS = [0x5b2a24, 0x2b3550, 0x6a6458, 0x3b4a3a, 0x7a5a2a, 0x2a2a2e, 0x6b3d5a];
-
-/** Dress a person as a soldier (or ready a Soldier model). */
+/** Ready a Soldier model to go out. */
 function dressSoldier(f) {
-  if (f.isSoldier) { f.reset(); f.root.scale.setScalar(rand(0.97, 1.03)); f.root.visible = true; return; }
-  f.helmet.visible = f.pack.visible = f.rifle.visible = true;
-  f.mats.cloth.color.setHex(0x3c4230);
-  f.mats.pants.color.setHex(0x2f3326);
-  f.root.scale.setScalar(rand(0.97, 1.05));
-  f.root.visible = true;
-  f.body.rotation.set(0, 0, 0);
-  f.body.position.y = 0;
+  f.reset(); f.root.scale.setScalar(rand(0.97, 1.03)); f.root.visible = true;
 }
 
 /** A soldier on the move fires at the nearest of them within range. */
@@ -92,23 +54,9 @@ function soldierFire(g, u, dt, range = 32, every = [0.18, 0.4]) {
   if (R() < 0.5) g.audio.wallGun(ox, oz);
 }
 
-/** Running (or, carrying, a heavy shuffle) pose for one step of the cycle. */
+/** Running (or, carrying, a heavy walk under the crate) for one step of the cycle. */
 function poseRun(f, ph, carry = false) {
-  if (f.isSoldier) { f.run(ph / 2.1, carry); return; } // the phase runs at 2.1 rad per metre
-  const s = Math.sin(ph), c = Math.cos(ph), a = carry ? 0.45 : 0.85;
-  f.legL.pivot.rotation.x = s * a; f.legR.pivot.rotation.x = -s * a;
-  f.legL.joint.rotation.x = -Math.max(0, c) * (carry ? 0.7 : 1.2) - 0.1; f.legR.joint.rotation.x = -Math.max(0, -c) * (carry ? 0.7 : 1.2) - 0.1;
-  if (carry) {
-    // both hands down on the crate's handles
-    f.armL.pivot.rotation.x = -0.35; f.armR.pivot.rotation.x = -0.35;
-    f.armL.joint.rotation.x = 0.2; f.armR.joint.rotation.x = 0.2;
-    f.torso.rotation.x = 0.4;
-  } else {
-    f.armL.pivot.rotation.x = -s * 0.7; f.armR.pivot.rotation.x = s * 0.7;
-    f.armL.joint.rotation.x = 1.1; f.armR.joint.rotation.x = 1.1;
-    f.torso.rotation.x = 0.28;
-  }
-  f.body.position.y = Math.abs(c) * (carry ? 0.03 : 0.06);
+  f.run(ph / 2.1, carry); // the phase runs at 2.1 rad per metre
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -292,14 +240,10 @@ class Escort {
       const soldier = this.kind === 'patrol';
       const f = soldier ? E.soldiers[k] : E.people[k];
       if (soldier) { dressSoldier(f); this.units.push(this.unit(f, x0, z0, P, false)); continue; }
-      f.helmet.visible = f.pack.visible = f.rifle.visible = soldier;
-      const c = soldier ? 0x3c4230 : pickOne(CIV_COLORS);
-      f.mats.cloth.color.setHex(c);
-      f.mats.pants.color.setHex(soldier ? 0x2f3326 : pickOne([0x1e2230, 0x2a2622, 0x3a3a3e]));
-      const small = !soldier && k >= P.count - 2; // children
-      f.root.scale.setScalar(small ? 0.68 : rand(0.97, 1.05));
+      const small = f.child; // the last two are children (see the people in NightEvents)
+      f.reset();
+      f.root.scale.setScalar(small ? rand(0.78, 0.88) : rand(0.96, 1.04));
       f.root.visible = true;
-      f.body.rotation.set(0, 0, 0);
       this.units.push(this.unit(f, x0, z0, P, small, k % 2 === 0));
     }
     this.track = new Set();
@@ -382,8 +326,7 @@ class Escort {
           else fx.glowDot(u.x + Math.sin(u.yaw) * 0.4, gy + 1.0 * sc, u.z + Math.cos(u.yaw) * 0.4, 0.35, 5, 4, 2.4, 0.05);
         }
       } else if (u.state === 'down') {
-        f.body.rotation.x = -Math.min(1, u.t / 0.5) * Math.PI / 2;
-        f.body.position.y = 0.1 * Math.min(1, u.t / 0.5);
+        f.die(u.t);
       } else if (u.state === 'safe') {
         f.root.visible = u.t < 0.4;
       }
@@ -590,8 +533,7 @@ class SupplyDrop {
       const f = u.f;
       u.t += dt;
       if (u.state === 'down') {
-        f.body.rotation.x = -Math.min(1, u.t / 0.5) * Math.PI / 2;
-        f.body.position.y = 0.1 * Math.min(1, u.t / 0.5);
+        f.die(u.t);
         continue;
       }
       let gx, gz, sp = u.sp;
@@ -1270,7 +1212,8 @@ export class NightEvents {
     this.active = [];
     const scene = game.scene;
     this.people = [];
-    for (let k = 0; k < 8; k++) { const p = buildPerson(); scene.add(p.root); this.people.push(p); }
+    // the civilians on the road: four adults, then two children (the escort takes the first six)
+    for (const m of ['man', 'woman', 'man2', 'woman', 'child', 'child', 'man', 'man2']) { const p = new Survivor(m); scene.add(p.root); this.people.push(p); }
     // our soldiers in the field: the patrol (0-3), the recovery team (4-7) and the gate squad (8-11)
     this.soldiers = [];
     for (let k = 0; k < 12; k++) { const s = new Soldier(); scene.add(s.root); this.soldiers.push(s); }
