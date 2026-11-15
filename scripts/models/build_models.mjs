@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import * as THREE from 'three';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { load } from './load.mjs';
+import { makeRetargeter } from './retarget.mjs';
 
 import { Document, NodeIO } from '@gltf-transform/core';
 import { ALL_EXTENSIONS } from '@gltf-transform/extensions';
@@ -88,6 +89,8 @@ function fixNormals(g) {
   }
   return flipped;
 }
+
+const acc0 = (doc, buffer, arr, type) => doc.createAccessor().setArray(arr).setType(type).setBuffer(buffer);
 
 async function finish(doc, file, { ratio = 1, error = 0.001 } = {}) {
   await doc.transform(
@@ -420,7 +423,10 @@ async function sandbags() {
 // 30 parts with their own 2K texture sets; the rifle, mags and pouches are loose meshes.
 // Game: ONE skinned mesh, ONE material on a 2048 atlas (4 x 4 cells of 512), the rifle and
 // mags riding the right hand and the pouches the chest, ~15k triangles; metres, feet at y = 0.
-// The skeleton keeps Mixamo's bone names; the game poses it procedurally.
+// The skeleton keeps Mixamo's bone names. Clips: every source/soldier/soldier_*.fbx (Mixamo,
+// "Without Skin", made on the auto-rigged export_mixamo.mjs mesh) is retargeted onto this rig
+// (retarget.mjs) and stored as a glTF animation; the rifle rides its own 'Rifle' joint so the
+// game can sling it.
 async function soldier() {
   const D = path.join(SRC, 'soldier');
   const T = (f) => path.join(D, 'textures', f);
@@ -448,6 +454,8 @@ async function soldier() {
   const bones = [], boneIx = new Map();
   fbx.traverse((o) => { if (o.isBone && !boneIx.has(o.name)) { boneIx.set(o.name, bones.length); bones.push(o); } });
   const RHAND = boneIx.get('mixamorigRightHand'), CHEST = boneIx.get('mixamorigSpine2');
+  // the rifle and its mags ride a joint of their own under the right hand, so the game can sling it
+  const RIFLE = bones.length;
 
   const pos = [], nor = [], uvs = [], jnt = [], wts = [];
   const v = new THREE.Vector3(), n = new THREE.Vector3(), nm = new THREE.Matrix3();
@@ -463,7 +471,7 @@ async function soldier() {
     nm.getNormalMatrix(o.matrixWorld);
     // a skinned part's own bone indices -> the shared list
     const map = o.isSkinnedMesh ? o.skeleton.bones.map((b) => boneIx.get(b.name)) : null;
-    const rigidBone = /^pouch/.test(o.name) ? CHEST : RHAND;
+    const rigidBone = /^pouch/.test(o.name) ? CHEST : RIFLE;
     const cx = cell % N, cy = (cell / N) | 0;
     // skinned parts are stored in their rigging pose: bake the pose the scene is in (rifle
     // ready, which is where the loose rifle was modelled) by skinning every vertex here
@@ -502,7 +510,7 @@ async function soldier() {
   let minY = Infinity; for (let i = 1; i < pos.length; i += 3) minY = Math.min(minY, pos[i]);
   // the muzzle: the rifle's (flat-cell, right-hand) vertex furthest forward; the game hangs tracers on it
   let tip = null;
-  for (let i = 0, k = 0; i < pos.length; i += 3, k += 4) if (jnt[k] === RHAND && wts[k] === 1 && (!tip || pos[i + 2] > tip[2])) tip = [pos[i], pos[i + 1], pos[i + 2]];
+  for (let i = 0, k = 0; i < pos.length; i += 3, k += 4) if (jnt[k] === RIFLE && (!tip || pos[i + 2] > tip[2])) tip = [pos[i], pos[i + 1], pos[i + 2]];
   console.log('soldier muzzle (m, feet at 0):', tip.map((x, j) => (j === 1 ? x - minY : x).toFixed(3)).join(', '));
   for (let i = 1; i < pos.length; i += 3) pos[i] -= minY;
 
@@ -553,11 +561,42 @@ async function soldier() {
   });
   bones.forEach((b, i) => { const p = bones.indexOf(b.parent); (p >= 0 ? nodes[p] : root).addChild(nodes[i]); });
   const S = new THREE.Matrix4().makeScale(0.01, 0.01, 0.01), lift = new THREE.Matrix4().makeTranslation(0, -minY, 0);
-  const ibm = new Float32Array(bones.length * 16);
+  const rifleNode = doc.createNode('Rifle'); // at the hand, unrotated: it binds like the hand
+  nodes[RHAND].addChild(rifleNode);
+  const ibm = new Float32Array((bones.length + 1) * 16);
   bones.forEach((b, i) => new THREE.Matrix4().multiplyMatrices(lift, S).multiply(b.matrixWorld).invert().toArray(ibm, i * 16));
+  ibm.copyWithin(RIFLE * 16, RHAND * 16, RHAND * 16 + 16);
   const skin = doc.createSkin('soldier').setSkeleton(nodes[0])
     .setInverseBindMatrices(doc.createAccessor().setArray(ibm).setType('MAT4').setBuffer(buffer));
   for (const nd of nodes) skin.addJoint(nd);
+  skin.addJoint(rifleNode);
+
+  // animation clips from Mixamo (source/soldier/soldier_*.fbx), retargeted onto this rig
+  {
+    const first = []; fbx.traverse((o) => { if (o.isSkinnedMesh && o.skeleton.bones[0] === bones[0]) first.push(o); });
+    const sk = first[0].skeleton;
+    const short = (b) => b.name.replace('mixamorig', '');
+    const gameBones = {}, bind = {};
+    sk.bones.forEach((b, k) => { gameBones[short(b)] = b; bind[short(b)] = sk.boneInverses[k].clone().invert(); });
+    const retarget = makeRetargeter(gameBones, bind);
+    const nodeOf = Object.fromEntries(bones.map((b, i) => [short(b), nodes[i]]));
+    const files = fs.readdirSync(D).filter((f) => /^soldier_.+\.fbx$/.test(f)).sort();
+    for (const f of files) {
+      const name = f.replace(/^soldier_|\.fbx$/g, '');
+      const c = await retarget(path.join(D, f));
+      const anim = doc.createAnimation(name);
+      const input = acc0(doc, buffer, c.times, 'SCALAR');
+      for (const [b, v] of Object.entries(c.rot)) {
+        if (!nodeOf[b]) continue;
+        const smp = doc.createAnimationSampler().setInput(input).setOutput(acc0(doc, buffer, v, 'VEC4')).setInterpolation('LINEAR');
+        anim.addSampler(smp).addChannel(doc.createAnimationChannel().setTargetNode(nodeOf[b]).setTargetPath('rotation').setSampler(smp));
+      }
+      const hp = c.hips.slice(); for (let i = 1; i < hp.length; i += 3) hp[i] -= minY * 100;
+      const smp = doc.createAnimationSampler().setInput(input).setOutput(acc0(doc, buffer, hp, 'VEC3')).setInterpolation('LINEAR');
+      anim.addSampler(smp).addChannel(doc.createAnimationChannel().setTargetNode(nodeOf.Hips).setTargetPath('translation').setSampler(smp));
+      console.log(`  clip ${name}: ${c.duration.toFixed(2)} s, ${c.times.length} keys`);
+    }
+  }
 
   const mat = doc.createMaterial('soldier').setMetallicFactor(1).setRoughnessFactor(1)
     .setBaseColorTexture(tex(doc, 'soldier_color', await bake(colorAt, { r: 60, g: 60, b: 60 }, 84)))

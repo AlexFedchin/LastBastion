@@ -293,6 +293,7 @@ export class Environment {
       su.uFlashDir.value.copy(dir).setY(Math.max(0.3, dir.y)).normalize();
       if (this.onThunder) this.onThunder(1.2 + Math.random() * 3);
     }
+    if (this.roofMen) for (const s of this.roofMen) s.idle(); // the spotter and loader by the nest
     this.bolts.update(dt, time);
     if (this.flash > 0) {
       this.flash = Math.max(0, this.flash - dt * 2.6);

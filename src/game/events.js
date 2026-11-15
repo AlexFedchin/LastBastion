@@ -94,7 +94,7 @@ function soldierFire(g, u, dt, range = 32, every = [0.18, 0.4]) {
 
 /** Running (or, carrying, a heavy shuffle) pose for one step of the cycle. */
 function poseRun(f, ph, carry = false) {
-  if (f.isSoldier) { f.run(ph, carry); return; }
+  if (f.isSoldier) { f.run(ph / 2.1, carry); return; } // the phase runs at 2.1 rad per metre
   const s = Math.sin(ph), c = Math.cos(ph), a = carry ? 0.45 : 0.85;
   f.legL.pivot.rotation.x = s * a; f.legR.pivot.rotation.x = -s * a;
   f.legL.joint.rotation.x = -Math.max(0, c) * (carry ? 0.7 : 1.2) - 0.1; f.legR.joint.rotation.x = -Math.max(0, -c) * (carry ? 0.7 : 1.2) - 0.1;
@@ -188,7 +188,7 @@ class GateCover {
       const m = this.men[k], f = m.f;
       m.t += dt;
       if (m.state === 'down') {
-        f.fall(Math.min(1, m.t / 0.5));
+        f.die(m.t);
         continue;
       }
       if (m.state === 'gone') continue;
@@ -205,7 +205,7 @@ class GateCover {
           m.x += dx / d * st; m.z += dz / d * st;
           m.yaw = Math.atan2(dx, dz);
           m.ph += dt * P.speed * 2.1;
-          f.run(m.ph);
+          f.run(m.ph / 2.1);
         }
       }
       if (m.state === 'hold') {

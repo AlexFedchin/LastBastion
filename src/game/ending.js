@@ -172,7 +172,7 @@ export class Ending {
     // the gate squad, out on the road to bring them in
     this.guards = this.g.events.soldiers.slice(8, 12).map((s, i) => {
       const side = i % 2 ? 1 : -1, x = side * (i < 2 ? 4.2 : 6.6), z = GATE_Z - 2.5 - (i < 2 ? 0 : 1.2);
-      s.reset(); s.aim(-0.45);
+      s.reset(); s.idle();
       s.root.position.set(x, groundH(x, z), z);
       s.root.rotation.y = Math.PI + side * 0.55;
       s.root.visible = false;
@@ -199,10 +199,11 @@ export class Ending {
       if (w.z > ROAD_TO) { w.z -= ROAD_TO - ROAD_FROM; w.x = w.lane; }
       const f = w.f;
       w.ph += dt * w.sp * 3.1;
-      if (w.soldier) f.walk(w.ph); else walkPose(f, w.ph);
+      if (w.soldier) f.walk(w.ph / 3.1); else walkPose(f, w.ph); // 3.1 rad per metre
       f.root.position.set(w.x, groundH(w.x, w.z), w.z);
       f.root.rotation.y = (w.lane - w.x) * 0.15;
     }
+    for (const s of this.guards) if (s.root.visible) s.idle();
     const T = this.truck, M = this.g.events.truck;
     if (T.on) {
       T.z += T.sp * dt;

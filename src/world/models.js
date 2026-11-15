@@ -17,7 +17,7 @@ export const KIT = [
   'tyre', 'utility', 'welder',
 ];
 for (const k of KIT) FILES['kit/' + k] = `models/kit/${k}.glb`;
-const scenes = {};
+const scenes = {}, clips = {};
 let loading = null;
 
 /** Start loading every model; resolves when all are in. */
@@ -29,6 +29,7 @@ export function loadModels() {
     if (!r.ok) throw new Error(`model ${url}: ${r.status}`);
     const gltf = await loader.parseAsync(await r.arrayBuffer(), '');
     scenes[name] = gltf.scene;
+    clips[name] = gltf.animations || [];
   }));
   return loading;
 }
@@ -42,6 +43,9 @@ export function modelScene(name) {
   if (!scenes[name]) throw new Error(`model ${name} not loaded`);
   return scenes[name];
 }
+
+/** A loaded model's animation clips (the soldier's, retargeted from Mixamo). */
+export function modelClips(name) { return clips[name] || []; }
 
 /** A loaded model's mesh by node name (or its first mesh): for instancing its geometry and material. */
 export function modelMesh(name, node = null) {

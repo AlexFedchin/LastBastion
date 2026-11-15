@@ -26,7 +26,7 @@ import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { Loader } from './ui/loader.js';
 import { loadModels, modelMesh } from './world/models.js';
-import { setSoldierLamps } from './game/soldier.js';
+import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
 import { Ending } from './game/ending.js';
 
@@ -747,6 +747,7 @@ class Game {
     const paused = this.state === 'paused' || (this.state === 'night' && !this.input.locked && !TEST);
     const dt = paused ? 0 : rdt * this.timeScale;
     this.time += dt;
+    setSoldierClock(this.time);
     this.stateT += rdt;
     this.barkCd = Math.max(0, this.barkCd - rdt);
 

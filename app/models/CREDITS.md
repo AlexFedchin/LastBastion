@@ -31,7 +31,10 @@ meshopt-compressed.
   the rifle (now riding the right hand) and the pouches (the chest) into one skinned mesh with one
   material on a 2048 px atlas (texture sets resized to 512 px cells; the rifle is flat gunmetal),
   simplified to ~13k triangles. Loose rounds, spare magazines and the smoke card are dropped.
-  The game poses the Mixamo skeleton procedurally (src/game/soldier.js).
+  Animation: eleven clips from Adobe Mixamo (rifle run, walk, aiming idle, firing, three idles,
+  two deaths, box carry, kneeling work), made on an auto-rigged copy of this mesh and retargeted
+  onto its own skeleton at build time (scripts/models/retarget.mjs). Mixamo animations are
+  royalty-free for use in games. The rifle rides its own joint so it can be slung on the back.
 - **Grenade, Molotov**: re-scaled to life size (10.5 cm, 34 cm), textures to WebP.
 - **Ammo crate**: untextured source; scaled to 0.9 m and painted olive drab.
 - **Sandbags**: two piles, 1.6 m long, PBR set at 1024/512 px, DirectX normal map converted, ~6k triangles each.
