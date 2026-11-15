@@ -161,6 +161,45 @@ export function makeBlastSub(ctx) {
   return toBuffer(ctx, chans);
 }
 
+// ── explosions ─────────────────────────────────────────────────────────────
+/**
+ * The shock front of a shell burst: the instant, bright CRACK the stock booms (all body and
+ * roll) don't have. An N-wave-ish slam, a burst of torn air, a short chest thump under it,
+ * and the hiss of earth thrown up. Laid at the front of the boom.
+ */
+export function makeCrack(ctx, seed = 1) {
+  const sr = ctx.sampleRate, n = Math.floor(0.6 * sr);
+  const chans = [];
+  for (let c = 0; c < 2; c++) {
+    const R = rng(seed * 6007 + c * 17 + 5);
+    const out = new Float32Array(n);
+    let hp = 0, prev = 0, lt = 0, ld = 0, ph = 0;
+    const aT = lpA(900, sr), aD = lpA(3500, sr);
+    const f0 = 70 + R() * 20;
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      const w = R() * 2 - 1;
+      // torn air: high-passed noise, gone in a few tens of ms
+      hp = 0.97 * (hp + w - prev); prev = w;
+      const air = hp * Math.exp(-t / 0.018) * 1.4;
+      // the slam: a 2 ms positive spike and its rebound
+      const slam = t < 0.002 ? Math.sin(Math.PI * t / 0.002) * 1.6 : t < 0.006 ? -Math.sin(Math.PI * (t - 0.002) / 0.004) * 0.7 : 0;
+      // the thump through the ground, its pitch falling
+      ph += 2 * Math.PI * (f0 + 90 * Math.exp(-t / 0.02)) / sr;
+      const thump = Math.sin(ph) * Math.exp(-t / 0.07) * 1.1;
+      // mid crunch, then the earth thrown up hissing back down
+      lt += aT * (w - lt);
+      ld += aD * (w - ld);
+      const crunch = lt * 3.2 * Math.exp(-t / 0.05);
+      const dirt = ld * 0.5 * Math.exp(-t / 0.22) * (1 - Math.exp(-t / 0.03));
+      out[i] = slam + air + thump + crunch + dirt;
+    }
+    for (let i = 0; i < n; i++) out[i] = Math.tanh(out[i] * 1.3);
+    chans.push(normalize(out, 0.95));
+  }
+  return toBuffer(ctx, chans);
+}
+
 // ── engines ────────────────────────────────────────────────────────────────
 /** Four turboprops: blade-pass hum beating between engines, turbine whine, wash. */
 export function makeProp(ctx) {

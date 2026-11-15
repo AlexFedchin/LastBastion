@@ -13,13 +13,13 @@
 //  rises with the pressure on the wall and the tide brings in the drums.
 // ─────────────────────────────────────────────────────────────────────────────
 import { clamp, rand } from '../core/util.js';
-import { makePunch, makeSizzle, makeTick, makeBlastSub, makeProp, makeJet, makePower, makeGau, makeGauImpacts } from './synth.js';
+import { makePunch, makeSizzle, makeTick, makeBlastSub, makeCrack, makeProp, makeJet, makePower, makeGau, makeGauImpacts } from './synth.js';
 import { GUNSHIP } from '../config.js';
 
 // name -> [variants (0 = single file), decode rate]
 const SFX = {
   hmg: [4, 44100], hmg_tail: [2, 32000], hmg2: [4, 44100], hmg2_tail: [2, 32000], mg: [5, 32000], casing: [6, 44100],
-  boom: [5, 44100], boom_far: [3, 22050], boom_sub: [0, 22050], mortar: [3, 44100], incoming: [5, 32000],
+  boom: [5, 44100], boom_far: [3, 22050], boom_sub: [0, 22050], mortar: [3, 44100], incoming: [5, 32000], shell_in: [0, 44100],
   molotov: [4, 44100], molotov_light: [0, 44100], molotov_flight: [0, 32000], ignite: [0, 32000], burn: [12, 32000], flesh: [5, 32000], headshot: [3, 32000], gib: [4, 32000], bloater: [0, 32000],
   acid: [0, 32000], bodyfall: [0, 32000], groan: [27, 32000], brute: [5, 32000], shriek: [3, 32000],
   death: [4, 32000], thunder: [7, 22050], siren: [0, 32000], klaxon: [0, 32000], radio_in: [0, 22050],
@@ -254,7 +254,9 @@ export class AudioEngine {
     this.deafen.connect(this.comp);
     this.muffle = ctx.createBiquadFilter(); this.muffle.type = 'lowpass'; this.muffle.frequency.value = 20000; this.muffle.Q.value = 0.5;
     this.muffle.connect(this.deafen);
-    this.snap = ctx.createGain(); this.snap.gain.value = SNAP[this.musicMode] ?? 1;
+    // the world fades in at start-up rather than switching on mid-barrage
+    this.snap = ctx.createGain(); this.snap.gain.value = 0;
+    this.snap.gain.setTargetAtTime(SNAP[this.musicMode] ?? 1, ctx.currentTime + 0.4, 1.4);
     this.snap.connect(this.muffle);
     this.sfx = ctx.createGain(); this.sfx.gain.value = this.settings.sfx;
     this.sfx.connect(this.snap);
@@ -316,6 +318,7 @@ export class AudioEngine {
       this.B.sizzle = [makeSizzle(ctx)];
       this.B.tick = [1, 2, 3, 4, 5, 6].map((k) => makeTick(ctx, k));
       this.B.blast_sub = [makeBlastSub(ctx)];
+      this.B.crack = [1, 2, 3].map((k) => makeCrack(ctx, k));
       this.B.prop = [makeProp(ctx)];
       this.B.jet = [makeJet(ctx)];
       this.B.power_down = [makePower(ctx, false)];
@@ -626,9 +629,20 @@ export class AudioEngine {
     const dist = Math.sqrt(dx * dx + dz * dz);
     const g = Math.min(1.7, 0.7 + size * 0.45);
     const rate = rand(0.9, 1.06) / Math.sqrt(Math.max(0.6, size));
-    if (dist < 170) this.play(this.pickVar('boom'), { gain: 1.25 * g, rate, x, z, ref: 70, sos: true, reverb: 0.5, force: true });
+    const near = dist < 170;
+    // the shock front first: a hard, bright crack (dulled by distance), then the body of the blast
+    if (this.B.crack) {
+      const lp = clamp(20000 * Math.exp(-dist / 220), 1800, 20000);
+      this.play(this.pickVar('crack'), { gain: (near ? 0.9 : 0.45) * g, rate: rand(0.92, 1.08) / Math.sqrt(Math.max(0.8, size * 0.8)), x, z, ref: 55, sos: true, reverb: 0.3, lowpass: lp, force: true });
+    }
+    if (near) this.play(this.pickVar('boom'), { gain: 1.2 * g, rate, x, z, ref: 70, sos: true, reverb: 0.5, delay: 0.006, force: true });
     else this.play(this.pickVar('boom_far'), { gain: 1.3 * g, rate, x, z, ref: 90, sos: true, reverb: 0.6, force: true });
-    if (size >= 1.2) this.play(this.B.boom_sub[0], { gain: 0.9 * g, rate: rand(0.9, 1.1), x, z, ref: 90, sos: true, force: true });
+    if (size >= 1.2) this.play(this.B.boom_sub[0], { gain: 1.0 * g, rate: rand(0.9, 1.1), x, z, ref: 90, sos: true, force: true });
+    if (size >= 1.4) {
+      // shells: the valley throws it back, and the earth comes down again
+      this.play(this.pickVar('boom_far'), { gain: 0.4 * g, rate: rand(0.78, 0.86), x, z, ref: 120, sos: true, delay: rand(0.3, 0.45), reverb: 0.9, force: true });
+      if (dist < 140) for (let k = 0; k < 3; k++) this.play(this.pickVar('gib'), { x: x + rand(-6, 6), z: z + rand(-6, 6), ref: 40, gain: 0.16 * g, rate: rand(0.5, 0.7), sos: true, delay: rand(0.55, 1.5), force: true });
+    }
     if (dist < 60) this.duck(clamp(0.5 * size * (1 - dist / 60), 0, 0.6), 0.2, 0.7);
     if (dist < 24 && size >= 1.2) this.ringEars(clamp(1.2 - dist / 30, 0.4, 1));
   }
@@ -639,10 +653,11 @@ export class AudioEngine {
    * and is cut by the blast at the moment the blast reaches the ear (impact + distance / c).
    * flight: seconds until impact. Up to four at once, so a salvo stays readable.
    */
-  whistle(x, z, flight, { gain = 1, rate = rand(0.94, 1.06), ref = 180 } = {}) {
+  whistle(x, z, flight, { gain = 1, rate = rand(0.94, 1.06), ref = 180, clip = 'shell_in' } = {}) {
     if (!this.ready) return;
     if ((this._active.whistle || 0) >= 4) return;
-    const buf = this.pickVar('incoming');
+    const buf = this.pickVar(clip) || this.pickVar('incoming');
+    const own = clip === 'shell_in'; // the recording builds by itself: only a gentle swell on top
     if (!buf) return;
     const ctx = this.ctx;
     const dx = x - this.listenerX, dz = z - this.listenerZ, dist = Math.hypot(dx, dz);
@@ -661,7 +676,7 @@ export class AudioEngine {
     const g = ctx.createGain();
     const peak = 1.5 * gain / (1 + dist / ref);
     g.gain.setValueAtTime(0.0001, t0);
-    g.gain.linearRampToValueAtTime(peak * 0.22, t0 + Math.min(0.25, play * 0.2));
+    g.gain.linearRampToValueAtTime(peak * (own ? 0.6 : 0.22), t0 + Math.min(own ? 0.08 : 0.25, play * 0.2));
     g.gain.exponentialRampToValueAtTime(peak, t1 - 0.02);
     g.gain.linearRampToValueAtTime(0, t1);                 // the blast takes over
     const p = ctx.createStereoPanner();
@@ -750,7 +765,7 @@ export class AudioEngine {
   }
 
   /** Falling bomb: a long, deep shriek that ends on impact. */
-  bombWhistle(x, z, flight) { this.whistle(x, z, flight, { gain: 1.3, rate: 0.72, ref: 220 }); }
+  bombWhistle(x, z, flight) { this.whistle(x, z, flight, { gain: 1.3, rate: 0.72, ref: 220, clip: 'incoming' }); }
 
   /**
    * A whole GAU burst (take k): the BRRRT from the aircraft, and the rolling
@@ -1017,7 +1032,8 @@ export class AudioEngine {
     b.rain_near.set(0.12 * (1 - 0.65 * day), 2);
     b.wind.set(0.12 + 0.06 * this._gust, 1.5);
     b.wind_howl.set(0.13 * this._gust * this._gust * (0.4 + 0.6 * night), 1.5);
-    b.war.set(0.15 * (1 - 0.75 * day), 3);
+    // (the battle bed carries a distant aircraft drone: kept well back behind the menu)
+    b.war.set(0.15 * (1 - 0.75 * day) * (m === 'menu' ? 0.2 : 1), 3);
     b.horde_far.set(smooth(0, 70, alive) * 0.3, tc);
     b.horde_mid.set(smooth(40, 300, alive) * 0.26, tc);
     b.horde_near.set(inPlay ? clamp(p * 1.3 + alive / 1200, 0, 1) * 0.36 : 0, tc);

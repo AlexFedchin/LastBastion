@@ -273,7 +273,8 @@ def write_credits():
         m = meta.get(sid, {})
         lines.append(f'| [{m.get("title", sid)}]({m.get("url", "https://freesound.org/s/" + sid)}) | {m.get("user", "?")} | '
                      f'{", ".join(sorted(used[sid]))} |')
-    lines += ['', '"50cal.mp3" (the M2HB take-two report, hmg2) was recorded and supplied by the developer.']
+    lines += ['', '"50cal.mp3" (the M2HB take-two report, hmg2) and "incoming_shell.mp3" (the artillery shell coming in,',
+              'shell_in) were supplied by the developer.']
     lines += [''] + ['## Radio voice-over', '', 'Every radio line is performed by [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign)', '(Qwen team, Alibaba Cloud; 1.7B VoiceDesign model and 12 Hz tokenizer), released under the', '[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), each line directed from a written', 'character description and delivery note. Some takes were re-voiced onto one reference voice per', 'character with the voice-conversion model of [Chatterbox](https://github.com/resemble-ai/chatterbox)', '(Resemble AI, MIT). The takes were processed into radio transmissions for the game by', '`scripts/audio/build_voice.py`.']
     open(os.path.join(OUT, 'CREDITS.md'), 'w', encoding='utf8').write('\n'.join(lines) + '\n')
 
@@ -350,6 +351,11 @@ for k, (src, ss, t, rate) in enumerate([(398255, 0.0, 5.2, 1.0), (398255, 0.0, 5
                                         (438513, 10.25, 1.0, 1.0), (438513, 14.55, 1.0, 1.0)]):
     oneshot(f'sfx/incoming_{k + 1}', [dict(src=src, ss=ss, t=t, rate=rate, hp=120, fi=0.3 if t > 2 else 0.05, fo=0.03)],
             sr=32000, target=-14)
+
+# shell_in: an artillery shell arriving (supplied by the developer, scripts/audio/user/incoming_shell.mp3):
+# a deep rushing roar that builds to its peak at ~0.85 s and dies away. Cut just past the peak, so the
+# game lands the blast on the climax (the clip ends where the explosion reaches the ear).
+clip('sfx/shell_in', os.path.join(HERE, 'user', 'incoming_shell.mp3'), 0, 0.9, fi=0.02, fo=0.03, target=-14)
 
 # ── Molotov cocktails ───────────────────────────────────────────────────────
 # lighting the rag: a Zippo strike, then the soaked cloth catches

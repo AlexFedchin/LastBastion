@@ -145,7 +145,8 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [torturedscream](https://freesound.org/people/mr-str4nger.d4nger/sounds/863442/) | mr-str4nger.d4nger | burn |
 | [Anguished Zombie Moans 02](https://freesound.org/people/MalikArsYasakani/sounds/876576/) | MalikArsYasakani | burn |
 
-"50cal.mp3" (the M2HB take-two report, hmg2) was recorded and supplied by the developer.
+"50cal.mp3" (the M2HB take-two report, hmg2) and "incoming_shell.mp3" (the artillery shell coming in,
+shell_in) were supplied by the developer.
 
 ## Radio voice-over
 
