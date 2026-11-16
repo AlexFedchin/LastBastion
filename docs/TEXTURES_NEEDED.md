@@ -14,7 +14,7 @@ The list is in order of importance (screen time × how far the generated version
   - **OpenGL-style** normal map (green up)
   - roughness
   - optionally AO and height
-- **Size:** 2048² source is ideal (4096 is fine; I'll downscale). The game ships 512–2048 depending on the quality preset.
+- **Size:** each entry below gives a source resolution, what the game ships at each quality preset, and a minimum. Larger sources are always fine; I'll downscale. For comparison, the generated grass, rock and asphalt are only 512 px today.
 - **Format:** PNG / JPG / EXR / TIFF, anything. I'll convert to WebP.
 - **Real-world scale:** note how many metres one tile covers (e.g. "2 × 2 m"), so it lands at the right size.
 - **Licence:** CC0 or CC-BY, with the source noted for the credits.
@@ -34,6 +34,8 @@ The list is in order of importance (screen time × how far the generated version
 
 **Tile:** about 2–4 m.
 
+**Resolution:** source **2048²** (4096 welcome). Ships at 1024 on LOW, 2048 on MEDIUM+. This is the most-seen surface, from 2 m to 200 m; with a 3 m tile, 2048 gives about 680 px/m, sharp right at the foot of the wall. Minimum acceptable: 1024.
+
 ### 2. Grass / meadow turf
 
 **Replaces:** `makeTurfTextures`.
@@ -43,6 +45,8 @@ The list is in order of importance (screen time × how far the generated version
 **Need:** a patchy, late-autumn, flattened grass-and-soil ground texture: brownish-green, not lawn green.
 
 **Tile:** about 2–3 m.
+
+**Resolution:** source **2048²**. Ships at 1024 on LOW and MEDIUM, 2048 on HIGH+. Seen from about 15 m outwards, and mostly blended with the grass cards. Minimum: 1024.
 
 ### 3. Rock / cliff face
 
@@ -54,6 +58,8 @@ The list is in order of importance (screen time × how far the generated version
 
 **Tile:** about 3–5 m.
 
+**Resolution:** source **2048²**. Ships at 1024. The valley walls are 60–200 m from the gun, but boulders and the cliffs by the wings come closer, and it's sampled three times per pixel, so it should stay crisp at 1024. Minimum: 1024.
+
 ### 4. Cracked asphalt road
 
 **Replaces:** `makeAsphaltTextures`.
@@ -64,6 +70,8 @@ The list is in order of importance (screen time × how far the generated version
 
 **Tile:** about 3–4 m.
 
+**Resolution:** source **2048²**. Ships at 1024 on LOW, 2048 on MEDIUM+. The road starts about 10 m from the gun and runs straight away from it, so it's seen at grazing angles, where detail along the road matters. Minimum: 1024.
+
 ### 5. Dirt track / gravel
 
 **New** (the rear track and the yard lanes are tinted mud right now).
@@ -71,6 +79,8 @@ The list is in order of importance (screen time × how far the generated version
 **Need:** a rutted dirt or gravel farm track: compacted earth, gravel, tyre ruts.
 
 **Tile:** about 2–4 m.
+
+**Resolution:** source **1024²** (2048 welcome). Ships at 1024. Mostly seen from the air in cutscenes, plus the yard lanes in the landing-zone shots. Minimum: 512.
 
 ### 6. Farmland: ploughed soil and stubble
 
@@ -84,6 +94,8 @@ Both directional, with the furrows or rows running along one axis.
 
 **Tile:** about 3–5 m.
 
+**Resolution:** source **1024²** per variant (2048 welcome). Ships at 512 on LOW, 1024 on MEDIUM+. Only seen from 50 m or more, from the air. Minimum: 512.
+
 ### 7. Concrete: wall, viaduct, slabs
 
 **Replaces:** `makeConcreteTextures` and `makeSlabTextures`.
@@ -94,6 +106,8 @@ Both directional, with the furrows or rows running along one axis.
 
 **Tile:** about 2–3 m.
 
+**Resolution:** source **2048²**. Ships at 1024 on LOW, 2048 on MEDIUM+. The wall's walkway and parapet are 2–10 m from the gun all game; with a 2.5 m tile, 2048 gives about 800 px/m. The slab texture can be 1024. Minimum: 1024.
+
 ### 8. HESCO barrier: wire mesh and geotextile
 
 **Replaces:** `makeHescoTextures`.
@@ -103,6 +117,8 @@ Both directional, with the furrows or rows running along one axis.
 **Need:** a welded-wire grid over beige or olive geotextile fabric, dirty and torn in places. An alpha mask for the wire alone is a bonus.
 
 **Tile:** one barrier face (about 1 × 1 m).
+
+**Resolution:** source **1024²** for one roughly 1 × 1 m face (2048 welcome). Ships at 1024, which gives about 1000 px/m: the wire grid stays readable on the nearest blocks a few metres from the gun. Minimum: 512.
 
 ### 9. Painted and rusted metal
 
@@ -117,6 +133,8 @@ Both directional, with the furrows or rows running along one axis.
 
 **Tile:** about 1–2 m.
 
+**Resolution:** source **2048²** for the painted/rusted steel (the nest deck is right under the gun), **1024²** for the burnt and corrugated variants. Ships at 1024 on LOW, 2048 on HIGH+ for the main steel. Minimum: 1024 / 512.
+
 ### 10. Plaster / brick wall
 
 **Replaces:** `makePlasterTextures`.
@@ -126,6 +144,8 @@ Both directional, with the furrows or rows running along one axis.
 **Need:** old rendered plaster over brick, cracked, with bare brick showing through, soot-stained.
 
 **Tile:** about 2–3 m.
+
+**Resolution:** source **1024²**. Ships at 1024 on MEDIUM+ and 512 on LOW. The buildings are 100–600 m away, except the ruins in the field (about 60 m+). Minimum: 512.
 
 ### 11. Bark and weathered wood
 
@@ -137,6 +157,8 @@ Both directional, with the furrows or rows running along one axis.
 
 **Tile:** about 1 m.
 
+**Resolution:** source **1024²** for each of bark, charred bark and planks. Ships at 512 on LOW, 1024 on MEDIUM+. Poles, pallets and duckboards come within a few metres; the forests are far. Minimum: 512.
+
 ### 12. Burlap / canvas
 
 **Replaces:** `makeBurlapTexture`.
@@ -146,6 +168,8 @@ Both directional, with the furrows or rows running along one axis.
 **Need:** coarse woven burlap, and olive military canvas.
 
 **Tile:** about 0.5–1 m.
+
+**Resolution:** source **1024²** each (burlap, canvas). Ships at 1024. The sandbags round the nest are within 1–2 m of the camera; with a 0.75 m tile, 1024 gives about 1360 px/m. Minimum: 512.
 
 ---
 
@@ -165,6 +189,8 @@ Both directional, with the furrows or rows running along one axis.
 
 Something like an 8 × 8 grid of 128–256 px frames each. Grey-on-black for smoke (I tint it), additive-friendly for fire.
 
+**Resolution:** each sheet **2048²** as an 8 × 8 grid of **256 px** frames (64 frames). Ships at 2048 (1024 sheets of 128 px frames on LOW). For the explosion fireball, a **4096²** sheet of 512 px frames is welcome, since it fills the screen; I'll downscale it for lower presets. Minimum: 128 px frames.
+
 ### 14. Ground decals
 
 **Replaces:** `makeDecalAtlas`.
@@ -173,6 +199,8 @@ Something like an 8 × 8 grid of 128–256 px frames each. Grey-on-black for smo
 
 **Need:** an atlas (or separate PNGs with alpha) of 4–8 blood splatters, 3–4 scorch and burn marks, and a few bullet-hole or chip decals for concrete and metal.
 
+**Resolution:** each decal **512²**, or one **2048²** atlas holding 16 of them (4 × 4 cells of 512). Ships as a 2048 atlas on MEDIUM+, 1024 on LOW. Blood at the wall is seen from 3–20 m, so 512 per decal covers a splat of about 2 m sharply. Minimum: 256 per decal.
+
 ### 15. Grass and weed clumps
 
 **Replaces:** `makeGrassBladeTexture`.
@@ -180,6 +208,8 @@ Something like an 8 × 8 grid of 128–256 px frames each. Grey-on-black for smo
 **Where:** the grass cards scattered over the field near the wall.
 
 **Need:** alpha-cutout textures of tall dry grass, weeds and nettle clumps, 2–4 variants on one sheet, roots at the bottom edge.
+
+**Resolution:** a **1024²** sheet holding 2–4 clumps (about 512 × 1024 or 512 × 512 per clump), with alpha. Ships at 1024 (512 on LOW). Cards are under a metre tall and seen from 14 m outwards. Minimum: 512 sheet.
 
 ---
 
