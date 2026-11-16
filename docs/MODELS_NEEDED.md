@@ -39,7 +39,39 @@ Everything below is still built from boxes, cylinders and cones in code. The lis
 
 **Note:** this is the biggest visual upgrade, but also the biggest engineering job. The renderer has to move from shader-posed parts to baked skinned animation.
 
-## 2. Heavy-lift tandem-rotor transport helicopter (CH-47 class)
+## 2. The central tower (the bastion's bunker, your gun position)
+
+**Where:** the heart of the base. You sit on its roof behind the M2 all game. It is the centre of the gun view's foreground and of almost every cutscene shot: overrun, bombers, ramp, liftoff, flyaway and the ending's crane.
+
+**Now:** a single concrete box with:
+- a stepped blast plinth and two buttresses
+- a roof parapet
+- two firing-slit frames on the front
+- a ladder down the back
+
+It uses one tiled concrete material.
+
+**Need:** a fortified reinforced-concrete bunker or blockhouse tower:
+- weathered, rain-stained and scarred by fire and bullets, with exposed rebar here and there
+- firing slits (embrasures) in the front face
+- a flat roof that serves as the gun position: walkable, with a low parapet
+
+Nice to have:
+- blast plinth or buttresses at the base
+- a steel door at the back
+- an external ladder or stairs up to the roof
+- vents, cable runs and drainage stains
+
+The roof stays mostly clear: the nest deck, the sandbag ring, the shelter, crates and the crew are placed on it by the game.
+
+**Fixed dimensions** (the gun camera, the nest and the roof dressing are placed relative to them; a model that differs will be scaled or adapted to fit):
+- footprint about 16.5 m wide (along the wall) × 9 m deep
+- roof deck 11.6 m above the ground
+- the front face is flush with the wall line, and the wall wings join its two front corners at a 29° sweep back
+
+**Budget:** about 20–50k triangles. It is seen from metres away (from the roof) up to a few hundred metres (from the air), so a high-resolution or trim-sheet concrete texture matters more than polygons.
+
+## 3. Heavy-lift tandem-rotor transport helicopter (CH-47 class)
 
 **Where:** the extraction cutscene. Three of them fly in over the hills, land in the yard, lower their ramps and take the garrison out. They fill the frame in the landing-zone, run, ramp and liftoff shots.
 
@@ -53,7 +85,7 @@ Everything below is still built from boxes, cylinders and cones in code. The lis
 
 **Budget:** about 40–60k triangles.
 
-## 3. Attack helicopter (Apache / Cobra / Mi-24 class)
+## 4. Attack helicopter (Apache / Cobra / Mi-24 class)
 
 **Where:** the extraction cutscene. Two gunships sweep the field with searchlights; the "helos" shot follows the lead one from close behind.
 
@@ -67,7 +99,7 @@ Everything below is still built from boxes, cylinders and cones in code. The lis
 
 **Budget:** about 30–50k triangles.
 
-## 4. Military cargo truck (M35 / Ural / KrAZ class)
+## 5. Military cargo truck (M35 / Ural / KrAZ class)
 
 **Where:**
 - parked in the yard
@@ -83,7 +115,7 @@ Everything below is still built from boxes, cylinders and cones in code. The lis
 
 **Budget:** about 15–30k triangles per variant.
 
-## 5. Wrecked civilian cars
+## 6. Wrecked civilian cars
 
 **Where:** about 16 abandoned cars along the road through the killing field, plus a few on the rear road. Visible from the gun all game.
 
@@ -97,7 +129,7 @@ Everything below is still built from boxes, cylinders and cones in code. The lis
 
 **Budget:** about 5–15k triangles each.
 
-## 6. Trees and vegetation set
+## 7. Trees and vegetation set
 
 **Where:**
 - forests on every hill around the valley
@@ -118,7 +150,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 500–2,000 triangles per tree, alpha-cut foliage cards are fine. Bushes about 200–800.
 
-## 7. Wrecked main battle tank
+## 8. Wrecked main battle tank
 
 **Where:** a burnt tank out on the killing field, in plain view from the gun.
 
@@ -128,7 +160,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 20–40k triangles.
 
-## 8. Crashed helicopter wreck
+## 9. Crashed helicopter wreck
 
 **Where:** a downed helicopter lying in the field.
 
@@ -138,7 +170,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 15–30k triangles.
 
-## 9. Rural buildings set
+## 10. Rural buildings set
 
 **Where:**
 - the dead village and church on the far hills
@@ -156,7 +188,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 5–20k triangles each. They're seen from 100–600 m away, so silhouette and texture matter more than detail.
 
-## 10. Shipping container (20 ft)
+## 11. Shipping container (20 ft)
 
 **Where:** a stack of them in the yard, plus single ones by the walls. Seen in the yard and cutscene shots.
 
@@ -166,7 +198,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 2–5k triangles.
 
-## 11. HESCO / defensive barrier unit
+## 12. HESCO / defensive barrier unit
 
 **Where:** the wall itself, the thing you defend all game.
 
@@ -180,7 +212,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 1–4k triangles per unit.
 
-## 12. Military tents
+## 13. Military tents
 
 **Where:** five tents in the yard, with lit doorways. Seen in the yard, landing-zone and run shots.
 
@@ -190,7 +222,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 3–8k triangles.
 
-## 13. Guard / searchlight tower
+## 14. Guard / searchlight tower
 
 **Where:** the two searchlight towers at the wing ends, which carry the sweeping beams.
 
@@ -200,7 +232,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 5–15k triangles.
 
-## 14. Utility poles and power pylon
+## 15. Utility poles and power pylon
 
 **Where:**
 - telephone poles along the field road and the new rear track
@@ -212,7 +244,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** pole about 300–1,000 triangles, pylon about 2–6k.
 
-## 15. Portable toilets and water tank
+## 16. Portable toilets and water tank
 
 **Where:** the yard's latrine row and the water tanks.
 
@@ -222,7 +254,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 1–3k triangles each.
 
-## 16. Aircraft bomb
+## 17. Aircraft bomb
 
 **Where:** the B-36's falling bomb sticks in the bombing-run shot.
 
@@ -232,7 +264,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 1–2k triangles.
 
-## 17. Round hay bale
+## 18. Round hay bale
 
 **Where:** the stubble fields behind the base, seen from the air in the extraction flyaway.
 
