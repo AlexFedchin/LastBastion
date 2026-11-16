@@ -23,6 +23,7 @@ import { buildFortification, buildTowers, buildBase, buildLightPools, updateWall
 import { buildProps } from './props.js';
 import { buildDressing } from './dressing.js';
 import { buildFar } from './far.js';
+import { buildRear } from './rear.js';
 import { buildSky, buildEnvMap, buildRain, buildSplashes, Bolts, BEAM_VERT, BEAM_FRAG } from './sky.js';
 import { PF } from './textures.js';
 
@@ -99,6 +100,7 @@ export class Environment {
     buildDressing(this, wingMatrix);
     buildProps(this);
     buildFar(this);
+    buildRear(this);
     buildLightPools(this);
     buildRain(this);
     buildSplashes(this);

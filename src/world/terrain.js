@@ -48,6 +48,73 @@ export function trenchZ(x) {
 }
 export const NAPALM_OFFSET = 9;
 
+// ── behind the base: farmland in a broad valley, wooded hills either side ───
+/** x of the rear valley's axis at depth z (straight out of the yard, then winding). */
+export function rearValleyX(z) {
+  return S(80, 320, z) * (45 * Math.sin(z * 0.0055 + 0.4) - 10);
+}
+/** x of the dirt track that leaves the yard and runs back down the rear valley. */
+export function rearRoadX(z) {
+  return rearValleyX(z) + S(40, 160, z) * 15 * Math.sin(z * 0.02);
+}
+/** Half-width of the rear valley floor at depth z. */
+function rearValleyW(z) {
+  return 78 + Math.max(0, z - 70) * 0.16 + (fbm(z * 0.01, 3.3, 2) - 0.5) * 40;
+}
+/** The patchwork of fields on the rear valley floor: a rotated grid of plots. */
+export const FIELD = { a: 0.32, w: 54, d: 36 };
+const FC = Math.cos(FIELD.a), FS = Math.sin(FIELD.a);
+/** Field coordinates (in plot units) of a world point. */
+export function fieldCoords(x, z, out = [0, 0]) {
+  out[0] = (FC * x - FS * z) / FIELD.w; out[1] = (FS * x + FC * z) / FIELD.d;
+  return out;
+}
+/** World point of field coordinates. */
+export function fieldToWorld(u, v, out = [0, 0]) {
+  const fx = u * FIELD.w, fz = v * FIELD.d;
+  out[0] = FC * fx + FS * fz; out[1] = -FS * fx + FC * fz;
+  return out;
+}
+/** What a plot is used for: 0 ploughed, 1 stubble, 2 meadow, 3 fallow (same hash as the shader). */
+export function fieldKind(iu, iv) {
+  const h = fieldHash(iu + 3.7, iv + 3.7);
+  return h < 0.3 ? 0 : h < 0.55 ? 1 : h < 0.85 ? 2 : 3;
+}
+// the shader's tHash, in JS (float32-faithful enough for a plot id)
+function fract(v) { return v - Math.floor(v); }
+export function fieldHash(px, py) {
+  px = fract(px * 443.897); py = fract(py * 441.423);
+  const d = px * (py + 19.19) + py * (px + 19.19);
+  px += d; py += d;
+  return fract((px + py) * px);
+}
+/** Height of the land behind the base (0 in the yard and on the landing zone). */
+function rearLand(x, z) {
+  if (z < 20) return 0;
+  const Rh = S(20, 130, z), Rf = S(72, 150, z);
+  const dx = x - rearValleyX(z);
+  const adx = Math.abs(dx);
+  const side = Math.max(0, adx - rearValleyW(z));
+  // hills: rounded, ridged, rising out of the valley floor
+  let hill = 0;
+  if (side > 0) {
+    const n = fbm(x * 0.0045 + 21, z * 0.0045 - 4, 4);
+    const ridged = 1 - Math.abs(vnoise(x * 0.011 + 7, z * 0.011) * 2 - 1);
+    hill = (1 - Math.exp(-side / 70)) * (34 + 74 * n) + side * 0.06 + ridged * Math.min(side, 90) * 0.17
+      + (vnoise(x * 0.05, z * 0.05) - 0.5) * 2.2 * S(0, 30, side);
+  }
+  // the floor: gentle swells, the odd knoll off to the side, falling away from the base
+  let floor = (fbm(x * 0.009 + 9, z * 0.009, 3) - 0.5) * 9 - 5 * S(90, 500, z);
+  floor += Math.max(0, vnoise(x * 0.006 + 50, z * 0.006) - 0.6) * 55 * S(30, 70, adx) * S(160, 260, z);
+  let detail = (vnoise(x * 0.045 + 3, z * 0.045) - 0.5) * 1.3 + (vnoise(x * 0.16, z * 0.16) - 0.5) * 0.25;
+  // the track: fine detail smoothed away, a shallow ditch each side
+  const rd = Math.abs(x - rearRoadX(z));
+  const onRoad = S(5.5, 3.2, rd) * S(26, 40, z);
+  detail *= 1 - onRoad * 0.85;
+  floor += -0.4 * Math.exp(-Math.pow((rd - 4.6) / 0.9, 2)) * S(30, 60, z);
+  return Rf * (floor + detail) + Rh * hill * (1 - onRoad);
+}
+
 // craters: placed once, deterministic
 const CRATERS = [];
 const CGRID = new Map();
@@ -127,21 +194,31 @@ export function heightParts(x, z, out = _parts) {
   let h = base * (1 - road * 0.55) + crater * (1 - road * 0.55) + trench * (1 - road * 0.7) + road * 0.04;
 
   // cliffs continuing the wall line beyond the wings
-  if (ax > 74) {
-    const k = S(78, 98, ax) * S(14, -10, wd);
-    if (k > 0) h += k * (16 + fbm(x * 0.03, z * 0.03, 3) * 14);
+  // (behind the base they die away into the rear hills)
+  const rearFade = 1 - S(20, 130, z);
+  if (ax > 74 && rearFade > 0) {
+    const k = S(78, 98, ax) * S(14, -10, wd) * rearFade;
+    if (k > 0) {
+      const spur = 1 - Math.abs(vnoise(x * 0.05 + 8.5, z * 0.05 + 2.5) * 2 - 1);
+      h += k * (16 + fbm(x * 0.03, z * 0.03, 3) * 14 + (spur - 0.5) * 7 + (fbm(x * 0.09 + 4, z * 0.09, 2) - 0.5) * 5);
+    }
   }
   // valley walls
   const side = ax - valleyEdge(z);
-  if (side > -12) {
+  if (side > -12 && rearFade > 0) {
     const s = Math.max(0, side + 12);
     const n = fbm(x * 0.012 + 5, z * 0.012, 4);
     const ridged = 1 - Math.abs(vnoise(x * 0.02, z * 0.02) * 2 - 1);
-    h += (44 * (1 - Math.exp(-s / 55)) + s * 0.1) * (0.65 + n * 0.7) + ridged * Math.min(s, 50) * 0.12;
+    let wh = (44 * (1 - Math.exp(-s / 55)) + s * 0.1) * (0.65 + n * 0.7) + ridged * Math.min(s, 50) * 0.12;
+    // break the face up: gullies and spurs down it, rough ground, soft strata steps
+    const rug = Math.min(s, 40) / 40;
+    const spur = 1 - Math.abs(vnoise(x * 0.034 + 2.5, z * 0.034 - 1.5) * 2 - 1);
+    wh += rug * ((spur - 0.55) * 9 + (fbm(x * 0.055 + 1, z * 0.055 + 2, 3) - 0.5) * 7);
+    wh -= Math.sin(wh * 0.9) * 0.9 * rug;
+    h += wh * rearFade;
   }
-  // hills behind the base
-  const rear = S(45, 260, z);
-  if (rear > 0) h += rear * (fbm(x * 0.0042 + 20, z * 0.0042, 4) * 80 - 8) * (0.5 + 0.5 * S(0, 300, ax));
+  // the country behind the base
+  h += rearLand(x, z);
   // far hills & the city plain
   const far = S(-360, -640, z);
   if (far > 0) {
@@ -271,6 +348,8 @@ float tNoise(vec2 p){
 }
 float tS(float a, float b, float v){ float t = clamp((v - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
 float roadXg(float z){ return -52.0 * tS(-110.0, -470.0, z) + 96.0 * tS(-540.0, -930.0, z); }
+float rearValleyXg(float z){ return tS(80.0, 320.0, z) * (45.0 * sin(z * 0.0055 + 0.4) - 10.0); }
+float rearRoadXg(float z){ return rearValleyXg(z) + tS(40.0, 160.0, z) * 15.0 * sin(z * 0.02); }
 // Anti-tiling (after Inigo Quilez, "texture repetition" #3): a low-frequency
 // noise picks between eight randomly offset copies of the texture and blends
 // neighbouring copies, so no two patches of ground repeat.
@@ -356,9 +435,9 @@ export class Terrain {
       xs[i] = Math.sign(u) * (230 * a + 1500 * a * a * a);
     }
     // behind the base (coarse) then the valley (dense near the wall)
-    const REAR = 40;
+    const REAR = q.texSize >= 1024 ? 130 : 110;
     const zList = [];
-    for (let j = 0; j < REAR; j++) { const t = j / REAR; zList.push(900 - 830 * (1 - Math.pow(1 - t, 1.8))); }
+    for (let j = 0; j < REAR; j++) { const t = j / REAR; zList.push(70 + 830 * Math.pow(1 - t, 1.7)); }
     for (let j = 0; j <= NZ; j++) { const v = j / NZ; zList.push(70 - (400 * v + 1330 * v * v * v)); }
     const zs = Float32Array.from(zList);
     NZ = zs.length - 1;
@@ -442,7 +521,7 @@ ${T_COMMON}
   // (weights are zero over most of the field, and a zero-weight mix changes nothing)
   vec3 gX3 = dFdx(tw), gY3 = dFdy(tw);
   vec2 gX = gX3.xz, gY = gY3.xz;
-  bool hasTurf = tGrass > 0.002, hasRoad = tRoad > 0.002, hasRock = tRock > 0.002;
+  bool hasTurf = tGrass > 0.002 || tw.z > 40.0, hasRoad = tRoad > 0.002, hasRock = tRock > 0.002;
   NT ntMud = ntSetup(tw.xz / 9.0);
   NT ntTurf, ntAsph, ntRock;
   vec3 mudC = ntSample(tMudA, ntMud).rgb * 0.7 + texture2D(tMudA, tw.xz / 41.0 + 0.37).rgb * 0.3;
@@ -470,8 +549,56 @@ ${T_COMMON}
     float paint = (1.0 - tS(0.07, 0.12, abs(tw.x - roadXg(tw.z)))) * step(0.45, fract(along / 7.0)) * tS(0.35, 0.6, tNoise(tw.xz * 0.9));
     asphC = mix(asphC, vec3(0.32, 0.29, 0.2), paint * 0.7);
   }
+  // ── behind the base: a patchwork of fields on the valley floor, a dirt track ──
+  float rz = tS(40.0, 95.0, tw.z);
+  float rRoad = 0.0, rRut = 0.0, fieldW = 0.0, fKind = 0.0, hedge = 0.0;
+  vec3 fieldC = vec3(0.0);
+  if (rz > 0.0) {
+    float rrd = abs(tw.x - rearRoadXg(tw.z));
+    rRoad = tS(3.9 + tNoise(tw.xz * 0.3) * 0.9, 2.6, rrd) * tS(24.0, 34.0, tw.z);
+    rRut = exp(-pow((rrd - 0.95) / 0.28, 2.0)) * rRoad;
+    // plots: a rotated grid, each one ploughed, stubble, meadow or fallow
+    vec2 fr = vec2(${Math.cos(0.32).toFixed(6)} * tw.x - ${Math.sin(0.32).toFixed(6)} * tw.z, ${Math.sin(0.32).toFixed(6)} * tw.x + ${Math.cos(0.32).toFixed(6)} * tw.z);
+    vec2 fc = fr / vec2(54.0, 36.0);
+    vec2 fid = floor(fc), ff = fract(fc);
+    float fh = tHash(fid + 3.7);
+    fKind = fh < 0.3 ? 0.0 : fh < 0.55 ? 1.0 : fh < 0.85 ? 2.0 : 3.0;
+    float edge = min(min(ff.x, 1.0 - ff.x) * 54.0, min(ff.y, 1.0 - ff.y) * 36.0);
+    fieldW = rz * tS(0.09, 0.035, slope) * tS(16.0, 7.0, tw.y) * tS(70.0, 110.0, tw.z) * (1.0 - tS(2.2, 6.5, -(rrd - 9.0)));
+    float wob = tNoise(tw.xz * 0.21) - 0.5;
+    hedge = tS(2.6, 1.0, edge + wob * 1.6) * fieldW;
+    float tone = 0.85 + 0.3 * tHash(fid + 9.1);
+    if (fKind < 0.5) {
+      // ploughed: dark turned earth in furrows along the plot
+      float fur = 0.5 + 0.5 * sin(fr.x * 3.1 + wob * 0.6);
+      fieldC = mudC * mix(0.55, 0.95, fur) * vec3(0.95, 0.88, 0.8) * tone;
+    } else if (fKind < 1.5) {
+      // stubble: pale, combed in rows
+      float row = 0.5 + 0.5 * sin(fr.y * 4.4);
+      fieldC = vec3(0.25, 0.21, 0.135) * mix(0.75, 1.05, row) * (0.8 + 0.4 * tNoise(tw.xz * 0.6)) * tone;
+    } else if (fKind < 2.5) {
+      fieldC = mix(mudC, turfC + vec3(0.02, 0.025, 0.0), 0.85) * tone;
+    } else {
+      fieldC = mix(mudC * 0.9, turfC * 0.8, tS(0.35, 0.65, tNoise(tw.xz * 0.09))) * tone;
+    }
+  }
+  if (rz > 0.0) {
+    // meadow grass over the hills, thinning on the steep bits
+    float rg = clamp((macro - 0.22) * 2.2, 0.0, 1.0) * (1.0 - tS(0.25, 0.45, slope)) * rz;
+    tGrass = mix(tGrass, max(tGrass, rg), rz) * (1.0 - rRoad);
+    tTrample *= 1.0 - rz;
+  }
   vec3 tcol = mudC;
   tcol = mix(tcol, turfC, tGrass);
+  if (rz > 0.0) {
+    tcol = mix(tcol, fieldC, fieldW * (1.0 - rRoad));
+    tcol = mix(tcol, turfC * vec3(0.55, 0.6, 0.45), hedge * 0.85);
+    // the track: wet packed mud, two darker ruts, a grassy crown
+    vec3 trackC = mudC * vec3(0.82, 0.78, 0.72);
+    trackC = mix(trackC, mudC * 0.45, rRut / max(rRoad, 1e-3) * 0.8);
+    trackC = mix(trackC, turfC * 0.7, exp(-pow(abs(tw.x - rearRoadXg(tw.z)) / 0.35, 2.0)) * 0.6);
+    tcol = mix(tcol, trackC, rRoad);
+  }
   tcol = mix(tcol, asphC, tRoad);
   tcol = mix(tcol, rockC * vec3(0.95, 0.93, 0.9), tRock);
   tcol *= 0.72 + 0.56 * macro;
@@ -490,6 +617,7 @@ ${T_COMMON}
   roughnessFactor = max(roughnessFactor, 0.55) * mix(1.0, 0.86, uRain);
   roughnessFactor = mix(roughnessFactor, 0.35, tWet * 0.6);
   roughnessFactor = mix(roughnessFactor, 0.035, puddle);
+  roughnessFactor = mix(roughnessFactor, 0.4, rRut * 0.7);
 `)
         .replace('vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;', /* glsl */`
   vec3 nMud = ntSample(normalMap, ntMud).xyz * 2.0 - 1.0;

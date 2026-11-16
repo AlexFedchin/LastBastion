@@ -69,30 +69,44 @@ void main(){
   gl_FragColor = vec4(col, a * (1.0 - vFog * 0.5));
 }`;
 
+/** A layered conifer (pivot at the root). */
+export function makeConiferGeo() {
+  return merge([
+    cylY(0.25, 4, 5, 0, 2, 0),
+    xf(new THREE.ConeGeometry(2.6, 5.5, 7), 0, 4.6, 0),
+    xf(new THREE.ConeGeometry(2.0, 4.8, 7), 0, 7.2, 0, 0, 0.5),
+    xf(new THREE.ConeGeometry(1.3, 4.0, 7), 0, 9.8, 0, 0, 1.0),
+  ]);
+}
+/** A burnt pine: a bare pole and a few snapped limbs. */
+export function makeDeadPineGeo() {
+  return merge([
+    xf(new THREE.CylinderGeometry(0.12, 0.35, 12, 5), 0, 6, 0),
+    box(2.2, 0.12, 0.12, 0.6, 7, 0, 0, 0.3, 0.2), box(1.8, 0.1, 0.1, -0.4, 8.6, 0, 0, 1.9, -0.25),
+    box(1.4, 0.1, 0.1, 0.3, 10, 0, 0, 3.6, 0.3), box(2.4, 0.12, 0.12, -0.5, 5.6, 0, 0, 4.4, -0.15),
+  ]);
+}
+let _pineMat = null;
+export function makePineMat() {
+  return _pineMat || (_pineMat = weather(new THREE.MeshStandardMaterial({ color: 0x1b2318, roughness: 0.95, flatShading: true }), { soot: 0.6, key: 'pine' }));
+}
+
 export function buildFar(env) {
   const { scene, mats, fire } = env;
   const q = env.quality;
   const rng = makeRng(9090);
 
   // ── forests on the hills ────────────────────────────────────────────────
-  const conifer = merge([
-    cylY(0.25, 4, 5, 0, 2, 0),
-    xf(new THREE.ConeGeometry(2.6, 5.5, 7), 0, 4.6, 0),
-    xf(new THREE.ConeGeometry(2.0, 4.8, 7), 0, 7.2, 0, 0, 0.5),
-    xf(new THREE.ConeGeometry(1.3, 4.0, 7), 0, 9.8, 0, 0, 1.0),
-  ]);
-  const deadPine = merge([
-    xf(new THREE.CylinderGeometry(0.12, 0.35, 12, 5), 0, 6, 0),
-    box(2.2, 0.12, 0.12, 0.6, 7, 0, 0, 0.3, 0.2), box(1.8, 0.1, 0.1, -0.4, 8.6, 0, 0, 1.9, -0.25),
-    box(1.4, 0.1, 0.1, 0.3, 10, 0, 0, 3.6, 0.3), box(2.4, 0.12, 0.12, -0.5, 5.6, 0, 0, 4.4, -0.15),
-  ]);
-  const pineMat = weather(new THREE.MeshStandardMaterial({ color: 0x1b2318, roughness: 0.95, flatShading: true }), { soot: 0.6, key: 'pine' });
+  const conifer = makeConiferGeo();
+  const deadPine = makeDeadPineGeo();
+  const pineMat = makePineMat();
   const NT = q.texSize >= 1024 ? 5200 : 2600;
   const cMs = [], dMs = [];
   let tries = 0;
   while (cMs.length + dMs.length < NT && tries < NT * 12) {
     tries++;
     const x = (rng() - 0.5) * 2900, z = rng() < 0.16 ? 90 + rng() * 700 : -150 - rng() * 1400;
+    if (z > 0) continue; // the country behind the base is dressed in rear.js
     const inField = Math.abs(x) < valleyEdge(z) + 8 && z > -430;
     if (inField) continue;
     if (z < -930 && Math.abs(x) < 820) continue; // the city
