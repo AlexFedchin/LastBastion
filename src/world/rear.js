@@ -203,14 +203,16 @@ export function buildRear(env) {
       ruin.position.set(cx, heightFn(cx, cz) - 0.1, cz); ruin.rotation.y = ry;
       scene.add(ruin);
     } else {
-      const [hg, rg] = makeHouseGeo(9, 7, 5.5, 3);
-      place(hg, 0, 0); houses.push(hg);
-      place(rg, 0, 0); roofs.push(rg);
+      // the farmhouse (app/models/house.glb: 12 x 9.7 m, its long front on +z)
+      const h = new THREE.Object3D();
+      h.position.set(cx, heightFn(cx, cz) - 0.25, cz); h.rotation.y = ry;
+      placeModel(env, 'house', h);
       if (lit) {
-        const win = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 1.1), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.2, 0.45) }));
-        const c = Math.cos(ry), s = Math.sin(ry);
-        const x = cx + s * 3.55, zz = cz + c * 3.55;
-        win.position.set(x, heightFn(cx, cz) + 2.0, zz); win.rotation.y = ry;
+        // one window glowing on the front: someone is still in there
+        const win = new THREE.Mesh(new THREE.PlaneGeometry(0.85, 1.05), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.2, 0.45) }));
+        const c = Math.cos(ry), s = Math.sin(ry), dx = 2.2, dz = 4.4;
+        const x = cx + c * dx + s * dz, zz = cz - s * dx + c * dz;
+        win.position.set(x, heightFn(cx, cz) + 1.55, zz); win.rotation.y = ry;
         win.id = seed;
         scene.add(win);
         env.flickerWindows.push(win);

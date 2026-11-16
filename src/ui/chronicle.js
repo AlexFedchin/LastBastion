@@ -71,7 +71,7 @@ export class Chronicle {
     this.done = true;
   }
 
-  /** Show and narrate a story. onDone runs once, when the player moves on (or it times out). */
+  /** Show and narrate a story. onDone runs once, when the player clicks on after the last line. */
   play(story, onDone) {
     this.story = story;
     this.onDone = onDone;
@@ -81,6 +81,7 @@ export class Chronicle {
     this.t = 0;
     this.next = 1.4; // let the card settle before the first words
     this.endT = -1;
+    this.waiting = false;
     $('chr-kicker').textContent = `BASTION-7 · THE CHRONICLE · DAY ${story.night}`;
     $('chr-night').textContent = `NIGHT ${String(story.night).padStart(2, '0')}`;
     $('chr-title').textContent = story.title;
@@ -105,23 +106,33 @@ export class Chronicle {
       this.next = this.t + (spoken > 0 ? spoken + 0.6 : 1.2 + words / 2.6);
       if (this.i === L.length - 1) this.endT = this.next;
     }
-    if (this.endT >= 0 && this.t >= this.endT) {
-      $('chr-next').classList.add('on');
-      if (this.t >= this.endT + 9) this.finish(); // nobody at the keyboard: carry on
-    }
+    if (this.endT >= 0 && this.t >= this.endT && !this.waiting) this.prompt();
   }
 
-  /** Click / Space: first reveal everything, then move on. */
+  /** Every line is on the page: wait for the reader to click on. */
+  prompt() {
+    this.waiting = true;
+    this.waitFrom = this.t;
+    $('chr-next').textContent = 'CLICK OR PRESS SPACE TO CONTINUE ▸';
+    $('chr-next').classList.add('on');
+  }
+
+  /**
+   * Click / Space. While the story is being told, the first press shows the rest of it at
+   * once (and stops the narrator); the screen then waits for one more press to move on.
+   * Presses closer than a moment apart count once, so a double-click can't skip it all.
+   */
   advance() {
     if (!this.active) return;
-    if (this.endT < 0 || this.t < this.endT) {
+    if (!this.waiting) {
       this.g.audio.stopVoice();
       this.story.lines.forEach((_, k) => { const el = $('chr-l' + k); el.classList.add('on'); if (k < this.story.lines.length - 1) el.classList.add('past'); });
       this.i = this.story.lines.length - 1;
       this.endT = this.t;
-      $('chr-next').classList.add('on');
+      this.prompt();
       return;
     }
+    if (this.t - this.waitFrom < 0.35) return;
     this.finish();
   }
 

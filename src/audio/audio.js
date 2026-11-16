@@ -906,6 +906,7 @@ export class AudioEngine {
     src.start(ctx.currentTime + delay);
     src.onended = () => { try { p.disconnect(); } catch { /* noop */ } if (this._voice === src) this._voice = null; };
     this._voice = src;
+    this._voiceEnd = ctx.currentTime + delay + buf.duration;
     // pull the score and the ambience back a little under the voice
     const t = ctx.currentTime;
     this.musicDuck.gain.cancelScheduledValues(t);
@@ -930,12 +931,19 @@ export class AudioEngine {
     src.onended = () => { try { src.disconnect(); } catch { /* noop */ } if (this._voice === src) this._voice = null; };
     this._voice = src;
     const t = ctx.currentTime, end = t + delay + buf.duration;
+    this._voiceEnd = end;
     for (const [g, lvl] of [[this.musicDuck.gain, 0.42], [this.ambDuck.gain, 0.55]]) {
       g.cancelScheduledValues(t);
       g.setTargetAtTime(lvl, t, 0.25);
       g.setTargetAtTime(1, end + 0.4, 1.2);
     }
     return buf.duration + delay;
+  }
+
+  /** Seconds left of the voice now speaking (radio or narrator), 0 if none. */
+  voiceLeft() {
+    if (!this._voice || !this.ready) return 0;
+    return Math.max(0, (this._voiceEnd || 0) - this.ctx.currentTime);
   }
 
   stopVoice() {

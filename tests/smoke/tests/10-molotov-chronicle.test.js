@@ -44,7 +44,9 @@ module.exports = {
     await t.js(`__LB.events.log = [{ kind: 'fog', phase: 'start', data: {} }, { kind: 'fog', phase: 'end', data: {} }]`);
     for (let k = 0; k < 60 && (await t.get('__LB.state')) === 'night'; k++) await t.js('__LB.horde.clearLiving(); __LB.director.t = 1e4; __LB.test.advance(1, 1/30, false)');
     t.eq(await t.get('__LB.state'), 'dawn', 'night 2 ends at dawn');
-    await t.advance(7);
+    // the chronicle comes up over the dawn (once any radio line still being spoken has ended)
+    for (let k = 0; k < 25 && !(await t.get('__LB.chronicle.active')); k++) await t.advance(1);
+    await t.advance(2); // and the narrator starts
     const c = await t.get(`({ screen: __LB.screens.current, title: document.getElementById('chr-title').textContent,
       lines: [...document.querySelectorAll('#chr-body p')].map((p) => p.textContent), on: document.querySelectorAll('#chr-body p.on').length })`);
     t.log(JSON.stringify(c));
@@ -58,6 +60,9 @@ module.exports = {
     // Space: everything at once; Space again: on to the resupply
     await t.js(`document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' }))`);
     t.eq(await t.get(`document.querySelectorAll('#chr-body p.on').length`), c.lines.length, 'skipping shows the whole story');
+    // ...and then it waits: no timeout, no second press -> still on the chronicle, the prompt up
+    await t.js(`for (let k = 0; k < 40; k++) __LB.chronicle.update(0.5)`);
+    t.eq(await t.get(`[__LB.screens.current, __LB.chronicle.active, document.getElementById('chr-next').classList.contains('on')]`), ['chronicle', true, true], 'it waits for a second press');
     await t.js(`document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Space' })); __LB.test.advance(5, 1/30, false)`);
     t.eq(await t.get('__LB.state'), 'shop', 'then the resupply opens');
     t.assert(await t.get(`document.querySelector('#shop-report .chron h3').textContent === 'THE FOG'`), 'the resupply keeps the story');

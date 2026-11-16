@@ -29,6 +29,7 @@ import { loadModels, modelMesh } from './world/models.js';
 import { loadTextures } from './world/texlib.js';
 import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
+import { DevTools } from './ui/devtools.js';
 import { Ending } from './game/ending.js';
 import { obstacles } from './world/obstacles.js';
 import { ExtractionHold, ExtractionScene } from './game/extraction.js';
@@ -123,6 +124,7 @@ class Game {
     this.hud = new HUD();
     this.screens = new Screens(this);
     this.chronicle = new Chronicle(this);
+    this.dev = new DevTools(this);
     this.ending = new Ending(this);
     this.extraction = new ExtractionScene(this);
     this.input = new Input(canvas);
@@ -351,7 +353,7 @@ class Game {
     document.getElementById('s-click').addEventListener('click', () => { this.audio.init(); this.input.lock(); });
     document.addEventListener('keydown', (e) => {
       this.audio.init();
-      if (this.chronicle.active && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.chronicle.advance(); return; }
+      if (this.chronicle.active && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { if (!e.repeat) this.chronicle.advance(); return; }
       if (this.state === 'ending' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.ending.skipPress(); return; }
       if (this.state === 'extraction' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.extraction.skipPress(); return; }
       if (e.code === 'Escape') {
@@ -415,6 +417,7 @@ class Game {
         this.screens.show(this.prevScreen || 'menu');
         break;
       case 'back': this.screens.show(this.state === 'paused' ? 'pause' : (this.prevScreen && this.prevScreen !== 'howto' && this.prevScreen !== 'settings' ? this.prevScreen : 'menu')); break;
+      case 'dev': this.dev.toggle(true); break;
       case 'quit': window.bastion?.quit(); break;
       case 'resume': this.resume(); break;
       case 'abandon': this.abandonNight(); break;
@@ -423,7 +426,7 @@ class Game {
       case 'buy-mines': this.buyMines(); break;
       case 'begin': this.beginNightFromShop(); break;
       case 'shop-menu': writeSave(this.run); this.enterMenu(); break;
-      case 'retry': { const s = loadSave(); if (s) this.deploy(s, () => this.startRun(s)); break; }
+      case 'retry': { const s = this.run && this.run.dev ? this.devSave : loadSave(); if (s) this.deploy(s, () => this.startRun(s)); break; }
       case 'menu': this.enterMenu(); break;
       case 'endless': this.run.endless = true; writeSave(this.run); this.audio.setMusicMode('dawn'); this.openShop(); break;
       case 'ending-skip': if (this.state === 'extraction') this.extraction.skipPress(); else this.ending.skipPress(); break;
@@ -663,7 +666,7 @@ class Game {
     run.atShop = true;
     writeSave(run);
     // endless: every dawn past the seventy-second hour counts toward the record
-    if (run.endless && survived > FINAL_NIGHT) this.newRecord = recordBest(survived - FINAL_NIGHT, run.kills, run.difficulty) || this.newRecord;
+    if (run.endless && !run.dev && survived > FINAL_NIGHT) this.newRecord = recordBest(survived - FINAL_NIGHT, run.kills, run.difficulty) || this.newRecord;
     this.telemetry.endNight('survived');
     return survived;
   }
@@ -686,6 +689,7 @@ class Game {
     });
     run.chronicle = { night: this.story.night, title: this.story.title, lines: this.story.lines };
     this.chronicleStarted = false;
+    this.voiceUntil = null;
     const survived = this.settleNight();
     this.hud.announce('DAWN', `NIGHT ${String(survived).padStart(2, '0')} SURVIVED · ${run.survivors} ALIVE`, 5);
     this.hud.radio(CALL.kovac, pick(BARKS.dawn), true);
@@ -1066,7 +1070,14 @@ class Game {
     this.audio.intensity = 0;
     this.audio.pressure = 0;
     // once the light is coming up, the chronicle of the night is told over it
-    if (!this.chronicleStarted && this.story && this.stateT > 5.5) {
+    // (no new radio lines once the light comes; the chronicle waits for the one still being
+    // spoken to end, rather than cutting it off mid-word: that was the stutter at dawn)
+    if (this.stateT > 3) {
+      this.hud.radioQueue.length = 0;
+      // (measured once, then counted in game time like everything else in the dawn)
+      if (this.voiceUntil == null) this.voiceUntil = this.stateT + this.audio.voiceLeft();
+    }
+    if (!this.chronicleStarted && this.story && this.stateT > Math.max(5.5, Math.min(20, (this.voiceUntil ?? 0) + 0.6))) {
       this.chronicleStarted = true;
       this.hud.show(false);
       this.hud.radioQueue.length = 0;
@@ -1074,7 +1085,7 @@ class Game {
     }
     if (this.chronicle.active) this.chronicle.update(rdt);
     else this.hud.update(rdt, this);
-    if (this.stateT > 11 && !this.chronicle.active) {
+    if (this.stateT > 11 && !this.chronicle.active && (this.chronicleStarted || !this.story)) {
       if (this.victory) this.playEnding();
       else this.openShop();
     }

@@ -387,7 +387,7 @@ class SupplyDrop {
     const E = this.E;
     const x = rand(-34, 34);
     this.tx = x; this.tz = offsetZ(x, rand(55, 85));
-    this.phase = 'inbound'; this.t = 0; this.integrity = 100; this.hurtSaid = false;
+    this.phase = 'inbound'; this.t = 0; this.integrity = 100; this.hurtSaid = false; this.broken = false;
     // the C-130 comes in from behind the wall, low, across the drop zone
     const p = E.c130;
     p.group.visible = true;
@@ -403,7 +403,49 @@ class SupplyDrop {
 
   friendlies() {
     if (this.phase !== 'carry' || !this.crate) return [];
-    return [{ x: this.crate.x, z: this.crate.z }];
+    return this.team.filter((u) => u.state !== 'down').map((u) => ({ x: u.x, z: u.z }));
+  }
+
+  /** The team opens the load: the crates, the straps and the pallet tumble apart where it stood. */
+  breakCrate() {
+    const E = this.E, c = this.crate, g = E.g;
+    E.crate.visible = false;
+    E.crate.updateMatrixWorld(true);
+    for (const p of E.crateParts) {
+      p.m.position.copy(p.home).applyMatrix4(E.crate.matrixWorld);
+      p.m.rotation.set(p.rot.x, p.rot.y + c.yaw, p.rot.z);
+      const out = p.m.position.clone().sub(E.crate.position); out.y = 0;
+      if (out.lengthSq() < 1e-4) out.set(R() - 0.5, 0, R() - 0.5);
+      out.normalize();
+      p.v.set(out.x * rand(0.6, 1.8), rand(0.8, 2.2), out.z * rand(0.6, 1.8));
+      p.w.set(rand(-4, 4), rand(-2, 2), rand(-4, 4));
+      p.rest = false;
+      p.m.visible = true;
+    }
+    g.fx.groundHit(c.x, c.z, false);
+    g.audio.giantStep(c.x, c.z, 0.12);
+    this.broken = true;
+  }
+
+  /** The loose parts fall, tumble and settle on the ground. */
+  updateParts(dt) {
+    for (const p of this.E.crateParts) {
+      if (p.rest || !p.m.visible) continue;
+      const m = p.m;
+      p.v.y -= 9.8 * dt;
+      m.position.addScaledVector(p.v, dt);
+      m.rotation.x += p.w.x * dt; m.rotation.y += p.w.y * dt; m.rotation.z += p.w.z * dt;
+      const gy = groundH(m.position.x, m.position.z) + 0.12;
+      if (m.position.y < gy) {
+        m.position.y = gy;
+        if (Math.abs(p.v.y) < 1.2) {
+          // settle flat on whichever face it landed on
+          p.rest = true;
+          const q = (a) => Math.round(a / (Math.PI / 2)) * (Math.PI / 2);
+          m.rotation.x = q(m.rotation.x); m.rotation.z = q(m.rotation.z);
+        } else { p.v.y *= -0.3; p.v.x *= 0.5; p.v.z *= 0.5; p.w.multiplyScalar(0.5); }
+      }
+    }
   }
 
   /** The recovery team comes out of the gate. */
@@ -506,6 +548,7 @@ class SupplyDrop {
         if (this.integrity <= 0) return this.finish(false);
       }
     }
+    if (this.broken) { this.updateParts(dt); return false; }
     // crate + strobe
     E.crate.position.set(c.x, c.y, c.z);
     if ((this.t % 0.9) < dt) {
@@ -520,16 +563,14 @@ class SupplyDrop {
     const E = this.E, g = E.g, h = g.horde, fx = g.fx, P = this.P, c = this.crate;
     if (!this.team.length) return null;
     const up = this.team.filter((u) => u.state !== 'down');
-    // carrying: the crate rides between the men, as fast as the men left can move it
+    // carrying: each man with a crate in his arms; c is the middle of the group, walking home
     if (this.phase === 'carry') {
       let dx = GATE.x - c.x, dz = GATE.z - c.z;
       const d = Math.hypot(dx, dz) || 1;
       dx /= d; dz /= d;
-      const sp = P.carrySpeed[Math.min(up.length, TEAM)];
+      const sp = P.carrySpeed[TEAM];
       walkStep(c, dx * sp, dz * sp, dt, 1.4);
-      c.y = groundH(c.x, c.z) + 0.75 + Math.abs(Math.sin(this.t * 4.5)) * 0.04;
       c.yaw = Math.atan2(dx, dz);
-      E.crate.rotation.y = c.yaw;
       if (c.z > GATE.z - 0.6 && Math.abs(c.x) < 6) return this.finish(true);
     }
     for (const u of this.team) {
@@ -545,13 +586,13 @@ class SupplyDrop {
         gx = c.x + Math.cos(a) * r; gz = c.z + Math.sin(a) * r;
         if (this.phase === 'rig') sp = 2;
       } else {
-        // the first two still standing carry; the others walk point and the flank
+        // two by two, a crate each
         const idx = up.indexOf(u);
         const fx_ = Math.sin(c.yaw), fz_ = Math.cos(c.yaw);
-        const [side, ahead] = [[-0.95, 0], [0.95, 0], [0, 2.6], [1.8, -1.6]][idx];
+        const [side, ahead] = [[-0.9, 0.9], [0.9, 0.9], [-0.9, -1.1], [0.9, -1.1]][idx];
         gx = c.x + fz_ * side + fx_ * ahead; gz = c.z - fx_ * side + fz_ * ahead;
         sp = 4;
-        u.carrying = idx < 2;
+        u.carrying = true;
       }
       const dx = gx - u.x, dz = gz - u.z, dd = Math.hypot(dx, dz);
       const moving = dd > 0.25;
@@ -562,7 +603,7 @@ class SupplyDrop {
         u.ph += dt * Math.min(sp, 2 + dd * 4) * 2.1;
       } else if (this.phase === 'carry') {
         u.yaw = c.yaw;
-        u.ph += dt * P.carrySpeed[Math.min(up.length, TEAM)] * 2.1;
+        u.ph += dt * P.carrySpeed[TEAM] * 2.1;
       } else {
         // at the crate: face it and work the straps
         u.yaw = Math.atan2(c.x - u.x, c.z - u.z);
@@ -572,6 +613,7 @@ class SupplyDrop {
       // caught
       if (u.t > 1 && h.queryRadius(u.x, u.z, P.catchR * f.root.scale.x, h._q) > 0) {
         u.state = 'down'; u.t = 0; u.carrying = false; this.lost++;
+        this.dropLoad(u);
         g.audio.scream2(u.x, u.z);
         fx.headshot(u.x, groundH(u.x, u.z) + 1.3, u.z, 0, 0.3, 1);
         fx.blood(u.x, u.z, 1.4);
@@ -587,6 +629,7 @@ class SupplyDrop {
       f.root.rotation.y = u.yaw;
       if (moving || this.phase === 'carry') poseRun(f, u.ph, u.carrying);
       else f.work(u.t); // bent over the crate
+      this.placeLoad(u);
       fx.glowDot(u.x, groundH(u.x, u.z) + 1.72 * f.root.scale.x, u.z, 0.32, 0.4, 5, 0.8, 0.05);
     }
     if (this.phase === 'out' && up.every((u) => Math.hypot(u.x - c.x, u.z - c.z) < 2)) {
@@ -595,9 +638,32 @@ class SupplyDrop {
     } else if (this.phase === 'rig' && (this.rigT -= dt) <= 0) {
       this.phase = 'carry';
       c.yaw = Math.atan2(GATE.x - c.x, GATE.z - c.z);
-      g.hud.alert('THEY HAVE THE CRATE — BRING THEM HOME');
+      this.breakCrate();
+      g.hud.alert('THEY HAVE THE CRATES — BRING THEM HOME');
     }
     return null;
+  }
+
+  /** A carrying man's crate, held between his hands. */
+  placeLoad(u) {
+    const m = this.E.loads[u.slot];
+    if (!u.carrying) { m.visible = false; return; }
+    const f = u.f;
+    f.root.updateMatrixWorld(true);
+    const l = f.bones.LeftHand, r = f.bones.RightHand;
+    l.getWorldPosition(_v); r.getWorldPosition(_w3);
+    m.position.addVectors(_v, _w3).multiplyScalar(0.5);
+    m.position.y -= 0.16 * f.root.scale.x;
+    m.rotation.set(0, u.yaw, 0);
+    m.visible = true;
+  }
+
+  /** A man goes down: his crate falls where he stood. */
+  dropLoad(u) {
+    const m = this.E.loads[u.slot];
+    if (!m.visible) return;
+    m.position.y = groundH(m.position.x, m.position.z);
+    m.rotation.set(0, m.rotation.y + rand(-0.6, 0.6), rand(-0.2, 0.2));
   }
 
   finish(ok) {
@@ -605,7 +671,7 @@ class SupplyDrop {
     E.report('drop', 'end', { recovered: ok, integrity: Math.max(0, Math.round(this.integrity)), pulled: this.track.size, teamLost: this.lost });
     for (let i = 0; i < h.n; i++) if (this.track.has(h.id[i])) h.resetLane(i);
     E.crate.visible = false; E.chute.visible = false;
-    for (const u of this.team) if (u.state !== 'down') u.f.root.visible = false;
+    for (const u of this.team) if (u.state !== 'down') { u.f.root.visible = false; E.loads[u.slot].visible = false; }
     if (ok) {
       // green smoke: recovered
       for (let k = 0; k < 12; k++) g.fx.smoke.spawn(c.x, c.y, c.z, rand(-1, 1), rand(1.5, 3), rand(-1, 1), rand(4, 7), 1, 6, PF.SMOKE + ((R() * 4) | 0), 0.05, 0.3, 0.08, 0.7, 0.02, 0.06, 0.02, -0.2, 0.4);
@@ -631,6 +697,8 @@ class SupplyDrop {
   end() {
     const E = this.E;
     E.crate.visible = false; E.chute.visible = false;
+    for (const m of E.loads) m.visible = false;
+    for (const p of E.crateParts) p.m.visible = false;
     E.crate.rotation.set(0, 0, 0);
     if (this.plane) { if (this.plane.loop) this.plane.loop.stop(1); this.plane = null; }
     E.c130.group.visible = false;
@@ -1213,7 +1281,7 @@ class GunshipDown {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-const _v = new THREE.Vector3();
+const _v = new THREE.Vector3(), _w3 = new THREE.Vector3();
 
 export class NightEvents {
   constructor(game) {
@@ -1250,6 +1318,22 @@ export class NightEvents {
     lamp.position.y = 0.62; this.crate.add(lamp);
     this.crate.visible = false;
     scene.add(this.crate);
+    // the same load as loose parts: when the team breaks it open, it falls apart where it lies
+    this.crateParts = [];
+    for (const o of [...this.crate.children]) {
+      const m = o.clone(true);
+      m.visible = false;
+      scene.add(m);
+      this.crateParts.push({ m, home: o.position.clone(), rot: o.rotation.clone(), v: new THREE.Vector3(), w: new THREE.Vector3(), rest: false });
+    }
+    // and what each man carries home: a weapons crate in his arms
+    this.loads = Array.from({ length: 4 }, () => {
+      const m = cloneModel('mcrate');
+      m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+      m.visible = false;
+      scene.add(m);
+      return m;
+    });
     this.chute = new THREE.Group();
     const canopy = new THREE.Mesh(new THREE.SphereGeometry(4.2, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2.4),
       new THREE.MeshStandardMaterial({ color: 0x6f6c56, roughness: 0.95, side: THREE.DoubleSide }));

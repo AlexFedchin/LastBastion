@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { makeRng, lerp } from '../core/util.js';
 import { groundH, groundNormal, heightFn, roadX, valleyEdge, vnoise } from './terrain.js';
 import { box, cylY, merge, xf, worldUV, makeHouseGeo, makePylonGeo, sagWire, weather } from './kit.js';
+import { placeModel } from './vehicles.js';
 import { FOG_CUSTOM_GLSL, fogUniforms } from '../render/atmosphere.js';
 
 const _m = new THREE.Matrix4();
@@ -139,18 +140,19 @@ export function buildFar(env) {
       const a = r() * 6.28, d = Math.sqrt(r()) * 60;
       const x = cx + Math.cos(a) * d, z = cz + Math.sin(a) * d * 0.7;
       const w = 6 + r() * 5, dd = 5 + r() * 4, h = 3 + r() * 3;
-      const [g1, roof] = makeHouseGeo(w, dd, h, 2 + r() * 1.5);
+      r(); // (was the roof's pitch: keeps the village where it was)
       const ry = r() * 6.28;
       const y = groundH(x, z) - 0.5;
-      for (const [g, list] of [[g1, houseParts], [roof, roofParts]]) {
-        if (list === roofParts && r() < 0.3) continue; // roof burnt away
-        g.rotateY(ry); g.translate(x, y, z);
-        list.push(g);
-      }
+      // the house model, sized by the plot; some have lost their roofs to the fires
+      const burnt = r() < 0.3;
+      const o = new THREE.Object3D();
+      o.position.set(x, y + 0.25, z); o.rotation.y = ry; o.scale.setScalar(0.7 + (w - 6) / 5 * 0.3);
+      placeModel(env, 'house', o, burnt ? { skip: 'roof' } : undefined);
       if (r() < 0.22) fire.add(x, y + h * 0.6, z, w * 0.7, h * 1.6, 3.2, { smoke: 0, glow: false, fogScale: 0.75 });
       if (r() < 0.08) {
         const win = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 1.1), new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 1.2, 0.45) }));
-        win.position.set(x + Math.sin(ry) * (dd / 2 + 0.05), y + 1.8, z + Math.cos(ry) * (dd / 2 + 0.05));
+        const k = 0.7 + (w - 6) / 5 * 0.3;
+        win.position.set(x + Math.sin(ry) * 4.4 * k, y + 0.25 + 1.55 * k, z + Math.cos(ry) * 4.4 * k);
         win.rotation.y = ry;
         scene.add(win);
         env.flickerWindows.push(win);

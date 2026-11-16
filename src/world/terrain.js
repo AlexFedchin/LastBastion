@@ -541,21 +541,34 @@ ${T_COMMON}
   bool hasTurf = tGrass > 0.002 || tw.z > 40.0, hasRoad = tRoad > 0.002, hasRock = tRock > 0.002;
   NT ntMud = ntSetup(tw.xz / ${f(TS.mud)});
   NT ntTurf, ntAsph, ntRock;
-  vec3 mudC = ntSample(tMudA, ntMud).rgb * ${mud.file ? '0.85' : '0.7'} + texture2D(tMudA, tw.xz / ${f(TS.mudMacro)} + 0.37).rgb * ${mud.file ? '0.15' : '0.3'};
+  // the macro layer is anti-tiled too (seen from the air it was the one that repeated), and
+  // with distance the detail hands over to a coarser copy so no tile size can show in a wide view
+  NT ntMacro = ntSetup(tw.xz / ${f(TS.mudMacro)} + 0.37);
+  vec3 mudC = ntSample(tMudA, ntMud).rgb * ${mud.file ? '0.85' : '0.7'} + ntSample(tMudA, ntMacro).rgb * ${mud.file ? '0.15' : '0.3'};
+  float farK = tS(45.0, 220.0, distC);
+  if (farK > 0.0) {
+    NT ntFar = ntSetupD(tw.xz / ${f(TS.mud * 5.3)} + 63.0, gX / ${f(TS.mud * 5.3)}, gY / ${f(TS.mud * 5.3)});
+    mudC = mix(mudC, ntSample(tMudA, ntFar).rgb * ${mud.file ? '0.85' : '0.7'} + ntSample(tMudA, ntMacro).rgb * ${mud.file ? '0.15' : '0.3'}, farK * 0.7);
+  }
   // large-scale tonal drift so the field never reads as one flat material
   mudC *= 0.8 + 0.4 * tNoise(tw.xz * 0.013 + 7.0);
   vec3 turfC = vec3(0.0);
   if (hasTurf) {
     ntTurf = ntSetupD(tw.xz / ${f(TS.turf)} + 31.0, gX / ${f(TS.turf)}, gY / ${f(TS.turf)});
-    turfC = ntSample(tTurfA, ntTurf).rgb * mix(0.36, 0.6, tNoise(tw.xz * 0.11));
+    turfC = ntSample(tTurfA, ntTurf).rgb;
+    if (farK > 0.0) {
+      NT ntTurfFar = ntSetupD(tw.xz / ${f(TS.turf * 5.3)} + 77.0, gX / ${f(TS.turf * 5.3)}, gY / ${f(TS.turf * 5.3)});
+      turfC = mix(turfC, ntSample(tTurfA, ntTurfFar).rgb, farK * 0.7);
+    }
+    turfC *= mix(0.36, 0.6, tNoise(tw.xz * 0.11));
   }
   vec3 rockC = vec3(0.0);
   if (hasRock) {
     ntRock = ntSetupD(tw.xz / ${f(TS.rock)} + 5.0, gX / ${f(TS.rock)}, gY / ${f(TS.rock)});
     vec3 bw = pow(abs(tn), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
-    rockC = textureGrad(tRockA, tw.zy / ${f(TS.rock)}, gX3.zy / ${f(TS.rock)}, gY3.zy / ${f(TS.rock)}).rgb * bw.x
-          + ntSample(tRockA, ntRock).rgb * bw.y
-          + textureGrad(tRockA, tw.xy / ${f(TS.rock)}, gX3.xy / ${f(TS.rock)}, gY3.xy / ${f(TS.rock)}).rgb * bw.z;
+    NT ntRx = ntSetupD(tw.zy / ${f(TS.rock)} + 13.0, gX3.zy / ${f(TS.rock)}, gY3.zy / ${f(TS.rock)});
+    NT ntRz = ntSetupD(tw.xy / ${f(TS.rock)} - 29.0, gX3.xy / ${f(TS.rock)}, gY3.xy / ${f(TS.rock)});
+    rockC = ntSample(tRockA, ntRx).rgb * bw.x + ntSample(tRockA, ntRock).rgb * bw.y + ntSample(tRockA, ntRz).rgb * bw.z;
   }
   vec3 asphC = vec3(0.0);
   if (hasRoad) {
@@ -589,7 +602,9 @@ ${T_COMMON}
       // ploughed: dark turned earth in furrows along the plot
       float fur = 0.5 + 0.5 * sin(fr.x * 3.1 + wob * 0.6);
       vec2 pu = fr / ${f(TS.plough)};
-      vec3 pc = textureGrad(tPloughA, pu, vec2(dot(gX, vec2(${Math.cos(0.32).toFixed(5)}, -${Math.sin(0.32).toFixed(5)})), dot(gX, vec2(${Math.sin(0.32).toFixed(5)}, ${Math.cos(0.32).toFixed(5)}))) / ${f(TS.plough)}, vec2(dot(gY, vec2(${Math.cos(0.32).toFixed(5)}, -${Math.sin(0.32).toFixed(5)})), dot(gY, vec2(${Math.sin(0.32).toFixed(5)}, ${Math.cos(0.32).toFixed(5)}))) / ${f(TS.plough)}).rgb;
+      vec2 pgx = vec2(dot(gX, vec2(0.94924, -0.31457)), dot(gX, vec2(0.31457, 0.94924))) / ${f(TS.plough)};
+      vec2 pgy = vec2(dot(gY, vec2(0.94924, -0.31457)), dot(gY, vec2(0.31457, 0.94924))) / ${f(TS.plough)};
+      vec3 pc = ntSample(tPloughA, ntSetupD(pu, pgx, pgy)).rgb;
       fieldC = ${fileTex('plough') ? 'pc * mix(0.85, 1.0, fur)' : 'mudC * mix(0.55, 0.95, fur) * vec3(0.95, 0.88, 0.8)'} * tone;
     } else if (fKind < 1.5) {
       // stubble: pale, combed in rows
@@ -613,7 +628,7 @@ ${T_COMMON}
     tcol = mix(tcol, fieldC, fieldW * (1.0 - rRoad));
     tcol = mix(tcol, turfC * vec3(0.55, 0.6, 0.45), hedge * 0.85);
     // the track: wet packed mud, two darker ruts, a grassy crown
-    vec3 trackC = ${fileTex('track') ? `textureGrad(tTrackA, tw.xz / ${f(TS.track)}, gX / ${f(TS.track)}, gY / ${f(TS.track)}).rgb` : 'mudC * vec3(0.82, 0.78, 0.72)'};
+    vec3 trackC = ${fileTex('track') ? `ntSample(tTrackA, ntSetupD(tw.xz / ${f(TS.track)} + 5.0, gX / ${f(TS.track)}, gY / ${f(TS.track)})).rgb` : 'mudC * vec3(0.82, 0.78, 0.72)'};
     trackC = mix(trackC, mudC * 0.45, rRut / max(rRoad, 1e-3) * 0.8);
     trackC = mix(trackC, turfC * 0.7, exp(-pow(abs(tw.x - rearRoadXg(tw.z)) / 0.35, 2.0)) * 0.6);
     tcol = mix(tcol, trackC, rRoad);
@@ -621,6 +636,8 @@ ${T_COMMON}
   tcol = mix(tcol, asphC, tRoad);
   tcol = mix(tcol, rockC * vec3(0.95, 0.93, 0.9), tRock);
   tcol *= 0.72 + 0.56 * macro;
+  // a broad wash of light and dark over hundreds of metres, for the wide shots from the air
+  tcol *= 0.84 + 0.32 * tNoise(tw.xz * 0.0023 + 1.3);
   tcol *= mix(1.0, 0.22, tBurn);
   tcol *= mix(1.0, 0.55, tTrample * (1.0 - tRoad));
   float puddle = tS(0.5, 0.72, tWet + (tNoise(tw.xz * 0.55) - 0.5) * 0.18) * (1.0 - tRock);

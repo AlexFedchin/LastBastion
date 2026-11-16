@@ -359,10 +359,10 @@ export const ENDLESS_EVENTS = ['giant', 'stampede', 'bloaters', 'drop', 'fog', '
 export const EVENTS = {
   patrol: { count: 4, speed: [4.5, 4.9], chasers: 16, catchR: 1.05, reward: { survivors: 1, supplies: 40 } },
   civilians: { count: 6, speed: [3.8, 4.3], chasers: 20, catchR: 1.05, reward: { survivors: 1, supplies: 20 } },
-  // the recovery team leaves the gate teamDelay s after the crate lands, rigs it for rig s,
-  // and carries it home at carrySpeed[men still standing] m/s
   // the gate squad: four men step out of the gate to cover anyone of ours coming in
   cover: { men: 4, callD: 95, out: [7, 11], speed: 4.6, every: [0.22, 0.45], range: 55, hit: 0.55, damage: 30, catchR: 1.0, fallBack: 4.5, linger: 3 },
+  // the recovery team leaves the gate teamDelay s after the crate lands, breaks the load open
+  // in rig s, and each man carries a crate home at carrySpeed[TEAM] m/s
   drop: { teamDelay: 6, teamSpeed: [4.4, 4.8], rig: 3.5, carrySpeed: [0, 1.0, 1.7, 2.1, 2.4], catchR: 1.0,
     tear: 1.3, maxTearing: 6, pull: 32, reward: { grenades: 6, molotovs: 3, supplies: 150 } },
   giant: { name: 'GOLIATH', hpMul: 1, scale: 4.0, smash: 2.4 },

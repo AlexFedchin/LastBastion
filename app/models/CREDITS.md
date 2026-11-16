@@ -19,16 +19,18 @@ meshopt-compressed.
 | `molotov.glb` | Molotov bottle with rag | _TODO_ (Sketchfab) | _TODO_ | _TODO_ |
 | `crate.glb` | Wooden ammunition crate | _TODO_ | _TODO_ | _TODO_ |
 | `sandbags.glb` | Two scanned sandbag piles ("Low poly Sandbag" 01, 02) | _TODO_ | _TODO_ | _TODO_ |
-| `car_sedan.glb` | Rusted, stripped sedan (Car-1) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | attribution required (see the Sketchfab page) |
-| `car_police.glb`, `car_police_flip.glb` | Burnt police sedan, upright and on its roof (Car-2) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | attribution required |
-| `car_hatch.glb`, `car_saloon.glb` | Two burnt-out cars, a compact MPV and a saloon (Car-3) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | attribution required |
-| `apache.glb` | AH-64D Apache: the extraction's gunships | [Sketchfab](https://sketchfab.com/MirzaArrafiERV_45) | Muhamad Mirza Arrafi | attribution required |
-| `ch47.glb` | CH-47 Chinook: the extraction's lifters | [Sketchfab](https://sketchfab.com/MirzaArrafiERV_45) | Muhamad Mirza Arrafi | attribution required |
-| `ural.glb`, `ural_burnt.glb` | Ural-4320 army truck; the burnt-out wreck is derived from it | [Sketchfab](https://sketchfab.com/javanilga) | javanilga | attribution required |
-| `heliwreck.glb` | Crashed helicopter in the field | [Sketchfab](https://sketchfab.com/jigar6102021) | J1G4R | attribution required |
-| `container.glb` | Rusty 20 ft shipping container | [Sketchfab](https://sketchfab.com/sousinho) | Sousinho | attribution required |
-| `bale.glb` | Round hay bale | [Sketchfab](https://sketchfab.com/FrodoUndead) | FrodoUndead | attribution required |
-| `bomb.glb` | General-purpose aircraft bomb: the B-36s' sticks and the air strike | [Sketchfab](https://sketchfab.com/Youssef.Loukili) | Youssef.Loukili | attribution required |
+| `car_sedan.glb` | Rusted, stripped sedan (Car-1) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | CC BY 4.0 |
+| `car_police.glb`, `car_police_flip.glb` | Burnt police sedan, upright and on its roof (Car-2) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | CC BY 4.0 |
+| `car_hatch.glb`, `car_saloon.glb` | Two burnt-out cars, a compact MPV and a saloon (Car-3) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | CC BY 4.0 |
+| `apache.glb` | AH-64D Apache: the extraction's gunships | [Sketchfab](https://sketchfab.com/MirzaArrafiERV_45) | Muhamad Mirza Arrafi | CC BY 4.0 |
+| `ch47.glb` | CH-47 Chinook: the extraction's lifters | [Sketchfab](https://sketchfab.com/MirzaArrafiERV_45) | Muhamad Mirza Arrafi | CC BY 4.0 |
+| `ural.glb`, `ural_burnt.glb` | Ural-4320 army truck; the burnt-out wreck is derived from it | [Sketchfab](https://sketchfab.com/javanilga) | javanilga | CC BY 4.0 |
+| `heliwreck.glb` | Crashed helicopter in the field | [Sketchfab](https://sketchfab.com/jigar6102021) | J1G4R | CC BY 4.0 |
+| `container.glb` | Rusty 20 ft shipping container | [Sketchfab](https://sketchfab.com/sousinho) | Sousinho | CC BY 4.0 |
+| `bale.glb` | Round hay bale | [Sketchfab](https://sketchfab.com/FrodoUndead) | FrodoUndead | CC BY 4.0 |
+| `bomb.glb` | General-purpose aircraft bomb: the B-36s' sticks and the air strike | [Sketchfab](https://sketchfab.com/Youssef.Loukili) | Youssef.Loukili | CC BY 4.0 |
+| `house.glb` | Single-storey house: the farmhouses and the village houses | [Sketchfab: House](https://sketchfab.com/3d-models/house-cfaf9a6c3a304dd9948044f8a63e391f) | Mateusz Woliński | CC BY 4.0 |
+| `mcrate.glb` | Weapons crate: what each man of the recovery team carries home | [Sketchfab: Weapons Crate](https://sketchfab.com/3d-models/weapons-crate-6597d3858df94da698ece8e0038f50b7) | Sousinho | CC BY 4.0 |
 
 ## What was changed
 
@@ -72,6 +74,13 @@ meshopt-compressed.
     around it. The game tints some olive.
   - Hay bale: the round bale only (the square one is dropped), 1.5 m across, ~700 triangles.
   - Bomb: laid nose +z, 2.2 m.
+  - House: the ground plane dropped, scaled to 12 m, the roof a node of its own so burnt-out houses can stand
+    open; simplified to ~5k triangles.
+  - Weapons crate: scaled to 0.9 m long, ~1.5k triangles.
+  - Night grade: every colour texture is darkened and desaturated in the build so the models sit in the night
+    scene. The car wrecks, the burnt Ural, the crashed helicopter and the containers also get rust laid over
+    them from ambientCG's CC0 [Rust009](https://ambientcg.com/a/Rust009) (colour), with
+    [Metal041B](https://ambientcg.com/a/Metal041B) as the mask for where it gathers.
 
 ## Bastion kit (`kit/*.glb`)
 

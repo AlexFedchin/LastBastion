@@ -80,7 +80,8 @@ export class Arsenal {
       const g = new THREE.Group();
       const b = cloneModel('molotov');
       b.position.y = -0.17; // base at -0.17, rag at the top (+0.17)
-      b.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.material.emissive.setRGB(0.12, 0.04, 0.01); } });
+      // a faint warm cast from the rag on the glass, no more: it should read as a bottle
+      b.traverse((o) => { if (o.isMesh) { o.castShadow = false; o.material.emissive.setRGB(0.025, 0.01, 0.003); } });
       g.add(b);
       g.scale.setScalar(1.5); // read from the gun at 60 m
       g.visible = false;
@@ -222,7 +223,7 @@ export class Arsenal {
         m.visible = true;
         this.audio.molotovThrow();
         b.light = fx.lights.acquire();
-        if (b.light) { b.light.color.setRGB(1, 0.55, 0.2); b.light.distance = 16; b.light.decay = 1.8; }
+        if (b.light) { b.light.color.setRGB(1, 0.55, 0.2); b.light.distance = 7; b.light.decay = 1.8; }
       }
       const u = Math.min(1, b.t / b.f.dur);
       flightAt(b.f, Math.min(b.t, b.f.dur), m.position);
@@ -230,11 +231,11 @@ export class Arsenal {
       m.rotation.z += dt * b.spin;
       m.updateMatrixWorld();
       _v.copy(this._rag).applyMatrix4(m.matrixWorld);
-      // the rag streams fire behind it
-      fx.flame(_v.x, _v.y, _v.z, 0.32, 1.2);
-      fx.glowDot(_v.x, _v.y, _v.z, 0.7, 3.2, 1.3, 0.35, 0.05);
-      if (R() < 0.35) fx.ember(_v.x, _v.y, _v.z);
-      if (b.light) { b.light.position.copy(_v); b.light.intensity = 40 + R() * 30; }
+      // the rag burns at the neck: a small flame licking back, a few sparks, not a fireball
+      if (R() < 0.6) fx.flame(_v.x, _v.y, _v.z, 0.12, 0.6, 0.18);
+      fx.glowDot(_v.x, _v.y, _v.z, 0.22, 2.4, 1.0, 0.3, 0.05);
+      if (R() < 0.12) fx.ember(_v.x, _v.y, _v.z);
+      if (b.light) { b.light.position.copy(_v); b.light.intensity = 9 + R() * 6; }
       if (u >= 1) {
         m.visible = false;
         if (b.light) { fx.lights.release(b.light); b.light = null; }

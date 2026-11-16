@@ -85,6 +85,48 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     }
     tex.setImage(await sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).png().toBuffer()).setMimeType('image/png');
   }
+  // ambientCG CC0 rust (Rust009 colour; Metal041B's rust spots as the mask), for weathering
+  const ACG = (a, m) => path.join(SRC, 'ambientcg', a, `${a}_1K-JPG_${m}.jpg`);
+  let rustTex = null;
+  async function rustLayers() {
+    if (rustTex) return rustTex;
+    const R = 512, raw = async (f) => (await sharp(f).resize(R, R).removeAlpha().raw().toBuffer());
+    const col = await raw(ACG('Rust009', 'Color')), spot = await raw(ACG('Metal041B', 'Color'));
+    // the mask: how orange (rust) rather than grey (bare steel) Metal041B is there
+    const mask = new Float32Array(R * R);
+    for (let i = 0; i < R * R; i++) { const r = spot[i * 3], g = spot[i * 3 + 1], b = spot[i * 3 + 2]; mask[i] = Math.min(1, Math.max(0, (r - b) / 90)); }
+    rustTex = { R, col, mask };
+    return rustTex;
+  }
+  /**
+   * Grade every opaque material's colour texture for the night: darker (dark), greyer (sat),
+   * rust from ambientCG laid over it where its mask says (rust: amount; tile: repeats over
+   * the atlas), soot blotches (soot). Untextured materials get the same darkening on their factor.
+   */
+  async function grade(doc, { dark = 0.6, sat = 0.8, rust = 0, tile = 3, soot = 0, tint = [1, 1, 1] } = {}) {
+    const L = rust ? await rustLayers() : null;
+    const done = new Set();
+    for (const m of doc.getRoot().listMaterials()) {
+      if (m.getAlphaMode() === 'BLEND') continue;
+      const t = m.getBaseColorTexture();
+      if (!t) { const f = m.getBaseColorFactor(); m.setBaseColorFactor([f[0] * dark, f[1] * dark, f[2] * dark, f[3]]); continue; }
+      if (done.has(t)) continue; done.add(t);
+      await repaint(t, (r, g, b, u, v) => {
+        let c = [r / 255, g / 255, b / 255];
+        const l = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+        c = c.map((x) => l + (x - l) * sat);
+        if (L) {
+          const px = Math.floor(((u * tile) % 1) * L.R), py = Math.floor(((v * tile) % 1) * L.R), j = py * L.R + px;
+          // the rust spots, opened up by low-frequency noise so it gathers in patches
+          const k = Math.min(1, L.mask[j] * (0.55 + 0.9 * fbm(u * 7 + 3, v * 7 + 1))) * rust;
+          const rc = [L.col[j * 3] / 255, L.col[j * 3 + 1] / 255, L.col[j * 3 + 2] / 255];
+          c = c.map((x, i) => x * (1 - k) + rc[i] * 0.7 * k);
+        }
+        if (soot) { const s = THREE.MathUtils.smoothstep(fbm(u * 11 + 7, v * 11), 0.4, 0.75) * soot; c = c.map((x) => x * (1 - 0.8 * s)); }
+        return c.map((x, i) => Math.round(255 * Math.min(1, x * dark * tint[i])));
+      });
+    }
+  }
   /** Smooth value noise in 0..1, for soot and rust blotches. */
   function noise2(x, y) {
     const h = (i, j) => { const s = Math.sin(i * 127.1 + j * 311.7) * 43758.5453; return s - Math.floor(s); };
@@ -116,6 +158,7 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
   // Car-1 a rusted sedan (hood up, doors open); Car-2 a burnt police sedan and its
   // overturned twin; Car-3 a burnt-out compact hatchback and a burnt saloon.
   const CARS = [
+    // [name, source, node, length, triangle budget]; grades for the night below
     ['car_sedan', 'Car-1.glb', null, 5.2, 7000],
     ['car_police', 'Car-2.glb', 'Object004', 5.2, 7000],
     ['car_police_flip', 'Car-2.glb', 'Object005', 5.2, 7000],
@@ -127,6 +170,7 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
       const doc = await readRigid(V(file), node ? (n) => n.startsWith(node) : null);
       xformAll(doc, new THREE.Matrix4().makeRotationY(pcaYaw(doc)));
       fit(doc, 0, len);
+      await grade(doc, name === 'car_sedan' ? { dark: 0.5, sat: 0.7, rust: 0.5, soot: 0.25 } : { dark: 0.36, sat: 0.5, rust: 0.65, soot: 0.55 });
       await texWebp(doc, 1024, { normalSize: 512 });
       const t = triCount(doc);
       const b = getBounds(scene(doc));
@@ -149,6 +193,9 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
   }
   async function ural() {
     let doc = await uralDoc();
+    await grade(doc, { dark: 0.48, sat: 0.65, soot: 0.3 });
+    // the untextured windscreen: dark glass, not a white sheet
+    for (const m of doc.getRoot().listMaterials()) if (!m.getBaseColorTexture()) m.setBaseColorFactor([0.03, 0.035, 0.04, 1]).setRoughnessFactor(0.25).setMetallicFactor(0.3);
     await texWebp(doc, 2048, { normalSize: 1024 });
     let b = getBounds(scene(doc));
     console.log('ural size', b.max.map((v, i) => (v - b.min[i]).toFixed(2)).join(' x '));
@@ -170,6 +217,7 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
       });
     }
     await doc.transform(prune());
+    await grade(doc, { dark: 0.85, sat: 0.8, rust: 0.45 });
     await texWebp(doc, 1024, { normalSize: 1024 });
     await finish(doc, 'ural_burnt.glb', { ratio: 0.75, error: 0.002 });
   }
@@ -204,6 +252,7 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
       rampFoot: P(0.25, 1.0, -98), inside: P(0.25, 6, -40),
       lightPort: P(26, 12, 4), lightStbd: P(-25, 12, 4), lightTail: P(0.4, 72, -86), hold: P(0.25, 20, -70),
     });
+    await grade(doc, { dark: 0.68, sat: 0.7 });
     await texWebp(doc, 2048);
     console.log('ch47 scale', s.toFixed(4), 'ramp drop', drop.toFixed(3), 'tris', triCount(doc));
     await finish(doc, 'ch47.glb', { ratio: 0.8, error: 0.001 });
@@ -234,6 +283,7 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
       podL: P(0.42, -0.2, 0.255), podR: P(0.42, -0.2, -0.255),
       lightPort: P(0.27, -0.12, -0.42), lightStbd: P(0.27, -0.12, 0.42), lightTail: P(-1.22, 0.17, 0), // port is the model's +x
     });
+    await grade(doc, { dark: 0.68, sat: 0.7 });
     await texWebp(doc, 1024);
     console.log('apache scale', s.toFixed(3), 'tris', triCount(doc));
     await finish(doc, 'apache.glb', { ratio: 0.8, error: 0.001 });
@@ -247,6 +297,7 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     const b0 = getBounds(scene(doc));
     fit(doc, 0, b0.max[0] - b0.min[0]); // metres already: centre and ground it
     for (const m of doc.getRoot().listMaterials()) m.setDoubleSided(true);
+    await grade(doc, { dark: 0.7, sat: 0.7, rust: 0.3 });
     await texWebp(doc, 1024, { normalSize: 512 });
     const b = getBounds(scene(doc));
     console.log('heliwreck size', b.max.map((v, i) => (v - b.min[i]).toFixed(2)).join(' x '), 'tris', triCount(doc));
@@ -262,6 +313,7 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     xformAll(doc, new THREE.Matrix4().makeScale(6.058 / d[0], 2.591 / d[1], 2.438 / d[2]));
     fit(doc, 0, 6.058);
     for (const m of doc.getRoot().listMaterials()) if (m.getName() === 'corrugated_sides') await inpaintWhite(m.getBaseColorTexture());
+    await grade(doc, { dark: 0.55, sat: 0.75, rust: 0.25, soot: 0.25 });
     await texWebp(doc, 1024, { normalSize: 1024 });
     await finish(doc, 'container.glb');
   }
@@ -329,5 +381,50 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     await finish(doc, 'bomb.glb');
   }
 
-  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb };
+  // ── farmhouse (House-1): single storey, 12 m across its long side, base at 0, its long
+  // front along +x facing +z. The ground plane is dropped; the roof is a node of its own
+  // ('roof') so burnt-out houses can stand open to the sky.
+  async function house() {
+    const doc = await readRigid(V('House-1.glb'));
+    for (const n of meshNodes(doc)) {
+      const mesh = n.getMesh();
+      for (const p of mesh.listPrimitives()) if (p.getMaterial()?.getName() === 'ground') { mesh.removePrimitive(p); p.dispose(); }
+      if (!mesh.listPrimitives().length) { n.setMesh(null); mesh.dispose(); }
+    }
+    await doc.transform(prune());
+    const b = getBounds(scene(doc)), d = b.max.map((v, i) => v - b.min[i]);
+    if (d[2] > d[0]) xformAll(doc, new THREE.Matrix4().makeRotationY(Math.PI / 2));
+    fit(doc, 0, 12);
+    const root = rootNode(doc, 'house');
+    const roof = doc.createNode('roof'); root.addChild(roof);
+    for (const n of meshNodes(doc)) {
+      const mesh = n.getMesh();
+      const rp = mesh.listPrimitives().filter((p) => p.getMaterial()?.getName() === 'roof');
+      if (!rp.length) continue;
+      const rm = doc.createMesh(n.getName() + '_roof');
+      for (const p of rp) { mesh.removePrimitive(p); rm.addPrimitive(p); }
+      roof.addChild(doc.createNode(n.getName() + '_roof').setMesh(rm));
+      if (!mesh.listPrimitives().length) n.setMesh(null);
+    }
+    await grade(doc, { dark: 0.42, sat: 0.6, soot: 0.45 });
+    await texWebp(doc, 1024, { normalSize: 512 });
+    const bb = getBounds(scene(doc));
+    console.log('house size', bb.max.map((v, i) => (v - bb.min[i]).toFixed(2)).join(' x '), 'tris', triCount(doc));
+    await finish(doc, 'house.glb', { ratio: Math.min(1, 9000 / triCount(doc)), error: 0.002 });
+  }
+
+  // ── a soldier's load: the weapons crate, 0.9 m long along x, base at 0
+  async function mcrate() {
+    const doc = await readRigid(V('MilitaryCrate.glb'));
+    const b = getBounds(scene(doc)), d = b.max.map((v, i) => v - b.min[i]);
+    if (d[2] > d[0]) xformAll(doc, new THREE.Matrix4().makeRotationY(Math.PI / 2));
+    fit(doc, 0, 0.9);
+    await grade(doc, { dark: 0.55, sat: 0.75 });
+    await texWebp(doc, 512);
+    const bb = getBounds(scene(doc));
+    console.log('mcrate size', bb.max.map((v, i) => (v - bb.min[i]).toFixed(2)).join(' x '), 'tris', triCount(doc));
+    await finish(doc, 'mcrate.glb', { ratio: Math.min(1, 1500 / triCount(doc)), error: 0.002 });
+  }
+
+  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate };
 }

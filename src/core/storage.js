@@ -44,6 +44,7 @@ export function loadSave() {
   return s && s.version === 1 ? s : null;
 }
 export function writeSave(run) {
+  if (run.dev) return; // a developer-tools run never saves over the campaign
   write(SAVE_KEY, {
     version: 1,
     difficulty: run.difficulty,

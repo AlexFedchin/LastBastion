@@ -371,9 +371,10 @@ export class Effects {
   }
 
   // ── Fire ──────────────────────────────────────────────────────────────────
-  flame(x, y, z, size = 1, vy = 3) {
+  /** A tongue of fire; life scales how long it lingers (short for one on something moving fast). */
+  flame(x, y, z, size = 1, vy = 3, life = 1) {
     this.glow.spawn(x + (R() - 0.5) * 0.5 * size, y, z + (R() - 0.5) * 0.5 * size, (R() - 0.5) * 0.8, vy * rand(0.6, 1.3), (R() - 0.5) * 0.8,
-      rand(0.45, 0.9), rand(0.5, 0.9) * size, rand(1.2, 2.2) * size, PF.FIRE + ((R() * 4) | 0), 2.4, 1.0, 0.28, 0.85, 0.45, 0.07, 0.01, -1.5, 1.2, 0, R() * 6, (R() - 0.5) * 2, 0.15);
+      rand(0.45, 0.9) * life, rand(0.5, 0.9) * size, rand(1.2, 2.2) * size, PF.FIRE + ((R() * 4) | 0), 2.4, 1.0, 0.28, 0.85, 0.45, 0.07, 0.01, -1.5, 1.2, 0, R() * 6, (R() - 0.5) * 2, 0.15);
   }
   ember(x, y, z) {
     this.glow.spawn(x, y, z, (R() - 0.5) * 2, rand(1.5, 4), (R() - 0.5) * 2, rand(1, 2.5), 0.06, 0.03, PF.SPARK, 5, 2, 0.4, 1, 1.5, 0.3, 0.05, -0.3, 0.6, 0.01);

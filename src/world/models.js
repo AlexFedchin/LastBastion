@@ -10,6 +10,7 @@ const FILES = {
   // vehicles and field props (scripts/models/build_vehicles.mjs)
   ch47: 'models/ch47.glb', apache: 'models/apache.glb', ural: 'models/ural.glb', ural_burnt: 'models/ural_burnt.glb',
   heliwreck: 'models/heliwreck.glb', container: 'models/container.glb', bale: 'models/bale.glb', bomb: 'models/bomb.glb',
+  house: 'models/house.glb', mcrate: 'models/mcrate.glb',
 };
 /** The wrecked cars on the roads, each its own model (long axis +x, base at 0). */
 export const CARS = ['car_sedan', 'car_police', 'car_police_flip', 'car_hatch', 'car_saloon'];
