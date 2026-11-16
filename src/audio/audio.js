@@ -13,7 +13,7 @@
 //  rises with the pressure on the wall and the tide brings in the drums.
 // ─────────────────────────────────────────────────────────────────────────────
 import { clamp, rand } from '../core/util.js';
-import { makePunch, makeSizzle, makeTick, makeBlastSub, makeCrack, makeProp, makeJet, makePower, makeGau, makeGauImpacts } from './synth.js';
+import { makePunch, makeSizzle, makeTick, makeBlastSub, makeCrack, makeRotor, makeProp, makeJet, makePower, makeGau, makeGauImpacts } from './synth.js';
 import { GUNSHIP } from '../config.js';
 
 // name -> [variants (0 = single file), decode rate]
@@ -321,6 +321,8 @@ export class AudioEngine {
       this.B.crack = [1, 2, 3].map((k) => makeCrack(ctx, k));
       this.B.prop = [makeProp(ctx)];
       this.B.jet = [makeJet(ctx)];
+      // helicopters (the extraction): the gunships' quick slap, the lifters' slow deep one
+      this.B.rotor = [makeRotor(ctx, { rate: 19, seed: 1, depth: 0.8 }), makeRotor(ctx, { rate: 9.5, seed: 2, depth: 1.6 })];
       this.B.power_down = [makePower(ctx, false)];
       this.B.power_up = [makePower(ctx, true)];
       // one take per GAU burst length the gunship fires
@@ -776,6 +778,14 @@ export class AudioEngine {
     this.play(this.B.gau[k], { x, y, z, gain: 2.6, ref: 220, sos: true, reverb: 0.75, lowpass: 2400, force: true });
     this.play(this.B.gau_hits[k], { x: tx, z: tz, gain: 1.5, ref: 70, sos: true, delay: flight, reverb: 0.5, force: true });
     if (this.B.boom_sub[0]) this.play(this.B.boom_sub[0], { x: tx, z: tz, gain: 0.5, rate: rand(1.2, 1.4), ref: 80, sos: true, delay: flight + 0.1, force: true });
+  }
+
+  /** A gunship helicopter's minigun burst (the GAU takes, quicker and brighter). */
+  minigun(x, y, z, tx, tz) {
+    if (!this.ready || !this.B.gau) return;
+    const k = (Math.random() * this.B.gau.length) | 0;
+    this.play(this.B.gau[k], { x, y, z, gain: 1.6, rate: rand(1.35, 1.5), ref: 160, sos: true, reverb: 0.5, lowpass: 5000, force: true, duration: 0.9, fadeOut: 0.15 });
+    this.play(this.B.gau_hits[k], { x: tx, z: tz, gain: 1.0, rate: 1.2, ref: 60, sos: true, delay: 0.15, reverb: 0.4, force: true, duration: 1.0, fadeOut: 0.2 });
   }
 
   /** A heavier 25 mm HE round on the ground (layered on the burst's crackle now and then). */

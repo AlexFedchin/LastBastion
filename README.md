@@ -4,7 +4,7 @@
 
 # L A S T &nbsp; B A S T I O N
 
-### *Seventy-two hours. One gun. No relief.*
+### *Seventy-two hours. One gun. One way out.*
 
 ![three.js](https://img.shields.io/badge/three.js-r187-black?style=for-the-badge&logo=threedotjs)
 ![Electron](https://img.shields.io/badge/Electron-45-2b2e3a?style=for-the-badge&logo=electron&logoColor=9feaf9)
@@ -163,7 +163,7 @@ Every night has its own event and its own radio traffic. Objectives, a boss bar 
 | **7** | **Blackout**: the generator dies, the lamps go out |
 | **8** | Spectre goes down in the hills |
 | **9** | A bloater column, plus a resupply |
-| **10** | 👹 **The Behemoth**, before the last tide |
+| **10** | 👹 **The Behemoth**, before the last tide, and, with fifteen alive, the hold for the extraction flight |
 
 **The chronicle.** As the light comes up, an old voice tells the night you just survived: not the numbers but the story, years later. It is built from what actually happened: whether Recon Two made it to the gate, whether the giant reached the wall, whether the danger-close fire cost you men, how many places stood empty on the walkway by morning. Every line is narrated (Space reveals it all; Space again moves on), and the story stays on the resupply screen.
 
@@ -171,11 +171,16 @@ Every night has its own event and its own radio traffic. Objectives, a boss bar 
 artillery battery, wall gunners, wire, claymores and grenades. A tool's upgrades open at the dawn after
 the first night you had it; until then its cards are greyed out with the night it arrives.
 
-**The ending.** After the tenth night, a cutscene in the engine, narrated and voiced: Kovac's broadcast is
-answered, survivors come up the road to the gate, and the narrator tells how the place got its name
-(`ENDING` in `config.js`, staged by `src/game/ending.js`; Space twice skips). Then **Endless**: every tool,
-the upgrades you earned, two random events a night, and a record of the most nights held past the
-seventy-second hour. Or start a new campaign.
+**The endings.** Command promised an extraction flight at the seventy-second hour, but it flies only
+for **fifteen souls or more**. Start night 10 with at least fifteen survivors and the last night becomes a
+hold: the flight is inbound, everything in the valley comes over the ridge at once, and if the wall still
+stands when the timer runs out, the bombers carpet the field, gunship helicopters circle it with their
+searchlights, and the lifters land behind the wall to carry everyone out (`EXTRACT_ENDING` in `config.js`,
+staged by `src/game/extraction.js`). If the wall falls first, fight the night again. Come to night 10 with
+fewer than fifteen and nobody comes: hold anyway, and in the morning Kovac's broadcast is answered by
+strangers who come up the road to the gate (`ENDING`, `src/game/ending.js`). Space twice skips either.
+Then **Endless**: every tool, the upgrades you earned, two random events a night, and a record of the
+most nights held past the seventy-second hour. Or start a new campaign.
 
 Difficulties: **Recruit**, **Veteran** *(intended)*, **Last Stand**.
 

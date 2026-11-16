@@ -69,7 +69,7 @@ export function buildGunship() {
  * B-36 (app/models/b36.glb): metres, nose +z, port +x. Six pusher props on
  * their hubs; the four jets ride in two pods outboard.
  */
-function buildBomber() {
+export function buildBomber() {
   const g = cloneModel('b36');
   tint(g, 0x08090b);
   return {
@@ -80,7 +80,7 @@ function buildBomber() {
   };
 }
 
-function buildBomb() {
+export function buildBomb() {
   const mat = new THREE.MeshStandardMaterial({ color: 0x4a4f3a, roughness: 0.6, metalness: 0.3 });
   const geo = merge([
     tube(0.45, 0.45, 2.6, 0, 0, 0), nose(0.45, 0.9, 0, 0, 1.3, 1), tube(0.45, 0.2, 1.2, 0, 0, -1.9),

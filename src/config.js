@@ -224,11 +224,11 @@ export const GUNSHIP = {
 // ── Radio. The story is told in fragments. ───────────────────────────────────
 export const RADIO = {
   1: [
-    ['COMMAND', 'Bastion-7, this is Command. Relief column departs at dawn. Hold for seventy-two hours.'],
+    ['COMMAND', 'Bastion-7, this is Command. Extraction is set for the seventy-second hour. Hold until then.'],
     ['SGT. KOVAC', 'You heard the man. Seventy-two hours. Keep that barrel cool and the wall clean.'],
   ],
   2: [
-    ['COMMAND', 'Bastion-7, relief column delayed. Bridge at Halden is down. Keep the gate shut.'],
+    ['COMMAND', 'Bastion-7, Command. The bridge at Halden is down. Nobody leaves that valley by road now. Keep the gate shut.'],
     ['SGT. KOVAC', 'Whatever you hear out there tonight — the gate stays shut.'],
   ],
   3: [
@@ -244,8 +244,8 @@ export const RADIO = {
     ['SGT. KOVAC', 'We\'re what\'s left on this line. Make it count.'],
   ],
   6: [
-    ['COMMAND', 'Bastion-7... relief column has been... (static) ...rerouted. Hold position.'],
-    ['SGT. KOVAC', 'Rerouted. Sure. Load the belt.'],
+    ['COMMAND', 'Bastion-7... airframes are short... (static) ...the flight goes only for fifteen souls or more. Keep your people alive.'],
+    ['SGT. KOVAC', 'Fifteen. You heard him. Nobody else dies on this wall.'],
   ],
   7: [
     ['SGT. KOVAC', 'Command hasn\'t answered since 0300. I\'m sure it\'s the antenna.'],
@@ -259,12 +259,13 @@ export const RADIO = {
     ['SGT. KOVAC', 'Biggest one yet coming down the valley. Everything we have, tonight.'],
     ['PVT. ARAN', 'Sarge, if this is it... it was an honour.'],
   ],
+  // the last night with too few left for the flight (with enough, see EXTRACTION.lines)
   10: [
-    ['SGT. KOVAC', 'Seventy-two hours. This is the last night. Whatever comes down that valley — we are still here.'],
+    ['SGT. KOVAC', 'Seventy-two hours, and not enough of us left to be worth a flight. Whatever comes down that valley — we are still here.'],
     ['SGT. KOVAC', 'If anyone is listening: Bastion-7 is holding. Bastion-7 is holding.'],
   ],
   endless: [
-    ['SGT. KOVAC', 'No relief. No orders. Just the night, and the gun.'],
+    ['SGT. KOVAC', 'No birds. No orders. Just the night, and the gun.'],
     ['SGT. KOVAC', 'Count the survivors. Then count the dead out there. Keep counting.'],
     ['PVT. ARAN', 'I stopped writing their names down.'],
     ['SGT. KOVAC', 'They\'ll come again tomorrow. So will we.'],
@@ -276,6 +277,8 @@ export const CALL = {
   kovac: 'SGT. KOVAC', aran: 'PVT. ARAN', command: 'COMMAND', unknown: 'UNKNOWN', battery: 'BATTERY',
   hammer: 'HAMMER 1-1', spectre: 'SPECTRE 2-1', spectre2: 'SPECTRE 2-2', hollis: 'LT. HOLLIS', reach: 'REACH 3-1', survivor: 'SURVIVOR',
   narrator: 'NARRATOR', ridge: 'THE RIDGE', quarry: 'THE QUARRY',
+  // the extraction: the lifters, and the gunship helicopters escorting them
+  nightingale: 'NIGHTINGALE', reaper: 'REAPER 1-1',
 };
 export const COMMS = {
   battery: {
@@ -466,15 +469,15 @@ export const CHRONICLE = {
   title: {
     1: 'THE FIRST NIGHT', 2: 'THE FOG', 3: 'THE OVERPASS', 4: 'THE DROP', 5: 'GOLIATH',
     6: 'THE STAMPEDE', 7: 'LIGHTS OUT', 8: 'SPECTRE FALLS', 9: 'EVERYTHING WE HAD', 10: 'THE SEVENTY-SECOND HOUR',
-    endless: 'NO RELIEF',
+    endless: 'NOBODY CAME',
   },
   open: {
     1: 'On the first night, the dead came down the valley in their thousands. Bastion-7 answered them with one gun.',
-    2: 'On the second night, word came that the bridge at Halden was down. The relief would be late. Only late, we told ourselves.',
+    2: 'On the second night, word came that the bridge at Halden was down. There was no road out of the valley any more. Only the sky, we told ourselves.',
     3: 'The third night began with a woman\'s voice on the radio, begging for help that we could not give.',
     4: 'On the fourth night, Command promised us an airdrop. The bloaters came down the valley to meet it.',
     5: 'On the fifth night, Bastion-3 fell, and Bastion-5 went silent. We were the last lights left on the line.',
-    6: 'On the sixth night, the radio told us the relief column had been rerouted. Nobody on the wall believed it.',
+    6: 'On the sixth night, Command told us the birds would only fly for fifteen souls or more. After that, we counted heads every hour.',
     7: 'By the seventh night, Command had stopped answering. Out on the horizon, the city\'s fires were going out.',
     8: 'On the eighth night, a recorded voice told us that no one was listening anymore. We kept talking anyway.',
     9: 'On the ninth night, the biggest horde we had ever seen filled the valley from the wall to the ridge. We gave it everything.',
@@ -611,11 +614,11 @@ export const CHRONICLE = {
     3: 'By morning the radio was quiet. Kovac sat beside it for a long time, listening to the static.',
     4: 'The fourth dawn came up cold and red. The crows had learned where to find us.',
     5: 'That morning we understood that there was no line anymore. There was only us.',
-    6: 'At dawn, Kovac loaded a fresh belt without a word. Nobody said rerouted out loud again.',
+    6: 'At dawn, Kovac counted heads twice, and chalked the number on the wall where everyone could see it.',
     7: 'That morning the city on the horizon lay dark and still. There was nothing left in it to burn.',
     8: 'When the sun came up, we said it to each other, one by one, all along the line. Bastion-7 is holding.',
     9: 'At dawn, Aran told the sergeant it had been an honour. Kovac told him to save it. One more night.',
-    10: 'And then the sun rose on the seventy-second hour. No column came down the road. But we were still there.',
+    10: 'And then the sun rose on the seventy-second hour. No aircraft came over the ridge. But we were still there.',
     endless: [
       'The sun rose again. It did not care who was still alive to see it.',
       'Dawn. We counted the living, then the dead, and then we stopped counting.',
@@ -633,7 +636,7 @@ export const CHRONICLE = {
 // narrator. `shot` names the camera shot that starts with the cue, `gap` the
 // silence before it, `title` brings up the title card as the line ends.
 export const ENDING = [
-  { shot: 'gun', who: CALL.narrator, gap: 3, text: 'Seventy-two hours, Command had said. Now the hours had run out, and the radio stayed silent. There was no one left on the other end.' },
+  { shot: 'gun', who: CALL.narrator, gap: 3, text: 'Extraction at the seventy-second hour, Command had said. Fifteen souls, or the birds would not fly. The hour came, and the sky stayed empty.' },
   { shot: 'radio', who: CALL.narrator, text: 'Kovac kept broadcasting anyway. Every hour, on every channel the set could reach, the same four words.' },
   { who: CALL.kovac, radio: true, text: 'This is Bastion-7. Bastion-7 is holding.' },
   { shot: 'field', who: CALL.ridge, radio: true, gap: 2.4, text: "Bastion-7... we hear you. We can see your lights from the ridge. Please don't shoot. We're coming down." },
@@ -643,6 +646,41 @@ export const ENDING = [
   { shot: 'gate', who: CALL.narrator, text: 'Command had called us Bastion-7, one light in a line of many. But there was no line anymore. There were no other lights.' },
   { shot: 'crane', who: CALL.narrator, gap: 1.2, text: 'By the time the dead came down the valley again, nobody called it Bastion-7. They called it the Last Bastion.', title: true },
   { who: CALL.narrator, gap: 2.2, text: 'And for as long as there was anyone left to man the wall... it held.' },
+];
+
+// ── Extraction (the last night with at least `souls` alive) ─────────────────
+// Night 10 becomes a hold: the flight is inbound, the horde comes over the ridge
+// all at once, and if the wall still stands when the timer runs out, the
+// extraction cutscene (src/game/extraction.js) plays. Otherwise the wall falls
+// and the night can be fought again.
+export const EXTRACTION = {
+  souls: 15,                 // alive at the start of night 10
+  hold: 210,                 // seconds from the start of the night until the flight is overhead
+  overrun: 80,               // the last seconds: everything comes over the ridge at once
+  overrunRate: 13,           // extra dead a second through the overrun
+  // [seconds before the flight arrives (or 'start'), who, text]
+  lines: [
+    ['start', CALL.kovac, 'Seventy-two hours. This is the last night. Whatever comes down that valley — we are still here.'],
+    [196, CALL.nightingale, 'Bastion-7, Nightingale. Extraction flight is airborne, three lifters and escort. Hold that wall until we are overhead.'],
+    [120, CALL.nightingale, 'Nightingale, two minutes out. Hammer flight is with us. Keep them off that wall, Bastion.'],
+    [82, CALL.kovac, 'They know. God help us, they know we are leaving. Everything is coming over that ridge — hold!'],
+    [40, CALL.reaper, 'Bastion-7, Reaper one-one, inbound with the lifters. Forty seconds. Just hold on.'],
+    [12, CALL.nightingale, 'Ten seconds, Bastion. Get your heads down.'],
+  ],
+};
+
+// The extraction cutscene, voiced like ENDING (same fields). Shots: see SHOTS in extraction.js.
+export const EXTRACT_ENDING = [
+  { shot: 'overrun', who: CALL.nightingale, radio: true, gap: 0.6, text: 'Bastion-7, Nightingale. We are over the ridge. Hammer flight, you are cleared hot. Everything past the wire.' },
+  { who: CALL.kovac, radio: true, text: 'Bring it down on them! Everyone off the wall — get your heads down!' },
+  { shot: 'bombers', who: CALL.hammer, radio: true, gap: 0.4, text: 'Hammer flight, in hot. Walking it up the valley. Bombs away, bombs away.' },
+  { shot: 'helos', who: CALL.reaper, radio: true, gap: 3.2, text: 'Reaper one-one, on station. We have the wall. Anything that moves down there is ours.' },
+  { shot: 'lz', who: CALL.nightingale, radio: true, gap: 1.6, text: 'Nightingale is on the ground. Ramp is down. Move, move, move!' },
+  { shot: 'run', who: CALL.narrator, gap: 0.6, text: 'For ten nights we had held that wall. Now we ran from it, past the fires, toward the red light at the back of the ramp.' },
+  { shot: 'ramp', who: CALL.kovac, radio: true, gap: 0.8, text: "That's everyone. Bastion-7 is off the wall. Go, go!" },
+  { shot: 'liftoff', who: CALL.narrator, gap: 1.2, text: 'We left the gun on the wall, still pointed down the valley. By the time we cleared the ridge, the dead were on the walkway where we had stood.' },
+  { shot: 'away', who: CALL.narrator, gap: 1.0, text: 'Command had called us Bastion-7. The people we carried out of that valley called it something else. They called it the Last Bastion.', title: true },
+  { who: CALL.narrator, gap: 2.0, text: 'And for seventy-two hours... it held.' },
 ];
 
 /** Every chronicle fragment, flat. */
@@ -675,5 +713,7 @@ export function allRadioLines() {
   }
   for (const t of chronicleLines()) add(CALL.narrator, t);
   for (const c of ENDING) add(c.who, c.text);
+  for (const c of EXTRACT_ENDING) add(c.who, c.text);
+  for (const [, w, t] of EXTRACTION.lines) add(w, t);
   return out;
 }

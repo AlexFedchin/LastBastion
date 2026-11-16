@@ -214,10 +214,12 @@ export class HUD {
     const el = this.el;
     const isDawn = g.state === 'dawn';
     this.set('night', el.night, String(isDawn ? run.night - 1 : run.night).padStart(2, '0'));
-    const rem = director.plan ? director.remaining : 0;
-    this.set('dawnl', el.dawnLbl, isDawn ? 'DAWN' : rem > 0 ? 'DAWN IN' : 'CLEAR THE FIELD');
+    // the last night with the flight coming: the clock counts to the extraction, not the dawn
+    const hold = g.extracting && g.events.active.find((e) => e.kind === 'extraction');
+    const rem = hold ? hold.left : director.plan ? director.remaining : 0;
+    this.set('dawnl', el.dawnLbl, isDawn ? 'DAWN' : hold ? 'FLIGHT IN' : rem > 0 ? 'DAWN IN' : 'CLEAR THE FIELD');
     this.set('dawn', el.dawn, isDawn ? '' : rem > 0 ? formatTime(rem) : '');
-    this.set('dawnbar', el.dawnBar.style, `${(director.plan ? director.progress : 0) * 100}%`, 'width');
+    this.set('dawnbar', el.dawnBar.style, `${(hold ? hold.t / hold.P.hold : director.plan ? director.progress : 0) * 100}%`, 'width');
     const contacts = horde.alive + director.queue.length;
     this.set('contacts', el.contacts, `CONTACTS ${formatInt(contacts)}`);
     this.set('kills', el.kills, formatInt(run.kills));

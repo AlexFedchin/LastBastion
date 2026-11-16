@@ -5,11 +5,13 @@ import {
   ZOMBIE_TYPES, ZT, WORLD, wallZ, wallDist, wallFacing, sectionOf, PILE,
   ZOMBIE_HEIGHT, HEADSHOT_FRAC, WING_COS,
 } from '../config.js';
+import { nearObstacle, steer, pushOut } from '../world/obstacles.js';
 import { createZombieGeometry, createGiantGeometry, createZombieMaterial, createZombieDepthMaterial, createEyeMesh } from './zombieModel.js';
 import { rand } from '../core/util.js';
 import { groundH } from '../world/terrain.js';
 import { fogUniforms } from '../render/atmosphere.js';
 
+const _ob = [0, 0];
 const CELL = 2;
 const GX0 = -230, GZ0 = -300;
 const GW = 230, GH = 156;
@@ -796,6 +798,9 @@ export class Horde {
       if (dd > 0.05) { vx = dx / dd * sp; vz = dz / dd * sp; }
       // keep off the central tower base
       if (x > -9.5 && x < 9.5 && z > -11) vx += (x >= 0 ? 2.2 : -2.2);
+      // round the wrecks on the road, not through them
+      const solidOK = type !== ZT.GIANT && nearObstacle(x, z);
+      if (solidOK && steer(x, z, vx, vz, this.radius[i], _ob, (this.id[i] & 1) ? 1 : -1)) { vx = _ob[0]; vz = _ob[1]; }
 
       // which mound (if any) this one is on: the one it stands highest on
       const sec = sectionOf(x);
@@ -861,6 +866,7 @@ export class Horde {
       if (pl > 0.35) { pxs *= 0.35 / pl; pzs *= 0.35 / pl; }
       x += vx * dt + pxs * 0.85;
       z += vz * dt + pzs * 0.85;
+      if (solidOK && pushOut(x, z, this.radius[i], _ob)) { x = _ob[0]; z = _ob[1]; }
 
       // wall constraint
       dist = wallDist(x, z);

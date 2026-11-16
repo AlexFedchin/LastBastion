@@ -55,6 +55,8 @@ CAST = {
     'SPECTRE 2-2': dict(voice={'am_eric': 0.5, 'am_michael': 0.5}, speed=1.0, radio='aircraft'),
     'LT. HOLLIS': dict(voice='am_echo', speed=1.12, radio='field'),
     'REACH 3-1': dict(voice='bm_lewis', speed=1.05, radio='aircraft'),
+    'NIGHTINGALE': dict(voice='bf_emma', speed=1.04, radio='aircraft'),  # the extraction: the lifters' lead
+    'REAPER 1-1': dict(voice='am_adam', speed=1.08, radio='aircraft'),  # ...and the gunship helicopters
     'SURVIVOR': dict(voice='af_nicole', speed=1.05, radio='handheld'),  # the overpass woman, close now
     'THE RIDGE': dict(voice='bf_isabella', speed=1.0, radio='hf'),  # the ending: strangers on weak sets
     'THE QUARRY': dict(voice='bm_daniel', speed=0.95, radio='hf'),

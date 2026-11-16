@@ -9,6 +9,7 @@ import {
   box, cylY, merge, xf, sandbagGeo, concertinaGeo, sagWire,
   makeSedan, makeTruck, makeTank, makeHelicopter, makeRuin,
 } from './kit.js';
+import { addObstacle } from './obstacles.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -29,6 +30,12 @@ function plant(obj, x, z, ry = 0, sink = 0, tiltK = 1, extra = null) {
   return obj;
 }
 
+/** Register a vehicle's footprint (its local +x is its length; `off` = centre offset along it). */
+function solid(x, z, ry, off, halfLen, halfWid) {
+  const ax = Math.cos(ry), az = -Math.sin(ry);
+  return addObstacle(x + ax * off, z + az * off, ry, halfLen, halfWid);
+}
+
 function instanced(geo, mat, mats, { cast = true, receive = true } = {}) {
   const im = new THREE.InstancedMesh(geo, mat, mats.length);
   mats.forEach((m, i) => im.setMatrixAt(i, m));
@@ -46,6 +53,7 @@ export function buildProps(env) {
   const wreck = makeTruck(mats, { body: mats.burnt, burnt: true, seed: 11, covered: false });
   plant(wreck, -38, -98, 0.7, 0.12, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.06)));
   scene.add(wreck);
+  solid(-38, -98, 0.7, -0.25, 4.55, 1.3);
   const wy = groundH(-38, -97);
   env.wreckFlames = { x: -38, y: wy + 1.4, z: -97 };
   fire.add(-38.4, wy + 1.2, -97.6, 3.2, 4.8, 3.4, { smoke: 3, embers: 6 });
@@ -54,14 +62,14 @@ export function buildProps(env) {
   env.wreckFire.position.set(-38, wy + 2.6, -97);
 
   const t2 = makeTruck(mats, { body: mats.burnt, burnt: true, seed: 12, covered: false });
-  scene.add(plant(t2, 52, -150, -1.2, 0.1));
+  scene.add(plant(t2, 52, -150, -1.2, 0.1)); solid(52, -150, -1.2, -0.25, 4.55, 1.3);
   const t3 = makeTruck(mats, { body: mats.olive, burnt: false, seed: 13, covered: true });
-  scene.add(plant(t3, -90, -186, 2.1, 0.05, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.04, 0, -0.1))));
+  scene.add(plant(t3, -90, -186, 2.1, 0.05, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.04, 0, -0.1)))); solid(-90, -186, 2.1, -0.25, 4.55, 1.3);
   const tank = makeTank(mats, { body: mats.burnt, seed: 14 });
-  scene.add(plant(tank, 26, -72, -0.45, 0.25, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, 0, 0.04))));
+  scene.add(plant(tank, 26, -72, -0.45, 0.25, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, 0, 0.04)))); solid(26, -72, -0.45, 0.1, 3.75, 1.85);
   fire.add(25.6, groundH(26, -72) + 2.2, -72.4, 1.2, 1.8, 1.6, { smoke: 1.2, embers: 1, fadeIn: 0 });
   const heli = makeHelicopter(mats, { body: mats.burnt });
-  scene.add(plant(heli, -118, -258, 0.9, 0.4, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.08, 0, 0.35))));
+  scene.add(plant(heli, -118, -258, 0.9, 0.4, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.08, 0, 0.35)))); solid(-118, -258, 0.9, -2.5, 6.3, 1.5);
   fire.add(-118, groundH(-118, -258) + 1.6, -258, 2.4, 3.6, 2.6, { smoke: 2.4, embers: 3 });
 
   // abandoned column of cars on the road
@@ -82,6 +90,7 @@ export function buildProps(env) {
     plant(car, x, z, ry, burnt ? 0.08 : 0, 1, flip ? new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2 * (rng() < 0.5 ? 1 : -1), 0, 0)) : null);
     if (flip) car.position.y += 0.85;
     scene.add(car);
+    solid(x, z, ry, 0, 2.42, flip ? 0.75 : 0.9);
     carCount++;
     if (burnt && rng() < 0.35) fire.add(x, groundH(x, z) + 0.9, z, 1.0, 1.4, 1.5, { smoke: 0.8, embers: 0.6 });
   }

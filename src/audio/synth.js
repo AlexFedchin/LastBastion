@@ -365,3 +365,48 @@ export function makeGauImpacts(ctx, dur, seed = 1) {
   }
   return toBuffer(ctx, chans);
 }
+
+// ── helicopters ───────────────────────────────────────────────────────────
+/**
+ * A helicopter, looped: the blade slap (a thump per blade pass, `rate` per second,
+ * with the slightly uneven spacing a real rotor has), the rotor wash under it and the
+ * turbine whine on top. Heavy tandem-rotor lifters slap slow and deep; gunships quicker.
+ */
+export function makeRotor(ctx, { rate = 18, seed = 1, depth = 1 } = {}) {
+  const sr = ctx.sampleRate, L = 4, n = Math.floor(L * sr), xf = Math.floor(0.4 * sr);
+  const chans = [];
+  // whole blade passes per loop so the slap stays seamless
+  const passes = Math.round(rate * L), period = n / passes;
+  for (let c = 0; c < 2; c++) {
+    const R = rng(7717 + seed * 31 + c * 5);
+    const wash = new Float32Array(n + xf);
+    let l1 = 0, l2 = 0;
+    const aw = lpA(260 * depth + 120, sr);
+    for (let i = 0; i < n + xf; i++) { const w = R() * 2 - 1; l1 += aw * (w - l1); l2 += aw * (l1 - l2); wash[i] = l2 * 4; }
+    const bed = loopify(wash, n, xf);
+    const out = new Float32Array(n);
+    // blade slaps: a short low-passed noise burst + a pitched thump, per pass
+    const jit = []; for (let k = 0; k < passes; k++) jit.push((R() - 0.5) * 0.06 * period);
+    let lt = 0;
+    const at = lpA(900, sr);
+    for (let k = 0; k < passes; k++) {
+      const s0 = Math.floor(k * period + jit[k] + period * 0.5);
+      const amp = 0.75 + 0.25 * Math.sin(k * 2.1) + (k % 2 ? 0.1 : 0);
+      const len = Math.floor(0.07 * sr);
+      for (let j = 0; j < len; j++) {
+        const i = (s0 + j) % n, t = j / sr;
+        const w = R() * 2 - 1;
+        lt += at * (w - lt);
+        const env = Math.exp(-t / (0.012 + 0.01 * depth));
+        out[i] += (lt * 3.2 + Math.sin(TAU * (55 / depth + 30) * t) * 0.9) * env * amp;
+      }
+    }
+    const whine = [Math.round(1210 * L) / L, Math.round(2425 * L) / L];
+    for (let i = 0; i < n; i++) {
+      const t = i / sr;
+      out[i] = Math.tanh((out[i] * 0.9 + bed[i] * (0.5 + 0.2 * depth) + Math.sin(TAU * whine[0] * t) * 0.03 + Math.sin(TAU * whine[1] * t + c) * 0.012) * 1.2);
+    }
+    chans.push(normalize(out, 0.9));
+  }
+  return toBuffer(ctx, chans);
+}

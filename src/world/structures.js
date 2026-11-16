@@ -329,7 +329,8 @@ function buildBunker(env) {
   // the nest deck
   const deckMat = weather(new THREE.MeshStandardMaterial({ color: 0x3a3c37, roughness: 0.55, metalness: 0.65, normalMap: tex.metal.normalMap }), { soot: 0.5, rust: 0.3, key: 'deck' });
   const D = [];
-  D.push(box(5.6, 0.3, 3.4, 0, top - 0.15, -2.5));
+  // cantilevered off the tower's face (z0), not overlapping its roof: the two tops are level and would fight
+  D.push(box(5.6, 0.3, z0 + 4.2, 0, top - 0.15, (-4.2 + z0) / 2));
   for (const sx of [-2.4, 2.4]) D.push(xf(new THREE.BoxGeometry(0.22, 0.3, 4.2), sx, top - 1.6, -2.2, -0.75));
   D.push(box(5.8, 0.08, 0.08, 0, top - 0.02, -4.22));
   const deck = new THREE.Mesh(merge(D), deckMat);

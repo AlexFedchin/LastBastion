@@ -27,6 +27,10 @@
   "dur": 6.22,
   "file": "command_6bca788847.ogg"
  },
+ "COMMAND|Bastion-7, Command. The bridge at Halden is down. Nobody leaves that valley by road now. Keep the gate shut.": {
+  "dur": 8.652,
+  "file": "command_517569d2df.ogg"
+ },
  "COMMAND|Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.": {
   "dur": 8.655,
   "file": "command_69313163d7.ogg"
@@ -39,9 +43,17 @@
   "dur": 7.18,
   "file": "command_ca76ae91fb.ogg"
  },
+ "COMMAND|Bastion-7, this is Command. Extraction is set for the seventy-second hour. Hold until then.": {
+  "dur": 8.02,
+  "file": "command_7a601b0d60.ogg"
+ },
  "COMMAND|Bastion-7, this is Command. Relief column departs at dawn. Hold for seventy-two hours.": {
   "dur": 7.54,
   "file": "command_67599b0bdc.ogg"
+ },
+ "COMMAND|Bastion-7... airframes are short... (static) ...the flight goes only for fifteen souls or more. Keep your people alive.": {
+  "dur": 10.94,
+  "file": "command_2885a3d092.ogg"
  },
  "COMMAND|Bastion-7... relief column has been... (static) ...rerouted. Hold position.": {
   "dur": 6.7,
@@ -62,6 +74,10 @@
  "HAMMER 1-1|Good effect on target. That's a lot of them down. Hammer one-one off and climbing.": {
   "dur": 4.72,
   "file": "hammer_1_1_eafa8f7e5a.ogg"
+ },
+ "HAMMER 1-1|Hammer flight, in hot. Walking it up the valley. Bombs away, bombs away.": {
+  "dur": 4.56,
+  "file": "hammer_1_1_16b07744af.ogg"
  },
  "HAMMER 1-1|Hammer one-one, I have your red smoke. One GBU, danger close. Heads down, Bastion.": {
   "dur": 6.24,
@@ -125,6 +141,11 @@
   "file": "narrator_2c7eb57b6d.ogg",
   "sr": 24000
  },
+ "NARRATOR|And for seventy-two hours... it held.": {
+  "dur": 5.66,
+  "file": "narrator_14d9b035cb.ogg",
+  "sr": 24000
+ },
  "NARRATOR|And then it came — the biggest of them all. It reached our wall, and for a long moment I thought the whole line would come down with it. It didn't. It fell.": {
   "dur": 13.7,
   "file": "narrator_1cafff97fd.ogg",
@@ -133,6 +154,11 @@
  "NARRATOR|And then it came — the biggest of them all. We threw everything we had left at it, and somehow, out there in the field, it fell.": {
   "dur": 13.358,
   "file": "narrator_4938152ca2.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|And then the sun rose on the seventy-second hour. No aircraft came over the ridge. But we were still there.": {
+  "dur": 8.82,
+  "file": "narrator_bc141dcebb.ogg",
   "sr": 24000
  },
  "NARRATOR|And then the sun rose on the seventy-second hour. No column came down the road. But we were still there.": {
@@ -163,6 +189,11 @@
  "NARRATOR|At dawn, Aran told the sergeant it had been an honour. Kovac told him to save it. One more night.": {
   "dur": 7.371,
   "file": "narrator_891d5d9bc6.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|At dawn, Kovac counted heads twice, and chalked the number on the wall where everyone could see it.": {
+  "dur": 6.82,
+  "file": "narrator_d7ae8938bc.ogg",
   "sr": 24000
  },
  "NARRATOR|At dawn, Kovac loaded a fresh belt without a word. Nobody said rerouted out loud again.": {
@@ -200,6 +231,11 @@
   "file": "narrator_9de8f4b4b9.ogg",
   "sr": 24000
  },
+ "NARRATOR|Command had called us Bastion-7. The people we carried out of that valley called it something else. They called it the Last Bastion.": {
+  "dur": 9.671,
+  "file": "narrator_36b4a3a034.ogg",
+  "sr": 24000
+ },
  "NARRATOR|Dawn. We counted the living, then the dead, and then we stopped counting.": {
   "dur": 7.02,
   "file": "narrator_d46968dfe0.ogg",
@@ -218,6 +254,16 @@
  "NARRATOR|Everything we had, we gave. Some of us gave all of it. Their rifles stayed on the parapet where they fell.": {
   "dur": 9.94,
   "file": "narrator_95b852925a.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|Extraction at the seventy-second hour, Command had said. Fifteen souls, or the birds would not fly. The hour came, and the sky stayed empty.": {
+  "dur": 14.7,
+  "file": "narrator_0a44d46f95.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|For ten nights we had held that wall. Now we ran from it, past the fires, toward the red light at the back of the ramp.": {
+  "dur": 7.98,
+  "file": "narrator_bf1630a0ea.ogg",
   "sr": 24000
  },
  "NARRATOR|Hollis came back that night with a truck full of strangers from Halden. The dead stopped it on the road, short of the gate, and we could not clear them fast enough.": {
@@ -313,6 +359,16 @@
  "NARRATOR|On the second night, word came that the bridge at Halden was down. The relief would be late. Only late, we told ourselves.": {
   "dur": 9.62,
   "file": "narrator_f3047a2366.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|On the second night, word came that the bridge at Halden was down. There was no road out of the valley any more. Only the sky, we told ourselves.": {
+  "dur": 12.66,
+  "file": "narrator_d0193d13e7.ogg",
+  "sr": 24000
+ },
+ "NARRATOR|On the sixth night, Command told us the birds would only fly for fifteen souls or more. After that, we counted heads every hour.": {
+  "dur": 11.535,
+  "file": "narrator_8644e21506.ogg",
   "sr": 24000
  },
  "NARRATOR|On the sixth night, the radio told us the relief column had been rerouted. Nobody on the wall believed it.": {
@@ -535,6 +591,11 @@
   "file": "narrator_1d49d6f50c.ogg",
   "sr": 24000
  },
+ "NARRATOR|We left the gun on the wall, still pointed down the valley. By the time we cleared the ridge, the dead were on the walkway where we had stood.": {
+  "dur": 9.86,
+  "file": "narrator_71aeeafb01.ogg",
+  "sr": 24000
+ },
  "NARRATOR|We lost good men on the walkway that night. We buried them at first light, beside the others.": {
   "dur": 7.311,
   "file": "narrator_a3fa01a810.ogg",
@@ -605,6 +666,26 @@
   "file": "narrator_90cf2afa2c.ogg",
   "sr": 24000
  },
+ "NIGHTINGALE|Bastion-7, Nightingale. Extraction flight is airborne, three lifters and escort. Hold that wall until we are overhead.": {
+  "dur": 8.837,
+  "file": "nightingale_16a2fef36a.ogg"
+ },
+ "NIGHTINGALE|Bastion-7, Nightingale. We are over the ridge. Hammer flight, you are cleared hot. Everything past the wire.": {
+  "dur": 6.98,
+  "file": "nightingale_5c183622bf.ogg"
+ },
+ "NIGHTINGALE|Nightingale is on the ground. Ramp is down. Move, move, move!": {
+  "dur": 4.117,
+  "file": "nightingale_1d98e30eb3.ogg"
+ },
+ "NIGHTINGALE|Nightingale, two minutes out. Hammer flight is with us. Keep them off that wall, Bastion.": {
+  "dur": 6.86,
+  "file": "nightingale_2d7e3d66a3.ogg"
+ },
+ "NIGHTINGALE|Ten seconds, Bastion. Get your heads down.": {
+  "dur": 3.196,
+  "file": "nightingale_cf7a308009.ogg"
+ },
  "PVT. ARAN|I stopped writing their names down.": {
   "dur": 2.529,
   "file": "pvt_aran_9f75de4bcc.ogg"
@@ -624,6 +705,14 @@
  "REACH 3-1|Load away, load away. Good chute. Reach three-one is clear — good luck down there.": {
   "dur": 6.38,
   "file": "reach_3_1_babe69a46c.ogg"
+ },
+ "REAPER 1-1|Bastion-7, Reaper one-one, inbound with the lifters. Forty seconds. Just hold on.": {
+  "dur": 6.86,
+  "file": "reaper_1_1_af15af7bbc.ogg"
+ },
+ "REAPER 1-1|Reaper one-one, on station. We have the wall. Anything that moves down there is ours.": {
+  "dur": 5.42,
+  "file": "reaper_1_1_d8157475be.ogg"
  },
  "SGT. KOVAC|Another night. Another dawn.": {
   "dur": 3.4,
@@ -652,6 +741,10 @@
  "SGT. KOVAC|Breach! We lost someone!": {
   "dur": 3.442,
   "file": "sgt_kovac_a71307f29f.ogg"
+ },
+ "SGT. KOVAC|Bring it down on them! Everyone off the wall — get your heads down!": {
+  "dur": 4.4,
+  "file": "sgt_kovac_1a40ba1826.ogg"
  },
  "SGT. KOVAC|Brutes! A whole herd of them — left flank!": {
   "dur": 3.745,
@@ -692,6 +785,10 @@
  "SGT. KOVAC|Everybody in? Squad, back inside — shut the gate!": {
   "dur": 3.96,
   "file": "sgt_kovac_cb6d717953.ogg"
+ },
+ "SGT. KOVAC|Fifteen. You heard him. Nobody else dies on this wall.": {
+  "dur": 4.84,
+  "file": "sgt_kovac_d8d33dd289.ogg"
  },
  "SGT. KOVAC|Fog's lifting. Back to work.": {
   "dur": 3.128,
@@ -769,6 +866,10 @@
   "dur": 3.76,
   "file": "sgt_kovac_971743d1d3.ogg"
  },
+ "SGT. KOVAC|No birds. No orders. Just the night, and the gun.": {
+  "dur": 7.322,
+  "file": "sgt_kovac_15b471bedd.ogg"
+ },
  "SGT. KOVAC|No relief. No orders. Just the night, and the gun.": {
   "dur": 5.233,
   "file": "sgt_kovac_d57bbba184.ogg"
@@ -809,6 +910,10 @@
   "dur": 3.44,
   "file": "sgt_kovac_bfb8aa0a82.ogg"
  },
+ "SGT. KOVAC|Seventy-two hours, and not enough of us left to be worth a flight. Whatever comes down that valley — we are still here.": {
+  "dur": 8.684,
+  "file": "sgt_kovac_dc0584847a.ogg"
+ },
  "SGT. KOVAC|Seventy-two hours. This is the last night. Whatever comes down that valley — we are still here.": {
   "dur": 9.8,
   "file": "sgt_kovac_e5d31812b1.ogg"
@@ -837,6 +942,10 @@
   "dur": 3.76,
   "file": "sgt_kovac_4412808d0c.ogg"
  },
+ "SGT. KOVAC|That's everyone. Bastion-7 is off the wall. Go, go!": {
+  "dur": 5.32,
+  "file": "sgt_kovac_65e276659f.ogg"
+ },
  "SGT. KOVAC|That's not like the other one. That's bigger. Everything we have — put it on that thing!": {
   "dur": 7.4,
   "file": "sgt_kovac_321e273ef5.ogg"
@@ -856,6 +965,10 @@
  "SGT. KOVAC|There's a fuel tanker stalled out on the road. Let them crowd around it, then put a burst through the tank.": {
   "dur": 6.76,
   "file": "sgt_kovac_8d74ca31f3.ogg"
+ },
+ "SGT. KOVAC|They know. God help us, they know we are leaving. Everything is coming over that ridge — hold!": {
+  "dur": 6.04,
+  "file": "sgt_kovac_8d74f76065.ogg"
  },
  "SGT. KOVAC|They walked right past the tanker. Waste of good fuel.": {
   "dur": 4.84,

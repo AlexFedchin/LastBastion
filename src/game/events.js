@@ -15,6 +15,8 @@ import { makeTruck, cylX } from '../world/kit.js';
 import { cloneModel } from '../world/models.js';
 import { Soldier } from './soldier.js';
 import { Survivor } from './survivor.js';
+import { walkStep, steer, addObstacle, removeObstacle } from '../world/obstacles.js';
+const _w2 = [0, 0];
 
 const R = Math.random;
 const pickOne = (a) => a[(R() * a.length) | 0];
@@ -296,8 +298,8 @@ class Escort {
         let vx = dx + ax * 0.6, vz = dz + az * 0.25;
         const vl = Math.hypot(vx, vz) || 1;
         vx = vx / vl * u.sp; vz = vz / vl * u.sp;
-        u.x += vx * dt; u.z += vz * dt;
-        u.yaw = Math.atan2(vx, vz);
+        const wv = walkStep(u, vx, vz, dt, 0.4);
+        u.yaw = Math.atan2(wv[0], wv[1]);
         u.ph += dt * u.sp * 2.1;
         // caught
         if (this.t > 1.5 && h.queryRadius(u.x, u.z, P.catchR * f.root.scale.x, h._q) > 0) {
@@ -523,7 +525,7 @@ class SupplyDrop {
       const d = Math.hypot(dx, dz) || 1;
       dx /= d; dz /= d;
       const sp = P.carrySpeed[Math.min(up.length, TEAM)];
-      c.x += dx * sp * dt; c.z += dz * sp * dt;
+      walkStep(c, dx * sp, dz * sp, dt, 1.4);
       c.y = groundH(c.x, c.z) + 0.75 + Math.abs(Math.sin(this.t * 4.5)) * 0.04;
       c.yaw = Math.atan2(dx, dz);
       E.crate.rotation.y = c.yaw;
@@ -554,8 +556,8 @@ class SupplyDrop {
       const moving = dd > 0.25;
       if (moving) {
         const st = Math.min(dd, sp * dt);
-        u.x += dx / dd * st; u.z += dz / dd * st;
-        u.yaw = this.phase === 'carry' ? c.yaw : Math.atan2(dx, dz);
+        const wv = walkStep(u, dx / dd * st / dt, dz / dd * st / dt, dt, 0.4);
+        u.yaw = this.phase === 'carry' ? c.yaw : Math.atan2(wv[0], wv[1]);
         u.ph += dt * Math.min(sp, 2 + dd * 4) * 2.1;
       } else if (this.phase === 'carry') {
         u.yaw = c.yaw;
@@ -834,6 +836,8 @@ class Tanker {
     T.visible = true;
     T.updateMatrixWorld(true);
     this.box = new THREE.Box3().setFromObject(T);
+    if (E.tankerSolid) removeObstacle(E.tankerSolid);
+    E.tankerSolid = addObstacle(this.x - Math.cos(this.yaw) * 0.25, this.z + Math.sin(this.yaw) * 0.25, this.yaw, 4.55, 1.3);
     this.hp = P.hp; this.t = 0; this.state = 'wait'; this.leak = 0;
     // the crowd that will walk past it
     this.ids = new Set();
@@ -944,7 +948,7 @@ class Convoy {
 
   start() {
     const { E, P } = this, g = E.g, h = g.horde, plan = g.plan;
-    this.x = rand(-3, 3); this.z = -235; this.hp = 100; this.t = 0; this.state = 'drive'; this.sp = P.speed;
+    this.x = rand(-3, 3); this.z = -235; this.hp = 100; this.t = 0; this.state = 'drive'; this.sp = P.speed; this.yaw = 0;
     const T = E.truck;
     T.visible = true;
     this.track = new Set();
@@ -983,8 +987,12 @@ class Convoy {
       this.hp -= Math.min(P.maxTearing, touching) * P.tear * dt;
       let dx = GATE.x - this.x, dz = GATE.z - this.z;
       const d = Math.hypot(dx, dz) || 1;
-      this.x += dx / d * this.sp * dt; this.z += dz / d * this.sp * dt;
-      this.yaw = Math.atan2(dx, dz);
+      // the driver swerves round the wrecks on the road
+      steer(this.x + Math.sin(this.yaw) * 3, this.z + Math.cos(this.yaw) * 3, dx / d * this.sp, dz / d * this.sp, 1.6, _w2, 1);
+      const head = Math.atan2(_w2[0], _w2[1]);
+      let dyaw = head - this.yaw; dyaw = Math.atan2(Math.sin(dyaw), Math.cos(dyaw));
+      this.yaw += dyaw * Math.min(1, dt * 3);
+      this.x += Math.sin(this.yaw) * this.sp * dt; this.z += Math.cos(this.yaw) * this.sp * dt;
       for (let i = 0; i < h.n; i++) if (!h.dead[i] && this.track.has(h.id[i])) { h.tgtX[i] = this.x; h.tgtZ[i] = this.z; }
       if (touching && R() < dt * 5) fx.spark(this.x + rand(-1, 1), groundH(this.x, this.z) + 1.5, this.z + rand(-2, 2), rand(-2, 2), rand(1, 3), rand(-2, 2), 4, 3, 2, 0.4);
       // headlights
@@ -1312,6 +1320,7 @@ export class NightEvents {
     for (const p of [...this.people, ...this.soldiers]) p.root.visible = false; // the fallen from last night
     if (this.cover) this.cover.reset();
     if (this.tankerWreck) { this.tankerWreck.visible = false; this.tanker.visible = false; this.truck.visible = false; }
+    if (this.tankerSolid) { removeObstacle(this.tankerSolid); this.tankerSolid = null; }
     this.queue.length = 0;
     const g = this.g;
     g.env.power = 1; g.env.fogBank = 0;
@@ -1354,6 +1363,8 @@ export class NightEvents {
   }
 
   objective() {
+    const pin = this.active.find((e) => e.pinned && e.objective);
+    if (pin) return pin.objective();
     for (let k = this.active.length - 1; k >= 0; k--) {
       const o = this.active[k].objective && this.active[k].objective();
       if (o) return o;

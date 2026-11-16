@@ -9,6 +9,7 @@ import { clamp, lerp, rand, fitFov } from '../core/util.js';
 import { groundH } from '../world/terrain.js';
 import { Survivor, ADULTS, WALKS } from './survivor.js';
 import { Soldier } from './soldier.js';
+import { walkStep } from '../world/obstacles.js';
 
 const $ = (id) => document.getElementById(id);
 const ease = (k) => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
@@ -152,7 +153,7 @@ export class Ending {
     const place = (f, soldier, kid) => {
       const z = ROAD_FROM + (k++ / n) * span + rand(-1.2, 1.2);
       const lane = soldier ? rand(-2.8, -1.4) : rand(-2.2, 2.6);
-      this.walkers.push({ f, soldier, kid, x: lane, lane, z, sp: rand(1.0, 1.35) * (kid ? 0.95 : 1), ph: Math.random() * 6 });
+      this.walkers.push({ f, soldier, kid, x: lane, lane, z, yaw: 0, bias: k % 2 ? 1 : -1, sp: rand(1.0, 1.35) * (kid ? 0.95 : 1), ph: Math.random() * 6 });
     };
     // families, stragglers, and soldiers with no unit
     const order = [];
@@ -195,8 +196,9 @@ export class Ending {
 
   updateColumn(dt) {
     for (const w of this.walkers) {
-      w.z += w.sp * dt;
-      w.x += (w.lane - w.x) * Math.min(1, dt * 0.3);
+      // along the road, round the wrecks on it
+      const wv = walkStep(w, (w.lane - w.x) * 0.3, w.sp, dt, 0.35);
+      w.yaw = Math.atan2(wv[0], wv[1]);
       if (Math.random() < dt * 0.05) w.lane = w.soldier ? rand(-2.8, -1.4) : rand(-2.2, 2.6);
       // through the gate: walk on from the far end of the column
       if (w.z > ROAD_TO) { w.z -= ROAD_TO - ROAD_FROM; w.x = w.lane; }
@@ -204,7 +206,7 @@ export class Ending {
       w.ph += dt * w.sp * 3.1;
       f.walk(w.ph / 3.1); // 3.1 rad per metre
       f.root.position.set(w.x, groundH(w.x, w.z), w.z);
-      f.root.rotation.y = (w.lane - w.x) * 0.15;
+      f.root.rotation.y += (w.yaw - f.root.rotation.y) * Math.min(1, dt * 5);
     }
     for (const s of this.guards) if (s.root.visible) s.idle();
     const T = this.truck, M = this.g.events.truck;

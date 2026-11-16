@@ -33,6 +33,11 @@ PERSONA = {
                  "tired to the bone, Scottish accent, careful and wary.",
     'THE QUARRY': "Male, about sixty, a farmer leading a group of refugees, on an old CB radio: slow, warm, rough bass voice, "
                   "Irish accent, cautious hope.",
+    # the extraction flight on the last night: the lifters' lead and the gunship escort
+    'NIGHTINGALE': "Female, late thirties, a British helicopter flight lead on the radio: clear, low, controlled alto, "
+                   "precise and warm, unflappable, the calm voice that has done this many times.",
+    'REAPER 1-1': "Male, about thirty, an American attack helicopter pilot: fast, dry, confident tenor with a Texan edge, "
+                  "speaking over rotor noise, steady under fire.",
     # the chronicle at every dawn: not on the radio, told years later
     'NARRATOR': "Male, about seventy, an old soldier telling the story of the siege decades later: a deep, warm, weathered "
                 "baritone with soft gravel, slow and measured, intimate and haunted, a storyteller by a fire; clear, unhurried diction.",
@@ -54,6 +59,8 @@ REF_TEXT = {
     'REACH 3-1': "Good evening, this is Reach. We're established on the approach, cargo is rigged, and the crew is ready back there.",
     'THE RIDGE': "We're about twelve of us. We've been in the hills since the city went. We've got water for a day, maybe two.",
     'THE QUARRY': "This is the quarry. We've a tractor, a trailer and forty souls. The road down's clear as far as the old mill.",
+    'NIGHTINGALE': "Nightingale flight, check in. Three lifters, escort is with us. We are low level, following the river north.",
+    'REAPER 1-1': "Reaper one-one, guns are hot, fuel is good. We'll keep the lifters covered all the way in.",
     'NARRATOR': "It was a long time ago now. But some nights, when the wind comes down the valley, I can still hear the gun.",
 }
 
@@ -77,17 +84,19 @@ DEFAULT = {
     'THE RIDGE': ("Wary and quiet, worn out, holding back hope.", 0.35),
     'THE QUARRY': ("Slow and cautious, an old man daring to hope.", 0.35),
     'REACH 3-1': ("Calm, warm, professional pilot radio call.", 0.3),
+    'NIGHTINGALE': ("Clear, calm and controlled helicopter radio call.", 0.4),
+    'REAPER 1-1': ("Fast, confident attack pilot radio call over rotor noise.", 0.55),
     'NARRATOR': ("Slow, low and measured, an old man remembering; quiet gravity, unhurried pauses between the sentences.", 0.22),
 }
 
 # text -> (direction, intensity)
 DIRECTION = {
     # ── night-by-night story ───────────────────────────────────────────────
-    'Bastion-7, this is Command. Relief column departs at dawn. Hold for seventy-two hours.':
-        ("Calm, confident and businesslike, a routine order, the officer still believes help is coming.", 0.3),
+    'Bastion-7, this is Command. Extraction is set for the seventy-second hour. Hold until then.':
+        ("Calm, confident and businesslike, a routine order, the officer still believes the flight will come.", 0.3),
     'You heard the man. Seventy-two hours. Keep that barrel cool and the wall clean.':
         ("Gruff and dry, half a smirk, rallying his men with easy authority. Steady pace.", 0.4),
-    'Bastion-7, relief column delayed. Bridge at Halden is down. Keep the gate shut.':
+    'Bastion-7, Command. The bridge at Halden is down. Nobody leaves that valley by road now. Keep the gate shut.':
         ("Grim, flat and controlled, delivering bad news without emotion, short heavy pauses between sentences.", 0.28),
     'Whatever you hear out there tonight — the gate stays shut.':
         ("Low, hard and deliberate, a warning; slow, every word weighted, quiet menace.", 0.35),
@@ -103,10 +112,10 @@ DIRECTION = {
         ("Hollow, shaken and slow, the officer's composure slipping; long weary pauses.", 0.25),
     "We're what's left on this line. Make it count.":
         ("Quiet, grave and resolute, steel under exhaustion, a short speech to his men.", 0.35),
-    'Bastion-7... relief column has been... (static) ...rerouted. Hold position.':
-        ("Halting and evasive, an officer reading an order he does not believe; tired, flat.", 0.25),
-    'Rerouted. Sure. Load the belt.':
-        ("Bitter, sardonic and dry, a tired scoff, then flat and practical.", 0.3),
+    'Bastion-7... airframes are short... (static) ...the flight goes only for fifteen souls or more. Keep your people alive.':
+        ("Halting and ashamed, an officer reading out a cold rule he hates; tired, breaking up, quieter on the last sentence.", 0.28),
+    'Fifteen. You heard him. Nobody else dies on this wall.':
+        ("Hard and low, a vow; slow, each sentence heavier, iron on the last.", 0.45),
     "Command hasn't answered since 0300. I'm sure it's the antenna.":
         ("Dry, weary, forced casualness, a joke nobody believes, a hollow little laugh in the voice.", 0.25),
     'Sarge... the city stopped burning.':
@@ -119,11 +128,13 @@ DIRECTION = {
         ("Tense and grim, controlled urgency, steeling himself for the worst night.", 0.5),
     'Sarge, if this is it... it was an honour.':
         ("Soft, tearful and sincere, a young soldier saying goodbye, voice catching.", 0.25),
+    'Seventy-two hours, and not enough of us left to be worth a flight. Whatever comes down that valley — we are still here.':
+        ("Bitter and bone-tired at first, then slow, proud and defiant, a fierce quiet strength on 'we are still here'.", 0.45),
     'Seventy-two hours. This is the last night. Whatever comes down that valley — we are still here.':
         ("Slow, proud and defiant, a final rallying speech, building to a fierce, quiet strength on 'we are still here'.", 0.5),
     'If anyone is listening: Bastion-7 is holding. Bastion-7 is holding.':
         ("Exhausted but unbroken, broadcasting into the dark; the second time quieter and more personal.", 0.35),
-    'No relief. No orders. Just the night, and the gun.':
+    'No birds. No orders. Just the night, and the gun.':
         ("Low, weary, almost meditative, a man who has accepted his fate.", 0.25),
     'Count the survivors. Then count the dead out there. Keep counting.':
         ("Grim, bone-tired and bitter, flat and slow.", 0.3),
@@ -302,7 +313,7 @@ DIRECTION = {
     # ── the chronicle at dawn (NARRATOR) ──────────────────────────────────
     'On the first night, the dead came down the valley in their thousands. Bastion-7 answered them with one gun.':
         ("Slow and grave, the opening of a long story; a pause, then quiet pride on 'one gun'.", 0.25),
-    'On the second night, word came that the bridge at Halden was down. The relief would be late. Only late, we told ourselves.':
+    'On the second night, word came that the bridge at Halden was down. There was no road out of the valley any more. Only the sky, we told ourselves.':
         ("Measured and weary, a wry, sad smile on 'Only late, we told ourselves'.", 0.2),
     "The third night began with a woman's voice on the radio, begging for help that we could not give.":
         ("Low and heavy with old guilt, slowing down at the end.", 0.2),
@@ -310,7 +321,7 @@ DIRECTION = {
         ("Dry and grim, measured storytelling with a bitter edge.", 0.22),
     'On the fifth night, Bastion-3 fell, and Bastion-5 went silent. We were the last lights left on the line.':
         ("Hushed and solemn, a long pause before the last sentence, quiet and lonely.", 0.2),
-    'On the sixth night, the radio told us the relief column had been rerouted. Nobody on the wall believed it.':
+    'On the sixth night, Command told us the birds would only fly for fifteen souls or more. After that, we counted heads every hour.':
         ("Dry, weary and sardonic, an old man shaking his head.", 0.2),
     "By the seventh night, Command had stopped answering. Out on the horizon, the city's fires were going out.":
         ("Quiet, numb and slow, haunted, almost a whisper at the end.", 0.15),
@@ -384,7 +395,7 @@ DIRECTION = {
         ("Bleak and poetic, slow.", 0.18),
     'That morning we understood that there was no line anymore. There was only us.':
         ("Quiet realisation, solemn, a long pause before 'There was only us'.", 0.2),
-    'At dawn, Kovac loaded a fresh belt without a word. Nobody said rerouted out loud again.':
+    'At dawn, Kovac counted heads twice, and chalked the number on the wall where everyone could see it.':
         ("Dry, quiet and wry, an old soldier's understatement.", 0.2),
     'That morning the city on the horizon lay dark and still. There was nothing left in it to burn.':
         ("Hushed and desolate, very slow.", 0.15),
@@ -392,7 +403,7 @@ DIRECTION = {
         ("Quiet pride growing, the last sentence firm and moved.", 0.3),
     'At dawn, Aran told the sergeant it had been an honour. Kovac told him to save it. One more night.':
         ("Tender and bittersweet, a small smile on 'save it', resolute on 'One more night'.", 0.25),
-    'And then the sun rose on the seventy-second hour. No column came down the road. But we were still there.':
+    'And then the sun rose on the seventy-second hour. No aircraft came over the ridge. But we were still there.':
         ("Slow and deeply moved, voice catching with pride on 'But we were still there'.", 0.3),
     'The sun rose again. It did not care who was still alive to see it.':
         ("Bleak and philosophical, slow.", 0.15),
@@ -477,7 +488,7 @@ DIRECTION = {
     'We threw every bottle we had. The foot of the wall was one long fire, and still they kept walking into it.':
         ('Building, intense, then hollow at the end.', 0.4),
     # the ending
-    'Seventy-two hours, Command had said. Now the hours had run out, and the radio stayed silent. There was no one left on the other end.':
+    'Extraction at the seventy-second hour, Command had said. Fifteen souls, or the birds would not fly. The hour came, and the sky stayed empty.':
         ('Slow and quiet, a bitter echo of an old promise; plain and heavy, the last sentence lands flat and final.', 0.2),
     'Kovac kept broadcasting anyway. Every hour, on every channel the set could reach, the same four words.':
         ('Warm, a faint smile of affection for a stubborn old friend, slow.', 0.25),
@@ -531,6 +542,37 @@ DIRECTION = {
         ("Mournful and grave, an elegy, slowing to a whisper at the end.", 0.25),
     'No one was left to write it down. The gun fell silent before the dawn, and in the morning, the valley belonged to the dead.':
         ("Hushed and final, an epitaph, very slow.", 0.2),
+    # ── the last night with enough of us: the extraction ─────────────────────
+    'Bastion-7, Nightingale. Extraction flight is airborne, three lifters and escort. Hold that wall until we are overhead.':
+        ("Calm, clear and warm, the first good news in days; steady professional pace, a firm promise on the last sentence.", 0.4),
+    'Nightingale, two minutes out. Hammer flight is with us. Keep them off that wall, Bastion.':
+        ("Focused and urgent but controlled, rotor noise behind her, encouraging on the last sentence.", 0.5),
+    'They know. God help us, they know we are leaving. Everything is coming over that ridge — hold!':
+        ("Horrified realisation, low at first, then rising to a desperate bellowed order on 'hold!' over gunfire.", 0.95),
+    'Bastion-7, Reaper one-one, inbound with the lifters. Forty seconds. Just hold on.':
+        ("Fast and tense, speaking over rotors, then softer and personal on 'Just hold on'.", 0.6),
+    'Ten seconds, Bastion. Get your heads down.':
+        ("Sharp, urgent and clipped, a warning.", 0.65),
+    'Bastion-7, Nightingale. We are over the ridge. Hammer flight, you are cleared hot. Everything past the wire.':
+        ("Commanding and crisp, rising intensity, a decisive order on 'cleared hot'.", 0.6),
+    'Bring it down on them! Everyone off the wall — get your heads down!':
+        ("Bellowing at the top of his lungs over gunfire and rotors, fierce and wild.", 1.0),
+    'Hammer flight, in hot. Walking it up the valley. Bombs away, bombs away.':
+        ("Crisp, fast, adrenaline under control, through an oxygen mask; punchy on 'bombs away'.", 0.65),
+    'Reaper one-one, on station. We have the wall. Anything that moves down there is ours.':
+        ("Cool, cocky and confident over the rotors, a hunter's grin in the voice.", 0.55),
+    'Nightingale is on the ground. Ramp is down. Move, move, move!':
+        ("Urgent and loud over the rotor wash, building to shouted 'Move, move, move!'", 0.85),
+    "That's everyone. Bastion-7 is off the wall. Go, go!":
+        ("Breathless and hoarse, relief and grief together, then a shouted 'Go, go!'", 0.8),
+    'For ten nights we had held that wall. Now we ran from it, past the fires, toward the red light at the back of the ramp.':
+        ("Quiet awe, a little faster than usual, remembering the rush; softening at 'the red light'.", 0.35),
+    'We left the gun on the wall, still pointed down the valley. By the time we cleared the ridge, the dead were on the walkway where we had stood.':
+        ("Slow and haunted, a long pause after the first sentence, the second almost a whisper.", 0.25),
+    'Command had called us Bastion-7. The people we carried out of that valley called it something else. They called it the Last Bastion.':
+        ("Warm, proud and measured, a storyteller's pause before 'the Last Bastion'.", 0.3),
+    'And for seventy-two hours... it held.':
+        ("Very slow and quiet, final and proud, a long pause before 'it held'.", 0.25),
 }
 
 

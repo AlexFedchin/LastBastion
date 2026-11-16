@@ -217,9 +217,11 @@ export class Screens {
       : '';
   }
 
-  buildVictory(run, best) {
-    $('victory-pre').textContent = `THE END · SEVENTY-TWO HOURS · ${DIFFICULTY[run.difficulty].label}`;
-    $('victory-text').textContent = `${run.survivors} of the garrison lived to see the seventy-second hour. ${formatInt(run.kills)} of the dead never walked again. The wall is still standing.`;
+  buildVictory(run, best, extracted = false) {
+    $('victory-pre').textContent = `THE END · ${extracted ? 'EXTRACTED' : 'SEVENTY-TWO HOURS'} · ${DIFFICULTY[run.difficulty].label}`;
+    $('victory-text').textContent = extracted
+      ? `${run.survivors} of the garrison were carried out of the valley at the seventy-second hour. ${formatInt(run.kills)} of the dead never walked again. The gun is still on the wall.`
+      : `${run.survivors} of the garrison lived to see the seventy-second hour, but there were too few of them for the flight. ${formatInt(run.kills)} of the dead never walked again. The wall is still standing.`;
     $('victory-stats').innerHTML = this.statsHtml(run);
     $('victory-record').innerHTML = best ? recordText(best) : '';
   }

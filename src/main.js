@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
   nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, ABILITY, CALL, COMMS,
-  UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines, CHRONICLE, NIGHT_EVENTS,
+  UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines, CHRONICLE, NIGHT_EVENTS, EXTRACTION,
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
@@ -29,6 +29,8 @@ import { loadModels, modelMesh } from './world/models.js';
 import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
 import { Ending } from './game/ending.js';
+import { obstacles } from './world/obstacles.js';
+import { ExtractionHold, ExtractionScene } from './game/extraction.js';
 
 const SECTION_LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
 const params = new URLSearchParams(location.search);
@@ -119,6 +121,7 @@ class Game {
     this.screens = new Screens(this);
     this.chronicle = new Chronicle(this);
     this.ending = new Ending(this);
+    this.extraction = new ExtractionScene(this);
     this.input = new Input(canvas);
 
     this.wireEvents();
@@ -256,13 +259,17 @@ class Game {
       const shop = !!save.atShop;
       const hours = Math.max(0, 72 - (n - 1) * 8);
       const fresh = Object.keys(UNLOCKS).filter((k) => UNLOCKS[k] === n).map((k) => UNLOCK_INFO[k]);
+      const souls = save.survivors ?? 0, past = save.endless || n > FINAL_NIGHT;
+      // from the sixth night on, the card keeps the count the flight is waiting for
+      const need = !past && n >= 6 && save.survivors ? ` · ${EXTRACTION.souls} NEEDED FOR EXTRACTION` : '';
       this.screens.show(null);
       await this.loader.show({
-        kicker: `BASTION-7 · ${diff.label}${save.survivors ? ` · ${save.survivors} ON THE WALL` : ''}`,
+        kicker: `BASTION-7 · ${diff.label}${save.survivors ? ` · ${save.survivors} ON THE WALL` : ''}${need}`,
         title: shop ? 'DAWN <b>RESUPPLY</b>' : `NIGHT <b>${String(n).padStart(2, '0')}</b>`,
         tag: shop ? 'Count the living. Spend what you scavenged.'
-          : n > FINAL_NIGHT ? 'No relief is coming.'
-            : fresh.length ? `New tonight: ${fresh.map((f) => f.replace(/ /g, '\u00a0')).join(' · ')}` : `${hours} hours until relief.`,
+          : past ? 'Nobody is coming for us.'
+            : n === FINAL_NIGHT ? (souls >= EXTRACTION.souls ? 'The flight is coming. Hold until it is overhead.' : 'Too few of us left for the flight. Hold anyway.')
+              : fresh.length ? `New tonight: ${fresh.map((f) => f.replace(/ /g, '\u00a0')).join(' · ')}` : `${hours} hours until extraction.`,
         sub: '',
         art: shop ? 'dawn' : this.nightArt(n),
       });
@@ -270,6 +277,8 @@ class Game {
       this.loader.step('issuing ammunition…', 0.2);
       await nextFrame();
       this.loader.step('briefing the crews…', 0.45);
+      // the extraction's aircraft and cast, built now so the precompile covers them
+      if (n === FINAL_NIGHT && !save.endless && (save.survivors ?? 0) >= EXTRACTION.souls) this.extraction.build();
       await this.precompile();
       this.loader.step('manning the wall…', 0.8);
       while (performance.now() - t0 < 1500) await nextFrame();
@@ -341,6 +350,7 @@ class Game {
       this.audio.init();
       if (this.chronicle.active && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.chronicle.advance(); return; }
       if (this.state === 'ending' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.ending.skipPress(); return; }
+      if (this.state === 'extraction' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.extraction.skipPress(); return; }
       if (e.code === 'Escape') {
         if (this.state === 'paused' && performance.now() - (this.pausedAt || 0) > 350) this.resume();
         else if (this.screens.current === 'settings' || this.screens.current === 'howto') this.onAction('back');
@@ -372,6 +382,7 @@ class Game {
     if (this.events) this.events.reset();
     if (this.chronicle) this.chronicle.stop();
     if (this.ending) this.ending.stop();
+    if (this.extraction) this.extraction.stop();
     this.audio.stopVoice();
     this.arsenal.startNight(this.menuStats, true);
     this.env.setStory(1);
@@ -412,7 +423,7 @@ class Game {
       case 'retry': { const s = loadSave(); if (s) this.deploy(s, () => this.startRun(s)); break; }
       case 'menu': this.enterMenu(); break;
       case 'endless': this.run.endless = true; writeSave(this.run); this.audio.setMusicMode('dawn'); this.openShop(); break;
-      case 'ending-skip': this.ending.skipPress(); break;
+      case 'ending-skip': if (this.state === 'extraction') this.extraction.skipPress(); else this.ending.skipPress(); break;
       case 'victory-new': this.enterMenu(); this.screens.show('new'); break;
       case 'chronicle-next': this.chronicle.advance(); break;
       default: break;
@@ -492,8 +503,11 @@ class Game {
     this.hud.radioQueue.length = 0;
     this.hud.clearAlerts();
     // radio script for the night
-    const lines = (run.night <= FINAL_NIGHT && !run.endless) ? RADIO[run.night] : [pick(RADIO.endless), pick(RADIO.endless)];
+    // the last night with enough of us left: the extraction flight is coming (ExtractionHold)
+    this.extracting = run.night === FINAL_NIGHT && !run.endless && run.survivors >= EXTRACTION.souls;
+    const lines = this.extracting ? [] : (run.night <= FINAL_NIGHT && !run.endless) ? RADIO[run.night] : [pick(RADIO.endless), pick(RADIO.endless)];
     this.events.start(run.night, run.endless || run.night > FINAL_NIGHT);
+    if (this.extracting) { const hold = new ExtractionHold(this); hold.start(); this.events.active.push(hold); }
     this.radioScript = (lines || []).map((l, i) => ({ at: i === 0 ? 4 : this.plan.duration * 0.42, who: l[0], text: l[1], done: false }));
     // new tools tonight: told over the radio, flagged on the HUD when you take the gun
     this.newUnlocks = Object.keys(UNLOCKS).filter((k) => UNLOCKS[k] === run.night && !run.endless);
@@ -510,8 +524,8 @@ class Game {
     this.introFrom = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone() };
     this.letterboxTarget = 1;
     const hoursLeft = Math.max(0, 72 - (run.night - 1) * 8);
-    const sub = run.endless || run.night > FINAL_NIGHT ? 'NO RELIEF IS COMING'
-      : run.night === FINAL_NIGHT ? 'THE LAST NIGHT' : `${hoursLeft} HOURS UNTIL RELIEF`;
+    const sub = run.endless || run.night > FINAL_NIGHT ? 'NOBODY IS COMING'
+      : run.night === FINAL_NIGHT ? (this.extracting ? 'HOLD FOR THE EXTRACTION FLIGHT' : 'THE LAST NIGHT') : `${hoursLeft} HOURS UNTIL EXTRACTION`;
     this.hud.announce(`NIGHT ${String(run.night).padStart(2, '0')}`, sub, 4.2);
     this.audio.init();
   }
@@ -626,24 +640,9 @@ class Game {
   }
 
   // ── Night end / fall ─────────────────────────────────────────────────────
-  endNight() {
+  /** The books for a night that was held: supplies, totals, the save (at the next dawn's shop). */
+  settleNight() {
     const run = this.run;
-    document.getElementById('scope').classList.remove('on');
-    this.hud.hint('');
-    this.state = 'dawn';
-    this.stateT = 0;
-    this.events.reset();
-    this.arsenal.endNight();
-    this.ignoreUnlock = true;
-    this.input.unlock();
-    setTimeout(() => { this.ignoreUnlock = false; }, 300);
-    // the night as it will be remembered: told over the dawn, kept for the resupply screen
-    this.story = composeChronicle({
-      night: run.night, endless: run.endless, log: this.events.log || [], ns: this.ns,
-      survivors: run.survivors, dangerUsed: this.arsenal.dangerUsed,
-    });
-    run.chronicle = { night: this.story.night, title: this.story.title, lines: this.story.lines };
-    this.chronicleStarted = false;
     const bonus = Math.round(SUPPLY_BONUS(run.night, run.survivors) * this.diff.supplyMul);
     run.supplies += bonus;
     this.ns.bonus = bonus;
@@ -663,6 +662,28 @@ class Game {
     // endless: every dawn past the seventy-second hour counts toward the record
     if (run.endless && survived > FINAL_NIGHT) this.newRecord = recordBest(survived - FINAL_NIGHT, run.kills, run.difficulty) || this.newRecord;
     this.telemetry.endNight('survived');
+    return survived;
+  }
+
+  endNight() {
+    const run = this.run;
+    document.getElementById('scope').classList.remove('on');
+    this.hud.hint('');
+    this.state = 'dawn';
+    this.stateT = 0;
+    this.events.reset();
+    this.arsenal.endNight();
+    this.ignoreUnlock = true;
+    this.input.unlock();
+    setTimeout(() => { this.ignoreUnlock = false; }, 300);
+    // the night as it will be remembered: told over the dawn, kept for the resupply screen
+    this.story = composeChronicle({
+      night: run.night, endless: run.endless, log: this.events.log || [], ns: this.ns,
+      survivors: run.survivors, dangerUsed: this.arsenal.dangerUsed,
+    });
+    run.chronicle = { night: this.story.night, title: this.story.title, lines: this.story.lines };
+    this.chronicleStarted = false;
+    const survived = this.settleNight();
     this.hud.announce('DAWN', `NIGHT ${String(survived).padStart(2, '0')} SURVIVED · ${run.survivors} ALIVE`, 5);
     this.hud.radio(CALL.kovac, pick(BARKS.dawn), true);
     this.audio.setMusicMode('dawn');
@@ -759,6 +780,7 @@ class Game {
       case 'shop': this.updateShop(dt, rdt); break;
       case 'fallen': this.updateFallen(dt, rdt); break;
       case 'ending': this.ending.update(dt, rdt); break;
+      case 'extraction': this.extraction.update(dt, rdt); break;
       case 'victory': this.updateShop(dt, rdt); break;
       default: break;
     }
@@ -1062,13 +1084,30 @@ class Game {
     this.ending.start();
   }
 
-  onEndingDone() {
+  /** The flight is overhead: the night is held, and the extraction plays (still at night). */
+  playExtraction() {
+    document.getElementById('scope').classList.remove('on');
+    this.hud.hint('');
+    this.settleNight();
+    this.victory = true;
+    this.events.reset();
+    this.ignoreUnlock = true;
+    this.input.unlock();
+    setTimeout(() => { this.ignoreUnlock = false; }, 300);
+    this.audio.setTide(false);
+    this.state = 'extraction';
+    this.stateT = 0;
+    this.extraction.start();
+  }
+
+  onEndingDone(extracted = false) {
     this.state = 'victory';
     this.stateT = 0;
     this.hud.show(false);
     this.letterboxTarget = 0;
     this.player.gun.visible = true;
-    this.screens.buildVictory(this.run, loadBest());
+    this.env.dawn = Math.max(this.env.dawn, 0.6);
+    this.screens.buildVictory(this.run, loadBest(), extracted);
     this.screens.show('victory');
     this.audio.setMusicMode('victory');
   }
@@ -1124,10 +1163,15 @@ class Game {
         if (!render) this.render(stepDt);
       },
       event: (kind) => { this.events.trigger(kind); },
+      extraction: (seek = 0) => { if (this.state !== 'extraction') this.playExtraction(); this.extraction.t = seek; for (const c of this.extraction.cues) c.done = c.at < seek; },
+      extractionInfo: () => ({ t: this.extraction.t, end: this.extraction.end, T: this.extraction.T, shots: this.extraction.shots }),
+      hold: (left) => { const h = this.events.active.find((e) => e.kind === 'extraction'); if (h) h.t = h.P.hold - left; return !!h; },
       ending: (seek = 0) => { this.victory = true; if (this.state !== 'ending') this.playEnding(); this.ending.t = seek; for (const c of this.ending.cues) c.done = c.at < seek; },
       endingInfo: () => ({ t: this.ending.t, end: this.ending.end, shots: this.ending.shots, cues: this.ending.cues.map((c) => [c.at, c.dur, c.shot || '']) }),
       freeze: (on = true) => { this.frozen = !!on; },
       radioLines: () => allRadioLines(),
+      obstacles: () => obstacles().map((b) => ({ ...b })),
+      inside: () => { let n = 0; const h = this.horde; for (let i = 0; i < h.n; i++) { if (h.dead[i]) continue; for (const b of obstacles()) { const dx = h.x[i] - b.x, dz = h.z[i] - b.z; if (Math.abs(dx * b.ax + dz * b.az) < b.hl && Math.abs(-dx * b.az + dz * b.ax) < b.hw) n++; } } return n; },
       ground: (x, z) => groundH(x, z),
       state: () => ({ state: this.state, n: this.horde.n, kills: this.run?.kills, surv: this.run?.survivors, pile: Array.from(this.horde.pileH).map((v) => +v.toFixed(2)), t: this.director.t }),
     };
