@@ -6,7 +6,8 @@ import * as THREE from 'three';
 import { WORLD } from '../config.js';
 import { makeRng } from '../core/util.js';
 import { groundH } from './terrain.js';
-import { box, cylX, cylY, cylZ, merge, xf, pillow, sagWire, extrude, weather, sandbagGeo, makeTruck } from './kit.js';
+import { box, cylX, cylY, cylZ, merge, xf, pillow, sagWire, extrude, weather, sandbagGeo } from './kit.js';
+import { placeModel } from './vehicles.js';
 
 const _q = new THREE.Quaternion();
 const _e = new THREE.Euler();
@@ -480,10 +481,10 @@ function dressYard(env, M, P, B, bagMs, rng) {
   B.put(P.tank(), at(46, 18, 0.2));
   B.put(P.tank(), at(-58, 15, 0.7));
   for (const [x, z, ry] of [[-38, 30, 0.9], [44, 31, -2.2]]) {
-    const t = makeTruck(env.mats, { body: env.mats.olive, burnt: false, seed: (x * 3) | 0, covered: x < 0 });
+    const t = new THREE.Object3D();
     t.position.set(x, G(x, z), z);
     t.rotation.y = ry;
-    env.scene.add(t);
+    placeModel(env, 'ural', t, { skip: x < 0 ? null : 'canvas' }); // one covered, one with its canvas off
   }
   // radio mast with guy wires and a red light on top
   const mx = -28, mz = 32, my = G(mx, mz);

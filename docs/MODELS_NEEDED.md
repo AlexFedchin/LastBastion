@@ -3,7 +3,11 @@
 The game already loads real models for:
 - the M2HB
 - the AC-130 and the B-36
+- the CH-47 lifters and the Apache gunships in the extraction
 - the soldier and the four survivors
+- the Ural trucks (covered, open, burnt out) and five wrecked cars
+- the crashed helicopter in the field
+- the shipping containers, the round hay bales and the bombs
 - the grenade and the molotov
 - the ammo crate and the sandbags
 - 48 Poly Haven props in the yard and on the walkway
@@ -71,65 +75,7 @@ The roof stays mostly clear: the nest deck, the sandbag ring, the shelter, crate
 
 **Budget:** about 20–50k triangles. It is seen from metres away (from the roof) up to a few hundred metres (from the air), so a high-resolution or trim-sheet concrete texture matters more than polygons.
 
-## 3. Heavy-lift tandem-rotor transport helicopter (CH-47 class)
-
-**Where:** the extraction cutscene. Three of them fly in over the hills, land in the yard, lower their ramps and take the garrison out. They fill the frame in the landing-zone, run, ramp and liftoff shots.
-
-**Now:** a rounded box with two rotor discs. In the cutscene it reads as a white block.
-
-**Need:**
-- Military tandem-rotor transport.
-- Both rotor heads as separate objects.
-- The rear loading ramp as a separate object hinged at its bottom edge.
-- A simple cabin interior visible through the open ramp (bench seats, red night lighting) is a big bonus.
-
-**Budget:** about 40–60k triangles.
-
-## 4. Attack helicopter (Apache / Cobra / Mi-24 class)
-
-**Where:** the extraction cutscene. Two gunships sweep the field with searchlights; the "helos" shot follows the lead one from close behind.
-
-**Now:** a procedural fuselage with stub wings, pods and rotors.
-
-**Need:**
-- Military attack helicopter.
-- Main and tail rotors as separate objects.
-- A chin turret or a mount point where the searchlight can sit.
-- Rocket pods or stub wings.
-
-**Budget:** about 30–50k triangles.
-
-## 5. Military cargo truck (M35 / Ural / KrAZ class)
-
-**Where:**
-- parked in the yard
-- wrecks on the field road
-- the burnt-out truck on the rear road
-- the truck in the ending's column
-
-**Now:** procedural boxes and wheels, in covered and uncovered variants.
-
-**Need:**
-- Canvas-covered cargo truck.
-- Ideally three versions: intact olive, uncovered, and a burnt-out wreck (rusty, no tyres, scorched).
-
-**Budget:** about 15–30k triangles per variant.
-
-## 6. Wrecked civilian cars
-
-**Where:** about 16 abandoned cars along the road through the killing field, plus a few on the rear road. Visible from the gun all game.
-
-**Now:**
-- procedural sedans
-- `kit/car` (a covered car from Poly Haven) in the yard
-
-**Need:**
-- 2–4 cars (sedan, hatchback, estate, a van).
-- Abandoned and burnt versions: broken glass, flat or missing tyres, rust, soot.
-
-**Budget:** about 5–15k triangles each.
-
-## 7. Trees and vegetation set
+## 3. Trees and vegetation set
 
 **Where:**
 - forests on every hill around the valley
@@ -150,7 +96,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 500–2,000 triangles per tree, alpha-cut foliage cards are fine. Bushes about 200–800.
 
-## 8. Wrecked main battle tank
+## 4. Wrecked main battle tank
 
 **Where:** a burnt tank out on the killing field, in plain view from the gun.
 
@@ -160,17 +106,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 20–40k triangles.
 
-## 9. Crashed helicopter wreck
-
-**Where:** a downed helicopter lying in the field.
-
-**Now:** a procedural fuselage with a broken tail.
-
-**Need:** a crashed or burnt utility helicopter (UH-1 / UH-60 class), rotor blades bent or snapped.
-
-**Budget:** about 15–30k triangles.
-
-## 10. Rural buildings set
+## 5. Rural buildings set
 
 **Where:**
 - the dead village and church on the far hills
@@ -188,17 +124,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 5–20k triangles each. They're seen from 100–600 m away, so silhouette and texture matter more than detail.
 
-## 11. Shipping container (20 ft)
-
-**Where:** a stack of them in the yard, plus single ones by the walls. Seen in the yard and cutscene shots.
-
-**Now:** textured boxes with corrugated UVs and door bars.
-
-**Need:** a rusty 20 ft ISO container with door details. 2–3 paint colours, or one I can tint.
-
-**Budget:** about 2–5k triangles.
-
-## 12. HESCO / defensive barrier unit
+## 6. HESCO / defensive barrier unit
 
 **Where:** the wall itself, the thing you defend all game.
 
@@ -212,7 +138,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 1–4k triangles per unit.
 
-## 13. Military tents
+## 7. Military tents
 
 **Where:** five tents in the yard, with lit doorways. Seen in the yard, landing-zone and run shots.
 
@@ -222,7 +148,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 3–8k triangles.
 
-## 14. Guard / searchlight tower
+## 8. Guard / searchlight tower
 
 **Where:** the two searchlight towers at the wing ends, which carry the sweeping beams.
 
@@ -232,7 +158,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 5–15k triangles.
 
-## 15. Utility poles and power pylon
+## 9. Utility poles and power pylon
 
 **Where:**
 - telephone poles along the field road and the new rear track
@@ -244,7 +170,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** pole about 300–1,000 triangles, pylon about 2–6k.
 
-## 16. Portable toilets and water tank
+## 10. Portable toilets and water tank
 
 **Where:** the yard's latrine row and the water tanks.
 
@@ -254,22 +180,58 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 1–3k triangles each.
 
-## 17. Aircraft bomb
+---
 
-**Where:** the B-36's falling bomb sticks in the bombing-run shot.
+## New asks
 
-**Now:** a procedural cylinder with fins.
+Things I noticed while putting the last batch in. Same rules as above.
 
-**Need:** a Mk 82 / M117-style general-purpose bomb.
+## 11. Fuel tanker truck
 
-**Budget:** about 1–2k triangles.
+**Where:** the tanker event: a fuel truck stalled on the road in front of the wall, which you shoot to blow up the crowd around it. It sits close to the gun, in plain view.
 
-## 18. Round hay bale
+**Now:** the open-bed Ural with a plain cylinder for a tank.
 
-**Where:** the stubble fields behind the base, seen from the air in the extraction flyaway.
+**Need:** a military fuel bowser (an ATZ on a Ural or KrAZ chassis, an M49 or M978 class), with the tank as part of the model. A burnt-out version after the blast is a bonus.
 
-**Now:** a textured cylinder.
+**Budget:** about 10-25k triangles.
 
-**Need:** a round straw bale, optionally wrapped.
+## 12. Burnt-out truck wreck
 
-**Budget:** about 300–800 triangles.
+**Where:** the burning truck everybody remembers at the foot of the field, a second burnt truck further out, and the one in the ditch on the rear road.
+
+**Now:** the Ural with its paint repainted to soot and rust in code. It still has its tyres and glass, so it reads as a dirty truck rather than a burnt one.
+
+**Need:** a properly burnt-out military truck: tyres burnt off to the rims, the cab glass gone, the paint blistered, the bed frame bare. A Ural, KrAZ or ZIL to match the others is ideal, but any 6x6 will do.
+
+**Budget:** about 10-25k triangles.
+
+## 13. Czech hedgehog (anti-tank obstacle)
+
+**Where:** 46 of them scattered across the killing field, right in front of the gun.
+
+**Now:** three crossed L-section beams in flat steel.
+
+**Need:** a welded steel hedgehog, rusty, ideally with a bit of wire caught on it.
+
+**Budget:** about 300-1,500 triangles. It is instanced.
+
+## 14. Supply-drop parachute and pallet
+
+**Where:** the night's supply drop: a crate comes down under a parachute in front of the wall, and the canopy collapses when it lands.
+
+**Now:** a flat dome with line segments for the rigging, and the ammo crate.
+
+**Need:** a cargo parachute (open canopy with rigging) and a strapped cargo pallet or A-22 bag. A collapsed-canopy version is a bonus.
+
+**Budget:** about 3-8k triangles.
+
+## 15. Van or minibus wreck
+
+**Where:** the abandoned column on the road out, and the rear road. The cars cover the sedans and hatchbacks, but nothing taller breaks up the line.
+
+**Now:** nothing: there are five car wrecks and no vans.
+
+**Need:** a burnt or abandoned panel van or minibus (Transit or Sprinter class, a UAZ or a RAF minibus).
+
+**Budget:** about 5-15k triangles.

@@ -2,7 +2,6 @@
 // on it) and an AC-130 gunship that circles the valley all night and works
 // the crowds with its 25 mm GAU-12 Gatling.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { WORLD, ABILITY, GUNSHIP, wallZ, wallDist, WING_COS, CALL, COMMS, isUnlocked } from '../config.js';
 import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
@@ -14,34 +13,6 @@ const _v = new THREE.Vector3();
 const _w = new THREE.Vector3();
 const _up = new THREE.Vector3(0, 1, 0);
 const GAU_SPEED = 1000; // m/s, 25 mm rounds coming down
-
-// ── geometry helpers ─────────────────────────────────────────────────────────
-function clean(g) {
-  g = g.index ? g.toNonIndexed() : g;
-  for (const k of Object.keys(g.attributes)) if (!['position', 'normal'].includes(k)) g.deleteAttribute(k);
-  return g;
-}
-const merge = (list) => mergeGeometries(list.map(clean));
-function box(w, h, d, x, y, z, ry = 0, rz = 0, rx = 0) {
-  const g = new THREE.BoxGeometry(w, h, d);
-  g.rotateX(rx); g.rotateZ(rz); g.rotateY(ry);
-  g.translate(x, y, z);
-  return g;
-}
-/** Cylinder along +z. */
-function tube(r0, r1, len, x, y, z, seg = 12) {
-  const g = new THREE.CylinderGeometry(r1, r0, len, seg);
-  g.rotateX(Math.PI / 2);
-  g.translate(x, y, z);
-  return g;
-}
-function nose(r, len, x, y, z, dir = 1) {
-  const g = new THREE.SphereGeometry(r, 14, 8, 0, Math.PI * 2, 0, Math.PI / 2);
-  g.rotateX(dir * Math.PI / 2);
-  g.scale(1, 1, len / r);
-  g.translate(x, y, z);
-  return g;
-}
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 /** Night tint: a faint glow so a dark airframe still reads against the clouds. */
@@ -80,13 +51,16 @@ export function buildBomber() {
   };
 }
 
+/**
+ * A general-purpose bomb (app/models/bomb.glb: 2.2 m, nose +z), drawn at 2x so a
+ * stick of them reads from the ground. Point it with lookAt.
+ */
 export function buildBomb() {
-  const mat = new THREE.MeshStandardMaterial({ color: 0x4a4f3a, roughness: 0.6, metalness: 0.3 });
-  const geo = merge([
-    tube(0.45, 0.45, 2.6, 0, 0, 0), nose(0.45, 0.9, 0, 0, 1.3, 1), tube(0.45, 0.2, 1.2, 0, 0, -1.9),
-    box(1.5, 0.05, 0.6, 0, 0, -2.3), box(0.05, 1.5, 0.6, 0, 0, -2.3),
-  ]);
-  return new THREE.Mesh(geo, mat);
+  const g = new THREE.Group();
+  const m = cloneModel('bomb');
+  m.scale.setScalar(2);
+  g.add(m);
+  return g;
 }
 
 /** Point at perpendicular distance d in front of the wall at x. */

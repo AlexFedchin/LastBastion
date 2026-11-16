@@ -30,8 +30,8 @@ Hold until dawn. Spend what you scavenged. Do it again.
 > [!NOTE]
 > **The world is painted procedurally at startup.** No texture packs: the mud, the
 > T-wall concrete, the zombies' torn clothes and the burning skyline are all generated in code.
-> The exceptions are the downloaded models: your M2HB, the aircraft, the soldiers, and the
-> scanned kit that dresses the bastion (ammo cans, crates, drums, barriers, generators: CC0, Poly Haven).
+> The exceptions are the downloaded models: your M2HB, the aircraft and helicopters, the soldiers,
+> the trucks, car wrecks and containers, and the scanned kit that dresses the bastion (ammo cans, crates, drums, barriers, generators: CC0, Poly Haven).
 > The sound is the opposite: real field recordings, a real .50 BMG report and an adaptive score.
 
 ---

@@ -33,6 +33,9 @@ if (q.get('debug') === 'normals') root.traverse((o) => { if (o.isMesh) o.materia
 if (q.get('debug') === 'front') root.traverse((o) => { if (o.isMesh) o.material = new THREE.MeshBasicMaterial({ color: 0x40ff40, side: THREE.FrontSide }); });
 if (q.get('debug') === 'mat') { const cols = [0xff4040, 0x40ff40, 0x4040ff, 0xffff40, 0xff40ff, 0x40ffff]; const seen = new Map();
   root.traverse((o) => { if (o.isMesh) { const k = o.material.name; if (!seen.has(k)) { seen.set(k, cols[seen.size % 6]); console.log('mat', k, seen.get(k).toString(16)); } o.material = new THREE.MeshBasicMaterial({ color: seen.get(k) }); } }); }
+if (q.get('debug') === 'parts') { const cols = { rotor: 0xff3030, ramp: 0x3060ff, canvas: 0xffd020, prop: 0xff3030 };
+  root.traverse((o) => { if (!o.isMesh) return; let p = o, c = null; while (p && c === null) { for (const k in cols) if (p.name.startsWith(k)) c = cols[k]; p = p.parent; }
+    o.material = new THREE.MeshLambertMaterial({ color: c ?? 0x909090, side: THREE.DoubleSide }); }); }
 const box = new THREE.Box3().setFromObject(root);
 const c = box.getCenter(new THREE.Vector3()), size = box.getSize(new THREE.Vector3());
 const r = size.length() * 0.5;

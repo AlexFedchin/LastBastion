@@ -6,8 +6,9 @@ import { WORLD, wallZ, sectionOf, sectionCenterX } from '../config.js';
 import { makeRng, lerp } from '../core/util.js';
 import { groundH, heightUniforms, HEIGHT_GLSL } from './terrain.js';
 import {
-  box, cylY, cylZ, merge, xf, worldUV, sandbagGeo, concertinaGeo, extrude, weather, makeTruck,
+  box, cylY, cylZ, merge, xf, worldUV, sandbagGeo, concertinaGeo, extrude, weather,
 } from './kit.js';
+import { placeModel } from './vehicles.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -511,27 +512,20 @@ export function buildTowers(env) {
 export function buildBase(env) {
   const { scene, mats, tex } = env;
   const rng = makeRng(909);
-  const corr = weather(new THREE.MeshStandardMaterial({ map: tex.corr.map, normalMap: tex.corr.normalMap, color: 0x6c7058, roughness: 0.75, metalness: 0.45 }), { soot: 0.3, rust: 0.6, key: 'cont' });
-  const corrRust = weather(new THREE.MeshStandardMaterial({ map: tex.corr.map, normalMap: tex.corr.normalMap, color: 0x7a4a34, roughness: 0.8, metalness: 0.4 }), { soot: 0.3, rust: 0.6, key: 'cont2' });
-  const container = (x, z, ry, y = 0, mat = corr) => {
-    const g = new THREE.BoxGeometry(6.06, 2.59, 2.44);
-    const uv = g.attributes.uv;
-    for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 3, uv.getY(i));
-    const m = new THREE.Mesh(g, mat);
-    m.position.set(x, groundH(x, z) + y + 1.3, z);
-    m.rotation.y = ry;
-    m.castShadow = true; m.receiveShadow = true;
-    scene.add(m);
-    // door bars
-    const bars = new THREE.Mesh(merge([0, 1, 2, 3].map((k) => box(0.04, 2.3, 0.04, 3.04, 0, -0.9 + k * 0.6))), mats.darkSteel);
-    bars.position.copy(m.position); bars.rotation.y = ry;
-    scene.add(bars);
+  // 20 ft containers (app/models/container.glb, doors at +x): the rusty red ones as they
+  // came, the rest painted over in a dull olive
+  const OLIVE = 0x8f9a72;
+  const container = (x, z, ry, y = 0, tint = OLIVE) => {
+    const o = new THREE.Object3D();
+    o.position.set(x, groundH(x, z) + y, z);
+    o.rotation.y = ry;
+    placeModel(env, 'container', o, { tint });
   };
   for (const side of [-1, 1]) {
     container(side * 30, 16, side * 0.55);
-    container(side * 31, 19, side * 0.5, 0, corrRust);
+    container(side * 31, 19, side * 0.5, 0, null);
     container(side * 30.5, 17.5, side * 0.52, 2.6);
-    container(side * 50, 8, side * 0.58 + 0.05, 0, corrRust);
+    container(side * 50, 8, side * 0.58 + 0.05, 0, null);
     container(side * 18, 24, side * 0.1);
   }
 
@@ -557,10 +551,10 @@ export function buildBase(env) {
   }
   // trucks parked in the yard
   for (const [x, z, ry] of [[-55, 24, 1.2], [26, 30, -1.6], [57, 22, -1.0]]) {
-    const t = makeTruck(mats, { body: mats.olive, burnt: false, seed: (x * 7) | 0, covered: true });
+    const t = new THREE.Object3D();
     t.position.set(x, groundH(x, z), z);
     t.rotation.y = ry;
-    scene.add(t);
+    placeModel(env, 'ural', t);
   }
   // generator and fuel drums
   const gen = new THREE.Mesh(merge([box(2.4, 1.4, 1.2, 0, 0.7, 0), cylY(0.08, 1.4, 8, 0.9, 2.0, 0.3)]), mats.olive);

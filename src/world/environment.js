@@ -76,6 +76,7 @@ export class Environment {
     };
     this.mats = makeMaterials(this.tex);
     this.kit = {}; // kit props asked for by the builders (addKit), placed in dressWithModels
+    this.placed = new Map(); // whole models asked for by the builders (addModel): vehicles, wrecks, containers, bales
     this.sandbagMat = weather(new THREE.MeshStandardMaterial({ map: this.tex.burlap, roughness: 1, color: 0x8a7d62 }), { soot: 0.45, key: 'bags' });
     this.rockMat = weather(new THREE.MeshStandardMaterial({ map: this.tex.rock.map, normalMap: this.tex.rock.normalMap, color: 0x857f77, roughness: 0.95 }), { soot: 0.3, key: 'rock' });
     this.wireMat = new THREE.MeshStandardMaterial({ color: 0x6b665e, metalness: 0.85, roughness: 0.42 });
@@ -180,6 +181,34 @@ export class Environment {
         this.scene.add(im);
       });
     }
+    // whole models: one instanced mesh per mesh of the model (vehicles keep their part nodes)
+    for (const { name, skip, tint, list } of this.placed.values()) {
+      const src = modelScene(name);
+      src.updateMatrixWorld(true);
+      src.traverse((o) => {
+        if (!o.isMesh) return;
+        for (let p = o; p; p = p.parent) if (skip && p.name === skip) return;
+        let mat = o.material;
+        if (tint != null) { mat = mat.clone(); mat.color.multiply(new THREE.Color(tint)); }
+        const im = new THREE.InstancedMesh(o.geometry, mat, list.length);
+        list.forEach((mm, j) => im.setMatrixAt(j, m.multiplyMatrices(mm, o.matrixWorld)));
+        im.castShadow = true; im.receiveShadow = true;
+        im.computeBoundingSphere();
+        im.name = name;
+        this.scene.add(im);
+      });
+    }
+  }
+
+  /**
+   * Ask for a model (app/models/<name>.glb) at a placement matrix, instanced once the
+   * models are in. skip: a node whose meshes are left out (the Ural's 'canvas');
+   * tint: a colour the materials are multiplied by.
+   */
+  addModel(name, matrix, { skip = null, tint = null } = {}) {
+    const key = `${name}|${skip || ''}|${tint ?? ''}`;
+    if (!this.placed.has(key)) this.placed.set(key, { name, skip, tint, list: [] });
+    this.placed.get(key).list.push(matrix.clone());
   }
 
   /** Ask for a kit prop at a placement matrix (instanced once the models are in). */

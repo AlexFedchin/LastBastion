@@ -19,6 +19,16 @@ meshopt-compressed.
 | `molotov.glb` | Molotov bottle with rag | _TODO_ (Sketchfab) | _TODO_ | _TODO_ |
 | `crate.glb` | Wooden ammunition crate | _TODO_ | _TODO_ | _TODO_ |
 | `sandbags.glb` | Two scanned sandbag piles ("Low poly Sandbag" 01, 02) | _TODO_ | _TODO_ | _TODO_ |
+| `car_sedan.glb` | Rusted, stripped sedan (Car-1) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | attribution required (see the Sketchfab page) |
+| `car_police.glb`, `car_police_flip.glb` | Burnt police sedan, upright and on its roof (Car-2) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | attribution required |
+| `car_hatch.glb`, `car_saloon.glb` | Two burnt-out cars, a compact MPV and a saloon (Car-3) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | attribution required |
+| `apache.glb` | AH-64D Apache: the extraction's gunships | [Sketchfab](https://sketchfab.com/MirzaArrafiERV_45) | Muhamad Mirza Arrafi | attribution required |
+| `ch47.glb` | CH-47 Chinook: the extraction's lifters | [Sketchfab](https://sketchfab.com/MirzaArrafiERV_45) | Muhamad Mirza Arrafi | attribution required |
+| `ural.glb`, `ural_burnt.glb` | Ural-4320 army truck; the burnt-out wreck is derived from it | [Sketchfab](https://sketchfab.com/javanilga) | javanilga | attribution required |
+| `heliwreck.glb` | Crashed helicopter in the field | [Sketchfab](https://sketchfab.com/jigar6102021) | J1G4R | attribution required |
+| `container.glb` | Rusty 20 ft shipping container | [Sketchfab](https://sketchfab.com/sousinho) | Sousinho | attribution required |
+| `bale.glb` | Round hay bale | [Sketchfab](https://sketchfab.com/FrodoUndead) | FrodoUndead | attribution required |
+| `bomb.glb` | General-purpose aircraft bomb: the B-36s' sticks and the air strike | [Sketchfab](https://sketchfab.com/Youssef.Loukili) | Youssef.Loukili | attribution required |
 
 ## What was changed
 
@@ -46,6 +56,22 @@ meshopt-compressed.
 - **Grenade, Molotov**: re-scaled to life size (10.5 cm, 34 cm), textures to WebP.
 - **Ammo crate**: untextured source; scaled to 0.9 m and painted olive drab.
 - **Sandbags**: two piles, 1.6 m long, PBR set at 1024/512 px, DirectX normal map converted, ~6k triangles each.
+
+- **Vehicles and field props** (`scripts/models/build_vehicles.mjs`): each turned to the game's axes (length
+  along +x, or nose +z for the helicopters), scaled to its real size, textures to WebP at 512-2048 px.
+  - Cars: each wreck is its own file (Car-2 and Car-3 each held two), its long axis laid on x, 5.2 m (the sedans) or
+    4.3-4.5 m; simplified to ~7k triangles.
+  - Ural: scaled to 7.37 m; the canvas tilt is cut out into its own node so the open-bed trucks can drop it. The
+    burnt wreck has no canvas and its paint repainted in code to soot and rust.
+  - CH-47: fuselage scaled to 15.46 m. Both rotors are separate nodes on their hubs; the ramp's two treadway boards
+    are cut out and hinged so they lower to the ground. Anchor points (ramp foot, lights) are in the root's extras.
+  - Apache: scaled to 17.7 m rotor tip to tail. The main and tail rotor blades are cut out of the airframe mesh
+    into nodes on their hubs; anchors for the chin gun, searchlight, rocket pods and lights.
+  - Crashed helicopter: spec-gloss materials converted to metal-rough, simplified from 121k to 22k triangles.
+  - Container: scaled to ISO 20 ft (6.06 x 2.59 x 2.44 m); the shipping line's painted logo is filled in from the rust
+    around it. The game tints some olive.
+  - Hay bale: the round bale only (the square one is dropped), 1.5 m across, ~700 triangles.
+  - Bomb: laid nose +z, 2.2 m.
 
 ## Bastion kit (`kit/*.glb`)
 

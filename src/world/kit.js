@@ -175,15 +175,7 @@ export function makeMaterials(tex) {
   return M;
 }
 
-// ── vehicles ────────────────────────────────────────────────────────────────
-function wheel(r, w, mats, burnt, x, y, z, rot = 0) {
-  const parts = [];
-  if (!burnt) parts.push([xf(new THREE.TorusGeometry(r * 0.72, r * 0.28, 8, 18), 0, 0, 0, 0, 0, 0, 1, 1, w / (r * 0.56)), mats.rubber]);
-  parts.push([cylZ(r * 0.55, w * 0.9, 12), burnt ? mats.burnt : mats.steel]);
-  parts.push([cylZ(r * 0.2, w * 1.02, 8), mats.darkSteel]);
-  return parts.map(([g, m]) => [xf(g, x, y, z, 0, 0, rot), m]);
-}
-
+// ── vehicles (the tank; the rest are downloaded models, see vehicles.js) ──────
 /** Group meshes by material and merge per material. */
 function assemble(list) {
   const byMat = new Map();
@@ -195,111 +187,6 @@ function assemble(list) {
     grp.add(mesh);
   }
   return grp;
-}
-
-export function makeSedan(mats, { body = mats.burnt, burnt = true, seed = 1 } = {}) {
-  const rng = makeRng(seed);
-  const L = [];
-  const W = 1.74;
-  // lower body profile with wheel arches
-  const prof = [];
-  const arch = (cx, from, to, r = 0.4) => { for (let k = 0; k <= 8; k++) { const a = Math.PI - (k / 8) * Math.PI; prof.push([cx + Math.cos(a) * r * (from < to ? 1 : -1), 0.3 + Math.sin(a) * r]); } };
-  prof.push([-2.32, 0.34], [-2.38, 0.62], [-2.28, 0.86], [-1.15, 0.94]);
-  prof.push([0.98, 0.96], [2.22, 0.84], [2.36, 0.62], [2.32, 0.34], [1.84, 0.3]);
-  arch(1.42, 1, 0); prof.push([-1.0, 0.3]);
-  arch(-1.42, 1, 0); prof.push([-1.84, 0.3]);
-  // the arch helper produces points right-to-left; fix order for the shape
-  const lower = extrude(prof, W - 0.08, 0.04);
-  L.push([lower, body]);
-  // greenhouse: glass block + roof skin + pillars
-  const gh = [[-1.12, 0.94], [-0.66, 1.36], [0.42, 1.4], [0.96, 0.96]];
-  L.push([extrude(gh, W - 0.24, 0.01), mats.glass]);
-  L.push([extrude([[-0.7, 1.33], [-0.64, 1.42], [0.44, 1.45], [0.4, 1.36]], W - 0.18, 0.02), body]);
-  for (const s of [-1, 1]) {
-    L.push([box(0.06, 0.48, 0.06, -0.9, 1.15, s * (W / 2 - 0.12), 0, 0, -0.75), body]);
-    L.push([box(0.06, 0.5, 0.06, 0.7, 1.16, s * (W / 2 - 0.12), 0, 0, 0.85), body]);
-    L.push([box(0.07, 0.44, 0.05, -0.1, 1.15, s * (W / 2 - 0.11)), body]);
-    // door seams and handles
-    L.push([box(0.02, 0.5, 0.01, 0.15, 0.62, s * (W / 2 - 0.02)), mats.darkSteel]);
-    L.push([box(0.02, 0.5, 0.01, -1.0, 0.62, s * (W / 2 - 0.02)), mats.darkSteel]);
-    L.push([box(0.12, 0.03, 0.02, -0.05, 0.82, s * (W / 2 - 0.01)), mats.steel]);
-    // mirrors
-    L.push([box(0.12, 0.09, 0.14, 0.88, 1.02, s * (W / 2 + 0.04)), body]);
-  }
-  // bumpers, lights, grille
-  L.push([box(0.12, 0.18, W - 0.04, 2.36, 0.44, 0), mats.darkSteel]);
-  L.push([box(0.12, 0.18, W - 0.04, -2.4, 0.46, 0), mats.darkSteel]);
-  L.push([box(0.05, 0.16, 0.9, 2.37, 0.66, 0), mats.darkSteel]);
-  for (const s of [-1, 1]) L.push([box(0.04, 0.12, 0.3, 2.35, 0.72, s * 0.64), mats.glass]);
-  for (const s of [-1, 1]) L.push([box(0.04, 0.12, 0.3, -2.37, 0.76, s * 0.6), mats.paintRed]);
-  // underside
-  L.push([box(4.2, 0.12, W - 0.3, 0, 0.28, 0), mats.darkSteel]);
-  // wheels
-  for (const sx of [-1.42, 1.42]) for (const s of [-1, 1]) {
-    if (burnt && rng() < 0.25) continue;
-    for (const w of wheel(0.34, 0.22, mats, burnt, sx, 0.33 - (burnt ? 0.1 : 0), s * (W / 2 - 0.12))) L.push(w);
-  }
-  return assemble(L);
-}
-
-export function makeTruck(mats, { body = mats.olive, burnt = false, seed = 2, covered = true } = {}) {
-  const rng = makeRng(seed);
-  const L = [];
-  const W = 2.45;
-  // chassis rails
-  for (const s of [-1, 1]) L.push([box(7.4, 0.25, 0.16, -0.3, 0.95, s * 0.55), mats.darkSteel]);
-  // cab with slanted windscreen
-  L.push([extrude([[2.0, 1.1], [2.0, 2.15], [2.25, 2.85], [3.55, 2.85], [3.75, 2.3], [3.75, 1.1]], W - 0.1, 0.05), body]);
-  L.push([extrude([[2.28, 2.25], [2.36, 2.75], [3.48, 2.75], [3.66, 2.28]], W - 0.02, 0.01), mats.glass]);
-  // bonnet & grille
-  L.push([extrude([[3.75, 1.05], [3.75, 2.05], [4.9, 1.95], [5.05, 1.6], [5.05, 1.05]], 1.9, 0.05), body]);
-  L.push([box(0.06, 0.7, 1.4, 5.08, 1.45, 0), mats.darkSteel]);
-  for (let k = 0; k < 7; k++) L.push([box(0.04, 0.6, 0.04, 5.11, 1.45, -0.6 + k * 0.2), mats.steel]);
-  for (const s of [-1, 1]) {
-    L.push([cylX(0.13, 0.08, 10, 5.1, 1.85, s * 0.78), mats.glass]);
-    // fenders
-    L.push([extrude([[3.6, 1.0], [3.75, 1.45], [4.9, 1.45], [5.05, 1.0]], 0.42, 0.03).translate(0, 0, s * 1.05), body]);
-    L.push([box(0.05, 1.3, 0.05, 2.25, 2.1, s * 1.3), mats.darkSteel]); // mirror arm
-    L.push([box(0.06, 0.32, 0.18, 2.25, 2.45, s * 1.36), mats.darkSteel]);
-    // fuel tank, step
-    L.push([cylX(0.28, 1.1, 12, 1.2, 0.95, s * 0.95), body]);
-    L.push([box(0.4, 0.06, 0.3, 1.9, 0.6, s * 1.1), mats.darkSteel]);
-  }
-  L.push([box(0.15, 0.25, W, 5.1, 0.85, 0), mats.darkSteel]);
-  // cargo bed
-  const bedL = 4.6, bx = -1.45;
-  L.push([box(bedL, 0.12, W, bx, 1.3, 0), mats.wood]);
-  for (const s of [-1, 1]) {
-    for (let k = 0; k < 3; k++) L.push([box(bedL, 0.16, 0.06, bx, 1.5 + k * 0.22, s * (W / 2 - 0.03)), body]);
-    for (let k = 0; k <= 4; k++) L.push([box(0.08, 0.7, 0.08, bx - bedL / 2 + k * (bedL / 4), 1.65, s * (W / 2 - 0.03)), mats.darkSteel]);
-  }
-  L.push([box(0.06, 0.7, W, bx - bedL / 2, 1.65, 0), body]);
-  if (covered) {
-    // canvas tilt over hoops: half-cylinder shell
-    const shell = new THREE.CylinderGeometry(W / 2, W / 2, bedL, 16, 1, true, 0, Math.PI);
-    xf(shell, bx, 2.0, 0, 0, 0, Math.PI / 2);
-    const p = shell.attributes.position;
-    for (let i = 0; i < p.count; i++) p.setY(i, 2.0 + (p.getY(i) - 2.0) * 0.75 + Math.sin(p.getX(i) * 3) * 0.03);
-    shell.computeVertexNormals();
-    L.push([shell, mats.canvas]);
-    for (const s of [-1, 1]) L.push([box(bedL, 0.75, 0.02, bx, 1.65, s * (W / 2 + 0.01)), mats.canvas]);
-  } else {
-    for (let k = 0; k < 4; k++) {
-      const hoop = new THREE.TorusGeometry(W / 2 - 0.05, 0.03, 4, 12, Math.PI);
-      L.push([xf(hoop, bx - bedL / 2 + 0.4 + k * 1.25, 1.95, 0, 0, Math.PI / 2), mats.darkSteel]);
-    }
-  }
-  // wheels (dual rear axles)
-  const axles = [4.15, -0.9, -2.35];
-  for (const ax of axles) for (const s of [-1, 1]) {
-    if (burnt && rng() < 0.2) continue;
-    for (const w of wheel(0.55, 0.42, mats, burnt, ax, 0.55 - (burnt ? 0.14 : 0), s * 1.0)) L.push(w);
-  }
-  for (const s of [-1, 1]) L.push([extrude([[-3.0, 1.1], [-2.9, 1.25], [-0.35, 1.25], [-0.25, 1.1]], 0.55, 0.02).translate(0, 0, s * 1.0), mats.darkSteel]);
-  const g = assemble(L);
-  g.position.x = -0.8;
-  const wrap = new THREE.Group(); wrap.add(g);
-  return wrap;
 }
 
 export function makeTank(mats, { body = mats.burnt, seed = 3 } = {}) {
@@ -342,48 +229,6 @@ export function makeTank(mats, { body = mats.burnt, seed = 3 } = {}) {
   for (const s of [-1, 1]) for (let k = 0; k < 3; k++) L.push([cylX(0.06, 0.3, 6, 1.6, 2.5 + k * 0.1, s * (1.25 + k * 0.05)), mats.darkSteel]);
   // engine deck grilles
   for (let k = 0; k < 6; k++) L.push([box(0.06, 0.04, 1.8, -1.4 - k * 0.3, 1.78, 0), mats.darkSteel]);
-  return assemble(L);
-}
-
-export function makeHelicopter(mats, { body = mats.burnt } = {}) {
-  const L = [];
-  // fuselage: lathe-like body from a tapered cylinder, squashed
-  const fus = new THREE.CylinderGeometry(1.0, 1.15, 6.5, 16, 6);
-  const p = fus.attributes.position;
-  for (let i = 0; i < p.count; i++) {
-    const y = p.getY(i);
-    const t = (y + 3.25) / 6.5; // 0 tail .. 1 nose
-    const k = t > 0.8 ? 1 - Math.pow((t - 0.8) / 0.2, 2) * 0.55 : 1;
-    p.setX(i, p.getX(i) * k);
-    p.setZ(i, p.getZ(i) * k * 0.95);
-  }
-  fus.computeVertexNormals();
-  L.push([xf(fus, 0, 1.45, 0, 0, 0, -Math.PI / 2, 1, 1, 1.0), body]);
-  // cockpit glass (shattered: dark)
-  L.push([xf(new THREE.SphereGeometry(0.95, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2), 2.9, 1.65, 0, 0, 0, -Math.PI / 2 + 0.3, 1, 1.1, 1), mats.glass]);
-  // engine housing + exhausts
-  L.push([box(2.6, 0.6, 1.3, -0.2, 2.65, 0), body]);
-  for (const s of [-1, 1]) L.push([cylX(0.22, 1.0, 10, -1.2, 2.6, s * 0.6), mats.darkSteel]);
-  // tail boom (snapped and bent)
-  const boom = new THREE.CylinderGeometry(0.28, 0.55, 5.5, 10);
-  L.push([xf(boom, -5.6, 1.9, 0.6, 0.08, 0.25, Math.PI / 2 + 0.12), body]);
-  L.push([box(1.3, 1.9, 0.12, -8.2, 2.9, 1.3, 0.1, 0.25, -0.4), body]);
-  // stub wings, doors open
-  for (const s of [-1, 1]) L.push([box(1.0, 0.1, 1.8, 0.6, 2.2, s * 1.6, s * 0.15), body]);
-  L.push([box(1.6, 1.4, 0.05, 0.9, 1.35, 1.12, 0, 0.35), body]);
-  // main rotor: hub + bent blades
-  L.push([cylY(0.3, 0.5, 10, -0.1, 3.15, 0), mats.darkSteel]);
-  const blades = [[0.2, -0.05], [1.8, 0.3], [3.4, -0.35], [4.9, 0.6]];
-  for (const [a, bend] of blades) {
-    const b = new THREE.BoxGeometry(5.8, 0.05, 0.42, 8, 1, 1);
-    const bp = b.attributes.position;
-    for (let i = 0; i < bp.count; i++) { const x = bp.getX(i) + 2.9; bp.setY(i, bp.getY(i) - Math.pow(x / 5.8, 2) * bend * 3); }
-    b.translate(2.9, 0, 0);
-    b.computeVertexNormals();
-    L.push([xf(b, -0.1, 3.35, 0, 0, a, 0), body]);
-  }
-  // landing gear
-  for (const s of [-1, 1]) L.push([cylZ(0.3, 0.2, 10, 1.6, 0.3, s * 1.0), mats.rubber]);
   return assemble(L);
 }
 

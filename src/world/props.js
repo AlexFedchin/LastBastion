@@ -5,10 +5,8 @@ import * as THREE from 'three';
 import { WORLD, wallZ, wallDist } from '../config.js';
 import { makeRng } from '../core/util.js';
 import { groundH, groundNormal, roadX, trenchZ, valleyEdge, NAPALM_OFFSET, craterList } from './terrain.js';
-import {
-  box, cylY, merge, xf, sandbagGeo, concertinaGeo, sagWire,
-  makeSedan, makeTruck, makeTank, makeHelicopter, makeRuin,
-} from './kit.js';
+import { box, cylY, merge, xf, sandbagGeo, concertinaGeo, sagWire, makeTank, makeRuin } from './kit.js';
+import { CAR_SIZE, TRUCK_SIZE, placeModel } from './vehicles.js';
 import { addObstacle } from './obstacles.js';
 
 const _m = new THREE.Matrix4();
@@ -49,11 +47,11 @@ export function buildProps(env) {
   const fire = env.fire;
 
   // ── vehicles ────────────────────────────────────────────────────────────
+  // (downloaded models, instanced once they load: see vehicles.js; a proxy carries each placement)
+  const at = () => new THREE.Object3D();
   // the burning truck everybody remembers
-  const wreck = makeTruck(mats, { body: mats.burnt, burnt: true, seed: 11, covered: false });
-  plant(wreck, -38, -98, 0.7, 0.12, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.06)));
-  scene.add(wreck);
-  solid(-38, -98, 0.7, -0.25, 4.55, 1.3);
+  placeModel(env, 'ural_burnt', plant(at(), -38, -98, 0.7, 0.12, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, 0.06))));
+  solid(-38, -98, 0.7, 0, TRUCK_SIZE[0], TRUCK_SIZE[1]);
   const wy = groundH(-38, -97);
   env.wreckFlames = { x: -38, y: wy + 1.4, z: -97 };
   fire.add(-38.4, wy + 1.2, -97.6, 3.2, 4.8, 3.4, { smoke: 3, embers: 6 });
@@ -61,19 +59,17 @@ export function buildProps(env) {
   fire.add(-39.8, wy + 0.4, -99.0, 1.4, 2.0, 2.2, { smoke: 0, embers: 1 });
   env.wreckFire.position.set(-38, wy + 2.6, -97);
 
-  const t2 = makeTruck(mats, { body: mats.burnt, burnt: true, seed: 12, covered: false });
-  scene.add(plant(t2, 52, -150, -1.2, 0.1)); solid(52, -150, -1.2, -0.25, 4.55, 1.3);
-  const t3 = makeTruck(mats, { body: mats.olive, burnt: false, seed: 13, covered: true });
-  scene.add(plant(t3, -90, -186, 2.1, 0.05, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.04, 0, -0.1)))); solid(-90, -186, 2.1, -0.25, 4.55, 1.3);
+  placeModel(env, 'ural_burnt', plant(at(), 52, -150, -1.2, 0.1)); solid(52, -150, -1.2, 0, TRUCK_SIZE[0], TRUCK_SIZE[1]);
+  placeModel(env, 'ural', plant(at(), -90, -186, 2.1, 0.05, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.04, 0, -0.1)))); solid(-90, -186, 2.1, 0, TRUCK_SIZE[0], TRUCK_SIZE[1]);
   const tank = makeTank(mats, { body: mats.burnt, seed: 14 });
   scene.add(plant(tank, 26, -72, -0.45, 0.25, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, 0, 0.04)))); solid(26, -72, -0.45, 0.1, 3.75, 1.85);
   fire.add(25.6, groundH(26, -72) + 2.2, -72.4, 1.2, 1.8, 1.6, { smoke: 1.2, embers: 1, fadeIn: 0 });
-  const heli = makeHelicopter(mats, { body: mats.burnt });
-  scene.add(plant(heli, -118, -258, 0.9, 0.4, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.08, 0, 0.35)))); solid(-118, -258, 0.9, -2.5, 6.3, 1.5);
+  // the downed helicopter: the airframe lies along its x, the debris thrown round it
+  placeModel(env, 'heliwreck', plant(at(), -118, -258, 0.9, 0.05, 1)); solid(-118, -258, 0.9, 0, 5.6, 1.6);
   fire.add(-118, groundH(-118, -258) + 1.6, -258, 2.4, 3.6, 2.6, { smoke: 2.4, embers: 3 });
 
-  // abandoned column of cars on the road
-  const carMats = [mats.burnt, mats.paintRed, mats.paintBlue, mats.paintWhite, mats.burnt, mats.olive];
+  // abandoned column of cars on the road: the rusted sedan, burnt ones, now and then one on its roof
+  const BURNT = ['car_police', 'car_hatch', 'car_saloon'];
   let z = -38;
   let carCount = 0;
   while (z > -330 && carCount < 16) {
@@ -83,14 +79,13 @@ export function buildProps(env) {
     const x = rx + lane + (rng() - 0.5) * 1.4;
     if (wallDist(x, z) < 22) continue;
     const burnt = rng() < 0.45;
-    const body = burnt ? mats.burnt : carMats[(rng() * carMats.length) | 0];
-    const car = makeSedan(mats, { body, burnt, seed: carCount * 13 + 5 });
+    if (!burnt) rng(); // (was the paint colour: keeps the rest of the field where it was)
     const ry = Math.PI / 2 + (rng() - 0.5) * 0.6 + (rng() < 0.2 ? Math.PI : 0);
     const flip = rng() < 0.12;
-    plant(car, x, z, ry, burnt ? 0.08 : 0, 1, flip ? new THREE.Quaternion().setFromEuler(new THREE.Euler(Math.PI / 2 * (rng() < 0.5 ? 1 : -1), 0, 0)) : null);
-    if (flip) car.position.y += 0.85;
-    scene.add(car);
-    solid(x, z, ry, 0, 2.42, flip ? 0.75 : 0.9);
+    if (flip) rng();
+    const name = flip ? 'car_police_flip' : burnt ? BURNT[carCount % 3] : 'car_sedan';
+    placeModel(env, name, plant(at(), x, z, ry, burnt ? 0.06 : 0.02, 1));
+    solid(x, z, ry, 0, CAR_SIZE[name][0], CAR_SIZE[name][1]);
     carCount++;
     if (burnt && rng() < 0.35) fire.add(x, groundH(x, z) + 0.9, z, 1.0, 1.4, 1.5, { smoke: 0.8, embers: 0.6 });
   }

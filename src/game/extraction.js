@@ -379,7 +379,7 @@ export class ExtractionScene {
       L.leave = this.T.lift + 0.3 + k * 1.8;
       L.from = V(lz.x * 1.6 + (k - 1) * 30, 140, lz.z + 640);
       L.rampK = 0; L.loop = null; L.pos = new THREE.Vector3(); L.group.visible = false;
-      L.ramp.rotation.x = Math.PI / 2;
+      L.ramp.rotation.x = L.rampUp;
     });
   }
 
@@ -413,7 +413,7 @@ export class ExtractionScene {
       // the ramp: down once it is on the ground, up again as it lifts
       const want = t > L.touch + 0.5 && t < L.leave - 1.5 ? 1 : 0;
       L.rampK = clamp(L.rampK + (want ? dt * 0.6 : -dt * 0.5), 0, 1);
-      L.ramp.rotation.x = lerp(Math.PI / 2, -0.14, ease(L.rampK)); // closed is upright, open rests on the ground
+      L.ramp.rotation.x = lerp(L.rampUp, L.rampDown, ease(L.rampK)); // up in flight, down to the ground on it
       // rotor wash: dust rolling out from under it near the ground
       const hAGL = L.pos.y - gy;
       if (hAGL < 16 && R() < dt * 26) {

@@ -8,7 +8,8 @@ import {
   heightFn, groundNormal, vnoise, valleyEdge, rearRoadX, rearValleyX,
   fieldCoords, fieldToWorld, fieldKind,
 } from './terrain.js';
-import { box, cylY, merge, xf, makeHouseGeo, makeRuin, makeTruck, makeSedan, sagWire, weather } from './kit.js';
+import { box, cylY, merge, xf, makeHouseGeo, makeRuin, sagWire, weather } from './kit.js';
+import { placeModel } from './vehicles.js';
 import { makeConiferGeo, makeDeadPineGeo, makePineMat } from './far.js';
 
 const _m = new THREE.Matrix4();
@@ -51,7 +52,7 @@ export function buildRear(env) {
   const rng = makeRng(31337);
   const gn = [0, 1, 0];
   let conifers = [], deads = [];
-  const bushes = [], bales = [], rocks = [];
+  const bushes = [], rocks = [];
   // the crest trees beside the base are seen in play; the rear valley only behind the gun:
   // separate meshes so the rear ones are culled while you look out over the field
   const crestC = [], crestD = [], rearC = conifers, rearD = deads;
@@ -152,9 +153,9 @@ export function buildRear(env) {
           fieldToWorld(iu + 0.2 + 0.6 * rng(), iv + 0.2 + 0.6 * rng(), w);
           const [x, z] = w;
           if (!onFloor(x, z)) continue;
-          _e.set(0, ry + (rng() - 0.5) * 0.5, Math.PI / 2);
-          _m.compose(_v.set(x, heightFn(x, z) + 0.72, z), _q.setFromEuler(_e, 'YXZ'), _s.set(1, 1, 1));
-          bales.push(_m.clone());
+          _e.set(0, ry + (rng() - 0.5) * 0.5, 0);
+          _m.compose(_v.set(x, heightFn(x, z) - 0.04, z), _q.setFromEuler(_e), _s.set(1, 1, 1));
+          env.addModel('bale', _m, { tint: 0x8a8070 }); // the round bale model on its side (axis along x), dulled to the night
         }
       }
     }
@@ -173,7 +174,6 @@ export function buildRear(env) {
   }
 
   const leafMat = weather(new THREE.MeshStandardMaterial({ color: 0x232b1b, roughness: 1, flatShading: true }), { soot: 0.4, key: 'hedge' });
-  const strawMat = weather(new THREE.MeshStandardMaterial({ map: env.tex.burlap, color: 0x9a8656, roughness: 1 }), { soot: 0.25, key: 'straw' });
   const coniferGeo = makeConiferGeo(), deadGeo = makeDeadPineGeo();
   instanced(scene, coniferGeo, makePineMat(), rearC);
   instanced(scene, deadGeo, mats.charred, rearD);
@@ -183,7 +183,6 @@ export function buildRear(env) {
     instanced(scene, deadGeo, mats.charred, crestD.filter((m) => Math.sign(m.elements[12]) === sd));
   }
   instanced(scene, lumpGeo(1, 41, 0.75, 1.2), leafMat, bushes);
-  instanced(scene, new THREE.CylinderGeometry(0.72, 0.72, 1.25, 14), strawMat, bales);
   instanced(scene, lumpGeo(1, 77, 0.78, 1.22), env.rockMat, rocks);
 
   // ── farmsteads along the track ────────────────────────────────────────────
@@ -266,13 +265,13 @@ export function buildRear(env) {
   }
 
   // ── what was left on the track: a truck in the ditch, two cars ───────────
-  const wreck = (obj, z, off, tilt) => {
-    const x = rearRoadX(z) + off;
+  const wreck = (name, z, off, tilt) => {
+    const x = rearRoadX(z) + off, obj = new THREE.Object3D();
     obj.position.set(x, heightFn(x, z) - 0.1, z);
     obj.rotation.set(0, Math.atan2(rearRoadX(z + 5) - rearRoadX(z - 5), 10) + (rng() - 0.5) * 0.6, tilt);
-    scene.add(obj);
+    placeModel(env, name, obj);
   };
-  wreck(makeTruck(mats, { body: mats.burnt, burnt: true, seed: 77, covered: false }), 215, 4.6, 0.12);
-  wreck(makeSedan(mats, { body: mats.burnt, burnt: true, seed: 91 }), 330, -1.2, 0);
-  wreck(makeSedan(mats, { body: mats.paintBlue, burnt: false, seed: 92 }), 470, 4.8, -0.15);
+  wreck('ural_burnt', 215, 4.6, 0.12);
+  wreck('car_saloon', 330, -1.2, 0);
+  wreck('car_sedan', 470, 4.8, -0.15);
 }

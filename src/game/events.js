@@ -11,7 +11,8 @@ import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
 import { groundH } from '../world/terrain.js';
 import { buildGunship } from './air.js';
-import { makeTruck, cylX } from '../world/kit.js';
+import { cylX } from '../world/kit.js';
+import { makeUral, URAL_BED, URAL_LAMPS, TRUCK_SIZE } from '../world/vehicles.js';
 import { cloneModel } from '../world/models.js';
 import { Soldier } from './soldier.js';
 import { Survivor } from './survivor.js';
@@ -837,7 +838,7 @@ class Tanker {
     T.updateMatrixWorld(true);
     this.box = new THREE.Box3().setFromObject(T);
     if (E.tankerSolid) removeObstacle(E.tankerSolid);
-    E.tankerSolid = addObstacle(this.x - Math.cos(this.yaw) * 0.25, this.z + Math.sin(this.yaw) * 0.25, this.yaw, 4.55, 1.3);
+    E.tankerSolid = addObstacle(this.x, this.z, this.yaw, TRUCK_SIZE[0], TRUCK_SIZE[1]);
     this.hp = P.hp; this.t = 0; this.state = 'wait'; this.leak = 0;
     // the crowd that will walk past it
     this.ids = new Set();
@@ -997,7 +998,8 @@ class Convoy {
       if (touching && R() < dt * 5) fx.spark(this.x + rand(-1, 1), groundH(this.x, this.z) + 1.5, this.z + rand(-2, 2), rand(-2, 2), rand(1, 3), rand(-2, 2), 4, 3, 2, 0.4);
       // headlights
       const gy = groundH(this.x, this.z);
-      for (const s of [-0.75, 0.75]) fx.glowDot(this.x + Math.cos(this.yaw) * s + Math.sin(this.yaw) * 4.6, gy + 1.8, this.z - Math.sin(this.yaw) * s + Math.cos(this.yaw) * 4.6, 0.7, 6, 5.5, 4, 0.05);
+      const L = URAL_LAMPS;
+      for (const s of [-L.side, L.side]) fx.glowDot(this.x + Math.cos(this.yaw) * s + Math.sin(this.yaw) * L.x, gy + L.y, this.z - Math.sin(this.yaw) * s + Math.cos(this.yaw) * L.x, 0.7, 6, 5.5, 4, 0.05);
       if (!this.loop && g.audio.ready && g.audio.B.prop) this.loop = g.audio.loop(g.audio.B.prop[0], { ref: 30, rate: 0.45 });
       if (this.loop) this.loop.update(this.x, gy + 1, this.z, 0, 0, this.sp, 1.2);
       if (this.hp <= 0) return this.finish(false);
@@ -1262,9 +1264,11 @@ export class NightEvents {
     // the fuel tanker (and what is left of it) and the survivors' truck
     const mats = game.env.mats;
     const tankerParts = (burnt) => {
-      const t = makeTruck(mats, { body: burnt ? mats.burnt : mats.olive, burnt, seed: 5, covered: false });
-      t.add(new THREE.Mesh(cylX(1.05, 4.3, 18, -2.2, 2.45, 0), burnt ? mats.burnt : (mats.steel || mats.darkSteel)));
-      for (const x of [-4.35, -0.05]) t.add(new THREE.Mesh(cylX(1.08, 0.12, 18, x, 2.45, 0), mats.darkSteel));
+      // a Ural with its canvas off and a fuel tank on the bed (burnt: the wreck, the tank scorched)
+      const t = makeUral({ burnt, covered: false });
+      const B = URAL_BED, r = 1.0, y = B.y + r;
+      t.add(new THREE.Mesh(cylX(r, B.len - 0.1, 18, B.x, y, 0), burnt ? mats.burnt : (mats.steel || mats.darkSteel)));
+      for (const x of [B.x - B.len / 2 + 0.1, B.x + B.len / 2 - 0.1]) t.add(new THREE.Mesh(cylX(r + 0.03, 0.12, 18, x, y, 0), mats.darkSteel));
       t.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       t.visible = false;
       scene.add(t);
@@ -1272,7 +1276,7 @@ export class NightEvents {
     };
     this.tanker = tankerParts(false);
     this.tankerWreck = tankerParts(true);
-    this.truck = makeTruck(mats, { body: mats.olive, seed: 9, covered: true });
+    this.truck = makeUral({ covered: true });
     this.truck.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     this.truck.visible = false;
     scene.add(this.truck);
