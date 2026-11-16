@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { makeRng, lerp } from '../core/util.js';
 import { groundH, groundNormal, heightFn, roadX, valleyEdge, vnoise } from './terrain.js';
-import { box, cylY, merge, xf, makeHouseGeo, makePylonGeo, sagWire, weather } from './kit.js';
+import { box, cylY, merge, xf, worldUV, makeHouseGeo, makePylonGeo, sagWire, weather } from './kit.js';
 import { FOG_CUSTOM_GLSL, fogUniforms } from '../render/atmosphere.js';
 
 const _m = new THREE.Matrix4();
@@ -208,7 +208,7 @@ export function buildFar(env) {
       G.push(box(4.2, 1.4, 12, x, deckY - 1.4, z));
     }
     const vMat = weather(new THREE.MeshStandardMaterial({ map: env.tex.concrete.map, normalMap: env.tex.concrete.normalMap, color: 0x8a8680, roughness: 0.95 }), { soot: 0.5, key: 'viaduct' });
-    const via = new THREE.Mesh(merge(G), vMat);
+    const via = new THREE.Mesh(env.tex.concrete.file ? worldUV(merge(G), 4.0) : merge(G), vMat);
     scene.add(via);
     // rebar dangling from the broken ends
     const R = [];

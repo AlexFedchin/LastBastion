@@ -1,0 +1,103 @@
+{
+ "mud": {
+  "id": "brown_mud_02",
+  "metres": 1.3,
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "turf": {
+  "id": "forest_leaves_02",
+  "metres": 3.001,
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "rock": {
+  "id": "rock_face_03",
+  "metres": 2.7,
+  "authors": [
+   "Dario Barresi",
+   "Rico Cilliers"
+  ]
+ },
+ "asphalt": {
+  "id": "asphalt_02",
+  "metres": 3.0,
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "track": {
+  "id": "rocky_trail",
+  "metres": 2.0,
+  "authors": [
+   "Amal Kumar"
+  ]
+ },
+ "plough": {
+  "id": "aerial_mud_1",
+  "metres": 8.0,
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "concrete": {
+  "id": "concrete_wall_006",
+  "metres": 2.0,
+  "authors": [
+   "Dario Barresi",
+   "Charlotte Baglioni"
+  ]
+ },
+ "slab": {
+  "id": "dirty_concrete",
+  "metres": 3.0,
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "metal": {
+  "id": "rusty_metal_02",
+  "metres": 1.0,
+  "authors": [
+   "Rob Tuytel"
+  ]
+ },
+ "corr": {
+  "id": "rusty_corrugated_iron",
+  "metres": 2.0,
+  "authors": [
+   "Charlotte Baglioni"
+  ]
+ },
+ "plaster": {
+  "id": "damaged_plaster",
+  "metres": 1.85,
+  "authors": [
+   "Amal Kumar"
+  ]
+ },
+ "bark": {
+  "id": "pine_bark",
+  "metres": 2.0,
+  "authors": [
+   "Dimitrios Savva"
+  ]
+ },
+ "planks": {
+  "id": "raw_plank_wall",
+  "metres": 1.87,
+  "authors": [
+   "Dimitrios Savva"
+  ]
+ },
+ "burlap": {
+  "id": "hessian_230",
+  "metres": 0.269,
+  "authors": [
+   "colormass",
+   "Rico Cilliers"
+  ]
+ }
+}

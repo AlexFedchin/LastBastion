@@ -24,6 +24,7 @@ import { buildProps } from './props.js';
 import { buildDressing } from './dressing.js';
 import { buildFar } from './far.js';
 import { buildRear } from './rear.js';
+import { fileTex } from './texlib.js';
 import { buildSky, buildEnvMap, buildRain, buildSplashes, Bolts, BEAM_VERT, BEAM_FRAG } from './sky.js';
 import { PF } from './textures.js';
 
@@ -55,20 +56,23 @@ export class Environment {
     scene.background = null;
 
     const ts = Math.min(512, quality.texSize);
+    // scanned sets where they loaded (texlib), the procedural ones otherwise
+    const F = (name, gen) => fileTex(name) || gen();
+    const F1 = (name, gen) => (fileTex(name) ? fileTex(name).map : gen());
     this.tex = {
-      ground: makeGroundTextures(quality.texSize),
-      concrete: makeConcreteTextures(512),
-      burlap: makeBurlapTexture(256),
+      ground: F('mud', () => makeGroundTextures(quality.texSize)),
+      concrete: F('concrete', () => makeConcreteTextures(512)),
+      burlap: F1('burlap', () => makeBurlapTexture(256)),
       glow: makeGlowTexture(128, 2.2),
       flag: makeFlagTexture(),
-      metal: makeMetalTextures(ts),
-      plaster: makePlasterTextures(ts),
-      slab: makeSlabTextures(ts),
-      bark: makeBarkTexture(256),
+      metal: F('metal', () => makeMetalTextures(ts)),
+      plaster: F('plaster', () => makePlasterTextures(ts)),
+      slab: F('slab', () => makeSlabTextures(ts)),
+      bark: F1('bark', () => makeBarkTexture(256)),
       hesco: makeHescoTextures(256),
-      planks: makePlankTextures(256),
-      corr: makeCorrugatedTextures(256),
-      rock: makeRockTextures(256),
+      planks: F('planks', () => makePlankTextures(256)),
+      corr: F('corr', () => makeCorrugatedTextures(256)),
+      rock: F('rock', () => makeRockTextures(256)),
     };
     this.mats = makeMaterials(this.tex);
     this.kit = {}; // kit props asked for by the builders (addKit), placed in dressWithModels

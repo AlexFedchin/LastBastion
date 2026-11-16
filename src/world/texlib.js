@@ -1,0 +1,67 @@
+// Scanned surface textures (Poly Haven CC0, built by scripts/textures/build_textures.py
+// into app/textures/<size>/). Loaded once at boot; every builder falls back to the
+// procedural texture of the same name if a file is missing or fails to load.
+//
+// Each set: <name>_c (colour; the mud carries roughness in alpha), <name>_n (OpenGL
+// normal), and for the metal <name>_r (G roughness, B metalness).
+import * as THREE from 'three';
+
+// the big, close surfaces get 2k on the detailed presets; everything else 1k (512 on LOW)
+const BIG = ['mud', 'turf', 'rock', 'asphalt', 'concrete', 'slab', 'metal'];
+const SETS = {
+  mud: ['c', 'n'], turf: ['c', 'n'], rock: ['c', 'n'], asphalt: ['c', 'n'], track: ['c', 'n'], plough: ['c', 'n'],
+  concrete: ['c', 'n'], slab: ['c', 'n'], metal: ['c', 'n', 'r'], corr: ['c', 'n'], plaster: ['c', 'n'],
+  bark: ['c'], planks: ['c', 'n'], burlap: ['c'],
+};
+/** Real-world width of one tile, in metres (from Poly Haven's scan dimensions). */
+export const TILE_M = {
+  mud: 1.3, turf: 3.0, rock: 2.7, asphalt: 3.0, track: 2.0, plough: 8.0, concrete: 2.0, slab: 3.0,
+  metal: 1.0, corr: 2.0, plaster: 1.85, bark: 2.0, planks: 1.87, burlap: 0.27,
+};
+
+const loaded = {};
+let loading = null;
+
+function sizeFor(name, q) {
+  const detailed = q.texSize >= 1024 && q.pixelRatio >= 1;
+  if (BIG.includes(name)) return detailed ? 2048 : 1024;
+  return q.texSize >= 1024 ? 1024 : 512;
+}
+
+/** Start loading every set at the size this quality preset wants; resolves when all are in (or failed). */
+export function loadTextures(quality) {
+  if (loading) return loading;
+  const loader = new THREE.TextureLoader();
+  const one = (url, srgb) => new Promise((resolve) => {
+    loader.load(url, (t) => {
+      t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
+      t.wrapS = t.wrapT = THREE.RepeatWrapping;
+      t.anisotropy = 8;
+      t.generateMipmaps = true;
+      t.minFilter = THREE.LinearMipmapLinearFilter;
+      resolve(t);
+    }, undefined, () => { console.warn('[textures] missing', url); resolve(null); });
+  });
+  loading = Promise.all(Object.entries(SETS).map(async ([name, maps]) => {
+    const s = sizeFor(name, quality);
+    const [c, n, r] = await Promise.all(maps.map((m) => one(`textures/${s}/${name}_${m}.webp`, m === 'c')));
+    if (!c) return;
+    loaded[name] = { map: c, normalMap: n || null, roughnessMap: r || null, size: s, file: true };
+  }));
+  return loading;
+}
+
+/** The scanned set by name ({map, normalMap, roughnessMap, file: true}), or null. */
+export function fileTex(name) { return loaded[name] || null; }
+
+/**
+ * A copy of a texture with its own repeat (and offset): shares the image and the GPU
+ * upload, so a material can fit a scan to its own UVs without touching anyone else's.
+ */
+export function fitTex(tex, rx, ry = rx) {
+  if (!tex) return tex;
+  const t = tex.clone();
+  t.repeat.set(rx, ry);
+  t.needsUpdate = true;
+  return t;
+}

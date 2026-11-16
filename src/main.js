@@ -26,6 +26,7 @@ import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { Loader } from './ui/loader.js';
 import { loadModels, modelMesh } from './world/models.js';
+import { loadTextures } from './world/texlib.js';
 import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
 import { Ending } from './game/ending.js';
@@ -68,6 +69,7 @@ class Game {
     const step = async (t) => { this.loader.step(t, stepN++ / BOOT_STEPS); await nextFrame(); };
     await step('warming the generators…');
     const modelsLoaded = loadModels();
+    const texturesLoaded = loadTextures(this.quality);
     const canvas = document.getElementById('game');
     this.canvas = canvas;
     const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
@@ -82,6 +84,7 @@ class Game {
     this.scene = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(this.settings.fov, window.innerWidth / window.innerHeight, 0.1, 3200);
 
+    await texturesLoaded;
     await step('painting the valley…');
     this.env = new Environment(this.scene, renderer, this.quality);
     await step('digging graves…');

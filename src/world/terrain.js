@@ -12,6 +12,7 @@ import * as THREE from 'three';
 import { WORLD, wallZ, wallDist } from '../config.js';
 import { makeRng, clamp, smoothstep as S } from '../core/util.js';
 import { makeTurfTextures, makeRockTextures, makeAsphaltTextures, makeGrassBladeTexture } from './textures2.js';
+import { fileTex } from './texlib.js';
 
 // ── deterministic value noise ───────────────────────────────────────────────
 function h2(ix, iz) {
@@ -414,11 +415,23 @@ export class Terrain {
   buildMesh(mud) {
     const q = this.quality;
     const tsz = Math.min(1024, q.texSize);
+    const F = (name, gen) => fileTex(name) || gen();
     this.tex = {
-      turf: makeTurfTextures(Math.min(512, tsz)),
-      rock: makeRockTextures(Math.min(512, tsz)),
-      asph: makeAsphaltTextures(Math.min(512, tsz)),
+      turf: F('turf', () => makeTurfTextures(Math.min(512, tsz))),
+      rock: F('rock', () => makeRockTextures(Math.min(512, tsz))),
+      asph: F('asphalt', () => makeAsphaltTextures(Math.min(512, tsz))),
     };
+    // the new rear surfaces have no procedural version: fall back to the mud
+    this.tex.track = fileTex('track') || { map: mud.map, normalMap: mud.normalMap };
+    this.tex.plough = fileTex('plough') || { map: mud.map, normalMap: mud.normalMap };
+    // tile sizes in metres: the scans at (about) their real size, the procedural ones as tuned
+    const scan = (n) => !!(fileTex(n) && fileTex(n).file);
+    const TS = {
+      mud: mud.file ? 2.2 : 9, mudMacro: mud.file ? 23 : 41, turf: scan('turf') ? 3.4 : 5.5,
+      rock: scan('rock') ? 6.5 : 13, asph: scan('asphalt') ? 3.6 : 7, track: 2.4, plough: 9,
+    };
+    const f = (v) => v.toFixed(2);
+    this.TS = TS;
     const splat = new THREE.DataTexture(SPLAT.data, SPLAT.res, SPLAT.res, THREE.RGBAFormat);
     splat.magFilter = THREE.LinearFilter;
     splat.minFilter = THREE.LinearMipmapLinearFilter;
@@ -467,7 +480,7 @@ export class Terrain {
     geo.computeVertexNormals();
     geo.computeBoundingSphere();
 
-    for (const t of [mud.map, mud.normalMap, mud.roughnessMap]) t.repeat.set(1, 1);
+    for (const t of [mud.map, mud.normalMap, mud.roughnessMap]) if (t) t.repeat.set(1, 1);
     const mat = new THREE.MeshStandardMaterial({
       color: 0xffffff, roughness: 1, metalness: 0,
       normalMap: mud.normalMap, normalScale: new THREE.Vector2(1.1, 1.1),
@@ -476,7 +489,9 @@ export class Terrain {
     this.uniforms = {
       tSplat: { value: splat },
       uSplatBox: { value: new THREE.Vector4(SPLAT.x0, SPLAT.z0, SPLAT.size, SPLAT.size) },
-      tMudA: { value: mud.map }, tMudR: { value: mud.roughnessMap },
+      tMudA: { value: mud.map }, tMudR: { value: mud.roughnessMap || mud.map },
+      tTrackA: { value: this.tex.track.map }, tTrackN: { value: this.tex.track.normalMap },
+      tPloughA: { value: this.tex.plough.map }, tPloughN: { value: this.tex.plough.normalMap },
       tTurfA: { value: this.tex.turf.map }, tTurfN: { value: this.tex.turf.normalMap },
       tRockA: { value: this.tex.rock.map }, tRockN: { value: this.tex.rock.normalMap },
       tAsphA: { value: this.tex.asph.map }, tAsphN: { value: this.tex.asph.normalMap },
@@ -496,6 +511,8 @@ uniform sampler2D tMudA; uniform sampler2D tMudR;
 uniform sampler2D tTurfA; uniform sampler2D tTurfN;
 uniform sampler2D tRockA; uniform sampler2D tRockN;
 uniform sampler2D tAsphA; uniform sampler2D tAsphN;
+uniform sampler2D tTrackA; uniform sampler2D tTrackN;
+uniform sampler2D tPloughA; uniform sampler2D tPloughN;
 uniform float uTime; uniform float uRain;
 ${T_COMMON}
 ` + sh.fragmentShader
@@ -522,27 +539,27 @@ ${T_COMMON}
   vec3 gX3 = dFdx(tw), gY3 = dFdy(tw);
   vec2 gX = gX3.xz, gY = gY3.xz;
   bool hasTurf = tGrass > 0.002 || tw.z > 40.0, hasRoad = tRoad > 0.002, hasRock = tRock > 0.002;
-  NT ntMud = ntSetup(tw.xz / 9.0);
+  NT ntMud = ntSetup(tw.xz / ${f(TS.mud)});
   NT ntTurf, ntAsph, ntRock;
-  vec3 mudC = ntSample(tMudA, ntMud).rgb * 0.7 + texture2D(tMudA, tw.xz / 41.0 + 0.37).rgb * 0.3;
+  vec3 mudC = ntSample(tMudA, ntMud).rgb * ${mud.file ? '0.85' : '0.7'} + texture2D(tMudA, tw.xz / ${f(TS.mudMacro)} + 0.37).rgb * ${mud.file ? '0.15' : '0.3'};
   // large-scale tonal drift so the field never reads as one flat material
   mudC *= 0.8 + 0.4 * tNoise(tw.xz * 0.013 + 7.0);
   vec3 turfC = vec3(0.0);
   if (hasTurf) {
-    ntTurf = ntSetupD(tw.xz / 5.5 + 31.0, gX / 5.5, gY / 5.5);
+    ntTurf = ntSetupD(tw.xz / ${f(TS.turf)} + 31.0, gX / ${f(TS.turf)}, gY / ${f(TS.turf)});
     turfC = ntSample(tTurfA, ntTurf).rgb * mix(0.36, 0.6, tNoise(tw.xz * 0.11));
   }
   vec3 rockC = vec3(0.0);
   if (hasRock) {
-    ntRock = ntSetupD(tw.xz / 13.0 + 5.0, gX / 13.0, gY / 13.0);
+    ntRock = ntSetupD(tw.xz / ${f(TS.rock)} + 5.0, gX / ${f(TS.rock)}, gY / ${f(TS.rock)});
     vec3 bw = pow(abs(tn), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
-    rockC = textureGrad(tRockA, tw.zy / 13.0, gX3.zy / 13.0, gY3.zy / 13.0).rgb * bw.x
+    rockC = textureGrad(tRockA, tw.zy / ${f(TS.rock)}, gX3.zy / ${f(TS.rock)}, gY3.zy / ${f(TS.rock)}).rgb * bw.x
           + ntSample(tRockA, ntRock).rgb * bw.y
-          + textureGrad(tRockA, tw.xy / 13.0, gX3.xy / 13.0, gY3.xy / 13.0).rgb * bw.z;
+          + textureGrad(tRockA, tw.xy / ${f(TS.rock)}, gX3.xy / ${f(TS.rock)}, gY3.xy / ${f(TS.rock)}).rgb * bw.z;
   }
   vec3 asphC = vec3(0.0);
   if (hasRoad) {
-    ntAsph = ntSetupD(tw.xz / 7.0 - 17.0, gX / 7.0, gY / 7.0);
+    ntAsph = ntSetupD(tw.xz / ${f(TS.asph)} - 17.0, gX / ${f(TS.asph)}, gY / ${f(TS.asph)});
     asphC = ntSample(tAsphA, ntAsph).rgb;
     // faded centre line on the road
     float along = tw.z;
@@ -571,7 +588,9 @@ ${T_COMMON}
     if (fKind < 0.5) {
       // ploughed: dark turned earth in furrows along the plot
       float fur = 0.5 + 0.5 * sin(fr.x * 3.1 + wob * 0.6);
-      fieldC = mudC * mix(0.55, 0.95, fur) * vec3(0.95, 0.88, 0.8) * tone;
+      vec2 pu = fr / ${f(TS.plough)};
+      vec3 pc = textureGrad(tPloughA, pu, vec2(dot(gX, vec2(${Math.cos(0.32).toFixed(5)}, -${Math.sin(0.32).toFixed(5)})), dot(gX, vec2(${Math.sin(0.32).toFixed(5)}, ${Math.cos(0.32).toFixed(5)}))) / ${f(TS.plough)}, vec2(dot(gY, vec2(${Math.cos(0.32).toFixed(5)}, -${Math.sin(0.32).toFixed(5)})), dot(gY, vec2(${Math.sin(0.32).toFixed(5)}, ${Math.cos(0.32).toFixed(5)}))) / ${f(TS.plough)}).rgb;
+      fieldC = ${fileTex('plough') ? 'pc * mix(0.85, 1.0, fur)' : 'mudC * mix(0.55, 0.95, fur) * vec3(0.95, 0.88, 0.8)'} * tone;
     } else if (fKind < 1.5) {
       // stubble: pale, combed in rows
       float row = 0.5 + 0.5 * sin(fr.y * 4.4);
@@ -594,7 +613,7 @@ ${T_COMMON}
     tcol = mix(tcol, fieldC, fieldW * (1.0 - rRoad));
     tcol = mix(tcol, turfC * vec3(0.55, 0.6, 0.45), hedge * 0.85);
     // the track: wet packed mud, two darker ruts, a grassy crown
-    vec3 trackC = mudC * vec3(0.82, 0.78, 0.72);
+    vec3 trackC = ${fileTex('track') ? `textureGrad(tTrackA, tw.xz / ${f(TS.track)}, gX / ${f(TS.track)}, gY / ${f(TS.track)}).rgb` : 'mudC * vec3(0.82, 0.78, 0.72)'};
     trackC = mix(trackC, mudC * 0.45, rRut / max(rRoad, 1e-3) * 0.8);
     trackC = mix(trackC, turfC * 0.7, exp(-pow(abs(tw.x - rearRoadXg(tw.z)) / 0.35, 2.0)) * 0.6);
     tcol = mix(tcol, trackC, rRoad);
@@ -609,7 +628,7 @@ ${T_COMMON}
   diffuseColor.rgb *= tcol;
 `)
         .replace('#include <roughnessmap_fragment>', /* glsl */`
-  float roughnessFactor = ntSample(tMudR, ntMud).g;
+  float roughnessFactor = ntSample(tMudR, ntMud).${mud.file ? 'a' : 'g'};
   roughnessFactor = mix(roughnessFactor, 0.93, tGrass);
   roughnessFactor = mix(roughnessFactor, 0.62, tRoad);
   roughnessFactor = mix(roughnessFactor, 0.78, tRock);

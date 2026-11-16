@@ -6,7 +6,7 @@ import { WORLD, wallZ, sectionOf, sectionCenterX } from '../config.js';
 import { makeRng, lerp } from '../core/util.js';
 import { groundH, heightUniforms, HEIGHT_GLSL } from './terrain.js';
 import {
-  box, cylY, cylZ, merge, xf, sandbagGeo, concertinaGeo, extrude, weather, makeTruck,
+  box, cylY, cylZ, merge, xf, worldUV, sandbagGeo, concertinaGeo, extrude, weather, makeTruck,
 } from './kit.js';
 
 const _m = new THREE.Matrix4();
@@ -64,7 +64,8 @@ export function buildFortification(env) {
   slabMat.onBeforeCompile = (sh) => {
     sh.vertexShader = 'attribute vec2 aSlab;\nvarying vec2 vSlab;\nvarying vec3 vSW;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
       vSW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
-      vSlab = aSlab;`);
+      vSlab = aSlab;
+      ${tex.slab.file ? '#ifdef USE_MAP\n      vMapUv += vec2(fract(aSlab.y * 7.31) * 3.0, fract(aSlab.y * 3.17) * 2.0);\n      #endif\n      #ifdef USE_NORMALMAP\n      vNormalMapUv += vec2(fract(aSlab.y * 7.31) * 3.0, fract(aSlab.y * 3.17) * 2.0);\n      #endif' : ''}`);
     sh.fragmentShader = 'varying vec2 vSlab;\nvarying vec3 vSW;\n' + SLAB_GLSL + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
       float su = vSW.x / 0.876;
       float sy = vSW.y;
@@ -92,6 +93,7 @@ export function buildFortification(env) {
   let slabCount = 0;
   const slabsPer = wings.map((w) => Math.round(w.len / 1.52));
   slabsPer.forEach((n) => { slabCount += n; });
+  if (tex.slab.file) worldUV(slabGeo, 2.6);
   const slabs = new THREE.InstancedMesh(slabGeo, slabMat, slabCount);
   const aSlab = new THREE.InstancedBufferAttribute(new Float32Array(slabCount * 2), 2);
   slabGeo.setAttribute('aSlab', aSlab);
@@ -319,7 +321,7 @@ function buildBunker(env) {
     G.push(box(3.6, 0.25, 0.3, sx, 9.05, z0 - 0.1));
     slits.push(box(3.2, 0.55, 0.05, sx, 8.65, z0 + 0.02));
   }
-  const bunker = new THREE.Mesh(merge(G), conc);
+  const bunker = new THREE.Mesh(tex.slab.file ? worldUV(merge(G), 3.0) : merge(G), conc);
   bunker.castShadow = true;
   bunker.receiveShadow = true;
   scene.add(bunker);

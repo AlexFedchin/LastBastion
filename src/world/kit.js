@@ -33,6 +33,24 @@ export function merge(geos) {
   return mergeGeometries(list);
 }
 
+/**
+ * Re-project a mesh's UVs onto the plane each face points along, at `tile` metres per
+ * repeat: a scanned texture then lands at its real size on any box, however long or tall
+ * (BoxGeometry maps one repeat per face, which smears a scan across a 7 m wall panel).
+ */
+export function worldUV(geo, tile, ox = 0, oz = 0) {
+  const p = geo.attributes.position, n = geo.attributes.normal, uv = geo.attributes.uv;
+  for (let i = 0; i < p.count; i++) {
+    const x = p.getX(i) + ox, y = p.getY(i), z = p.getZ(i) + oz;
+    const ax = Math.abs(n.getX(i)), ay = Math.abs(n.getY(i)), az = Math.abs(n.getZ(i));
+    if (ay >= ax && ay >= az) uv.setXY(i, x / tile, z / tile);
+    else if (ax >= az) uv.setXY(i, z / tile, y / tile);
+    else uv.setXY(i, x / tile, y / tile);
+  }
+  uv.needsUpdate = true;
+  return geo;
+}
+
 export const box = (w, h, d, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) => xf(new THREE.BoxGeometry(w, h, d), x, y, z, rx, ry, rz);
 export const cylX = (r, l, seg = 12, x = 0, y = 0, z = 0) => xf(new THREE.CylinderGeometry(r, r, l, seg), x, y, z, 0, 0, Math.PI / 2);
 export const cylY = (r, l, seg = 12, x = 0, y = 0, z = 0) => xf(new THREE.CylinderGeometry(r, r, l, seg), x, y, z);
