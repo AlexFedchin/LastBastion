@@ -283,8 +283,16 @@ export function buildProps(env) {
   const boulderGeo = new THREE.DodecahedronGeometry(1, 1);
   {
     const p = boulderGeo.attributes.position;
-    const r2 = makeRng(808);
-    for (let i = 0; i < p.count; i++) { const k = 0.78 + r2() * 0.44; p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k); }
+    // the polyhedron is non-indexed (every triangle has its own corners), so the
+    // jitter is keyed by corner position: copies of a shared corner move together
+    // and the rock stays closed instead of splitting into loose triangles
+    const r2 = makeRng(808), jit = new Map();
+    for (let i = 0; i < p.count; i++) {
+      const key = `${Math.round(p.getX(i) * 1e4)},${Math.round(p.getY(i) * 1e4)},${Math.round(p.getZ(i) * 1e4)}`;
+      let k = jit.get(key);
+      if (k === undefined) { k = 0.78 + r2() * 0.44; jit.set(key, k); }
+      p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k);
+    }
     boulderGeo.computeVertexNormals();
   }
   const bMs = [];
