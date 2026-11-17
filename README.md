@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/screenshots/banner.jpg" alt="Last Bastion — the burning city beyond the valley" width="100%">
+<img src="docs/screenshots/banner.jpg" alt="Last Bastion — an Apache gunship works the field by searchlight" width="100%">
 
 # L A S T &nbsp; B A S T I O N
 
@@ -23,16 +23,17 @@ Every night the dead come down that valley **in their thousands**.
 Hold until dawn. Spend what you scavenged. Do it again.
 
 <p align="center">
-  <img src="docs/screenshots/horde.jpg" alt="Night 3 — the horde fills the valley under the burning city" width="100%">
-  <br><sub><b>Night 3.</b> 269 contacts in the valley, Spectre on station overhead, the city burning on the horizon.</sub>
+  <img src="docs/screenshots/horde.jpg" alt="Night 3 — the horde fills the valley, fires burning along the far side" width="100%">
+  <br><sub><b>Night 3.</b> The valley full of them, Spectre on station overhead, the road to the city running out into the dark.</sub>
 </p>
 
 > [!NOTE]
-> **The world is painted procedurally at startup.** No texture packs: the mud, the
-> T-wall concrete, the zombies' torn clothes and the burning skyline are all generated in code.
-> The exceptions are the downloaded models: your M2HB, the aircraft and helicopters, the soldiers,
-> the trucks, car wrecks and containers, and the scanned kit that dresses the bastion (ammo cans, crates, drums, barriers, generators: CC0, Poly Haven).
-> The sound is the opposite: real field recordings, a real .50 BMG report and an adaptive score.
+> **Built in code, dressed with real scans.** The valley, the wall, the horde, the sky and the
+> burning skyline are generated at startup. The surfaces (mud, turf, rock, asphalt, concrete, rusted
+> metal) are CC0 scans from Poly Haven, and the models are downloaded: your M2HB, the AC-130, B-36,
+> Apaches and Chinooks, rigged soldiers and civilians, the trucks, car wrecks, containers, the church
+> and the kit that dresses the bastion. The sound is real too: field recordings, a real .50 BMG report,
+> a real helicopter, voiced radio traffic and an adaptive score.
 
 ---
 
@@ -40,28 +41,20 @@ Hold until dawn. Spend what you scavenged. Do it again.
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/screenshots/molotov.jpg" alt="Molotov fire burning at the foot of the wall"></td>
     <td width="50%"><img src="docs/screenshots/arty.jpg" alt="105 mm fire mission landing in the horde"></td>
+    <td width="50%"><img src="docs/screenshots/bombers.jpg" alt="Riding with the lead B-36 over the valley"></td>
   </tr>
   <tr>
-    <td align="center"><b>[E] Molotov.</b> Light the rag, throw the bottle. The dead walk into the fire screaming.</td>
-    <td align="center"><b>[Q] 105 mm fire mission.</b> Four rounds HE, splash in three. <i>Carnage ×16.</i></td>
+    <td align="center"><b>[Q] 105 mm fire mission.</b> Four rounds HE, splash in three. <i>Annihilation ×92.</i></td>
+    <td align="center"><b>The extraction.</b> Hammer flight, in hot. <i>"Walking it up the valley."</i></td>
   </tr>
   <tr>
-    <td width="50%"><img src="docs/screenshots/scope.jpg" alt="Looking through the optics at the city"></td>
-    <td width="50%"><img src="docs/screenshots/giant.jpg" alt="The Behemoth walking down the valley, seen through the optics"></td>
+    <td width="50%"><img src="docs/screenshots/bombing.jpg" alt="Bombs walking up the field in front of the wall"></td>
+    <td width="50%"><img src="docs/screenshots/gunships.jpg" alt="Two Apache gunships coming in over the wall"></td>
   </tr>
   <tr>
-    <td align="center"><b>[RMB] Optics.</b> Zoom, tighter spread, and the whole dead city in the glass.</td>
-    <td align="center"><b>Night 10: the Behemoth.</b> <i>"That's not like the other one. That's bigger."</i></td>
-  </tr>
-  <tr>
-    <td width="50%"><img src="docs/screenshots/fog.jpg" alt="Fog bank rolling over the wall"></td>
-    <td width="50%"><img src="docs/screenshots/shop.jpg" alt="The dawn resupply screen"></td>
-  </tr>
-  <tr>
-    <td align="center"><b>Night 2: Fog bank.</b> Visibility near zero, Spectre is blind, sodium lamps on the wall.</td>
-    <td align="center"><b>Dawn.</b> Spend the night's supplies on the gun, the battery and the wall.</td>
+    <td align="center"><b>Bombs away.</b> Three sticks carpet the field in front of the wall.</td>
+    <td align="center"><b>Reaper one-one, on station.</b> The gunships come in over the wall, searchlights on.</td>
   </tr>
 </table>
 
@@ -89,7 +82,12 @@ launches in a couple of seconds.
 | `npm run watch` | Rebuild on save while you tweak (`Ctrl+R` in the game window reloads) |
 
 *Play Last Bastion (windowed)* starts in a window instead of fullscreen. `F11` toggles fullscreen,
-`F12` opens DevTools. The graphics preset is chosen automatically on first launch with a short benchmark
+`F12` opens DevTools.
+
+**Developer tools:** `F10` (or *Developer* in the main menu) opens a panel to start any night with any
+difficulty, survivors, supplies, claymores and upgrades; during a run, to end the night, clear the
+field, trigger any event or jump to an ending; and, from anywhere, to **watch either cutscene** (the
+extraction or the ending) straight away. Dev runs never save over your campaign or the endless record. The graphics preset is chosen automatically on first launch with a short benchmark
 of a heavy night; *Settings ▸ Quality ▸ AUTO* runs it again.
 
 ---
@@ -154,15 +152,15 @@ Every night has its own event and its own radio traffic. Objectives, a boss bar 
 
 | Night | Event |
 |:---:|---|
-| **1** | A recon patrol fighting its way back to the gate |
-| **2** | A **fog bank** that blinds you *and* the gunship |
-| **3** | The civilians from the overpass make a run for it |
-| **4** | A resupply drop you have to hold until it's recovered |
+| **1** | A recon patrol fighting its way back to the gate, and a squad steps out to cover them |
+| **2** | A **fog bank** that blinds you *and* the gunship; a fuel tanker stalled on the road: let them crowd it, then put a burst through the tank |
+| **3** | The dead find the way round, down the cliffs past the end of a wing; the civilians from the overpass make a run for it |
+| **4** | A resupply drop you have to hold while the recovery team carries the crates home |
 | **5** | 🗿 **Goliath**: a giant that smashes ramps into the wall and kills a man every other blow |
-| **6** | A brute stampede down one flank |
+| **6** | A brute stampede down one flank, and more of them down the cliffs |
 | **7** | **Blackout**: the generator dies, the lamps go out |
-| **8** | Spectre goes down in the hills |
-| **9** | A bloater column, plus a resupply |
+| **8** | Spectre goes down in the hills; a survivors' truck runs the road through the horde |
+| **9** | A resupply, then a bloater column |
 | **10** | 👹 **The Behemoth**, before the last tide, and, with fifteen alive, the hold for the extraction flight |
 
 **The chronicle.** As the light comes up, an old voice tells the night you just survived: not the numbers but the story, years later. It is built from what actually happened: whether Recon Two made it to the gate, whether the giant reached the wall, whether the danger-close fire cost you men, how many places stood empty on the walkway by morning. Every line is narrated (Space reveals it all; Space again moves on), and the story stays on the resupply screen.
@@ -174,8 +172,9 @@ the first night you had it; until then its cards are greyed out with the night i
 **The endings.** Command promised an extraction flight at the seventy-second hour, but it flies only
 for **fifteen souls or more**. Start night 10 with at least fifteen survivors and the last night becomes a
 hold: the flight is inbound, everything in the valley comes over the ridge at once, and if the wall still
-stands when the timer runs out, the bombers carpet the field, gunship helicopters circle it with their
-searchlights, and the lifters land behind the wall to carry everyone out (`EXTRACT_ENDING` in `config.js`,
+stands when the timer runs out, the extraction plays: three B-36s carpet the field, two Apaches come in
+over the wall and work the crowd with rockets and the chain gun by searchlight, and three Chinooks land
+behind the wall in their own dust to carry everyone out while the dead come over it (`EXTRACT_ENDING` in `config.js`,
 staged by `src/game/extraction.js`). If the wall falls first, fight the night again. Come to night 10 with
 fewer than fifteen and nobody comes: hold anyway, and in the morning Kovac's broadcast is answered by
 strangers who come up the road to the gate (`ENDING`, `src/game/ending.js`). Space twice skips either.
@@ -188,22 +187,19 @@ Difficulties: **Recruit**, **Veteran** *(intended)*, **Last Stand**.
 
 ## 🔬 Under the hood
 
-<p align="center">
-  <img src="docs/screenshots/menu.jpg" alt="Main menu over the live valley" width="100%">
-  <br><sub>The main menu is the live game world: the valley, the craters, the burning city and the searchlights.</sub>
-</p>
-
 | | |
 |---|---|
-| ⛰️ **Terrain** | A real heightfield valley: shell craters with standing water and rain ripples, the anti-climb ditch, an old forward trench, a cratered road to the city, cliffs, forested hills. Layered mud / dead turf / rock / asphalt, wind-blown grass. |
+| ⛰️ **Terrain** | A real heightfield valley: shell craters with standing water and rain ripples, the anti-climb ditch, an old forward trench, a cratered road to the city, cliffs, forested hills, and farmland behind the base. Scanned mud / dead turf / rock / asphalt, hex-tiled so they never repeat, wind-blown grass. |
 | 🧱 **The wall** | Precast T-wall slabs over HESCO fill, duckboard walkways, razor wire on outriggers, sodium lamps, and **blood that climbs the face as the pile does**. |
-| 🚗 **The field** | A column of abandoned cars, burnt-out trucks, a tank hulk, a downed helicopter, hedgehogs, wire fences, dead trees, telephone poles, ruined farms. |
+| 🚗 **The field** | Rusted and burnt-out car wrecks, Ural army trucks, shipping containers, a crashed helicopter, hay bales, a tank hulk, hedgehogs, wire fences, dead trees, telephone poles, ruined farms and a church. |
+| 🪖 **People** | Rigged soldiers on the wall and in the field, civilians running for the gate, a gate squad covering them: rigged and animated, firing from the wall and running for the gate. |
+| 🚁 **Aircraft** | Spectre circling all night, the B-36 on call, and, for the extraction, Apaches and Chinooks that fly real flight paths: banked into their turns, nose down to speed up, flared to land. |
 | 🌆 **The horizon** | A dead village and church, a broken highway viaduct, power pylons, a radio mast, far mountains, and a **burning city** with smoke plumes, searchlights in the clouds, tracer fire and flak. |
 | 🌫️ **Atmosphere** | One fog model for every material: haze, drifting ground mist and in-scattered firelight that matches the sky. Storm clouds lit from below, lightning bolts, rain glittering in the searchlights. |
 | 🔥 **Fire** | Per-pixel procedural flames with ground glow, smoke and embers: Molotov pools, wrecks, barrels, burning dead, lingering blast fires. |
 | 🧟 **Zombies** | Three LODs, elbows and knees, faces, hands, torn clothes, gear (helmets, plate carriers, packs, caps, hi-vis), mud and blood shading. |
 | 🔭 **Lens** | Heat haze over fires, blast shockwaves, ghosts and halo, anamorphic streaks, a dirty lens catching bright light, gentle barrel distortion. |
-| 🔊 **Sound** | A real .50 BMG report layered over US Army M2 footage, valley reverb with slapback off the hillsides, brass on the platform, artillery that **arrives at the speed of sound**, a horde mixed at three distances, and an adaptive score that rises with the pressure on the wall. |
+| 🔊 **Sound** | A real .50 BMG report layered over US Army M2 footage, valley reverb with slapback off the hillsides, brass on the platform, artillery that **arrives at the speed of sound**, a horde mixed at three distances, and real helicopter rotors panned and Doppler-shifted as they pass, and an adaptive score that rises with the pressure on the wall. |
 
 ### Project layout
 
@@ -232,12 +228,12 @@ tests/smoke/     offscreen smoke tests
 
 <br>
 
-All audio lives in `app/audio/` (Ogg Vorbis, ~32 MB) and is loaded at boot: one-shots and ambience
+All audio lives in `app/audio/` (Ogg Vorbis, ~44 MB) and is loaded at boot: one-shots and ambience
 beds are decoded into memory, the score is streamed.
 
 | Folder | What |
 |---|---|
-| `sfx/` | one-shots: the M2HB (4 layered variants + burst tails), wall M240s, brass, explosions near/far, incoming rounds, mortar, Molotovs (Zippo, bottle, glass, the whoomph), impacts, burning zombies screaming, gore, 27 zombie voices, brutes, runners, the men on the wall, thunder, siren, radio, gun handling, UI, crows, a church bell |
+| `sfx/` | one-shots and positioned loops: the M2HB (4 layered variants + burst tails, and a second take: *Settings ▸ Machine gun*), wall M240s, helicopter rotors, the Apache's chain gun and rockets, brass, explosions near/far, incoming rounds, mortar, Molotovs (Zippo, bottle, glass, the whoomph), impacts, burning zombies screaming, gore, 27 zombie voices, brutes, runners, the men on the wall, thunder, siren, radio, gun handling, UI, crows, a church bell |
 | `amb/` | seamless loops: rain near/far, wind, the horde at three distances, bodies against the wall, fire, the distant battle, dawn air, flies, sodium lamps, radio carrier |
 | `music/` | the score: menu, two night drones, two percussion layers that follow the pressure on the wall, the tide, dawn, resupply, the fall, victory |
 | `voice/` | every radio line, spoken and run through a radio chain, and the dawn chronicle, narrated clean at 24 kHz (`lines.json` maps speaker + text to a take) |
@@ -256,7 +252,19 @@ python scripts/audio/build_audio.py hmg boom # only matching recipes
 
 The script downloads its sources (cached in `scripts/audio/.cache/`), then slices, layers,
 loop-crossfades, loudness-matches, limits and encodes every asset, and regenerates `CREDITS.md`.
-Every recipe is in that one file.
+Every recipe is in that one file. Your own recordings go in `scripts/audio/user/` (the second M2 take,
+the incoming shell and the helicopter rotors come from there).
+
+**Rebuilding the textures** (Python 3 + Pillow):
+
+```bash
+python3 scripts/textures/build_textures.py fetch   # download the Poly Haven sets, then build
+python3 scripts/textures/build_textures.py mud     # only matching sets
+```
+
+Each CC0 scan is matched in brightness to the procedural texture it replaces, has its ambient
+occlusion baked in, and ships as WebP at 2048, 1024 and 512 px (`app/textures/`, chosen by the
+graphics preset). The game falls back to the procedural textures if a file is missing.
 
 **Rebuilding the models** (Node):
 
@@ -350,8 +358,9 @@ npm run test:smoke -- events hud    # a subset
 Boots the real game offscreen (muted) and drives it through its test hooks: boot and sound loading
 (every radio line voiced), that tracers, sparks and impacts actually draw, the gun firing and killing,
 the unlock schedule and shop gating, HUD alert merging, every night event, the bomber and Spectre's
-range, and the play-test log. Results and screenshots land in `tests/smoke/out/`. CI runs them on
-every push with software WebGL (`.github/workflows/smoke.yml`).
+range, the play-test log, and both endings played through. Results and screenshots land in
+`tests/smoke/out/`. `SMOKE_SIZE=1600x900 SMOKE_QUALITY=high` gives screenshots worth keeping. The CI
+workflow (`.github/workflows/smoke.yml`) runs them with software WebGL when started by hand.
 
 </details>
 
@@ -359,14 +368,14 @@ every push with software WebGL (`.github/workflows/smoke.yml`).
 
 ## 📦 Build a Windows .exe
 
-**GitHub Actions** (`.github/workflows/build-windows.yml`) builds on every push to `main`/`master`,
-on pull requests, on manual dispatch, and on `v*` tags:
+**GitHub Actions** (`.github/workflows/build-windows.yml`) builds when you start it by hand
+(*Actions ▸ Build Windows .exe ▸ Run workflow*):
 
 - `LastBastion-1.0.0-portable.exe`: a single launchable .exe, no install
 - `LastBastion-1.0.0-setup.exe`: a regular installer
 
-Download them from the run's **Artifacts** section. Pushing a tag like `v1.0.0` also attaches both
-files to a GitHub Release.
+Download them from the run's **Artifacts** section. Run it on a `v*` tag (pick the tag in the branch
+dropdown) to also attach both files to a GitHub Release.
 
 Locally: `npm run dist:win` (Windows) or `npm run dist:linux` (AppImage). Output goes to `release/`.
 
@@ -389,7 +398,9 @@ Music by **Kevin MacLeod** ([incompetech.com](https://incompetech.com)), CC BY 4
 Sound effects from **Freesound** contributors, CC0. The full list (every recording, its author and
 what it became) is in [`app/audio/CREDITS.md`](app/audio/CREDITS.md) and ships with the game.
 Radio voices performed by **Qwen3-TTS** (Apache 2.0), partly re-voiced with **Chatterbox** voice conversion (MIT).
-3D models of the M2HB, AC-130 and B-36: see [`app/models/CREDITS.md`](app/models/CREDITS.md).
+The rotors and the second M2 take are the developer's own recordings.
+3D models (Sketchfab, CC BY 4.0, and others): see [`app/models/CREDITS.md`](app/models/CREDITS.md).
+Surface textures and the bastion's kit are CC0 scans from **Poly Haven**: [`app/textures/CREDITS.md`](app/textures/CREDITS.md).
 
 <div align="center">
 
@@ -397,6 +408,6 @@ Radio voices performed by **Qwen3-TTS** (Apache 2.0), partly re-voiced with **Ch
 
 **Hold the line.**
 
-<sub>Screenshots are real in-game captures at the High preset (`docs/screenshots/`).</sub>
+<sub>Screenshots are real in-game captures at the High preset, 1600×900 (`docs/screenshots/`).</sub>
 
 </div>
