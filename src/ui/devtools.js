@@ -1,6 +1,7 @@
 // Developer tools: F10 (or DEVELOPER in the main menu) opens a panel to start any night
 // with any difficulty, survivors, supplies and upgrades, and, during a run, to trigger
-// events, end the night or jump to the extraction. Dev runs never touch the campaign
+// events, end the night or jump to the extraction; and, from anywhere, to watch either
+// cutscene (extraction or ending) straight away. Dev runs never touch the campaign
 // save or the endless record (run.dev).
 import { DIFFICULTY, UPGRADES, FINAL_NIGHT, EXTRACTION } from '../config.js';
 
@@ -61,6 +62,11 @@ export class DevTools {
       <button class="close" data-dev="close" aria-label="Close developer tools">×</button>
       <h2>DEVELOPER</h2>
       <div class="sub">F10 opens and closes this panel. Dev runs never save over your campaign.</div>
+      <h3>WATCH A CUTSCENE</h3>
+      <div class="acts">
+        <button data-dev="watch-extract">THE EXTRACTION</button>
+        <button data-dev="watch-ending">THE ENDING</button>
+      </div>
       <div class="inrun" id="dv-inrun" hidden>
         <h3>THIS RUN</h3>
         <div class="acts">
@@ -104,6 +110,8 @@ export class DevTools {
       case 'max': for (const u of UPGRADES) this.setLevel(u.id, u.costs.length); break;
       case 'none': for (const u of UPGRADES) this.setLevel(u.id, 0); break;
       case 'start': this.start(); break;
+      case 'watch-extract': this.watch('extraction'); break;
+      case 'watch-ending': this.watch('ending'); break;
       case 'end': if (g.state === 'night') { g.horde.clearLiving(); g.director.spawningDone = true; } this.toggle(false); break;
       case 'clear': g.horde.clearLiving(); break;
       case 'supplies': if (g.run) g.run.supplies += 500; break;
@@ -129,7 +137,29 @@ export class DevTools {
     g.deploy(save, () => g.startRun(save));
   }
 
-  toggle(on = !this.el.classList.contains('on')) {
+  /**
+   * Jump straight into a cutscene from anywhere: a throwaway dev run on the final night
+   * (with enough survivors for the flight, so the extraction's cast is built and
+   * precompiled during the load), then the cutscene starts as soon as the run does.
+   */
+  watch(which) {
+    const g = this.g;
+    if (g.deploying) return;
+    this.toggle(false);
+    const save = {
+      difficulty: this.$('#dv-diff').value, night: FINAL_NIGHT, survivors: Math.max(EXTRACTION.souls, DIFFICULTY.veteran.survivors), supplies: 0, kills: 0,
+      upgrades: { ...this.up }, minesOwned: 0, endless: false, atShop: false, totals: { shots: 0, hits: 0, headshots: 0 }, log: [], dev: true,
+    };
+    g.devSave = save;
+    if (g.state !== 'menu') g.enterMenu();
+    g.deploy(save, () => {
+      g.startRun(save);
+      if (which === 'extraction') g.playExtraction();
+      else { g.victory = true; g.playEnding(); }
+    });
+  }
+
+  toggle(on =!this.el.classList.contains('on')) {
     const g = this.g;
     this.el.classList.toggle('on', on);
     this.$('#dv-inrun').hidden = !(g.run && g.state !== 'menu');
