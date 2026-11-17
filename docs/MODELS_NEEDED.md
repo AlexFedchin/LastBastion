@@ -14,8 +14,14 @@ The game already loads real models for:
 - the grenade and the molotov
 - the sandbags
 - 48 Poly Haven props in the yard and on the walkway
+- 17 more Poly Haven props for the dawn resupply hangar: the overhead crane, steel shelving, hanging and wall lamps, the tool chest, drill press, office desk, storage cart, extinguishers, a flood light and crates
 
 See [app/models/CREDITS.md](../app/models/CREDITS.md) for those.
+
+Surface textures don't need to be sent any more: the scanned sets come from Poly Haven
+(`scripts/textures/build_textures.py fetch`) and ambientCG (`scripts/textures/build_ambientcg.py`), both CC0,
+and are downloaded and built directly. The same goes for any CC0 prop Poly Haven has
+(`scripts/models/build_kit.mjs` downloads missing sources itself). The list below is what neither library has.
 
 Everything below is still built from boxes, cylinders and cones in code. The list is in order of importance: how much screen time a thing gets, multiplied by how far its current look falls short.
 
@@ -119,7 +125,19 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 10-25k triangles.
 
-## 6. Wrecked main battle tank
+## 6. M240 machine gun
+
+**Where:**
+- the crewed M240s on the wall (two to four, firing all night beside you)
+- bay 3 of the dawn resupply hangar, on its sandbags, where you buy wall gunners
+
+**Now:** the soldier's rifle stands in for it on the wall, and the bolt-action rifle prop lies on the sandbags in the hangar.
+
+**Need:** an M240B/G (or a PKM, if that fits the setting better) with its bipod, ideally with the feed cover and an ammo belt as separate meshes.
+
+**Budget:** about 3-8k triangles.
+
+## 7. Wrecked main battle tank
 
 **Where:** a burnt tank out on the killing field, in plain view from the gun.
 
@@ -129,7 +147,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 20–40k triangles.
 
-## 7. HESCO / defensive barrier unit
+## 8. HESCO / defensive barrier unit
 
 **Where:** the wall itself, the thing you defend all game.
 
@@ -143,7 +161,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 1–4k triangles per unit.
 
-## 8. Rural buildings set
+## 9. Rural buildings set
 
 **Where:**
 - the dead village and church on the far hills
@@ -160,7 +178,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 5–20k triangles each. They're seen from 100–600 m away, so silhouette and texture matter more than detail.
 
-## 9. Supply-drop parachute and pallet
+## 10. Supply-drop parachute and pallet
 
 **Where:** the night's supply drop: a crate comes down under a parachute in front of the wall, and the canopy collapses when it lands.
 
@@ -170,7 +188,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 3-8k triangles.
 
-## 10. Van or minibus wreck
+## 11. Van or minibus wreck
 
 **Where:** the abandoned column on the road out, and the rear road. The cars cover the sedans and hatchbacks, but nothing taller breaks up the line.
 
@@ -180,7 +198,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 5-15k triangles.
 
-## 11. Military tents
+## 12. Military tents
 
 **Where:** five tents in the yard, with lit doorways. Seen in the yard, landing-zone and run shots.
 
@@ -190,7 +208,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 3–8k triangles.
 
-## 12. Guard / searchlight tower
+## 13. Guard / searchlight tower
 
 **Where:** the two searchlight towers at the wing ends, which carry the sweeping beams.
 
@@ -200,7 +218,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 5–15k triangles.
 
-## 13. Utility poles and power pylon
+## 14. Utility poles and power pylon
 
 **Where:**
 - telephone poles along the field road and the new rear track
@@ -212,7 +230,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** pole about 300–1,000 triangles, pylon about 2–6k.
 
-## 14. Portable toilets and water tank
+## 15. Portable toilets and water tank
 
 **Where:** the yard's latrine row and the water tanks.
 
