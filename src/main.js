@@ -34,6 +34,7 @@ import { DevTools } from './ui/devtools.js';
 import { Hangar } from './world/hangar.js';
 import { Coach } from './ui/coach.js';
 import { Ending } from './game/ending.js';
+import { Prologue } from './game/prologue.js';
 import { obstacles } from './world/obstacles.js';
 import { ExtractionHold, ExtractionScene } from './game/extraction.js';
 
@@ -131,6 +132,7 @@ class Game {
     this.hangar = new Hangar(this);
     this.coach = new Coach(this);
     this.ending = new Ending(this);
+    this.prologue = new Prologue(this);
     this.extraction = new ExtractionScene(this);
     this.input = new Input(canvas);
 
@@ -386,6 +388,7 @@ class Game {
     document.addEventListener('keydown', (e) => {
       this.audio.init();
       if (this.chronicle.active && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { if (!e.repeat) this.chronicle.advance(); return; }
+      if (this.state === 'prologue' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { if (!e.repeat) this.prologue.skipPress(); return; }
       if (this.state === 'ending' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.ending.skipPress(); return; }
       if (this.state === 'extraction' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.extraction.skipPress(); return; }
       if (this.state === 'shop' && !e.repeat && this.screens.current === 'shop' && this.hangar.key(e.code)) { e.preventDefault(); return; }
@@ -422,6 +425,7 @@ class Game {
     if (this.chronicle) this.chronicle.stop();
     if (this.ending) this.ending.stop();
     if (this.extraction) this.extraction.stop();
+    if (this.prologue) this.prologue.stop();
     this.audio.stopVoice();
     this.arsenal.startNight(this.menuStats, true);
     this.env.setStory(1);
@@ -464,7 +468,7 @@ class Game {
       case 'retry': { const s = this.run && this.run.dev ? this.devSave : loadSave(); if (s) this.deploy(s, () => this.startRun(s)); break; }
       case 'menu': this.enterMenu(); break;
       case 'endless': this.run.endless = true; writeSave(this.run); this.audio.setMusicMode('dawn'); this.openShop(); break;
-      case 'ending-skip': if (this.state === 'extraction') this.extraction.skipPress(); else this.ending.skipPress(); break;
+      case 'ending-skip': if (this.state === 'prologue') this.prologue.skipPress(); else if (this.state === 'extraction') this.extraction.skipPress(); else this.ending.skipPress(); break;
       case 'victory-new': this.enterMenu(); this.screens.show('new'); break;
       case 'chronicle-next': this.chronicle.advance(); break;
       default: break;
@@ -481,10 +485,11 @@ class Game {
     };
     clearSave();
     writeSave(run);
-    this.startRun(run);
+    this.startRun(run, { prologue: true });
   }
 
-  startRun(save) {
+  /** opts.prologue: a new campaign, so the sunset before the first night plays first. */
+  startRun(save, opts = {}) {
     this.run = JSON.parse(JSON.stringify(save));
     this.newRecord = false;
     this.run.totals = this.run.totals || { shots: 0, hits: 0, headshots: 0 };
@@ -505,6 +510,19 @@ class Game {
       this.openShop();
       return;
     }
+    if (opts.prologue && this.run.night === 1) this.playPrologue();
+    else this.startNight();
+  }
+
+  /** The last evening before the first night (src/game/prologue.js); night 1 follows. */
+  playPrologue() {
+    this.state = 'prologue';
+    this.stateT = 0;
+    this.prologue.start();
+  }
+
+  onPrologueDone() {
+    if (this.state !== 'prologue') return;
     this.startNight();
   }
 
@@ -853,6 +871,7 @@ class Game {
       case 'dawn': this.updateDawn(dt, rdt); break;
       case 'shop': this.updateShop(dt, rdt); break;
       case 'fallen': this.updateFallen(dt, rdt); break;
+      case 'prologue': this.prologue.update(dt, rdt); break;
       case 'ending': this.ending.update(dt, rdt); break;
       case 'extraction': this.extraction.update(dt, rdt); break;
       case 'victory': this.updateVictory(dt, rdt); break;
@@ -892,9 +911,9 @@ class Game {
     u.uDamage.value = Math.max(this.damagePulse, lowLife, this.state === 'fallen' ? Math.min(1, this.stateT * 0.4) : 0);
     u.uFlash.value = this.flashPulse + this.env.flash * 0.04;
     u.uRadial.value = this.radial;
-    u.uDesat.value = this.state === 'fallen' ? Math.min(0.85, 0.28 + this.stateT * 0.15) : lerp(0.28, 0.4, this.env.dawn);
+    u.uDesat.value = this.state === 'fallen' ? Math.min(0.85, 0.28 + this.stateT * 0.15) : lerp(0.28, 0.4, this.env.dawn) - this.env.dusk * 0.2;
     u.uExposure.value = lerp(1.25, 1.2, this.env.dawn);
-    u.uWarm.value = this.env.dawn * 0.3;
+    u.uWarm.value = this.env.dawn * 0.3 * (1 - this.env.dusk) + this.env.dusk * 0.45;
     u.uCA.value = 0.008 + this.player.trauma * 0.008 + this.radial * 0.015;
     // the dawn resupply is drawn in the hangar: its own scene and camera through the same post chain
     const inHangar = this.state === 'shop' && this.hangar.active;
@@ -1273,6 +1292,8 @@ class Game {
       extractionInfo: () => ({ t: this.extraction.t, end: this.extraction.end, T: this.extraction.T, shots: this.extraction.shots }),
       hold: (left) => { const h = this.events.active.find((e) => e.kind === 'extraction'); if (h) h.t = h.P.hold - left; return !!h; },
       ending: (seek = 0) => { this.victory = true; if (this.state !== 'ending') this.playEnding(); this.ending.t = seek; for (const c of this.ending.cues) c.done = c.at < seek; },
+      prologue: (seek = 0) => { if (this.state !== 'prologue') this.playPrologue(); this.prologue.t = seek; for (const c of this.prologue.cues) c.done = c.at < seek; this.prologue.lightsOn = this.prologue.lightsAt < seek; },
+      prologueInfo: () => ({ t: this.prologue.t, end: this.prologue.end, shots: this.prologue.shots, cues: this.prologue.cues.map((c) => [c.at, c.dur, c.shot || '']) }),
       endingInfo: () => ({ t: this.ending.t, end: this.ending.end, shots: this.ending.shots, cues: this.ending.cues.map((c) => [c.at, c.dur, c.shot || '']) }),
       freeze: (on = true) => { this.frozen = !!on; },
       radioLines: () => allRadioLines(),

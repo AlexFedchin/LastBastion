@@ -86,8 +86,8 @@ launches in a couple of seconds.
 
 **Developer tools:** `F10` (or *Developer* in the main menu) opens a panel to start any night with any
 difficulty, survivors, supplies, claymores and upgrades; during a run, to end the night, clear the
-field, trigger any event or jump to an ending; and, from anywhere, to **watch either cutscene** (the
-extraction or the ending) straight away. Dev runs never save over your campaign or the endless record. The graphics preset is chosen automatically on first launch with a short benchmark
+field, trigger any event or jump to an ending; and, from anywhere, to **watch any cutscene** (the
+prologue, the extraction or the ending) straight away. Dev runs never save over your campaign or the endless record. The graphics preset is chosen automatically on first launch with a short benchmark
 of a heavy night; *Settings ▸ Quality ▸ AUTO* runs it again.
 
 ---
@@ -170,6 +170,16 @@ hangar: four bays (the gun, the battery, the wall, support) where every upgrade 
 spare barrels on the bench, pallets of 105 mm rounds, men, wire, crates of bottles, delivered as you buy
 it, and a duty board with last night's numbers. A tool's upgrades open at the dawn after
 the first night you had it; until then its cards are greyed out with the night it arrives.
+
+**The prologue.** A new campaign opens on the last evening before the first night: a long lens on
+the sun going down behind the burning city with crows crossing it, pulling out to the bastion; the wall
+lit orange from out on the road; along the walkway and round the M240 gunner as Aran and Kovac call the
+lights on; a searchlight clunking on and swinging out over the field; the first of the dead coming over
+the rise under a lightning strike; and the camera settling behind the fifty as the dark comes down and
+night 1 begins. Scored with its own ambience: a far siren, the crows, an evening bell down the valley, a
+dog, flies on the wall, the gunner loading his belt, the searchlight contactors, wind and rain coming in
+with the dark, the dead groaning on the road, the fifty's charging handle (`PROLOGUE` in `config.js`,
+staged and scored by `src/game/prologue.js`). Space twice skips it.
 
 **The endings.** Command promised an extraction flight at the seventy-second hour, but it flies only
 for **fifteen souls or more**. Start night 10 with at least fifteen survivors and the last night becomes a
@@ -362,7 +372,7 @@ npm run test:smoke -- events hud    # a subset
 Boots the real game offscreen (muted) and drives it through its test hooks: boot and sound loading
 (every radio line voiced), that tracers, sparks and impacts actually draw, the gun firing and killing,
 the unlock schedule and shop gating, HUD alert merging, every night event, the bomber and Spectre's
-range, the play-test log, and both endings played through. Results and screenshots land in
+range, the play-test log, the prologue and both endings played through. Results and screenshots land in
 `tests/smoke/out/`. `SMOKE_SIZE=1600x900 SMOKE_QUALITY=high` gives screenshots worth keeping. The CI
 workflow (`.github/workflows/smoke.yml`) runs them with software WebGL when started by hand.
 

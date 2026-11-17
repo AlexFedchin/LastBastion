@@ -190,6 +190,7 @@ export class AudioEngine {
     this._gust = 0.4; this._gustV = 0;
     this._bedT = 0;
     this._nextBeat = 0;
+    this.scape = null;    // a cutscene's ambience levels, bed -> level (overrides updateBeds)
     this._crowT = 6; this._dogT = 40; this._bellDone = false; this._bellT = 0;
     this._earT = 0;
     this._cool = [];      // barrel cool-down voices (cut when firing resumes)
@@ -1097,23 +1098,25 @@ export class AudioEngine {
     const alive = this.hordeAlive, p = this.pressure;
     const inPlay = m === 'night' || m === 'gameover';
     const tc = 1.2;
-    b.rain_far.set(0.21 * (1 - 0.5 * day), 2);
-    b.rain_near.set(0.12 * (1 - 0.65 * day), 2);
-    b.wind.set(0.12 + 0.06 * this._gust, 1.5);
-    b.wind_howl.set(0.13 * this._gust * this._gust * (0.4 + 0.6 * night), 1.5);
+    // a cutscene's own ambience (this.scape: bed -> level) over the game's
+    const S = this.scape, lv = (k, v) => (S && S[k] !== undefined ? S[k] : v);
+    b.rain_far.set(lv('rain_far', 0.21 * (1 - 0.5 * day)), 2);
+    b.rain_near.set(lv('rain_near', 0.12 * (1 - 0.65 * day)), 2);
+    b.wind.set(lv('wind', 0.12 + 0.06 * this._gust), 1.5);
+    b.wind_howl.set(lv('wind_howl', 0.13 * this._gust * this._gust * (0.4 + 0.6 * night)), 1.5);
     // (the battle bed carries a distant aircraft drone: kept well back behind the menu)
-    b.war.set(0.15 * (1 - 0.75 * day) * (m === 'menu' ? 0.2 : 1), 3);
-    b.horde_far.set(smooth(0, 70, alive) * 0.3, tc);
-    b.horde_mid.set(smooth(40, 300, alive) * 0.26, tc);
+    b.war.set(lv('war', 0.15 * (1 - 0.75 * day) * (m === 'menu' ? 0.2 : 1)), 3);
+    b.horde_far.set(lv('horde_far', smooth(0, 70, alive) * 0.3), tc);
+    b.horde_mid.set(lv('horde_mid', smooth(40, 300, alive) * 0.26), tc);
     b.horde_near.set(inPlay ? clamp(p * 1.3 + alive / 1200, 0, 1) * 0.36 : 0, tc);
-    b.horde_surge.set(inPlay ? smooth(0.45, 0.85, p) * 0.42 : 0, 0.8);
-    b.shuffle.set(inPlay ? clamp(p * 1.5, 0, 1) * 0.3 : 0, tc);
-    b.fire_roar.set(this.fireLevel * 0.4, 0.6);
-    b.fire_crackle.set(this.fireLevel * 0.35 + 0.035 * night, 0.8);
-    b.lamp.set(0.05 * clamp(1 - day * 1.7, 0, 1) * this.lampPower, 0.3);
-    b.dawn.set(0.3 * day, 2.5);
-    b.flies.set(0.1 * day, 3);
-    b.radio_static.set(this.ctx.currentTime < this._radioUntil ? 0.03 : 0, 0.08);
+    b.horde_surge.set(lv('horde_surge', inPlay ? smooth(0.45, 0.85, p) * 0.42 : 0), 0.8);
+    b.shuffle.set(lv('shuffle', inPlay ? clamp(p * 1.5, 0, 1) * 0.3 : 0), tc);
+    b.fire_roar.set(lv('fire_roar', this.fireLevel * 0.4), 0.6);
+    b.fire_crackle.set(lv('fire_crackle', this.fireLevel * 0.35 + 0.035 * night), 0.8);
+    b.lamp.set(lv('lamp', 0.05 * clamp(1 - day * 1.7, 0, 1) * this.lampPower), 0.3);
+    b.dawn.set(lv('dawn', 0.3 * day), 2.5);
+    b.flies.set(lv('flies', 0.1 * day), 3);
+    b.radio_static.set(lv('radio_static', this.ctx.currentTime < this._radioUntil ? 0.03 : 0), 0.08);
     for (const bed of Object.values(b)) bed.tick(dt);
     this.frontPan.pan.setTargetAtTime(clamp(Math.sin(-this.listenerYaw) * 0.5, -0.5, 0.5), this.ctx.currentTime, 0.2);
   }
@@ -1143,7 +1146,7 @@ export class AudioEngine {
     } else this._nextBeat = 0;
 
     // the world between the fighting
-    if (this.dawn > 0.4) {
+    if (this.scape) { /* the cutscene places its own */ } else if (this.dawn > 0.4) {
       this._crowT -= dt;
       if (this._crowT <= 0) {
         this._crowT = rand(5, 14);

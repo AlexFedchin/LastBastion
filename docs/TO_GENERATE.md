@@ -15,7 +15,29 @@ When a requisition is set down in its hangar bay, whoever brought it in says a l
   `allRadioLines()`; only the missing ones are recorded.
 - **Until then:** `tests/smoke/tests/01-boot.test.js` fails and lists these 16 lines as missing takes.
 
-## 2. Kovac's night-start line (optional)
+## 2. Voice takes for the prologue (8 lines)
+
+A new campaign opens with a sunset prologue before night 1 (`PROLOGUE` in `src/config.js`, staged by
+`src/game/prologue.js`). It plays now with subtitles only: each cue lasts a reading pace, and once a line
+is recorded the cue lasts as long as its take, so the shots re-time themselves.
+
+- **Lines:** 5 for the NARRATOR, 2 for SGT. KOVAC (over the radio) and 1 for PVT. ARAN (over the radio),
+  all existing voices.
+  1. NARRATOR: "When the cities fell, Command drew a line across the hills: a string of walls on the valley roads, to hold the dead back while the last flights got out."
+  2. NARRATOR: "Ours was the seventh. A wall of concrete across the road, a gate, one heavy gun, and whoever was left to man it."
+  3. NARRATOR: "Seventy-two hours, Command told us. Hold the valley for seventy-two hours, and the birds would come for us."
+  4. PVT. ARAN: "Sarge... sun's going down."
+  5. SGT. KOVAC: "Then they'll be up soon. Lights on. Everybody on the wall."
+  6. NARRATOR: "Every night the sun went down behind the burning city. And every night, the dead came out of it."
+  7. SGT. KOVAC: "Movement on the road. Here they come. Gunner — on the fifty."
+  8. NARRATOR: "That first night, there was only the wall, the dark, and the gun."
+- **Direction:** the narrator as in the endings (an old soldier remembering, quiet, unhurried); Aran
+  uneasy, half to himself; Kovac flat and steady, giving orders he has given before.
+- **How:** the same voice build as item 1 (`python scripts/audio/build_voice.py`); it picks the lines up from
+  `allRadioLines()` and records only the missing ones.
+- **Until then:** the boot test lists these 8 with the 16 above as missing takes (24 in all).
+
+## 3. Kovac's night-start line (optional)
 
 At the start of a night, Kovac lists what came out of the hangar at dawn ("New on the line tonight:
 a new match-grade barrel on the fifty, AP-T in the belt and…"). The sentence is assembled from

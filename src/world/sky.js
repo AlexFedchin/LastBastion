@@ -38,6 +38,9 @@ uniform vec3 uGlow;
 uniform float uGlowAmt;
 uniform float uCloudLight;
 uniform float uBank;
+uniform vec3 uSunDir;
+uniform vec3 uSunCol;
+uniform float uDusk;
 void main(){
   vec3 d = normalize(vDir);
   float h = d.y;
@@ -47,6 +50,18 @@ void main(){
   float glow = toward * toward * exp(-max(h, 0.0) * 13.0) * uGlowAmt;
   float dome = pow(toward, 3.0) * exp(-max(h, 0.0) * 3.5) * uGlowAmt;
   col += uGlow * (glow + dome * 0.18);
+  // sunset (the prologue): a low sun, a burning band under the storm deck, the deck
+  // lifting off the horizon so the band shows, undersides lit from below
+  float sd = max(dot(d, uSunDir), 0.0);
+  float az = max(dot(dxz, normalize(uSunDir.xz + 1e-5)), 0.0);
+  float band = exp(-max(h, 0.0) * 11.0);
+  vec3 sunSky = vec3(0.0);
+  if (uDusk > 0.001) {
+    sunSky = uSunCol * (band * (0.05 + 0.55 * pow(az, 5.0)) + pow(sd, 18.0) * 0.6 + pow(sd, 400.0) * 1.1) * uDusk;
+    col += sunSky;
+    col += uSunCol * uDusk * smoothstep(0.99975, 0.9999, sd) * smoothstep(-0.004, 0.004, h) * 7.0;
+    col = mix(col, col * vec3(0.78, 0.82, 1.15), uDusk * smoothstep(0.1, 0.5, h) * 0.6);
+  }
   // storm deck
   float ph = max(h, 0.0) + 0.055;
   vec2 uv = d.xz / ph * 0.5 + vec2(uTime * 0.0042, uTime * 0.0017);
@@ -54,14 +69,16 @@ void main(){
   float c = zFbm(uv * 1.15 + w * 1.6);
   float c2 = zFbm(uv * 3.2 + w * 0.7 + 11.0);
   float dens = smoothstep(0.34, 0.74, c * 0.82 + c2 * 0.3) * smoothstep(-0.01, 0.09, h);
+  dens *= 1.0 - uDusk * 0.9 * (1.0 - smoothstep(0.035, 0.2, h));
   // undersides lit by the fires: strongest towards the city, thin edges glow
   float under = (glow * 2.4 + dome * 1.3 + 0.03 * uGlowAmt) * (0.45 + c2 * 1.0) * (1.25 - dens * 0.5);
   vec3 cloudCol = vec3(0.0065, 0.007, 0.0095) * uCloudLight * (0.55 + 0.9 * c2) + uGlow * under;
   float fl = uFlash * (0.2 + 0.8 * pow(max(dot(d, uFlashDir), 0.0), 5.0));
   cloudCol += fl * vec3(0.55, 0.62, 0.86) * (0.35 + c * 1.3);
+  cloudCol += uSunCol * uDusk * (pow(sd, 3.0) * 1.3 * (0.25 + c2) * (1.2 - dens * 0.6) + band * 0.25 + 0.035);
   col = mix(col, cloudCol, dens * 0.96);
   col += fl * 0.04 * vec3(0.6, 0.65, 0.8);
-  col = mix(col, uHorizon + uGlow * glow, smoothstep(0.02, -0.06, h));
+  col = mix(col, uHorizon + uGlow * glow + sunSky * 0.6, smoothstep(0.02, -0.06, h));
   // fog bank: the sky goes too, leaving only a smear of the city's glow low down
   // fog bank: the sky takes exactly the colour lbFog() gives far geometry, so whatever
   // the bank swallows leaves no silhouette against it
@@ -83,6 +100,9 @@ export function buildSky(env) {
     uGlowAmt: { value: 1 },
     uCloudLight: { value: 1 },
     uBank: { value: 0 },
+    uSunDir: { value: new THREE.Vector3(-0.3, 0.05, -1).normalize() },
+    uSunCol: { value: new THREE.Color(1, 0.42, 0.14) },
+    uDusk: { value: 0 },
     ...fogUniforms,
   };
   const sky = new THREE.Mesh(

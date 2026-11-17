@@ -42,6 +42,8 @@ export class Environment {
     this.quality = quality;
     this.time = 0;
     this.dawn = 0; // 0 night .. 1 grey dawn
+    this.dusk = 0; // 0 .. 1 sunset warmth over the dawn blend (the prologue); sunDir is the low sun
+    this.sunDir = new THREE.Vector3(-0.3, 0.05, -1).normalize();
     this.flash = 0;
     this.nextLightning = 14;
     this.nextHorizonFlash = 3;
@@ -85,6 +87,7 @@ export class Environment {
     this.lightPools = [];
     this.lampSprites = [];
     this.power = 1;   // wall lighting (blackout event drops it to 0)
+    this.beamBoost = 1; // searchlight beams, brighter for a cutscene
     this.fogBank = 0; // fog bank event, 0..1
     this.towerHousings = [];
     this.blinkers = [];
@@ -404,7 +407,7 @@ export class Environment {
       _dir.subVectors(sl.aim, sl.spot.position).normalize();
       sl.beam.quaternion.setFromUnitVectors(_down, _dir);
       sl.beam.material.uniforms.uTime.value = time;
-      sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d) * this.power;
+      sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d) * this.power * this.beamBoost;
       sl.spot.intensity = 650 * (1 - d * 0.85) * this.power;
       if (sl.spot.castShadow && shadowNow) sl.spot.shadow.needsUpdate = true;
       const hs = this.towerHousings[k];
@@ -434,7 +437,42 @@ export class Environment {
     this.rim.intensity = lerp(0.14, 0.2, d) * (0.3 + 0.7 * this.burn);
     this.rainUniforms.uIntensity.value = lerp(0.32, 0.18, d);
     for (const s of this.lampSprites) s.visible = d < 0.6 && this.power > 0.5;
+    this.applyDusk();
     void audio;
+  }
+
+  /**
+   * Sunset over whatever the dawn blend gives: the fog and sky warm, the low sun lights the
+   * clouds from under the deck, and the key light swings round to come from it. Off (0),
+   * everything is as the night/dawn blend left it.
+   */
+  applyDusk() {
+    const k = this.dusk, su = this.skyUniforms;
+    if (!this._base) this._base = { moon: this.moon.position.clone(), sky: this.hemi.color.clone(), ground: this.hemi.groundColor.clone(), rain: 0 };
+    su.uDusk.value = k;
+    if (k < 0.001) {
+      if (this._duskOn) { this._duskOn = false; this.moon.position.copy(this._base.moon); this.hemi.color.copy(this._base.sky); this.hemi.groundColor.copy(this._base.ground); }
+      return;
+    }
+    this._duskOn = true;
+    const sd = this.sunDir;
+    // how much of the sun is left: full above the hills, a glow for a while after it sets
+    const up = Math.min(1, Math.max(0, (sd.y + 0.05) / 0.1));
+    const fc = this.scene.fog.color;
+    fc.lerp(_duskCol.setRGB(0.15, 0.075, 0.045).multiplyScalar(lerp(0.12, 1, up)), k * 0.85);
+    fogUniforms.lbFogColor.value.copy(fc);
+    su.uHorizon.value.copy(fc);
+    su.uZenith.value.lerp(_duskCol.setRGB(0.032, 0.036, 0.07).multiplyScalar(lerp(0.15, 1, up)), k);
+    su.uSunDir.value.copy(sd);
+    su.uSunCol.value.setRGB(1, lerp(0.22, 0.45, up), lerp(0.08, 0.16, up)).multiplyScalar(lerp(0.18, 1, up));
+    su.uCloudLight.value = lerp(su.uCloudLight.value, 3, k);
+    // the key light: the moon's light, out of the sun, low and orange
+    this.moon.position.copy(this._base.moon).lerp(_duskV.copy(sd).setY(Math.max(sd.y, 0.035)).multiplyScalar(300), k);
+    this.moon.color.lerp(_duskCol.setRGB(1, 0.52, 0.26), k);
+    this.moon.intensity = lerp(this.moon.intensity, 9 * up, k);
+    this.hemi.color.copy(this._base.sky).lerp(_duskCol.setRGB(0.5, 0.36, 0.38), k);
+    this.hemi.groundColor.copy(this._base.ground).lerp(_duskCol.setRGB(0.2, 0.12, 0.08), k);
+    this.rainUniforms.uIntensity.value *= 1 - k * 0.7;
   }
 
   updateCombat(dt, fx) {
@@ -498,6 +536,8 @@ export class Environment {
 }
 
 const _flashCol = new THREE.Color();
+const _duskCol = new THREE.Color();
+const _duskV = new THREE.Vector3();
 
 /** Small seeded RNG for placement. */
 function makeRngLocal(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }

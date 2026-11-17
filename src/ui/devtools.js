@@ -1,7 +1,7 @@
 // Developer tools: F10 (or DEVELOPER in the main menu) opens a panel to start any night
 // with any difficulty, survivors, supplies and upgrades, and, during a run, to trigger
 // events, end the night or jump to the extraction; and, from anywhere, to watch either
-// cutscene (extraction or ending) straight away. Dev runs never touch the campaign
+// cutscene (the prologue, the extraction or the ending) straight away. Dev runs never touch the campaign
 // save or the endless record (run.dev).
 import { DIFFICULTY, UPGRADES, FINAL_NIGHT, EXTRACTION } from '../config.js';
 
@@ -64,6 +64,7 @@ export class DevTools {
       <div class="sub">F10 opens and closes this panel. Dev runs never save over your campaign.</div>
       <h3>WATCH A CUTSCENE</h3>
       <div class="acts">
+        <button data-dev="watch-prologue">THE PROLOGUE</button>
         <button data-dev="watch-extract">THE EXTRACTION</button>
         <button data-dev="watch-ending">THE ENDING</button>
       </div>
@@ -110,6 +111,7 @@ export class DevTools {
       case 'max': for (const u of UPGRADES) this.setLevel(u.id, u.costs.length); break;
       case 'none': for (const u of UPGRADES) this.setLevel(u.id, 0); break;
       case 'start': this.start(); break;
+      case 'watch-prologue': this.watch('prologue'); break;
       case 'watch-extract': this.watch('extraction'); break;
       case 'watch-ending': this.watch('ending'); break;
       case 'end': if (g.state === 'night') { g.horde.clearLiving(); g.director.spawningDone = true; } this.toggle(false); break;
@@ -146,6 +148,15 @@ export class DevTools {
     const g = this.g;
     if (g.deploying) return;
     this.toggle(false);
+    if (which === 'prologue') {
+      // a throwaway night 1: the prologue, then that night as a dev run
+      const d = DIFFICULTY[this.$('#dv-diff').value] || DIFFICULTY.veteran;
+      const save = { difficulty: d.id, night: 1, survivors: d.survivors, supplies: 0, kills: 0, upgrades: {}, minesOwned: 0, endless: false, atShop: false, totals: { shots: 0, hits: 0, headshots: 0 }, log: [], dev: true };
+      g.devSave = save;
+      if (g.state !== 'menu') g.enterMenu();
+      g.deploy(save, () => g.startRun(save, { prologue: true }));
+      return;
+    }
     const save = {
       difficulty: this.$('#dv-diff').value, night: FINAL_NIGHT, survivors: Math.max(EXTRACTION.souls, DIFFICULTY.veteran.survivors), supplies: 0, kills: 0,
       upgrades: { ...this.up }, minesOwned: 0, endless: false, atShop: false, totals: { shots: 0, hits: 0, headshots: 0 }, log: [], dev: true,

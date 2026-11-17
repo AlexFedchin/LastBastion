@@ -680,6 +680,23 @@ export const ENDING = [
   { who: CALL.narrator, gap: 2.2, text: 'And for as long as there was anyone left to man the wall... it held.' },
 ];
 
+// ── The prologue: a new campaign opens at sunset (src/game/prologue.js stages it) ──
+// Same fields as ENDING, plus silent beats ({ hold: s }) that only hold a shot; `title`
+// brings the title card up as its line ends, `lights` throws the wall's lights on that
+// many seconds into its cue. The last shot hands over to night 1.
+export const PROLOGUE = [
+  { shot: 'sunTele', hold: 7.5, gap: 0 },
+  { shot: 'sun', who: CALL.narrator, gap: 0.2, text: 'When the cities fell, Command drew a line across the hills: a string of walls on the valley roads, to hold the dead back while the last flights got out.', title: true },
+  { shot: 'valley', who: CALL.narrator, gap: 1.6, text: 'Ours was the seventh. A wall of concrete across the road, a gate, one heavy gun, and whoever was left to man it.' },
+  { shot: 'wall', who: CALL.narrator, gap: 2.4, text: 'Seventy-two hours, Command told us. Hold the valley for seventy-two hours, and the birds would come for us.' },
+  { shot: 'sentry', who: CALL.aran, radio: true, gap: 1.6, text: "Sarge... sun's going down." },
+  { who: CALL.kovac, radio: true, gap: 0.5, text: "Then they'll be up soon. Lights on. Everybody on the wall." },
+  { shot: 'searchlight', hold: 5.8, gap: 0.9, lights: 0.9 },
+  { shot: 'lights', who: CALL.narrator, gap: 0.3, text: 'Every night the sun went down behind the burning city. And every night, the dead came out of it.' },
+  { shot: 'dead', who: CALL.kovac, radio: true, gap: 3.2, text: 'Movement on the road. Here they come. Gunner — on the fifty.' },
+  { shot: 'nest', who: CALL.narrator, gap: 1.0, text: 'That first night, there was only the wall, the dark, and the gun.' },
+];
+
 // ── Extraction (the last night with at least `souls` alive) ─────────────────
 // Night 10 becomes a hold: the flight is inbound, the horde comes over the ridge
 // all at once, and if the wall still stands when the timer runs out, the
@@ -754,6 +771,7 @@ export function allRadioLines() {
     }
   }
   for (const t of chronicleLines()) add(CALL.narrator, t);
+  for (const c of PROLOGUE) if (c.text) add(c.who, c.text);
   for (const c of ENDING) add(c.who, c.text);
   for (const c of EXTRACT_ENDING) if (c.text) add(c.who, c.text);
   for (const [, w, t] of EXTRACTION.lines) add(w, t);

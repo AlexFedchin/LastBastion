@@ -445,6 +445,8 @@ table.keys td:first-child { font-family: var(--mono); color: var(--amber); width
 .cine-title h1 { font-size: clamp(56px, 8.5vw, 132px); font-weight: 700; letter-spacing: 0.16em; line-height: 1; color: var(--bone);
   text-shadow: 0 0 50px rgba(255,140,50,0.28), 0 4px 0 rgba(0,0,0,0.6); }
 .cine-rule { width: 220px; height: 1px; margin-top: 22px; background: linear-gradient(90deg, transparent, var(--amber), transparent); }
+.cine-tag { margin-top: 16px; font-family: var(--mono); font-size: 13px; letter-spacing: 0.5em; color: var(--bone-dim); }
+.cine-tag:empty { display: none; }
 .cine-skip { position: absolute; right: 36px; bottom: 30px; font-size: 12px; letter-spacing: 0.35em; color: var(--bone-dim); opacity: 0; transition: opacity 0.4s; }
 .cine-skip.on { opacity: 0.85; }
 .end-screen h1.gold { color: var(--bone); text-shadow: 0 0 34px rgba(224,165,66,0.35); }
