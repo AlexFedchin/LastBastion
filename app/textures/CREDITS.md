@@ -27,3 +27,22 @@ The game falls back to its procedural textures if a file is missing.
 | `burlap` | [hessian_230](https://polyhaven.com/a/hessian_230) | colormass, Rico Cilliers | 0.269 m |
 
 All are licensed [CC0](https://polyhaven.com/license): no attribution is required; it is given here anyway.
+
+<!-- ambientcg -->
+
+## The hangar (ambientCG)
+
+The dawn resupply hangar's surfaces are CC0 materials from [ambientCG](https://ambientcg.com),
+converted by `scripts/textures/build_ambientcg.py` (AO baked into the colour, roughness and metalness packed).
+
+| Set | Source | License |
+|---|---|---|
+| `hgFloor` | [Concrete031](https://ambientcg.com/view?id=Concrete031) | CC0 1.0 |
+| `hgWall` | [CorrugatedSteel005](https://ambientcg.com/view?id=CorrugatedSteel005) | CC0 1.0 |
+| `hgSteel` | [Metal041B](https://ambientcg.com/view?id=Metal041B) | CC0 1.0 |
+| `hgHazard` | [PaintedMetal016](https://ambientcg.com/view?id=PaintedMetal016) | CC0 1.0 |
+| `hgPlate` | [DiamondPlate008C](https://ambientcg.com/view?id=DiamondPlate008C) | CC0 1.0 |
+| `hgRubber` | [Rubber004](https://ambientcg.com/view?id=Rubber004) | CC0 1.0 |
+| `hgWood` | [Wood089](https://ambientcg.com/view?id=Wood089) | CC0 1.0 |
+
+<!-- /ambientcg -->

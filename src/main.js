@@ -30,6 +30,7 @@ import { loadTextures } from './world/texlib.js';
 import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
 import { DevTools } from './ui/devtools.js';
+import { Hangar } from './world/hangar.js';
 import { Ending } from './game/ending.js';
 import { obstacles } from './world/obstacles.js';
 import { ExtractionHold, ExtractionScene } from './game/extraction.js';
@@ -125,6 +126,7 @@ class Game {
     this.screens = new Screens(this);
     this.chronicle = new Chronicle(this);
     this.dev = new DevTools(this);
+    this.hangar = new Hangar(this);
     this.ending = new Ending(this);
     this.extraction = new ExtractionScene(this);
     this.input = new Input(canvas);
@@ -367,13 +369,17 @@ class Game {
     this.canvas.addEventListener('click', () => {
       this.audio.init();
       if (this.state === 'night' && !this.input.locked) this.input.lock();
+      if (this.state === 'shop') this.hangar.click();
     });
+    // the hangar: what the cursor is over (only over the 3D view, not the panels)
+    window.addEventListener('mousemove', (e) => { if (this.state === 'shop') this.hangar.pointer(e.target === this.canvas ? e : null); });
     document.getElementById('s-click').addEventListener('click', () => { this.audio.init(); this.input.lock(); });
     document.addEventListener('keydown', (e) => {
       this.audio.init();
       if (this.chronicle.active && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { if (!e.repeat) this.chronicle.advance(); return; }
       if (this.state === 'ending' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.ending.skipPress(); return; }
       if (this.state === 'extraction' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.extraction.skipPress(); return; }
+      if (this.state === 'shop' && !e.repeat && this.screens.current === 'shop' && this.hangar.key(e.code)) { e.preventDefault(); return; }
       if (e.code === 'Escape') {
         if (this.state === 'paused' && performance.now() - (this.pausedAt || 0) > 350) this.resume();
         else if (this.screens.current === 'settings' || this.screens.current === 'howto') this.onAction('back');
@@ -443,6 +449,7 @@ class Game {
       case 'buy': this.buyUpgrade(el.dataset.id); break;
       case 'buy-mines': this.buyMines(); break;
       case 'begin': this.beginNightFromShop(); break;
+      case 'bay': this.hangar.go(el.dataset.bay); break;
       case 'shop-menu': writeSave(this.run); this.enterMenu(); break;
       case 'retry': { const s = this.run && this.run.dev ? this.devSave : loadSave(); if (s) this.deploy(s, () => this.startRun(s)); break; }
       case 'menu': this.enterMenu(); break;
@@ -721,6 +728,9 @@ class Game {
     this.state = 'shop';
     this.arsenal.air.hide();
     this.hud.show(false);
+    const first = !this.hangar.built;
+    this.hangar.enter(this.run, this.report);
+    if (first) this.renderer.compile(this.hangar.scene, this.hangar.camera);
     this.screens.buildShop(this.run, this.report);
     this.screens.show('shop');
   }
@@ -849,7 +859,15 @@ class Game {
     u.uExposure.value = lerp(1.25, 1.2, this.env.dawn);
     u.uWarm.value = this.env.dawn * 0.3;
     u.uCA.value = 0.008 + this.player.trauma * 0.008 + this.radial * 0.015;
-    this.post.updateDistortion(this.env.fire.heatSources, this.fx.shocks);
+    // the dawn resupply is drawn in the hangar: its own scene and camera through the same post chain
+    const inHangar = this.state === 'shop' && this.hangar.active;
+    if (!inHangar && this.hangar.active) this.hangar.exit();
+    this.post.scenePass.scene = inHangar ? this.hangar.scene : this.scene;
+    this.post.scenePass.camera = inHangar ? this.hangar.camera : this.camera;
+    if (inHangar) {
+      u.uHeatN.value = 0; u.uShockN.value = 0;
+      u.uDesat.value = 0.16; u.uExposure.value = 1.12; u.uWarm.value = 0.16; u.uCA.value = 0.006;
+    } else this.post.updateDistortion(this.env.fire.heatSources, this.fx.shocks);
     // pixel size for eye billboards
     const h = this.renderer.getDrawingBufferSize(this._sz || (this._sz = new THREE.Vector2())).y;
     this.uniforms.uPixel.value = 2 * Math.tan(THREE.MathUtils.degToRad(this.camera.fov) / 2) / h;
@@ -1150,11 +1168,12 @@ class Game {
 
   updateShop(dt, rdt) {
     this.env.dawn = damp(this.env.dawn, 1, 1, rdt);
-    // slow drift of the camera from the gun position
-    this.player.yaw = damp(this.player.yaw, Math.sin(this.time * 0.04) * 0.4, 0.5, rdt);
+    // the valley goes on behind the hangar (not drawn): the last of the night's fires and bodies settle
+    this.player.yaw = damp(this.player.yaw, 0, 0.5, rdt);
     this.player.pitch = damp(this.player.pitch, -0.17, 0.5, rdt);
     this.player.update(dt, rdt, this.input, this.stats, false, this.time);
     this.horde.update(dt, this.time);
+    this.hangar.update(rdt);
   }
 
   /** The summary after the last night: a slow crane over the empty bastion at first light. */

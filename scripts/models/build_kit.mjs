@@ -4,7 +4,7 @@
 // origin at the centre of its footprint on the floor, textures resized to WebP,
 // simplified to a triangle budget, meshopt-packed.
 //
-//   node scripts/models/build_kit.mjs [name ...]
+//   node scripts/models/build_kit.mjs [name ...]   (missing sources are downloaded first)
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -72,9 +72,45 @@ export const KIT = {
   toolbox: ['metal_toolbox', 512, 3000],
   rifle: ['bolt_action_rifle_7_62', 512, 5000],
   flashlight: ['signal_flashlight', 256, 1500],
+  // ── the hangar (the dawn resupply, src/world/hangar.js) ──
+  lampHang: ['hanging_industrial_lamp', 512, 1500],
+  wallLamp: ['industrial_wall_lamp', 512, 1500],
+  floodlight: ['flood_lights', 512, 3000],
+  crane: ['overhead_crane', 1024, 6000, { err: 0.02 }],
+  shelves: ['steel_frame_shelves_01', 1024, 5000, { err: 0.02, s: 0.0935 }], // (modelled at ten times size)
+  shelves2: ['steel_frame_shelves_02', 1024, 5000, { err: 0.02 }],
+  toolchest: ['metal_tool_chest', 1024, 4000],
+  drillpress: ['drill_press_01', 1024, 4000, { err: 0.02 }],
+  chalkboard: ['standing_chalkboard_01', 1024, 2500],
+  clipboard: ['clipboard', 512, 800],
+  desk: ['metal_office_desk', 1024, 3000],
+  extinguisher: ['korean_fire_extinguisher_01', 512, 1500],
+  storecart: ['industrial_storage_cart', 1024, 3000],
+  oilcan: ['small_oil_can_01', 256, 800],
+  wrench: ['pipe_wrench', 256, 800],
+  plasticCrate: ['plastic_crate_03', 512, 1500],
+  woodCrate: ['wooden_crate_01', 1024, 1500],
 };
 
+/** Download a Poly Haven model's 1k glTF and its textures into source/polyhaven/<id>/ (if not there yet). */
+async function fetchSource(id) {
+  const dir = path.join(SRC, id);
+  if (fs.existsSync(dir) && fs.readdirSync(dir).some((f) => f.endsWith('.gltf'))) return;
+  const files = await (await fetch(`https://api.polyhaven.com/files/${id}`, { headers: { 'User-Agent': 'LastBastion-kit-build/1.0' } })).json();
+  const g = files.gltf['1k'].gltf;
+  const get = async (url, to) => {
+    fs.mkdirSync(path.dirname(to), { recursive: true });
+    const r = await fetch(url);
+    if (!r.ok) throw new Error(`${url}: ${r.status}`);
+    fs.writeFileSync(to, Buffer.from(await r.arrayBuffer()));
+  };
+  for (const [rel, f] of Object.entries(g.include || {})) await get(f.url, path.join(dir, rel));
+  await get(g.url, path.join(dir, path.basename(g.url)));
+  console.log('fetched', id);
+}
+
 async function build(name, [id, px, budget, extra = {}]) {
+  await fetchSource(id);
   const dir = path.join(SRC, id);
   const file = fs.readdirSync(dir).find((f) => f.endsWith('.gltf'));
   const doc = await io.read(path.join(dir, file));

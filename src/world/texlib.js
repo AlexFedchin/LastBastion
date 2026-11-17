@@ -7,16 +7,20 @@
 import * as THREE from 'three';
 
 // the big, close surfaces get 2k on the detailed presets; everything else 1k (512 on LOW)
-const BIG = ['mud', 'turf', 'rock', 'asphalt', 'concrete', 'slab', 'metal'];
+const BIG = ['mud', 'turf', 'rock', 'asphalt', 'concrete', 'slab', 'metal', 'hgFloor', 'hgWall'];
 const SETS = {
   mud: ['c', 'n'], turf: ['c', 'n'], rock: ['c', 'n'], asphalt: ['c', 'n'], track: ['c', 'n'], plough: ['c', 'n'],
   concrete: ['c', 'n'], slab: ['c', 'n'], metal: ['c', 'n', 'r'], corr: ['c', 'n'], plaster: ['c', 'n'],
   bark: ['c'], planks: ['c', 'n'], burlap: ['c'],
+  // the hangar (ambientCG CC0, scripts/textures/build_ambientcg.py)
+  hgFloor: ['c', 'n', 'r'], hgWall: ['c', 'n', 'r'], hgSteel: ['c', 'n', 'r'], hgHazard: ['c', 'n', 'r'],
+  hgPlate: ['c', 'n', 'r'], hgRubber: ['c', 'n', 'r'], hgWood: ['c', 'n', 'r'],
 };
 /** Real-world width of one tile, in metres (from Poly Haven's scan dimensions). */
 export const TILE_M = {
   mud: 1.3, turf: 3.0, rock: 2.7, asphalt: 3.0, track: 2.0, plough: 8.0, concrete: 2.0, slab: 3.0,
   metal: 1.0, corr: 2.0, plaster: 1.85, bark: 2.0, planks: 1.87, burlap: 0.27,
+  hgFloor: 3.0, hgWall: 2.0, hgSteel: 2.0, hgHazard: 1.0, hgPlate: 1.0, hgRubber: 1.0, hgWood: 2.0,
 };
 
 const loaded = {};

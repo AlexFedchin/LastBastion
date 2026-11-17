@@ -996,6 +996,13 @@ export class AudioEngine {
   ui() { this.play(this.B.ui_click[0], { gain: 0.38, rate: rand(0.97, 1.03), force: true }); }
   uiHover() { this.play(this.B.ui_hover[0], { gain: 0.14, rate: rand(0.95, 1.05), force: true }); }
   uiBuy() { this.play(this.B.ui_buy[0], { gain: 0.55, force: true }); }
+  /** The hangar: a requisition set down in its bay, a heavy thud on concrete and a rattle of metal. */
+  delivery() {
+    if (!this.ready) return;
+    this.play(this.B.latch[0], { gain: 0.5, rate: rand(0.5, 0.6), reverb: 0.55, force: true });
+    if (this.B.barrel_seat[0]) this.play(this.B.barrel_seat[0], { gain: 0.35, rate: rand(0.7, 0.8), reverb: 0.5, delay: 0.02, force: true });
+    if (this.B.bodyfall && this.B.bodyfall[0]) this.play(this.B.bodyfall[0], { gain: 0.45, rate: rand(0.85, 0.95), reverb: 0.4, force: true });
+  }
 
   thunder(delay = 2) {
     this.play(this.pickVar('thunder'), { gain: 0.42 * (1 - this.dawn * 0.5), rate: rand(0.85, 1.05), delay, pan: rand(-0.7, 0.7), reverb: 0.12, bus: 'amb', force: true });

@@ -165,8 +165,10 @@ Every night has its own event and its own radio traffic. Objectives, a boss bar 
 
 **The chronicle.** As the light comes up, an old voice tells the night you just survived: not the numbers but the story, years later. It is built from what actually happened: whether Recon Two made it to the gate, whether the giant reached the wall, whether the danger-close fire cost you men, how many places stood empty on the walkway by morning. Every line is narrated (Space reveals it all; Space again moves on), and the story stays on the resupply screen.
 
-**Dawn.** Survive the night and clear the field. Every kill earns supplies: spend them on the gun, the
-artillery battery, wall gunners, wire, claymores and grenades. A tool's upgrades open at the dawn after
+**Dawn.** Survive the night and clear the field. Every kill earns supplies, spent in the bastion's
+hangar: four bays (the gun, the battery, the wall, support) where every upgrade is a thing you can see,
+spare barrels on the bench, pallets of 105 mm rounds, men, wire, crates of bottles, delivered as you buy
+it, and a duty board with last night's numbers. A tool's upgrades open at the dawn after
 the first night you had it; until then its cards are greyed out with the night it arrives.
 
 **The endings.** Command promised an extraction flight at the seventy-second hour, but it flies only
@@ -265,6 +267,8 @@ python3 scripts/textures/build_textures.py mud     # only matching sets
 Each CC0 scan is matched in brightness to the procedural texture it replaces, has its ambient
 occlusion baked in, and ships as WebP at 2048, 1024 and 512 px (`app/textures/`, chosen by the
 graphics preset). The game falls back to the procedural textures if a file is missing.
+The dawn resupply hangar's surfaces (concrete slab, corrugated cladding, steel, hazard paint, tread plate)
+come from ambientCG instead: `python3 scripts/textures/build_ambientcg.py` downloads and builds them the same way.
 
 **Rebuilding the models** (Node):
 
@@ -400,7 +404,7 @@ what it became) is in [`app/audio/CREDITS.md`](app/audio/CREDITS.md) and ships w
 Radio voices performed by **Qwen3-TTS** (Apache 2.0), partly re-voiced with **Chatterbox** voice conversion (MIT).
 The rotors and the second M2 take are the developer's own recordings.
 3D models (Sketchfab, CC BY 4.0, and others): see [`app/models/CREDITS.md`](app/models/CREDITS.md).
-Surface textures and the bastion's kit are CC0 scans from **Poly Haven**: [`app/textures/CREDITS.md`](app/textures/CREDITS.md).
+Surface textures and the bastion's kit are CC0 scans from **Poly Haven**, and the hangar's surfaces are CC0 materials from **ambientCG**: [`app/textures/CREDITS.md`](app/textures/CREDITS.md).
 
 <div align="center">
 

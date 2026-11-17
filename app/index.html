@@ -157,21 +157,34 @@
       </div>
     </section>
 
-    <section id="s-shop" class="screen shop-screen">
+    <section id="s-shop" class="screen shop-screen" data-bay="overview">
+      <div id="hangar-tags"></div>
       <header class="shop-head">
-        <div>
+        <div class="shop-id">
           <div class="pre" id="shop-pre">DAWN · DAY 1</div>
           <h2 id="shop-title">RESUPPLY</h2>
+          <div class="where" id="shop-where">THE HANGAR</div>
         </div>
         <div class="shop-res">
           <div><span class="lbl">SURVIVORS</span> <b id="shop-surv">30</b></div>
           <div><span class="lbl">SUPPLIES</span> <b id="shop-supplies">0</b></div>
         </div>
       </header>
-      <div class="shop-body">
-        <aside class="report" id="shop-report"></aside>
-        <div class="upgrades" id="shop-upgrades"></div>
-      </div>
+      <aside class="shop-side">
+        <div class="req" id="shop-req">
+          <div class="req-head"><h3 id="req-title">REQUISITION</h3><div class="gsub" id="req-sub"></div></div>
+          <div class="upgrades" id="shop-upgrades"></div>
+        </div>
+        <div class="report" id="shop-report"></div>
+      </aside>
+      <nav class="bays" id="shop-bays">
+        <button data-act="bay" data-bay="overview"><kbd>0</kbd>HANGAR</button>
+        <button data-act="bay" data-bay="hmg"><kbd>1</kbd>M2HB .50</button>
+        <button data-act="bay" data-bay="arty"><kbd>2</kbd>105MM</button>
+        <button data-act="bay" data-bay="wall"><kbd>3</kbd>THE WALL</button>
+        <button data-act="bay" data-bay="support"><kbd>4</kbd>SUPPORT</button>
+        <button data-act="bay" data-bay="report"><kbd>5</kbd>DUTY BOARD</button>
+      </nav>
       <footer class="shop-foot">
         <button data-act="shop-menu" class="ghost">SAVE &amp; EXIT</button>
         <button data-act="begin" class="primary" id="btn-begin">BEGIN NIGHT 2 ▸</button>

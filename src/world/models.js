@@ -23,6 +23,9 @@ export const KIT = [
   'ladder', 'lpg', 'medbox', 'pick', 'picnic', 'propane', 'rack', 'radio', 'rations', 'rifle', 'searchlight',
   'sledge', 'spade', 'stool', 'stove', 'thermos', 'toolbox', 'toolcart', 'trashbag', 'trashcans',
   'tyre', 'utility', 'welder',
+  // the hangar (the dawn resupply, src/world/hangar.js)
+  'lampHang', 'wallLamp', 'floodlight', 'crane', 'shelves', 'shelves2', 'toolchest', 'drillpress',
+  'chalkboard', 'clipboard', 'desk', 'extinguisher', 'storecart', 'oilcan', 'wrench', 'plasticCrate', 'woodCrate',
 ];
 for (const k of KIT) FILES['kit/' + k] = `models/kit/${k}.glb`;
 const scenes = {}, clips = {};

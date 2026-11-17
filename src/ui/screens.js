@@ -43,6 +43,9 @@ export class Screens {
       const b = e.target.closest('button');
       if (b && b !== this._hover) { this._hover = b; game.audio.uiHover(); }
     });
+    // a card under the cursor lights its things in the hangar
+    $('shop-upgrades').addEventListener('mouseover', (e) => { const c = e.target.closest('.card'); if (game.hangar) game.hangar.listHot = c ? c.dataset.id : null; });
+    $('shop-upgrades').addEventListener('mouseleave', () => { if (game.hangar) game.hangar.listHot = null; });
     if (!window.bastion) $('btn-quit').classList.add('hidden');
     this.buildDifficulty();
   }
@@ -138,7 +141,10 @@ export class Screens {
     $('shop-pre').textContent = `DAWN · DAY ${run.night - 1} · ${DIFFICULTY[run.difficulty].label}`;
     $('shop-title').textContent = 'RESUPPLY';
     $('shop-surv').textContent = run.survivors;
-    $('shop-supplies').textContent = formatInt(run.supplies);
+    const sup = $('shop-supplies');
+    if (this._sup !== undefined && run.supplies < this._sup) { sup.classList.remove('tick'); void sup.offsetWidth; sup.classList.add('tick'); }
+    this._sup = run.supplies;
+    sup.textContent = formatInt(run.supplies);
     const n = run.night;
     $('btn-begin').textContent = n === FINAL_NIGHT && !run.endless ? 'BEGIN THE LAST NIGHT ▸' : `BEGIN NIGHT ${n} ▸`;
 
@@ -161,22 +167,22 @@ export class Screens {
     : `<div class="log">${run.log.slice(-5).map((l) => `<p><em>${l[0]}:</em> ${l[1]}</p>`).join('')}</div>`}
     `;
 
-    // upgrades
+    // upgrades: every bay's list is built (each shown while the hangar's camera is at its bay);
+    // a tool's upgrades open at the first dawn after you have had it for a night (see UNLOCKS),
+    // until then the card is greyed out with the night it arrives
     const wrap = $('shop-upgrades');
     let html = '';
-    // everything is listed; a tool's upgrades open at the first dawn after you have had it for a
-    // night (see UNLOCKS), until then the card is greyed out with the night it arrives
     const had = (key) => !key || isUnlocked(key, n - 1);
     const arrives = (key) => (UNLOCKS[key] === n ? 'ARRIVES TONIGHT · UPGRADES FROM THE NEXT DAWN' : `ARRIVES ON NIGHT ${UNLOCKS[key]}`);
     for (const grp of UPGRADE_GROUPS) {
       const items = UPGRADES.filter((x) => x.group === grp.id);
       const mines = grp.id === 'support';
       if (!items.length && !mines) continue;
-      html += `<div class="ugroup"><h3>${grp.title}</h3><div class="gsub">${grp.sub}</div>`;
+      html += `<div class="ugroup" data-group="${grp.id}">`;
       for (const u of items) {
         if (!had(u.unlock)) {
           const pips = u.costs.map(() => '<i></i>').join('');
-          html += `<div class="card locked"><div class="nm">${u.name}</div><button class="buy" disabled>LOCKED</button><div class="ds">${u.desc}<br><span class="lock">${arrives(u.unlock)}</span></div><div class="pips">${pips}</div></div>`;
+          html += `<div class="card locked" data-id="${u.id}"><div class="nm">${u.name}</div><button class="buy" disabled>LOCKED</button><div class="ds">${u.desc}<br><span class="lock">${arrives(u.unlock)}</span></div><div class="pips">${pips}</div></div>`;
           continue;
         }
         const rank = run.upgrades[u.id] || 0;
@@ -184,24 +190,42 @@ export class Screens {
         const cost = rank < max ? u.costs[rank] : null;
         const pips = Array.from({ length: max }, (_, i) => `<i class="${i < rank ? 'on' : ''}"></i>`).join('');
         const btn = cost === null
-          ? `<button class="buy maxed" disabled>MAXED</button>`
-          : `<button class="buy" data-act="buy" data-id="${u.id}" ${run.supplies < cost ? 'disabled' : ''}>${formatInt(cost)}</button>`;
-        html += `<div class="card"><div class="nm">${u.name}</div>${btn}<div class="ds">${u.desc}<br><span class="tot">${upgradeTotal(u, rank, cost === null)}</span></div><div class="pips">${pips}</div></div>`;
+          ? `<button class="buy maxed" disabled>ISSUED</button>`
+          : `<button class="buy" data-act="buy" data-id="${u.id}" ${run.supplies < cost ? 'disabled' : ''}><small>REQUISITION</small>${formatInt(cost)}</button>`;
+        html += `<div class="card" data-id="${u.id}"><div class="nm">${u.name}</div>${btn}<div class="ds">${u.desc}<br><span class="tot">${upgradeTotal(u, rank, cost === null)}</span></div><div class="pips">${pips}</div></div>`;
       }
       // claymores are bought, not upgraded: on sale the dawn before the night they arrive
       if (mines && !isUnlocked('claymores', n)) {
-        html += `<div class="card locked"><div class="nm">CLAYMORES ×${CLAYMORE.perBuy}</div><button class="buy" disabled>LOCKED</button>
+        html += `<div class="card locked" data-id="claymores"><div class="nm">CLAYMORES ×${CLAYMORE.perBuy}</div><button class="buy" disabled>LOCKED</button>
           <div class="ds">Buried in the approach. Detonate on contact. Persist until used.<br><span class="lock">ON SALE THE DAWN BEFORE NIGHT ${UNLOCKS.claymores}</span></div><div class="pips"></div></div>`;
       } else if (mines) {
         const canBuy = run.minesOwned + CLAYMORE.perBuy <= CLAYMORE.max;
-        html += `<div class="card"><div class="nm">CLAYMORES ×${CLAYMORE.perBuy}</div>
-          <button class="buy" data-act="buy-mines" ${!canBuy || run.supplies < CLAYMORE.cost ? 'disabled' : ''}>${CLAYMORE.cost}</button>
+        html += `<div class="card" data-id="claymores"><div class="nm">CLAYMORES ×${CLAYMORE.perBuy}</div>
+          <button class="buy" data-act="buy-mines" ${!canBuy || run.supplies < CLAYMORE.cost ? 'disabled' : ''}><small>REQUISITION</small>${CLAYMORE.cost}</button>
           <div class="ds">Buried in the approach. Detonate on contact. Persist until used. In the field: <b>${run.minesOwned}</b></div><div class="pips"></div></div>`;
       }
       html += '</div>';
     }
     wrap.innerHTML = html;
-    void g;
+    if (g.hangar) { g.hangar.sync(run, report); this.shopView(g.hangar.view); }
+  }
+
+  /** The hangar's camera has moved: the list for that bay, the report at the board and the overview. */
+  shopView(view) {
+    const grp = UPGRADE_GROUPS.find((x) => x.id === view);
+    $('s-shop').dataset.bay = view;
+    $('req-title').textContent = grp ? grp.title : '';
+    $('req-sub').textContent = grp ? grp.sub : '';
+    $('shop-where').textContent = grp ? `THE HANGAR · BAY ${UPGRADE_GROUPS.indexOf(grp) + 1}` : view === 'report' ? 'THE HANGAR · DUTY BOARD' : 'THE HANGAR';
+    for (const b of document.querySelectorAll('#shop-bays button')) b.classList.toggle('on', b.dataset.bay === view);
+  }
+
+  /** Something was clicked in the hangar: bring its card into view. */
+  focusCard(id) {
+    const c = document.querySelector(`#shop-upgrades .card[data-id="${id}"]`);
+    if (!c) return;
+    c.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    c.classList.remove('flash'); void c.offsetWidth; c.classList.add('flash');
   }
 
   // ── End screens ──────────────────────────────────────────────────────────
