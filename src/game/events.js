@@ -596,6 +596,10 @@ class SupplyDrop {
       }
       const dx = gx - u.x, dz = gz - u.z, dd = Math.hypot(dx, dz);
       const moving = dd > 0.25;
+      // held off its place by a wreck or the crate itself: close enough once it stops getting closer
+      if (this.phase === 'out') {
+        if (dd < (u.best ?? 1e9) - 0.15) { u.best = dd; u.stall = 0; } else u.stall = (u.stall || 0) + dt;
+      }
       if (moving) {
         const st = Math.min(dd, sp * dt);
         const wv = walkStep(u, dx / dd * st / dt, dz / dd * st / dt, dt, 0.4);
@@ -632,7 +636,7 @@ class SupplyDrop {
       this.placeLoad(u);
       fx.glowDot(u.x, groundH(u.x, u.z) + 1.72 * f.root.scale.x, u.z, 0.32, 0.4, 5, 0.8, 0.05);
     }
-    if (this.phase === 'out' && up.every((u) => Math.hypot(u.x - c.x, u.z - c.z) < 2)) {
+    if (this.phase === 'out' && up.every((u) => { const d = Math.hypot(u.x - c.x, u.z - c.z); return d < 2 || (d < 7 && u.stall > 1.2); })) {
       this.phase = 'rig'; this.rigT = P.rig;
       g.hud.alert('RECOVERY TEAM AT THE CRATE — RIGGING IT');
     } else if (this.phase === 'rig' && (this.rigT -= dt) <= 0) {
@@ -1307,15 +1311,16 @@ export class NightEvents {
     this.crate = new THREE.Group();
     const pallet = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 1.15), crateMat); pallet.position.y = -0.5; this.crate.add(pallet);
     for (let r = 0; r < 3; r++) for (const z of [-0.28, 0.28]) {
-      const c = cloneModel('crate');
+      const c = cloneModel('mcrate'); // the weapons crates the team carries home, stacked
       c.scale.setScalar(1.6);
-      c.position.set((R() - 0.5) * 0.04, -0.45 + r * 0.335, z);
+      c.position.set((R() - 0.5) * 0.04, -0.45 + r * 0.39, z);
       c.rotation.y = (R() - 0.5) * 0.04;
+      c.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       this.crate.add(c);
     }
-    for (const x of [-0.45, 0.45]) { const s = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.12, 1.18), strap); s.position.set(x, 0.0, 0); this.crate.add(s); }
+    for (const x of [-0.45, 0.45]) { const s = new THREE.Mesh(new THREE.BoxGeometry(0.08, 1.24, 1.18), strap); s.position.set(x, 0.12, 0); this.crate.add(s); }
     const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.08, 6, 4), new THREE.MeshBasicMaterial({ color: new THREE.Color(4, 4, 5) }));
-    lamp.position.y = 0.62; this.crate.add(lamp);
+    lamp.position.y = 0.78; this.crate.add(lamp);
     this.crate.visible = false;
     scene.add(this.crate);
     // the same load as loose parts: when the team breaks it open, it falls apart where it lies

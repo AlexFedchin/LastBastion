@@ -32,21 +32,22 @@ module.exports = {
     await t.shot('ending-title');
 
     const done = await t.get(`(() => { const G = __LB; G.test.advance(G.ending.end + 4 - G.ending.t, 1/10, false);
-      return { state: G.state, screen: G.screens.current, gunOnCam: G.player.gun.parent === G.camera, fade: G.post.u.uFade.value,
+      return { state: G.state, screen: G.screens.current, gunInNest: G.player.gun.parent === G.scene, fade: G.post.u.uFade.value,
         buttons: [...document.querySelectorAll('#s-victory button')].map((b) => b.dataset.act) };
     })()`);
-    t.eq(done, { state: 'victory', screen: 'victory', gunOnCam: true, fade: 1, buttons: ['endless', 'victory-new', 'menu'] }, 'end screen, gun back on the camera');
+    t.eq(done, { state: 'victory', screen: 'victory', gunInNest: true, fade: 1, buttons: ['endless', 'victory-new', 'menu'] }, 'end screen over the bastion, the gun left in the nest');
     await t.shot('ending-screen');
 
     // endless: on to the shop with every tool open; a dawn past the seventy-second hour sets the record
     const endless = await t.get(`(() => { const G = __LB; localStorage.removeItem('lastbastion.best.v1');
-      G.onAction('endless'); const s = { state: G.state, endless: G.run.endless, locked: document.querySelectorAll('#shop-upgrades .card.locked').length };
+      G.onAction('endless'); G.test.advance(0.1, 1/30, false);
+      const s = { state: G.state, endless: G.run.endless, locked: document.querySelectorAll('#shop-upgrades .card.locked').length, gunOnCam: G.player.gun.parent === G.camera };
       G.onAction('begin'); G.test.skipIntro(); G.test.advance(0.1, 1/30, false); G.horde.clearLiving(); G.director.spawningDone = true;
       G.test.advance(0.5, 1/30, false); if (G.state !== 'dawn') G.endNight();
       return { ...s, best: JSON.parse(localStorage.getItem('lastbastion.best.v1') || 'null') };
     })()`);
     t.log(JSON.stringify(endless));
-    t.eq([endless.state, endless.endless, endless.locked], ['shop', true, 0], 'endless opens the shop with nothing locked');
+    t.eq([endless.state, endless.endless, endless.locked, endless.gunOnCam], ['shop', true, 0, true], 'endless opens the shop with nothing locked, the gun back on the camera');
     t.eq(endless.best && endless.best.nights, 1, 'surviving night 11 sets a one-night record');
   },
 };

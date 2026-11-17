@@ -351,35 +351,58 @@ float tS(float a, float b, float v){ float t = clamp((v - a) / (b - a), 0.0, 1.0
 float roadXg(float z){ return -52.0 * tS(-110.0, -470.0, z) + 96.0 * tS(-540.0, -930.0, z); }
 float rearValleyXg(float z){ return tS(80.0, 320.0, z) * (45.0 * sin(z * 0.0055 + 0.4) - 10.0); }
 float rearRoadXg(float z){ return rearValleyXg(z) + tS(40.0, 160.0, z) * 15.0 * sin(z * 0.02); }
-// Anti-tiling (after Inigo Quilez, "texture repetition" #3): a low-frequency
-// noise picks between eight randomly offset copies of the texture and blends
-// neighbouring copies, so no two patches of ground repeat.
-struct NT { vec2 a; vec2 b; float f; vec2 dx; vec2 dy; };
-// explicit gradients: safe to call inside branches (derivatives aren't, in divergent flow)
-NT ntSetupD(vec2 uv, vec2 dx, vec2 dy){
-  float k = tNoise(uv * 0.33 + 11.3) * 0.65 + tNoise(uv * 1.1 - 4.7) * 0.35;
-  float idx = k * 8.0;
-  float i = floor(idx);
+// Anti-tiling: hex tiling with random rotation (after Mikkelsen 2022, "Practical
+// Real-Time Hex-Tiling"). The plane is cut into a triangle grid; every grid vertex
+// owns a randomly rotated, randomly offset copy of the texture, and each point blends
+// the copies of its triangle's three vertices with gaussian falloff weights. The blend
+// keeps the texture's contrast (variance-preserving, Heitz & Neyret), so the seams
+// don't wash out to a blur, and there is no grid or repeat left to see. rot: how much
+// of a full turn the copies may rotate (directional textures, like furrows, get little).
+struct NT { vec2 u0; vec2 u1; vec2 u2; vec2 c0; vec2 c1; vec2 c2; vec3 w; vec2 dx; vec2 dy; };
+vec2 ntRot(vec2 v, vec2 cs){ return vec2(cs.x * v.x - cs.y * v.y, cs.y * v.x + cs.x * v.y); }
+vec3 ntHash3(vec2 p){
+  vec3 q = vec3(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)), dot(p, vec2(419.2, 371.9)));
+  return fract(sin(q) * 43758.5453);
+}
+NT ntBuild(vec2 uv, vec2 dx, vec2 dy, float rot){
+  vec2 st = uv * 1.3;
+  vec2 sk = vec2(st.x, -0.57735027 * st.x + 1.15470054 * st.y);
+  vec2 base = floor(sk);
+  vec3 t = vec3(fract(sk), 0.0); t.z = 1.0 - t.x - t.y;
+  float s = step(0.0, -t.z), s2 = 2.0 * s - 1.0;
+  vec3 w = vec3(-t.z * s2, s - t.y * s2, s - t.x * s2);
+  vec2 v0 = base + vec2(s, s), v1 = base + vec2(s, 1.0 - s), v2 = base + vec2(1.0 - s, s);
+  vec3 h0 = ntHash3(v0), h1 = ntHash3(v1), h2 = ntHash3(v2);
   NT n;
-  n.f = smoothstep(0.25, 0.75, fract(idx));
-  n.a = uv + sin(vec2(3.0, 7.0) * i) * 4.1;
-  n.b = uv + sin(vec2(3.0, 7.0) * (i + 1.0)) * 4.1;
+  float k = 6.2831853 * rot;
+  n.c0 = vec2(cos((h0.z - 0.5) * k), sin((h0.z - 0.5) * k));
+  n.c1 = vec2(cos((h1.z - 0.5) * k), sin((h1.z - 0.5) * k));
+  n.c2 = vec2(cos((h2.z - 0.5) * k), sin((h2.z - 0.5) * k));
+  n.u0 = ntRot(uv, n.c0) + h0.xy * 9.0;
+  n.u1 = ntRot(uv, n.c1) + h1.xy * 9.0;
+  n.u2 = ntRot(uv, n.c2) + h2.xy * 9.0;
+  // gaussian falloff from each vertex, zero on the far edge so nothing jumps there
+  w = w * exp(-(1.0 - w) * (1.0 - w) / 0.16);
+  n.w = w / (w.x + w.y + w.z);
   n.dx = dx; n.dy = dy;
   return n;
 }
-NT ntSetup(vec2 uv){
-  float k = tNoise(uv * 0.33 + 11.3) * 0.65 + tNoise(uv * 1.1 - 4.7) * 0.35;
-  float idx = k * 8.0;
-  float i = floor(idx);
-  NT n;
-  n.f = smoothstep(0.25, 0.75, fract(idx));
-  n.a = uv + sin(vec2(3.0, 7.0) * i) * 4.1;
-  n.b = uv + sin(vec2(3.0, 7.0) * (i + 1.0)) * 4.1;
-  n.dx = dFdx(uv); n.dy = dFdy(uv);
-  return n;
-}
+// explicit gradients: safe to call inside branches (derivatives aren't, in divergent flow)
+NT ntSetupD(vec2 uv, vec2 dx, vec2 dy){ return ntBuild(uv, dx, dy, 1.0); }
+NT ntSetupR(vec2 uv, vec2 dx, vec2 dy, float rot){ return ntBuild(uv, dx, dy, rot); }
+NT ntSetup(vec2 uv){ return ntBuild(uv, dFdx(uv), dFdy(uv), 1.0); }
+vec4 ntTap(sampler2D t, NT n, vec2 u, vec2 c){ return textureGrad(t, u, ntRot(n.dx, c), ntRot(n.dy, c)); }
 vec4 ntSample(sampler2D t, NT n){
-  return mix(textureGrad(t, n.a, n.dx, n.dy), textureGrad(t, n.b, n.dx, n.dy), n.f);
+  vec4 a = ntTap(t, n, n.u0, n.c0), b = ntTap(t, n, n.u1, n.c1), c = ntTap(t, n, n.u2, n.c2);
+  vec4 mean = textureLod(t, vec2(0.5), 12.0);
+  vec4 v = (a - mean) * n.w.x + (b - mean) * n.w.y + (c - mean) * n.w.z;
+  return clamp(mean + v * inversesqrt(dot(n.w, n.w)) * 0.85 + v * 0.15, 0.0, 1.0);
+}
+// a normal map through the same tiling: each copy's normal turned back by its rotation
+vec3 ntSampleN(sampler2D t, NT n){
+  vec3 a = ntTap(t, n, n.u0, n.c0).xyz * 2.0 - 1.0, b = ntTap(t, n, n.u1, n.c1).xyz * 2.0 - 1.0, c = ntTap(t, n, n.u2, n.c2).xyz * 2.0 - 1.0;
+  a.xy = ntRot(a.xy, vec2(n.c0.x, -n.c0.y)); b.xy = ntRot(b.xy, vec2(n.c1.x, -n.c1.y)); c.xy = ntRot(c.xy, vec2(n.c2.x, -n.c2.y));
+  return a * n.w.x + b * n.w.y + c * n.w.z;
 }
 vec2 rippleN(vec2 p, float t){
   vec2 acc = vec2(0.0);
@@ -604,7 +627,7 @@ ${T_COMMON}
       vec2 pu = fr / ${f(TS.plough)};
       vec2 pgx = vec2(dot(gX, vec2(0.94924, -0.31457)), dot(gX, vec2(0.31457, 0.94924))) / ${f(TS.plough)};
       vec2 pgy = vec2(dot(gY, vec2(0.94924, -0.31457)), dot(gY, vec2(0.31457, 0.94924))) / ${f(TS.plough)};
-      vec3 pc = ntSample(tPloughA, ntSetupD(pu, pgx, pgy)).rgb;
+      vec3 pc = ntSample(tPloughA, ntSetupR(pu, pgx, pgy, 0.04)).rgb;
       fieldC = ${fileTex('plough') ? 'pc * mix(0.85, 1.0, fur)' : 'mudC * mix(0.55, 0.95, fur) * vec3(0.95, 0.88, 0.8)'} * tone;
     } else if (fKind < 1.5) {
       // stubble: pale, combed in rows
@@ -628,7 +651,7 @@ ${T_COMMON}
     tcol = mix(tcol, fieldC, fieldW * (1.0 - rRoad));
     tcol = mix(tcol, turfC * vec3(0.55, 0.6, 0.45), hedge * 0.85);
     // the track: wet packed mud, two darker ruts, a grassy crown
-    vec3 trackC = ${fileTex('track') ? `ntSample(tTrackA, ntSetupD(tw.xz / ${f(TS.track)} + 5.0, gX / ${f(TS.track)}, gY / ${f(TS.track)})).rgb` : 'mudC * vec3(0.82, 0.78, 0.72)'};
+    vec3 trackC = ${fileTex('track') ? `ntSample(tTrackA, ntSetupR(tw.xz / ${f(TS.track)} + 5.0, gX / ${f(TS.track)}, gY / ${f(TS.track)}, 0.12)).rgb` : 'mudC * vec3(0.82, 0.78, 0.72)'};
     trackC = mix(trackC, mudC * 0.45, rRut / max(rRoad, 1e-3) * 0.8);
     trackC = mix(trackC, turfC * 0.7, exp(-pow(abs(tw.x - rearRoadXg(tw.z)) / 0.35, 2.0)) * 0.6);
     tcol = mix(tcol, trackC, rRoad);
@@ -656,11 +679,11 @@ ${T_COMMON}
   roughnessFactor = mix(roughnessFactor, 0.4, rRut * 0.7);
 `)
         .replace('vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;', /* glsl */`
-  vec3 nMud = ntSample(normalMap, ntMud).xyz * 2.0 - 1.0;
+  vec3 nMud = ntSampleN(normalMap, ntMud);
   vec3 mapN = nMud;
-  if (hasTurf) mapN = mix(mapN, ntSample(tTurfN, ntTurf).xyz * 2.0 - 1.0, tGrass);
-  if (hasRoad) mapN = mix(mapN, ntSample(tAsphN, ntAsph).xyz * 2.0 - 1.0, tRoad);
-  if (hasRock) mapN = mix(mapN, (ntSample(tRockN, ntRock).xyz * 2.0 - 1.0) * vec3(1.6, 1.6, 1.0), tRock);
+  if (hasTurf) mapN = mix(mapN, ntSampleN(tTurfN, ntTurf), tGrass);
+  if (hasRoad) mapN = mix(mapN, ntSampleN(tAsphN, ntAsph), tRoad);
+  if (hasRock) mapN = mix(mapN, ntSampleN(tRockN, ntRock) * vec3(1.6, 1.6, 1.0), tRock);
   mapN.xy *= (1.0 - puddle) * (1.0 - 0.35 * tWet);
   if (puddle > 0.01 && distC < 90.0) mapN.xy += rippleN(tw.xz * 1.6, uTime) * puddle * 0.9 * uRain;
 `);

@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { makeRng, lerp } from '../core/util.js';
 import { groundH, groundNormal, heightFn, roadX, valleyEdge, vnoise } from './terrain.js';
-import { box, cylY, merge, xf, worldUV, makeHouseGeo, makePylonGeo, sagWire, weather } from './kit.js';
+import { box, cylY, merge, xf, worldUV, makePylonGeo, sagWire, weather } from './kit.js';
 import { placeModel } from './vehicles.js';
 import { FOG_CUSTOM_GLSL, fogUniforms } from '../render/atmosphere.js';
 
@@ -133,7 +133,6 @@ export function buildFar(env) {
   scene.add(dead);
 
   // ── a dead village on the left hills, a hamlet on the right ─────────────
-  const houseParts = [], roofParts = [];
   const village = (cx, cz, n, seed) => {
     const r = makeRng(seed);
     for (let k = 0; k < n; k++) {
@@ -158,21 +157,15 @@ export function buildFar(env) {
         env.flickerWindows.push(win);
       }
     }
-    // church with a spire
-    const y = groundH(cx + 20, cz - 10) - 0.5;
-    houseParts.push(box(9, 8, 18, cx + 20, y + 4, cz - 10));
-    houseParts.push(box(5, 18, 5, cx + 20, y + 9, cz - 21));
-    roofParts.push(xf(new THREE.ConeGeometry(3.8, 12, 4), cx + 20, y + 24, cz - 21, 0, Math.PI / 4));
-    const [, croof] = makeHouseGeo(9, 18, 8, 4);
-    croof.translate(cx + 20, y, cz - 10);
-    roofParts.push(croof);
+    // the church (app/models/church.glb), its bell tower standing beside the nave
+    {
+      const x = cx + 20, z = cz - 12, o = new THREE.Object3D();
+      o.position.set(x, groundH(x, z) - 0.4, z); o.rotation.y = 0.35 + seed * 1.9;
+      placeModel(env, 'church', o);
+    }
   };
   village(-430, -610, 16, 1);
   village(520, -470, 9, 2);
-  const houseMesh = new THREE.Mesh(merge(houseParts), mats.plaster);
-  houseMesh.receiveShadow = true;
-  scene.add(houseMesh);
-  scene.add(new THREE.Mesh(merge(roofParts), mats.roofTile));
 
   // ── the broken viaduct ───────────────────────────────────────────────────
   {

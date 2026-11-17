@@ -2,10 +2,12 @@
 // of the last night, night 10 is a hold (ExtractionHold, run like a night event): the
 // flight is inbound, the radio counts it down, and for the last minute and a half
 // everything in the valley comes over the ridge at once. If the wall still stands when
-// the flight is overhead, ExtractionScene plays, still at night: the bombers carpet the
-// field, two gunship helicopters circle it with their searchlights and miniguns, the
-// lifters land behind the wall, the garrison runs for the ramps, and they leave the gun
-// on the wall with the dead coming over it. Voiced and cut to the script like the
+// the flight is overhead, ExtractionScene plays, still at night: the bombers come in
+// head-on and carpet the field, two gunship helicopters come in low over the nest and
+// make running passes with rockets and the chain gun, the lifters come round over the
+// field and land behind the wall in their own dust, the garrison runs for the ramps,
+// the ramps shut, and the lifters climb away with the dead coming over the wall under
+// them; the gunships turn round and follow. Voiced and cut to the script like the
 // other ending (EXTRACT_ENDING in config.js).
 import * as THREE from 'three';
 import { WORLD, EXTRACTION, EXTRACT_ENDING, ZT, wallZ } from '../config.js';
@@ -15,13 +17,14 @@ import { Survivor, ADULTS } from './survivor.js';
 import { Soldier } from './soldier.js';
 import { buildBomber, buildBomb } from './air.js';
 import { makeAttackHeli, makeLifter, spinRotors, makeBeam, aimBeam } from './helis.js';
+import { FlightPath, Attitude, racetrack } from './flight.js';
 
 const $ = (id) => document.getElementById(id);
 const ease = (k) => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const R = Math.random;
 const GAP = 0.8, TAIL = 5, FADE_OUT = 3;
-const _v = new THREE.Vector3(), _w = new THREE.Vector3(), _q = new THREE.Quaternion(), _m = new THREE.Matrix4();
+const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 
 // ─────────────────────────────────────────────────────────────────────────────
 /** Night 10, the hold: an event in NightEvents' list (blocking, so the night can't end on its own). */
@@ -41,6 +44,18 @@ export class ExtractionHold {
       if (this.said.has(k)) return;
       if (at === 'start' ? this.t >= 4 : left <= at) { this.said.add(k); g.hud.radio(who, text, at !== 'start' && at < 100); }
     });
+    // surges before the overrun: a flank at a time, so the wall is tested before the end
+    for (const at of P.surges || []) {
+      if (this.said.has('s' + at) || left > at) continue;
+      this.said.add('s' + at);
+      const side = R() < 0.5 ? -1 : 1, d = g.director;
+      g.hud.alert('HORDE INBOUND — ' + (side < 0 ? 'LEFT FLANK' : 'RIGHT FLANK'), 'red');
+      g.audio.horn();
+      for (let i = 0; i < P.surgeSize; i++) {
+        const r = R(), type = r < 0.5 ? ZT.RUNNER : r < 0.9 ? ZT.SHAMBLER : ZT.BRUTE;
+        d.queue.push({ type, x: side * rand(25, WORLD.SPAWN_X), z: WORLD.SPAWN_Z_NEAR + rand(0, 30), side: 0, delay: 0 });
+      }
+    }
     // the overrun: the whole valley at once, and faster
     if (left <= P.overrun) {
       if (!this.overrun) {
@@ -49,13 +64,13 @@ export class ExtractionHold {
         g.audio.setTide(true); g.audio.horn(); setTimeout(() => g.audio.horn(), 1600);
       }
       const d = g.director, plan = g.plan;
-      this.acc += P.overrunRate * dt * (0.6 + 0.8 * (1 - left / P.overrun));
+      this.acc += P.overrunRate * dt * (0.6 + 1.0 * (1 - left / P.overrun));
       while (this.acc >= 1) {
         this.acc -= 1;
-        const r = R(), type = r < 0.5 ? ZT.RUNNER : r < 0.93 ? ZT.SHAMBLER : r < 0.97 ? ZT.BRUTE : ZT.BLOATER;
+        const r = R(), type = r < 0.46 ? ZT.RUNNER : r < 0.86 ? ZT.SHAMBLER : r < 0.95 ? ZT.BRUTE : ZT.BLOATER;
         d.queue.push({ type, x: rand(-WORLD.SPAWN_X, WORLD.SPAWN_X), z: WORLD.SPAWN_Z_NEAR + rand(0, 25), side: 0, delay: 0 });
       }
-      g.horde.globalSpeed = Math.max(g.horde.globalSpeed, 1.2);
+      g.horde.globalSpeed = Math.max(g.horde.globalSpeed, 1.25);
       void plan;
     }
     // the flight, heard before it is seen: rotors coming up the valley behind the wall
@@ -84,6 +99,7 @@ export class ExtractionHold {
   }
 }
 
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Where the lifters set down behind the wall (nose away from the wall: the ramp faces the yard).
 const LZ = [
@@ -91,30 +107,64 @@ const LZ = [
   { x: -27, z: 66, yaw: 0.35 },
   { x: 27, z: 66, yaw: -0.35 },
 ];
-const ORBIT = { x: 0, z: -78, r: 72, alt: 30, w: 0.29 };
+const NEST = () => V(0, WORLD.TOWER_TOP + 1.9, 2);
+const RAMP_SHUT = 1.35; // the lifter's ramp node: 0 down on the ground (as modelled), this shut against the tail
+const smoother = (k) => { k = clamp(k, 0, 1); return k * k * k * (k * (k * 6 - 15) + 10); };
+const _f = new THREE.Vector3(), _s = new THREE.Vector3();
 
-// Each shot maps (k 0..1 over the shot, seconds into it, the scene) to a camera pose.
+/** Ease a stored vector toward a target (the camera's follow), at rate per second; returns a copy. */
+function follow(S, key, target, rate, dt) {
+  const v = S[key] || (S[key] = target.clone());
+  if (S._snap) v.copy(target); else v.lerp(target, 1 - Math.exp(-rate * dt));
+  return v.clone();
+}
+/** A look target from `from`, no steeper than maxEl above the horizon (no craning straight up). */
+function clampLook(from, to, maxEl = 1.1) {
+  const d = to.clone().sub(from), h = Math.hypot(d.x, d.z), el = Math.atan2(d.y, h);
+  if (el <= maxEl) return to;
+  const hh = Math.max(h, 1), ux = h > 1e-3 ? d.x / h : 0, uz = h > 1e-3 ? d.z / h : -1;
+  return from.clone().add(V(ux * hh, Math.tan(maxEl) * hh, uz * hh));
+}
+
+// Each shot maps (k 0..1 over the shot, seconds into it, the scene, frame dt) to a camera pose.
 const SHOTS = {
-  // on the left wing's walkway, the gunners firing, the field black with them
-  overrun: (k, st) => ({
-    pos: V(-22 - k * 3, WORLD.WALL_H + 1.75, wallZ(-22) + 2.2), look: V(-46 + k * 6, 1.5, -40 + k * 4), fov: 50, shake: 0.35,
-  }),
-  // from the nest roof: up at the bombers coming over, then down onto the field as it erupts
-  bombers: (k, st) => {
-    const u = ease(st / 3.4);
-    return { pos: V(3.5, WORLD.TOWER_TOP + 2.4, 3.5), look: V(0, 150, -40).lerp(V(-4, 0, -120), u), fov: lerp(62, 48, u), shake: 0.15 };
+  // on the right wing's walkway, looking back over the base: the bombers come in head-on out
+  // of the dark, lights first, and thunder over; the camera turns to watch them go
+  bombersIn: (k, st, S, dt) => {
+    const pos = V(52, WORLD.WALL_H + 1.8, wallZ(52) + 2.6);
+    const lead = S.bomberRuns[1].b.group.position;
+    const tgt = S.bomberRuns[1].b.group.visible ? lead.clone() : V(0, 120, 700);
+    return { pos, look: follow(S, '_lk', clampLook(pos, tgt, 1.05), 2.2, dt), fov: 56, shake: 0.12 };
   },
-  // riding behind the lead gunship as it comes over the wall and swings round the field
-  helos: (k, st, S) => {
-    const h = S.helos[0];
-    const f = h.fwd, p = h.pos;
-    return { pos: V(p.x - f.x * 26 + h.side.x * 7, p.y + 8, p.z - f.z * 26 + h.side.z * 7), look: V(p.x + f.x * 34, p.y - 20, p.z + f.z * 34), fov: 50, shake: 0.12 };
+  // high behind the left wing: the sticks walking up the field, wide enough to see all three
+  bombing: (k) => ({ pos: V(-58, 31, 16).lerp(V(-54, 29, 10), ease(k)), look: V(2, 0, -100).lerp(V(-6, 0, -110), ease(k)), fov: 52, shake: 0.2 }),
+  // from the nest roof: the gunships come in low behind us and out from under the frame
+  helosIn: (k) => ({ pos: NEST(), look: V(0, 6.5, -70).lerp(V(0, 9, -80), ease(k)), fov: 60, shake: 0.08 }),
+  // riding behind the lead gunship on its run: rockets and the gun into the crowd
+  helosFire: (k, st, S, dt) => {
+    const h = S.helos[0], p = h.att.pos;
+    h.att.axes(_f, _s);
+    const pos = follow(S, '_cp', V(p.x - _f.x * 24 - _s.x * 7, p.y + 6.5, p.z - _f.z * 24 - _s.z * 7), 3, dt);
+    const look = follow(S, '_cl', V(p.x + _f.x * 45, p.y - 15, p.z + _f.z * 45), 3, dt);
+    return { pos, look, fov: 52, shake: 0.1 };
   },
-  // in the yard: the lead lifter settles in its own dust and drops the ramp
-  lz: (k) => ({ pos: V(15, 0, 25).lerp(V(12, 0, 29), ease(k)), ground: 1.7, look: V(0, 5, 52), fov: 48, shake: 0.2 }),
+  // on the right wing, high: the lifters come round over the field in trail and in over the wall
+  liftersIn: (k, st, S, dt) => {
+    const pos = V(40, 24, 18).lerp(V(34, 22, 22), ease(k));
+    const L = S.lifters[0].att.pos;
+    return { pos, look: follow(S, '_lk2', clampLook(pos, L.clone(), 0.9), 2.4, dt), fov: 50, shake: 0.08 };
+  },
+  // in the yard: the lead lifter comes over us, flares and settles in its own dust
+  landing: (k, st, S, dt) => {
+    const pos = V(15, 0, 25).lerp(V(12.5, 0, 28.5), ease(k));
+    pos.y = groundH(pos.x, pos.z) + 1.7;
+    const L = S.lifters[0].att.pos, lz = V(LZ[0].x, groundH(LZ[0].x, LZ[0].z) + 4.5, LZ[0].z);
+    const tgt = S.lifters[0].group.visible ? L.clone().lerp(lz, 0.35) : lz;
+    return { pos, look: follow(S, '_lk3', clampLook(pos, tgt, 0.8), 2.5, dt), fov: 50, shake: 0.2 };
+  },
   // low behind the garrison running for the ramp
-  run: (k, st, S) => {
-    const z = lerp(10, 33, ease(k));
+  run: (k) => {
+    const z = lerp(14, 33, ease(k));
     return { pos: V(-4.5, 0, z - 6), ground: 1.5, look: V(0.5, 1.6, LZ[0].z - 9), fov: 50, shake: 0.18 };
   },
   // at the foot of the ramp, looking back: the last of them running past, the wall burning behind them
@@ -123,14 +173,29 @@ const SHOTS = {
     L.group.updateMatrixWorld();
     return { pos: _v.set(2.4, -0.9, -11.5).applyMatrix4(L.group.matrixWorld).clone(), look: V(-1, 3, 4), fov: 52, shake: 0.12 };
   },
-  // off the back of the lifter as it climbs away: the dead on the wall, the gun still there
-  liftoff: (k, st, S) => {
+  // behind the lifter: the ramp comes up and shuts, the dead already over the wall behind
+  doorClose: (k, st, S) => {
     const L = S.lifters[0];
     L.group.updateMatrixWorld();
-    const pos = _v.set(-3.4, -1.6, -10.5).applyMatrix4(L.group.matrixWorld).clone();
-    return { pos, look: V(0, WORLD.TOWER_TOP - 2, -10).lerp(V(0, 0, -60), ease(k)), fov: 50, shake: 0.08 };
+    const pos = _v.set(4.6, -0.6, -17.5 + k * 1.2).applyMatrix4(L.group.matrixWorld).clone();
+    pos.y = Math.max(pos.y, groundH(pos.x, pos.z) + 1.5);
+    return { pos, look: _w.set(0.3, -0.4, -7).applyMatrix4(L.group.matrixWorld).clone(), fov: 46, shake: 0.12 };
   },
-  // high and far: the lifters going away over the hills, the bastion small and burning
+  // low in the yard: the lifter climbs away slowly over the dead running in under it
+  liftoff: (k, st, S, dt) => {
+    const pos = V(-15, 0, 31).lerp(V(-17, 0, 29), ease(k));
+    pos.y = groundH(pos.x, pos.z) + 1.6;
+    const L = S.lifters[0].att.pos;
+    return { pos, look: follow(S, '_lk4', clampLook(pos, V(L.x, L.y + 1, L.z), 0.95), 2, dt), fov: 54, shake: 0.12 };
+  },
+  // back on the nest roof: the gunships stop over the field, turn round and go after the lifters
+  helosLeave: (k, st, S, dt) => {
+    const pos = NEST();
+    const a = S.helos[0].att.pos, b = S.helos[1].att.pos;
+    const mid = a.clone().add(b).multiplyScalar(0.5);
+    return { pos, look: follow(S, '_lk5', clampLook(pos, mid, 1.0), 1.8, dt), fov: 58, shake: 0.08 };
+  },
+  // high and far: the flight going away over the hills, the bastion small and burning
   away: (k) => ({ pos: V(70, 85, 210).lerp(V(40, 110, 300), ease(k)), look: V(0, 10, -30).lerp(V(0, 0, -90), ease(k)), fov: 46 }),
 };
 
@@ -142,14 +207,22 @@ export class ExtractionScene {
     this.built = true;
     const scene = this.g.scene;
     this.bombers = [0, 1, 2].map(() => { const b = buildBomber(); b.group.scale.setScalar(0.42); b.group.visible = false; scene.add(b.group); return b; });
-    this.bombPool = Array.from({ length: 24 }, () => { const m = buildBomb(); m.visible = false; m.scale.setScalar(0.8); scene.add(m); return m; });
-    this.helos = [0, 1].map(() => {
+    this.bombPool = Array.from({ length: 20 }, () => { const m = buildBomb(); m.visible = false; m.scale.setScalar(0.8); scene.add(m); return m; });
+    this.helos = [0, 1].map((k) => {
       const h = makeAttackHeli(); h.group.visible = false; scene.add(h.group);
       h.beam = makeBeam(); h.beam.visible = false; scene.add(h.beam);
-      h.pos = new THREE.Vector3(); h.fwd = new THREE.Vector3(0, 0, -1); h.side = new THREE.Vector3(1, 0, 0);
+      h.k = k; h.att = new Attitude({ drag: 0.0011, turn: 2.8, yawTurn: 1.8, maxBank: 0.8 });
       return h;
     });
-    this.lifters = LZ.map(() => { const l = makeLifter(); l.group.visible = false; scene.add(l.group); return l; });
+    this.lifters = LZ.map((lz, k) => {
+      const l = makeLifter(); l.group.visible = false; scene.add(l.group);
+      l.k = k; l.lz = lz; l.att = new Attitude({ drag: 0.0007, turn: 1.6, yawTurn: 0.9, maxBank: 0.5, maxPitch: 0.3, pitch0: -0.02 });
+      return l;
+    });
+    // 2.75 in rockets: a dark tube with the motor burning at its tail
+    const rg = new THREE.CylinderGeometry(0.05, 0.05, 1.3, 6).rotateX(Math.PI / 2);
+    const rm = new THREE.MeshStandardMaterial({ color: 0x2a2c26, roughness: 0.6, metalness: 0.4 });
+    this.rockets = Array.from({ length: 12 }, () => { const m = new THREE.Mesh(rg, rm); m.visible = false; scene.add(m); return { m, on: false, p: new THREE.Vector3(), v: new THREE.Vector3(), t: 0 }; });
     // the garrison: soldiers and the civilians who sheltered behind the wall
     this.troops = Array.from({ length: 12 }, () => { const s = new Soldier(); s.root.visible = false; scene.add(s.root); return s; });
     this.civs = Array.from({ length: 10 }, (_, k) => { const p = new Survivor(k % 4 === 3 ? 'child' : ADULTS[k % 3]); p.root.visible = false; scene.add(p.root); return p; });
@@ -159,14 +232,19 @@ export class ExtractionScene {
     const g = this.g;
     this.build();
     this.active = true;
-    this.t = 0; this.skipArm = 0; this.titleOn = false; this.shake = 0;
+    this.t = 0; this.skipArm = 0; this.titleOn = false; this.shake = 0; this.timers = []; this.lastShot = null;
     const A = g.audio;
     let at = 0;
+    // the script: voiced lines, and silent beats (hold: seconds) that only hold a shot
     this.cues = EXTRACT_ENDING.map((c, i) => {
       at += c.gap ?? (i ? GAP : 0);
-      const buf = A.voices_ && A.voices_[c.who + '|' + c.text];
-      const dur = buf ? buf.duration + 0.15 : 1.2 + c.text.split(/\s+/).length / 2.6;
-      const cue = { ...c, at, dur, done: false };
+      let dur;
+      if (!c.text) dur = c.hold || 2;
+      else {
+        const buf = A.voices_ && A.voices_[c.who + '|' + c.text];
+        dur = buf ? buf.duration + 0.15 : 1.2 + c.text.split(/\s+/).length / 2.6;
+      }
+      const cue = { ...c, at, dur, done: !c.text };
       at += dur;
       return cue;
     });
@@ -178,8 +256,8 @@ export class ExtractionScene {
       if (this.shots.length) this.shots[this.shots.length - 1].to = from;
       this.shots.push({ name: c.shot, from, to: this.end + FADE_OUT });
     });
-    const T = (n) => this.shots.find((s) => s.name === n)?.from ?? 0;
-    this.T = { bomb: T('bombers'), helo: T('helos'), lz: T('lz'), run: T('run'), ramp: T('ramp'), lift: T('liftoff'), away: T('away') };
+    this.T = {};
+    for (const s of this.shots) if (this.T[s.name] === undefined) this.T[s.name] = s.from;
     const title = this.cues.find((c) => c.title);
     this.titleAt = title ? title.at + title.dur - 0.4 : Infinity;
 
@@ -188,7 +266,8 @@ export class ExtractionScene {
     g.letterboxTarget = 1;
     // the fifty stays in the nest, pointed down the valley: they leave it there
     g.ending.placeGun();
-    g.audio.intensity = 1; g.audio.pressure = 0.8;
+    A.intensity = 1; A.pressure = 0.8;
+    A.setCine(true);
     this.pileMul0 = g.horde.pileMul;
     g.horde.pileMul = Math.max(g.horde.pileMul, 1.6);
     for (let i = 0; i < 260; i++) g.horde.spawn(R() < 0.45 ? ZT.RUNNER : ZT.SHAMBLER, rand(-110, 110), rand(-150, -40), 1, 1.1);
@@ -196,49 +275,62 @@ export class ExtractionScene {
     this.stageHelos();
     this.stageLifters();
     this.stagePeople();
-    this.lamps = [];
+    for (const r of this.rockets) { r.on = false; r.m.visible = false; }
+    this.intrudeAcc = 0;
     $('cine-sub').classList.remove('on');
     $('cine-title').classList.remove('on');
     $('cine-skip').classList.remove('on');
     g.screens.show('cine');
   }
 
-  // ── the bombers: three B-36s line abreast, each walking a stick of bombs up the field ──
+  // ── the bombers: three B-36s line abreast out of the south, each walking a stick of bombs up the field ──
   planBombs() {
-    const t0 = this.T.bomb - 5.2, v = 78, alt = 125, fall = 2.4; // over the wall ~1.5 s into the shot
+    const v = 70, alt = 120, fall = 2.6;
+    const tImpact = this.T.bombing + 0.6; // the first bombs land just after the cut
     this.drops = [];
     this.bomberRuns = this.bombers.map((b, k) => {
-      const x = [-42, 2, 44][k] + rand(-4, 4), start = t0 + [0.6, 0, 1.1][k];
-      const run = { b, x, start, v, alt, z0: 520, loop: null };
-      b.group.visible = false;
-      // a stick: from just off the wall face out to the far field
+      const x = [-40, 0, 40][k] + rand(-3, 3), lag = [0.5, 0, 0.9][k];
       const zFirst = wallZ(x) - 16;
-      for (let i = 0; i < 17; i++) {
-        const zi = zFirst - i * 13.5 + rand(-2, 2), xi = x + rand(-7, 7);
-        const zr = zi + v * fall * 0.75;
-        const trel = start + (run.z0 - zr) / v;
-        this.drops.push({ run, xi, zi, xr: x, zr, trel, timp: trel + fall, fall, mesh: null, done: false, big: i % 5 === 2 });
+      const zr0 = zFirst + v * fall * 0.75;       // where the first bomb leaves the bay
+      const trel0 = tImpact + lag - fall;          // and when
+      const run = { b, x, v, alt, zr0, trel0, loop: null };
+      b.group.visible = false;
+      for (let i = 0; i < 15; i++) {
+        const zi = zFirst - i * 14 + rand(-2, 2), xi = x + rand(-7, 7);
+        const zr = zi + v * fall * 0.75, trel = trel0 + (zr0 - zr) / v;
+        this.drops.push({ run, xi, zi, xr: x, zr, trel, timp: trel + fall, fall, mesh: null, done: false, big: i % 7 === 3 });
       }
       return run;
     });
   }
 
+  bomberZ(r, t) { return r.zr0 + r.v * (r.trel0 - t); }
+
   updateBombers(dt) {
     const g = this.g, fx = g.fx, t = this.t;
     for (const r of this.bomberRuns) {
-      const s = t - r.start;
+      const z = this.bomberZ(r, t), x = r.x, y = r.alt;
       const grp = r.b.group;
-      if (s < 0 || s > 16) { if (grp.visible) { grp.visible = false; if (r.loop) { r.loop.stop(3); r.loop = null; } } continue; }
-      const z = r.z0 - r.v * s, x = r.x, y = r.alt;
+      if (t < this.T.bombersIn - 0.5 || z < -700) {
+        if (grp.visible) { grp.visible = false; if (r.loop) { r.loop.stop(3); r.loop = null; } }
+        continue;
+      }
       grp.visible = true;
       grp.position.set(x, y, z);
       grp.lookAt(x, y, z - 1);
       grp.updateMatrixWorld();
       for (const p of r.b.props) p.rotation.z += dt * 30;
-      for (const e of r.b.engines) { _v.copy(e).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1.0, 3.2, 1.4, 0.5, 0.05); }
-      if ((performance.now() % 900) < 80) { _v.copy(r.b.lights.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.2, 8, 8, 8, 0.05); }
-      if (!r.loop && g.audio.ready && g.audio.B.jet) r.loop = g.audio.loop(g.audio.B.jet[0], { ref: 150, reverb: 0.35 });
-      if (r.loop) r.loop.update(x, y, z, 0, 0, -r.v, 2.6);
+      for (const e of r.b.engines) { _v.copy(e).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1.1, 3.4, 1.5, 0.5, 0.05); }
+      // position lights and the beacon: how you see them coming in the dark
+      _v.copy(r.b.lights.port).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.4, 7, 0.5, 0.3, 0.05);
+      _v.copy(r.b.lights.stbd).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.4, 0.4, 6, 0.9, 0.05);
+      // landing lights in the wing roots, burning straight ahead: blinding head-on, nothing from behind
+      const cam = g.camera.position, dz = cam.z - z, dd = Math.hypot(cam.x - x, cam.y - y, dz);
+      const face = Math.pow(clamp(-dz / dd, 0, 1), 3);
+      if (face > 0.02) for (const sx of [-9, 9]) { _v.set(sx, -2.4, 6).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3.2 + face * 3, 9 * face, 8.6 * face, 7.5 * face, 0.05); }
+      if (((t + 5 + r.x * 0.01) % 1.1) < 0.09) { _v.copy(r.b.lights.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3, 9, 9, 9, 0.05); }
+      if (!r.loop && g.audio.ready && g.audio.B.jet) r.loop = g.audio.loop(g.audio.B.jet[0], { ref: 170, reverb: 0.4 });
+      if (r.loop) r.loop.update(x, y, z, 0, 0, -r.v, 3.4);
     }
     for (const d of this.drops) {
       if (d.done || t < d.trel) continue;
@@ -260,182 +352,276 @@ export class ExtractionScene {
 
   blast(x, gy, z, big) {
     const g = this.g;
-    if (big) g.fx.bigExplosion(x, gy, z, 0.8); else g.fx.explosion(x, gy, z, 1.7);
+    if (big) g.fx.bigExplosion(x, gy, z, 0.75); else g.fx.explosion(x, gy, z, 1.6);
     g.horde.explode(x, gy + 0.5, z, big ? 20 : 14, 3200, 'bomb', { push: big ? 2.4 : 1.8, ignite: true });
     if (big) g.audio.bigBlast(x, z);
-    else if (R() < 0.6) g.audio.explosion(x, z, 1.6);
+    else if (R() < 0.7) g.audio.explosion(x, z, 1.7);
     const cam = g.camera.position, d = Math.hypot(x - cam.x, z - cam.z);
     this.shake = Math.min(1.4, this.shake + (big ? 30 : 14) / (d + 20));
   }
 
-  // ── the gunship helicopters ──
+  // ── the gunship helicopters: in low over the nest, then running passes up the field ──
   stageHelos() {
-    this.helos.forEach((h, k) => {
-      h.k = k; h.group.visible = false; h.beam.visible = false;
-      h.enter = this.T.helo - 2.2 + k * 1.4;              // when it starts its run in from behind the base
-      h.orbitAt = h.enter + 7;                            // when it is established on the orbit
-      h.phase0 = k ? Math.PI * 0.15 : Math.PI * 1.15;     // where on the orbit it arrives
-      h.from = V(k ? 70 : -60, 70, 300);
-      h.burst = 0; h.nextBurst = h.orbitAt + 0.8 + k * 1.3; h.round = 0; h.rocket = h.orbitAt + 2.5 + k;
-      h.loop = null; h.light = null; h.tgt = new THREE.Vector3();
+    const T = this.T, tA = T.helosIn;
+    this.helos.forEach((h) => {
+      const k = h.k, s = k ? 1 : -1;
+      const P = h.path = new FlightPath();
+      // in from behind the base, low and fast, under the camera on the nest roof
+      P.add(tA - 6, s * 15, 48, 230).add(tA - 2, s * 12, 19, 85).add(tA + 0.6, s * 11, 10.8, 10);
+      // then running passes up the field until the lifters are gone
+      const tl = T.helosLeave;
+      racetrack(P, { t0: tA + 1.6, t1: tl, side: s, inner: 13 + k * 2, outer: 72, zNear: -14, zFar: -205, alt: [16, 13, 26], speed: 23, turnSpeed: 16.5 });
+      // break off: slow to a hover over the field, turn round in it, and go after the lifters
+      P.hold(tl + 2.4, s * 16, 24, -40, Math.PI);
+      P.add(tl + 3.4, s * 16.2, 24.3, -40.2, s * Math.PI / 2);
+      P.hold(tl + 4.4, s * 16, 24.6, -40, 0);
+      P.add(tl + 6.6, s * 14, 31, -8).add(tl + 9, s * 12, 46, 60).add(tl + 14.5, s * 10, 80, 300).add(tl + 24, s * 8, 112, 760);
+      h.att.ready = false;
+      h.group.visible = false; h.beam.visible = false;
+      h.burst = 0; h.nextBurst = tA + 2 + k * 0.9; h.round = 0; h.rounds = 0;
+      // the first salvos on the run the camera rides along with, then every few seconds on a pass
+      h.salvos = k === 0 ? [T.helosFire + 0.9, T.helosFire + 3.6] : [T.helosFire + 2.2];
+      h.nextRocket = T.helosFire + 6 + k * 1.7;
+      h.loop = null; h.light = null; h.tgt = new THREE.Vector3(); h.aim = null;
     });
   }
 
-  orbitPos(h, t, out) {
-    const a = h.phase0 + (t - h.orbitAt) * ORBIT.w;
-    return out.set(ORBIT.x + Math.cos(a) * ORBIT.r, ORBIT.alt + Math.sin(t * 0.7 + h.k) * 2.5, ORBIT.z + Math.sin(a) * ORBIT.r);
-  }
-
-  helPos(h, t, out) {
-    if (t >= h.orbitAt) return this.orbitPos(h, t, out);
-    // a curve in from behind the base, over the wall, onto the orbit
-    const u = clamp((t - h.enter) / (h.orbitAt - h.enter), 0, 1), e = u * u * (3 - 2 * u) * 0.5 + u * 0.5;
-    const p1 = this.orbitPos(h, h.orbitAt, _w).clone();
-    const mid = V(h.from.x * 0.7 + p1.x * 0.3, 42, 6); // over a wing, clear of the nest
-    const a = h.from.clone().lerp(mid, e), b = mid.clone().lerp(p1, e);
-    return out.copy(a.lerp(b, e));
+  /** A zombie worth shooting near (x, z): the one with the most others around it, of a few looked at. */
+  pickNear(x, z, r) {
+    const h = this.g.horde;
+    let best = null, bestC = -1;
+    for (let s = 0; s < 40; s++) {
+      const i = (R() * h.n) | 0;
+      if (h.dead[i] || h.inside[i]) continue;
+      const dx = h.x[i] - x, dz = h.z[i] - z;
+      if (dx * dx + dz * dz > r * r) continue;
+      const c = h.queryRadius(h.x[i], h.z[i], 5, h._q);
+      if (c > bestC) { bestC = c; best = { x: h.x[i], z: h.z[i] }; }
+    }
+    return best;
   }
 
   updateHelos(dt) {
-    const g = this.g, fx = g.fx, h0 = g.horde, t = this.t;
+    const g = this.g, fx = g.fx, t = this.t;
     for (const h of this.helos) {
-      if (t < h.enter) continue;
-      const grp = h.group;
+      if (t < h.path.start) continue;
+      const grp = h.group, a = h.att;
+      if (t > h.path.end) { if (grp.visible) { grp.visible = false; h.beam.visible = false; if (h.loop) { h.loop.stop(2); h.loop = null; } } continue; }
       grp.visible = true;
-      this.helPos(h, t, h.pos);
-      this.helPos(h, t + 0.25, _w);
-      const vx = (_w.x - h.pos.x) / 0.25, vy = (_w.y - h.pos.y) / 0.25, vz = (_w.z - h.pos.z) / 0.25;
-      const sp = Math.hypot(vx, vz) || 1;
-      h.fwd.set(vx / sp, 0, vz / sp);
-      h.side.set(h.fwd.z, 0, -h.fwd.x);
-      // nose into the turn a little (toward the field's centre) so the gun bears inward
-      const inward = t >= h.orbitAt ? 0.45 : 0;
-      const yaw = Math.atan2(h.fwd.x, h.fwd.z) + inward;
-      const bank = t >= h.orbitAt ? -0.32 : 0.08 * Math.sin(t * 1.3);
-      grp.position.copy(h.pos);
-      grp.rotation.set(0.12 + Math.min(0.15, sp * 0.004), yaw, bank, 'YXZ');
-      grp.updateMatrixWorld();
+      a.update(h.path, t, dt);
+      a.apply(grp, t, h.k * 2);
+      a.axes(_f, _s);
+      const p = a.pos;
       spinRotors(h, dt, 1);
       // nav lights, the anti-collision strobe
       _v.copy(h.lights.port).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 0.9, 6, 0.4, 0.3, 0.05);
       _v.copy(h.lights.stbd).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 0.9, 0.3, 5, 0.8, 0.05);
       if (((t * 1.3 + h.k * 0.4) % 1) < 0.08) { _v.copy(h.lights.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2, 8, 8, 8, 0.05); }
-      // sound
-      if (!h.loop && g.audio.ready && g.audio.B.rotor) h.loop = g.audio.loop(g.audio.B.rotor[0], { ref: 110, reverb: 0.3, rate: 0.96 + h.k * 0.07 });
-      if (h.loop) h.loop.update(h.pos.x, h.pos.y, h.pos.z, vx, vy, vz, 2.2);
-      // the searchlight: sweeping the dead at the foot of the wall
+      // the rotor: the recording, panned and Doppler-shifted with it
+      if (!h.loop && g.audio.ready) { const b = g.audio.rotorBuf(0); if (b) h.loop = g.audio.loop(b, { ref: 150, reverb: 0.35, rate: 0.97 + h.k * 0.06 }); }
+      if (h.loop) h.loop.update(p.x, p.y, p.z, a.vel.x, a.vel.y, a.vel.z, 3.2);
+      // on a run (nose up the field, over it): the searchlight ahead, the gun, the rockets
+      const onRun = _f.z < -0.75 && p.z < -8 && t > this.T.helosIn + 1.4 && t < this.T.helosLeave + 1;
       const lamp = _v.copy(h.lamp).applyMatrix4(grp.matrixWorld).clone();
-      if (t >= h.orbitAt - 2) {
-        const sw = t * 0.45 + h.k * 2;
-        const tx = h.pos.x * 0.35 + Math.sin(sw) * 18, tz = clamp(h.pos.z * 0.35 - 30 + Math.cos(sw * 0.8) * 16, -110, wallZ(h.pos.x * 0.35) - 6);
-        h.tgt.x += (tx - h.tgt.x) * Math.min(1, dt * 2.5); h.tgt.z += (tz - h.tgt.z) * Math.min(1, dt * 2.5);
-        h.tgt.y = groundH(h.tgt.x, h.tgt.z);
-        if (!h.beam.visible) { h.tgt.set(tx, groundH(tx, tz), tz); h.beam.visible = true; }
+      const ahead = V(p.x + _f.x * 50, 0, p.z + _f.z * 50);
+      ahead.y = groundH(ahead.x, ahead.z);
+      h.tgt.lerp(ahead, h.beam.visible ? 1 - Math.exp(-dt * 2) : 1);
+      const lampK = clamp((t - this.T.helosIn - 1) * 0.8, 0, 1) * (t < this.T.helosLeave + 3 ? 1 : clamp(1 - (t - this.T.helosLeave - 3), 0, 1));
+      h.beam.visible = lampK > 0.01;
+      if (h.beam.visible) {
         aimBeam(h.beam, lamp, h.tgt, 5.5);
-        h.beam.material.uniforms.uK.value = Math.min(1, (t - h.orbitAt + 2) * 0.8);
+        h.beam.material.uniforms.uK.value = lampK;
         if (!h.light) { h.light = fx.lights.acquire(); if (h.light) { h.light.color.setRGB(0.85, 0.9, 1); h.light.distance = 26; h.light.decay = 1.2; } }
-        if (h.light) { h.light.position.set(h.tgt.x, h.tgt.y + 5, h.tgt.z); h.light.intensity = 260 * h.beam.material.uniforms.uK.value; }
+        if (h.light) { h.light.position.set(h.tgt.x, h.tgt.y + 5, h.tgt.z); h.light.intensity = 260 * lampK; }
         fx.glowDot(lamp.x, lamp.y, lamp.z, 1.4, 8, 8, 9, 0.05);
       }
-      // the minigun: bursts walked through the crowd round the light
-      if (t >= h.nextBurst && h.burst <= 0) { h.burst = rand(1.0, 1.6); h.nextBurst = t + h.burst + rand(1.2, 2.4); h.round = 0; }
+      // the 30 mm: bursts of ten-odd rounds walked into the crowd ahead, each round its own thud
+      if (onRun && t >= h.nextBurst && h.burst <= 0) {
+        h.burst = rand(0.9, 1.6); h.nextBurst = t + h.burst + rand(1.0, 2.2); h.round = 0; h.rounds = 0;
+        h.aim = this.pickNear(ahead.x, ahead.z, 30) || { x: ahead.x, z: ahead.z };
+      }
       if (h.burst > 0) {
         h.burst -= dt;
         const gun = _w.copy(h.gun).applyMatrix4(grp.matrixWorld);
-        if (h.round === 0) { const j = h0.densest(4, 160, 24, 6); if (j) { h.aimX = j.x; h.aimZ = j.z; } else { h.aimX = h.tgt.x; h.aimZ = h.tgt.z; } g.audio.minigun(gun.x, gun.y, gun.z, h.aimX, h.aimZ); }
-        h.round += dt;
-        while (h.round > 0.04) {
-          h.round -= 0.04;
-          const tx = h.aimX + rand(-3.5, 3.5), tz = h.aimZ + rand(-3.5, 3.5), ty = groundH(tx, tz);
-          fx.tracer(gun.x, gun.y, gun.z, tx, ty + 0.4, tz, 700, 1.1, 6.5, 2.4, 1.0);
-          if (R() < 0.4) fx.groundHit(tx, tz, R() < 0.2);
-          if (R() < 0.5) h0.explode(tx, ty + 0.6, tz, 2.4, 260, 'gunship', { push: 0.6 });
+        h.round -= dt;
+        while (h.round <= 0) {
+          h.round += 0.1;
+          h.rounds++;
+          const tx = h.aim.x + rand(-2.5, 2.5), tz = h.aim.z + rand(-2.5, 2.5), ty = groundH(tx, tz);
+          fx.tracer(gun.x, gun.y, gun.z, tx, ty + 0.3, tz, 600, 1.3, 7, 3, 1.1, 0.09, 0.012);
+          fx.muzzle(gun.x, gun.y, gun.z, _f.x, -0.35, _f.z, 0.9);
+          g.audio.chainShot(gun.x, gun.y, gun.z, h.burst <= 0.1);
+          const fly = Math.hypot(tx - gun.x, ty - gun.y, tz - gun.z) / 600, n = h.rounds;
+          this.later(fly, () => {
+            fx.explosion(tx, ty, tz, 0.32, { light: false, scorch: false, fires: false });
+            g.horde.explode(tx, ty + 0.5, tz, 3.2, 420, 'gunship', { push: 0.8 });
+            if (n % 3 === 0) g.audio.chainHit(tx, tz);
+          });
         }
-        h.round = h.round || 0.0001;
-        fx.muzzle(gun.x, gun.y, gun.z, h.fwd.x, -0.4, h.fwd.z, 0.6);
       }
-      // a pair of rockets now and then
-      if (t >= h.rocket) {
-        h.rocket = t + rand(3.5, 6);
-        const j = h0.densest(6, 160, 24, 6);
-        if (j) for (const pod of h.pods) {
-          const p = _w.copy(pod).applyMatrix4(grp.matrixWorld);
-          const tx = j.x + rand(-4, 4), tz = j.z + rand(-4, 4), ty = groundH(tx, tz);
-          fx.tracer(p.x, p.y, p.z, tx, ty, tz, 260, 1.6, 8, 4, 1.5, 0.16, 0.02);
-          const d = Math.hypot(tx - p.x, tz - p.z, ty - p.y) / 260;
-          setTimeout(() => { if (!this.active) return; g.fx.explosion(tx, ty, tz, 1.1); h0.explode(tx, ty + 0.5, tz, 8, 900, 'gunship', { push: 1.2 }); g.audio.explosion(tx, tz, 1.1); }, d * 1000);
-        }
+      // rockets: a pair off the pods, scripted for the camera's run, then now and then on a pass
+      const due = h.salvos.length && t >= h.salvos[0];
+      if (due || (onRun && t >= h.nextRocket)) {
+        if (due) h.salvos.shift(); else h.nextRocket = t + rand(3.5, 6);
+        const j = this.pickNear(p.x + _f.x * 80, p.z + _f.z * 80, 40) || { x: p.x + _f.x * 80, z: p.z + _f.z * 80 };
+        h.pods.forEach((pod, n) => this.later(n * 0.14, () => this.fireRocket(h, pod, j.x + rand(-4, 4), j.z + rand(-4, 4))));
       }
     }
   }
 
-  // ── the lifters ──
+  fireRocket(h, pod, tx, tz) {
+    const r = this.rockets.find((x) => !x.on);
+    if (!r || !h.group.visible) return;
+    r.p.copy(pod).applyMatrix4(h.group.matrixWorld);
+    const ty = groundH(tx, tz);
+    r.v.set(tx - r.p.x, ty - r.p.y, tz - r.p.z);
+    const d = r.v.length();
+    r.v.multiplyScalar(260 / d);
+    r.t = 0; r.dur = d / 260; r.tx = tx; r.ty = ty; r.tz = tz; r.on = true;
+    r.m.visible = true;
+    const fx = this.g.fx;
+    for (let k = 0; k < 6; k++) fx.smokePuff(r.p.x + rand(-0.4, 0.4), r.p.y, r.p.z + rand(-0.4, 0.4), 1.4, 0.14, rand(1.2, 2), 0.3);
+    fx.lights.flash(r.p.x, r.p.y, r.p.z, 0xffb070, 90, 18, 0.12);
+    this.g.audio.rocketLaunch(r.p.x, r.p.y, r.p.z);
+  }
+
+  updateRockets(dt) {
+    const g = this.g, fx = g.fx;
+    for (const r of this.rockets) {
+      if (!r.on) continue;
+      r.t += dt;
+      const prev = _v.copy(r.p).clone();
+      r.p.addScaledVector(r.v, dt);
+      r.m.position.copy(r.p);
+      r.m.lookAt(_w.copy(r.p).add(r.v));
+      // the motor and its trail: a hot point, then grey smoke left hanging in the air
+      _w.copy(r.v).normalize();
+      fx.glowDot(r.p.x - _w.x * 0.8, r.p.y - _w.y * 0.8, r.p.z - _w.z * 0.8, 1.1, 9, 5, 2, 0.05);
+      for (let k = 0; k < 3; k++) {
+        const u = k / 3;
+        fx.smoke.spawn(lerp(prev.x, r.p.x, u), lerp(prev.y, r.p.y, u), lerp(prev.z, r.p.z, u), rand(-0.3, 0.3), rand(0, 0.5), rand(-0.3, 0.3),
+          rand(1.4, 2.4), 0.35, 2.2, 2 + ((R() * 4) | 0), 0.2, 0.19, 0.17, 0.5, 0.1, 0.1, 0.1, -0.1, 0.8, 0, R() * 6, 0.2, 0.05);
+      }
+      if (r.t >= r.dur) {
+        r.on = false; r.m.visible = false;
+        fx.explosion(r.tx, r.ty, r.tz, 1.15, { fires: R() < 0.3 });
+        g.horde.explode(r.tx, r.ty + 0.5, r.tz, 8, 900, 'gunship', { push: 1.4 });
+        g.audio.explosion(r.tx, r.tz, 1.2);
+        const cam = g.camera.position;
+        this.shake = Math.min(1.2, this.shake + 6 / (Math.hypot(r.tx - cam.x, r.tz - cam.z) + 20));
+      }
+    }
+  }
+
+  /** Run fn after s seconds of scene time (only while the scene plays). */
+  later(s, fn) { this.timers.push({ at: this.t + s, fn }); }
+
+  // ── the lifters: a long approach up the valley, round over the field and in over the wall ──
   stageLifters() {
-    this.lifters.forEach((L, k) => {
-      const lz = LZ[k];
-      L.k = k; L.lz = lz;
-      L.arrive = this.T.lz - 13 + k * 1.6;  // starts its descent in from the hills behind the base
-      L.touch = this.T.lz - 0.6 + k * 1.6;  // wheels down
-      L.leave = this.T.lift + 0.3 + k * 1.8;
-      L.from = V(lz.x * 1.6 + (k - 1) * 30, 140, lz.z + 640);
-      L.rampK = 0; L.loop = null; L.pos = new THREE.Vector3(); L.group.visible = false;
-      L.ramp.rotation.x = L.rampUp;
+    const T = this.T;
+    this.lifters.forEach((L) => {
+      const { k, lz } = L, X = lz.x, Z = lz.z;
+      const gy = groundH(X, Z), base = gy + L.gear;
+      const Td = L.touch = T.landing + 4.4 + k * 2.1;
+      const Tl = L.leave = T.liftoff + 0.6 + k * 1.5;
+      const P = L.path = new FlightPath();
+      // up the left side of the valley, high, in trail
+      P.add(Td - 36, -150 - k * 12, 125, 540 + k * 30).add(Td - 26.5, -112 - k * 6, 86, 200).add(Td - 21, -96, 62, 40);
+      // round to the right over the far side of the field, losing height
+      const xf = X * 0.5 - 12, cx = (xf - 92) / 2, r = (xf + 92) / 2;
+      for (let i = 0; i <= 4; i++) {
+        const ang = Math.PI * (1 + i / 4);
+        P.add(Td - 17.2 + i * 1.9, cx + Math.cos(ang) * r, 50 - i * 3, -45 + Math.sin(ang) * r);
+      }
+      // in over the wall, slowing; the flare; the hover; down
+      P.add(Td - 7.0, xf * 0.6 + X * 0.4, 22, -5);
+      P.add(Td - 3.7, X, base + 8.5, Z - 9);
+      P.hold(Td - 1.5, X, base + 3.2, Z, lz.yaw);
+      P.hold(Td, X, base, Z, lz.yaw);
+      // the liftoff: slow off the ground with the dead running in under it, then away
+      P.hold(Tl, X, base, Z, lz.yaw);
+      const s = k - 1;
+      P.add(Tl + 3.8, X, base + 2.6, Z, lz.yaw).add(Tl + 7, X + s, base + 8.5, Z + 2.5, lz.yaw);
+      P.add(Tl + 10.5, X + s * 4, base + 22, Z + 22).add(Tl + 15.5, X + s * 12, base + 50, Z + 110).add(Tl + 23.5, X + s * 30, base + 95, Z + 430).add(Tl + 33, X + s * 50, 140, Z + 950);
+      L.base = base; L.gy = gy;
+      L.att.ready = false;
+      L.shut = 1; L.loop = null; L.group.visible = false;
+      this.setRamp(L, 1);
     });
   }
 
+  /** The ramp: 0 down on the ground, 1 shut; the treadway boards slide back up it as it closes. */
+  setRamp(L, shut) {
+    L.ramp.rotation.x = RAMP_SHUT * shut;
+    if (L.boards) L.boards.position.copy(L.boardsHome).multiplyScalar(1 - 0.8 * shut);
+  }
+
+  /** Rotor wash: dust rolling out along the ground from under the discs, thicker the lower it hovers. */
+  rotorWash(L, dt) {
+    const p = L.att.pos, hAGL = p.y - L.gear - L.gy;
+    if (hAGL > 24) return;
+    const k = Math.pow(1 - Math.max(0, hAGL) / 24, 1.4) * (hAGL < 0.3 ? 1.3 : 1);
+    const fx = this.g.fx;
+    let n = dt * 70 * k;
+    while (n > 0) {
+      if (n < 1 && R() > n) break;
+      n -= 1;
+      // under one of the two discs (fore and aft, along the fuselage)
+      const along = (R() < 0.5 ? 6.2 : -6.2), yaw = L.att.yaw;
+      const ox = p.x + Math.sin(yaw) * along, oz = p.z + Math.cos(yaw) * along;
+      const a = R() * Math.PI * 2, r0 = rand(2, 7), sp = rand(7, 15) * (0.6 + 0.4 * k);
+      const x = ox + Math.cos(a) * r0, z = oz + Math.sin(a) * r0;
+      const c = rand(0.09, 0.13);
+      fx.smoke.spawn(x, groundH(x, z) + rand(0.2, 1.2), z, Math.cos(a) * sp, rand(0.4, 1.8), Math.sin(a) * sp,
+        rand(1.8, 3.4), rand(1.6, 2.6), rand(5.5, 9), 2 + ((R() * 4) | 0), c, c * 0.88, c * 0.72, 0.5 * Math.min(1, k + 0.3), c * 0.8, c * 0.72, c * 0.6,
+        -0.05, 1.3, 0, R() * 6, (R() - 0.5) * 0.4, 0.15);
+    }
+    // grit kicked up close in
+    if (hAGL < 6 && R() < dt * 8) fx.groundHit(p.x + rand(-8, 8), p.z + rand(-8, 8), false);
+  }
+
   updateLifters(dt) {
-    const g = this.g, fx = g.fx, t = this.t;
+    const g = this.g, fx = g.fx, t = this.t, T = this.T;
     for (const L of this.lifters) {
-      if (t < L.arrive) continue;
-      const lz = L.lz, gy = groundH(lz.x, lz.z), grp = L.group;
+      if (t < L.path.start) continue;
+      const grp = L.group, a = L.att;
+      if (t > L.path.end) { if (grp.visible) { grp.visible = false; if (L.loop) { L.loop.stop(2); L.loop = null; } } continue; }
       grp.visible = true;
-      const ground = gy + L.gear;
-      let pitch = 0, roll = 0, yaw = lz.yaw;
-      if (t < L.touch) {
-        // in on a long descending approach, flaring over the LZ
-        const u = clamp((t - L.arrive) / (L.touch - L.arrive), 0, 1), e = 1 - Math.pow(1 - u, 2.4);
-        L.pos.set(lerp(L.from.x, lz.x, e), lerp(L.from.y, ground, Math.pow(e, 1.25)), lerp(L.from.z, lz.z, e));
-        pitch = -0.18 * Math.sin(Math.PI * u) - (u > 0.75 ? (u - 0.75) * 0.6 : 0); // nose up in the flare
-        yaw = lz.yaw + Math.PI * (1 - ease(u * 1.3)); // swings round to put its ramp to the yard
-      } else if (t < L.leave) {
-        L.pos.set(lz.x, ground + Math.max(0, (L.touch + 0.8 - t)) * 0.4, lz.z);
-      } else {
-        // up, nose down, and away over the hills
-        const s = t - L.leave;
-        L.pos.set(lz.x + s * s * 0.25 * (L.k - 1), ground + s * 5.5 + s * s * 0.8, lz.z + s * s * 2.2);
-        pitch = Math.min(0.16, s * 0.05);
-        roll = (L.k - 1) * Math.min(0.15, s * 0.04);
+      a.update(L.path, t, dt);
+      a.apply(grp, t, 1 + L.k);
+      // on its wheels: level, and squatting a little as the weight comes on
+      if (t >= L.touch && t < L.leave + 0.3) {
+        const w = smoother((t - L.touch) / 0.8) * (1 - smoother((t - L.leave) / 0.3));
+        grp.position.y = L.base - 0.06 * w;
+        grp.rotation.x *= 1 - w; grp.rotation.z *= 1 - w;
+        grp.updateMatrixWorld();
       }
-      grp.position.copy(L.pos);
-      grp.rotation.set(pitch, yaw, roll, 'YXZ');
-      grp.updateMatrixWorld();
       spinRotors(L, dt, 1, true);
-      // the ramp: down once it is on the ground, up again as it lifts
-      const want = t > L.touch + 0.5 && t < L.leave - 1.5 ? 1 : 0;
-      L.rampK = clamp(L.rampK + (want ? dt * 0.6 : -dt * 0.5), 0, 1);
-      L.ramp.rotation.x = lerp(L.rampUp, L.rampDown, ease(L.rampK)); // up in flight, down to the ground on it
-      // rotor wash: dust rolling out from under it near the ground
-      const hAGL = L.pos.y - gy;
-      if (hAGL < 16 && R() < dt * 26) {
-        const a = R() * Math.PI * 2, r = rand(4, 10);
-        fx.smokePuff(L.pos.x + Math.cos(a) * r, gy + 0.4, L.pos.z + Math.sin(a) * r, rand(2.2, 3.4), 0.12, rand(1.6, 2.6), 0.6);
-      }
+      // the ramp: down once the weight is on the wheels, shut again when everyone is in
+      let shut = 1;
+      if (t > L.touch + 0.8) shut = 1 - smoother((t - L.touch - 0.8) / 2.6);
+      const close = L.k === 0 ? T.doorClose + 0.4 : T.doorClose - 1 + L.k * 0.6;
+      if (t > close) shut = smoother((t - close) / 3.6);
+      this.setRamp(L, shut);
+      L.shut = shut;
+      this.rotorWash(L, dt);
       // lights: nav, strobe, and the red glow of the open ramp
       _v.copy(L.lights.port).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1, 6, 0.4, 0.3, 0.05);
       _v.copy(L.lights.stbd).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1, 0.3, 5, 0.8, 0.05);
       if (((t * 1.1 + L.k * 0.3) % 1) < 0.07) { _v.copy(L.lights.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.4, 8, 8, 8, 0.05); }
-      if (L.rampK > 0.2) { _v.set(0, -0.6, -5.2).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.6, 5 * L.rampK, 0.5, 0.25, 0.05); }
+      const open = 1 - shut;
+      if (open > 0.2) { _v.set(0, -0.6, -5.2).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.6, 5 * open, 0.5, 0.25, 0.05); }
       // the lead lifter's hold spills red light down the ramp onto the yard
       if (L.k === 0) {
-        if (L.rampK > 0.05 && !L.light) { L.light = fx.lights.acquire(); if (L.light) { L.light.color.setRGB(1, 0.16, 0.08); L.light.distance = 16; L.light.decay = 1.3; } }
+        if (open > 0.05 && !L.light) { L.light = fx.lights.acquire(); if (L.light) { L.light.color.setRGB(1, 0.16, 0.08); L.light.distance = 16; L.light.decay = 1.3; } }
         if (L.light) {
           _v.set(0, -0.4, -8).applyMatrix4(grp.matrixWorld);
-          L.light.position.copy(_v); L.light.intensity = 70 * L.rampK;
-          if (L.rampK <= 0.01 && t > L.leave) { fx.lights.release(L.light); L.light = null; }
+          L.light.position.copy(_v); L.light.intensity = 70 * open;
+          if (open <= 0.01 && t > close) { fx.lights.release(L.light); L.light = null; }
         }
       }
-      if (!L.loop && g.audio.ready && g.audio.B.rotor) L.loop = g.audio.loop(g.audio.B.rotor[1], { ref: 140, reverb: 0.35, rate: 0.95 + L.k * 0.05 });
-      if (L.loop) L.loop.update(L.pos.x, L.pos.y, L.pos.z, 0, 0, 0, L.k === 0 ? 2.4 : 1.6);
+      if (!L.loop && g.audio.ready) { const b = g.audio.rotorBuf(1); if (b) L.loop = g.audio.loop(b, { ref: 170, reverb: 0.4, rate: 0.96 + L.k * 0.05 }); }
+      if (L.loop) L.loop.update(a.pos.x, a.pos.y, a.pos.z, a.vel.x, a.vel.y, a.vel.z, L.k === 0 ? 3.4 : 2.4);
     }
   }
 
@@ -446,19 +632,17 @@ export class ExtractionScene {
     const alive = g.run ? g.run.survivors : 20;
     const nS = Math.min(this.troops.length, Math.max(6, Math.round(alive * 0.45)));
     const nC = Math.min(this.civs.length, Math.max(4, Math.round(alive * 0.35)));
-    this.runners = [];
-    const add = (f, soldier, k) => {
-      const L = k % 5 === 4 ? 1 + (k % 2) : 0; // most to the lead lifter (on camera), some to the others
-      const x = rand(-5, 5), z = rand(1.5, 7);
-      this.runners.push({ f, soldier, L, x, z, ph: R() * 6, sp: rand(4.2, 5.2) * (f.child ? 0.9 : 1), go: this.T.run - 1.2 + k * 0.62, state: 'wait', yaw: 0, wp: 0, bias: k % 2 ? 1 : -1 });
-      f.reset();
-      f.root.visible = false;
-    };
-    let k = 0;
     const order = [];
     for (let i = 0; i < nS; i++) order.push([this.troops[i], true]);
     for (let i = 0; i < nC; i++) order.splice(1 + ((i * 2.3) | 0) % (order.length + 1), 0, [this.civs[i], false]);
-    for (const [f, s] of order) add(f, s, k++);
+    // they have to be up the ramps before it shuts: the gap between them shrinks with their number
+    const gap = Math.min(0.55, 8.5 / order.length);
+    this.runners = order.map(([f, soldier], k) => {
+      const L = k % 5 === 4 ? 1 + (k % 2) : 0; // most to the lead lifter (on camera), some to the others
+      f.reset();
+      f.root.visible = false;
+      return { f, soldier, L, x: rand(-5, 5), z: rand(10, 17), ph: R() * 6, sp: rand(4.4, 5.4) * (f.child ? 0.9 : 1), go: this.T.run - 2.2 + k * gap, state: 'wait', yaw: 0, wp: 0, bias: k % 2 ? 1 : -1 };
+    });
   }
 
   updatePeople(dt) {
@@ -467,6 +651,8 @@ export class ExtractionScene {
       if (u.state === 'gone') continue;
       if (t < u.go) continue;
       const f = u.f, L = this.lifters[u.L];
+      // anyone still out when the ramp starts up is already on it, out of sight
+      if (t > this.T.doorClose + 0.6) { u.state = 'gone'; f.root.visible = false; continue; }
       if (u.state === 'wait') { u.state = 'run'; f.root.visible = true; }
       // the track out of the yard, then the ramp foot, then inside
       L.group.updateMatrixWorld();
@@ -493,6 +679,27 @@ export class ExtractionScene {
     }
   }
 
+  // ── the dead over the wall: once the garrison has left it, they come up it and run for the lifters ──
+  updateIntruders(dt) {
+    const g = this.g, h = g.horde, t = this.t, T = this.T;
+    if (t < T.run + 2 || t > T.away) return; // the garrison is off the wall: nothing holds them now
+    if (!h.overWall) {
+      h.overWall = (x) => { const L = LZ.reduce((b, l) => (Math.abs(l.x - x) < Math.abs(b.x - x) ? l : b), LZ[0]); return [L.x + rand(-9, 9), L.z + rand(-10, 4)]; };
+      h.pileMul = 5;
+      // the horde is at its cap by now: the far field (off camera from here on) makes room for the ones coming over
+      h.cull((x, z) => z < -85 && R() < 0.75);
+      for (let i = 0; i < 200; i++) h.spawn(R() < 0.55 ? ZT.RUNNER : ZT.SHAMBLER, rand(-70, 70), rand(-55, -12), 1, 1.25);
+    }
+    // a steady stream topping the wings, more as the scene goes on
+    this.intrudeAcc += dt * (6 + 12 * clamp((t - T.run - 2) / 14, 0, 1));
+    while (this.intrudeAcc >= 1) {
+      this.intrudeAcc -= 1;
+      const x = (R() < 0.5 ? -1 : 1) * (R() < 0.75 ? rand(10, 34) : rand(34, 62)); // mostly over the near wing sections, closest to the yard
+      const i = h.spawn(R() < 0.8 ? ZT.RUNNER : ZT.SHAMBLER, x, wallZ(x) - 0.6, 1, 1.2);
+      if (i >= 0) { const [tx, tz] = h.overWall(x, 0); h.goInside(i, tx, tz); }
+    }
+  }
+
   /** Space / Enter / Esc / click: first press offers to skip, the second skips. */
   skipPress() {
     if (!this.active) return;
@@ -515,8 +722,9 @@ export class ExtractionScene {
       if (c.radio) { const len = g.audio.radioVoice(c.who, c.text, 0.2); g.audio.radioStatic(Math.max(0.6, (len || c.dur) - 0.1)); } else g.audio.narrate(c.who, c.text, 0.05);
       this.showSub(c);
     }
-    if (!this.cues.find((c) => t >= c.at && t < c.at + c.dur + 0.5)) $('cine-sub').classList.remove('on');
+    if (!this.cues.find((c) => c.text && t >= c.at && t < c.at + c.dur + 0.5)) $('cine-sub').classList.remove('on');
     if (!this.titleOn && t >= this.titleAt) { this.titleOn = true; $('cine-title').classList.add('on'); }
+    for (let i = this.timers.length - 1; i >= 0; i--) if (t >= this.timers[i].at) { const f = this.timers[i].fn; this.timers.splice(i, 1); f(); }
 
     // the world goes on: the wall still fighting until the garrison leaves it
     const T = this.T;
@@ -527,24 +735,21 @@ export class ExtractionScene {
       for (const r of g.arsenal.riflemen || []) r.group.visible = false;
       g.audio.setMusicMode('victory');
     }
-    if (t > T.lift && !this.overrun) {
-      // nobody on the wall now: the dead come up it
-      this.overrun = true;
-      g.horde.pileMul = 5;
-      for (let i = 0; i < 380; i++) g.horde.spawn(R() < 0.5 ? ZT.RUNNER : ZT.SHAMBLER, rand(-70, 70), rand(-60, -14), 1, 1.2);
-    }
     if (onWall) g.arsenal.update(dt, g.time);
     g.horde.update(dt, g.time);
     this.updateBombers(dt);
     this.updateHelos(dt);
+    this.updateRockets(dt);
     this.updateLifters(dt);
     this.updatePeople(dt);
-    if (t < T.away && g.horde.n < g.horde.cap - 40 && R() < dt * 25) g.spawnMenuZombie(rand(-200, -120));
+    this.updateIntruders(dt);
+    if (t < T.ramp - 2 && g.horde.n < g.horde.cap - 40 && R() < dt * 25) g.spawnMenuZombie(rand(-200, -120));
 
     // the shot
     const s = this.shots.find((x) => t >= x.from && t < x.to) || this.shots[this.shots.length - 1];
     const st = t - s.from, k = clamp(st / Math.max(0.01, s.to - s.from), 0, 1);
-    const p = SHOTS[s.name](k, st, this);
+    this._snap = this.lastShot !== s; this.lastShot = s; // on a cut the follow cameras start on their target
+    const p = SHOTS[s.name](k, st, this, rdt);
     if (p.ground !== undefined) p.pos.y = groundH(p.pos.x, p.pos.z) + p.ground;
     // hand-held: a little drift always, a jolt with every blast
     this.shake = Math.max(0, this.shake - rdt * 1.6);
@@ -590,17 +795,21 @@ export class ExtractionScene {
     this.active = false;
     const g = this.g;
     g.audio.stopVoice();
+    g.audio.setCine(false);
+    this.timers = [];
     for (const r of this.bomberRuns || []) { r.b.group.visible = false; if (r.loop) r.loop.stop(1); r.loop = null; }
     for (const m of this.bombPool || []) m.visible = false;
+    for (const r of this.rockets || []) { r.on = false; r.m.visible = false; }
     for (const h of this.helos || []) { h.group.visible = false; h.beam.visible = false; if (h.loop) h.loop.stop(1); h.loop = null; if (h.light) g.fx.lights.release(h.light); h.light = null; }
     for (const L of this.lifters || []) { L.group.visible = false; if (L.loop) L.loop.stop(1); L.loop = null; if (L.light) g.fx.lights.release(L.light); L.light = null; }
     g.ending.restoreGun();
     for (const u of this.runners || []) u.f.root.visible = false;
     for (const r of g.arsenal.riflemen || []) r.group.visible = true;
     g.arsenal.endNight();
+    g.horde.overWall = null;
     g.horde.pileMul = this.pileMul0 ?? g.horde.pileMul;
     g.horde.clearLiving();
-    this.wallLeft = false; this.overrun = false;
+    this.wallLeft = false;
     g.post.u.uFade.value = 1;
     $('cine-sub').classList.remove('on');
     $('cine-title').classList.remove('on');

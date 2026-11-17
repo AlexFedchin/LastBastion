@@ -151,13 +151,17 @@ export class Environment {
       this.scene.add(s.root);
       return s;
     });
-    // ammo crates
-    const crate = modelMesh('crate');
-    if (crate && this.roofCrates && this.roofCrates.length) {
-      const im = new THREE.InstancedMesh(crate.geometry, crate.material, this.roofCrates.length);
-      this.roofCrates.forEach(([x, y, z, ry], j) => im.setMatrixAt(j, m.compose(p.set(x, y, z), q.setFromEuler(e.set(0, ry, 0)), s.set(1, 1, 1))));
-      im.castShadow = true; im.receiveShadow = true;
-      this.scene.add(im);
+    // ammo crates: the weapons crate model (every mesh of it), stacked on the roof
+    if (this.roofCrates && this.roofCrates.length) {
+      const src = modelScene('mcrate');
+      src.updateMatrixWorld(true);
+      src.traverse((o) => {
+        if (!o.isMesh) return;
+        const im = new THREE.InstancedMesh(o.geometry, o.material, this.roofCrates.length);
+        this.roofCrates.forEach(([x, y, z, ry], j) => im.setMatrixAt(j, m.compose(p.set(x, y, z), q.setFromEuler(e.set(0, ry, 0)), s.set(1, 1, 1)).multiply(o.matrixWorld)));
+        im.castShadow = true; im.receiveShadow = true;
+        this.scene.add(im);
+      });
     }
     // the kit: everything the builders asked for in this.kit (name -> [Matrix4]), one instanced
     // mesh per prop and material; only what is big enough to matter casts a shadow

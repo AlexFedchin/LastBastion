@@ -259,9 +259,11 @@ export class Horde {
     this.pileJit = F();
     this.fadeIn = F();
     this.seek = F(); // countdown to looking for a mound to join (99 = already heading to one)
+    this.inside = new Uint8Array(N); // over the wall and in the yard (only in the extraction: overWall)
+    this.overWall = null; // the extraction sets (x, z) -> [tx, tz]: climbers drop into the yard and run there
     this._arrays = [this.seek, this.id, this.x, this.y, this.z, this.yaw, this.hp, this.maxHp, this.speed, this.rate, this.phase, this.lean,
       this.scale, this.radius, this.weight, this.tgtX, this.tgtZ, this.flash, this.burn, this.burnDps, this.atk, this.climb,
-      this.climbDur, this.slow, this.tr, this.tg, this.tb, this.type, this.dead, this.pileJit, this.fadeIn];
+      this.climbDur, this.slow, this.tr, this.tg, this.tb, this.type, this.dead, this.pileJit, this.fadeIn, this.inside];
 
     // mounds against the wall (see PILE): position along the wall (m from the tower corner) per side
     const P = PILE.MAX;
@@ -378,7 +380,7 @@ export class Horde {
     this.alive++;
     this.id[i] = this.nextId++;
     this.type[i] = type;
-    this.dead[i] = 0;
+    this.dead[i] = 0; this.inside[i] = 0;
     this.x[i] = x; this.z[i] = z; this.y[i] = 0;
     const sc = rand(T.scale[0], T.scale[1]);
     this.scale[i] = sc;
@@ -551,8 +553,25 @@ export class Horde {
     if (!flying) this.fx.blood(x, z, 0.8 * s);
   }
 
+  /** Quietly remove the living for which keep(x, z) is false (no corpses): room for a cutscene's own crowd. */
+  cull(drop) {
+    for (let i = 0; i < this.n; i++) if (!this.dead[i] && drop(this.x[i], this.z[i])) { this.dead[i] = 1; this.alive--; }
+    this.compact();
+  }
+
+  /** One of them is in the yard (the extraction): off the wall top and running for (tx, tz). */
+  goInside(i, tx, tz) {
+    const x = this.x[i];
+    this.inside[i] = 1;
+    this.z[i] = wallZ(x) + (Math.abs(x) <= WORLD.GATE_HALF ? 1.2 : 1.2 / WING_COS);
+    this.y[i] = WORLD.WALL_H + 0.6;
+    this.tgtX[i] = tx; this.tgtZ[i] = tz;
+    this.climb[i] = 0;
+  }
+
   breach(i) {
     if (this.dead[i]) return;
+    if (this.overWall) { const [tx, tz] = this.overWall(this.x[i], this.z[i]); this.goInside(i, tx, tz); return; }
     this.dead[i] = 1;
     this.alive--;
     // the men on the walkway fight back and shove the pile down before they fall
@@ -771,6 +790,7 @@ export class Horde {
         if (this.burn[i] <= 0) this.burnDps[i] = 0;
       }
 
+      if (this.inside[i]) { this.updateInside(i, dt, time, gs); continue; }
       let dist = wallDist(x, z);
       // burning fuel on the ground / wire
       if (ctx.fireAt) {
@@ -927,6 +947,21 @@ export class Horde {
     this.compact();
     this.buildGrid();
     this.corpses.update(dt);
+  }
+
+  /** In the yard: drop off the wall, then a straight run at the target, clawing when there. */
+  updateInside(i, dt, time, gs) {
+    let x = this.x[i], z = this.z[i];
+    const dx = this.tgtX[i] - x, dz = this.tgtZ[i] - z, dd = Math.sqrt(dx * dx + dz * dz);
+    const Y = this.y[i];
+    if (Y > 0) this.y[i] = Math.max(0, Y - dt * (Y > WORLD.WALL_H * 0.5 ? 4 : 11)); // over the parapet, then the drop
+    const sp = Math.max(2.6, this.speed[i] * 1.6) * gs * (this.y[i] > 3 ? 0.35 : 1) * (0.8 + 0.2 * Math.abs(Math.sin(time * this.rate[i] + this.phase[i])));
+    if (dd > 1.5) { x += dx / dd * sp * dt; z += dz / dd * sp * dt; }
+    this.x[i] = x; this.z[i] = z;
+    const want = dd > 0.05 ? Math.atan2(dx, dz) : this.yaw[i];
+    let dy = want - this.yaw[i]; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    this.yaw[i] += dy * (1 - Math.exp(-6 * dt));
+    this.atk[i] += ((dd < 3 || this.y[i] > 1 ? 1 : 0) - this.atk[i]) * (1 - Math.exp(-5 * dt));
   }
 
   compact() {

@@ -495,6 +495,18 @@ loop('amb/flies', 46938, 2, 22, ch=1)
 loop('amb/lamp', 553075, 2, 8, ch=1, X=1.0)
 loop('amb/radio_static', 50750, 40, 10, ch=1, sr=22050, X=1.0, bp=(1200, 0.7))
 
+# ── the extraction's helicopters (2026-11-17): real rotors in place of the synthesized ones ──
+# the gunships: a UH-60's steady slap from a long take; the lifters: an overhead pass, slowed
+# a fifth for the CH-47's heavier, slower blades
+loop('sfx/heli_a', 156678, 9.0, 9.0, X=1.2, sr=32000, ch=1, target=-18, hp=40)
+loop('sfx/heli_b', 573942, 30.0, 10.0, X=1.5, sr=32000, ch=1, target=-18, rate=0.8, hp=30, lp=6000)
+# the AH-64's 30 mm chain gun: single rounds cut from an autocannon burst, fired one by one at ~10 a second
+for k, ss in enumerate((0.0, 0.276, 0.551)):
+    clip(f'sfx/chain_{k + 1}', 854186, ss, 0.26 if k < 2 else 0.8, fi=0.001, fo=0.12 if k < 2 else 0.5, hp=60, target=-12)
+# 2.75 in rockets leaving the pods
+clip('sfx/rocket_1', 857959, 0.0, 2.6, fi=0.002, fo=1.2, hp=50, target=-13)
+clip('sfx/rocket_2', 854476, 0.0, 2.2, fi=0.002, fo=1.0, hp=50, target=-13)
+
 # ── score ────────────────────────────────────────────────────────────────────
 music('music/menu', 'Night Vigil', -19)
 music('music/night_bed_1', 'Echoes of Time v2', -21)

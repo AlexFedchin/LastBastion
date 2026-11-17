@@ -655,31 +655,40 @@ export const ENDING = [
 // and the night can be fought again.
 export const EXTRACTION = {
   souls: 15,                 // alive at the start of night 10
-  hold: 210,                 // seconds from the start of the night until the flight is overhead
-  overrun: 80,               // the last seconds: everything comes over the ridge at once
-  overrunRate: 13,           // extra dead a second through the overrun
+  hold: 300,                 // seconds from the start of the night until the flight is overhead
+  overrun: 115,              // the last seconds: everything comes over the ridge at once
+  overrunRate: 19,           // extra dead a second through the overrun (ramping up to 1.6x)
+  surges: [235, 175],        // seconds left: a flank surge each, before the overrun
+  surgeSize: 80,
   // [seconds before the flight arrives (or 'start'), who, text]
   lines: [
     ['start', CALL.kovac, 'Seventy-two hours. This is the last night. Whatever comes down that valley — we are still here.'],
-    [196, CALL.nightingale, 'Bastion-7, Nightingale. Extraction flight is airborne, three lifters and escort. Hold that wall until we are overhead.'],
-    [120, CALL.nightingale, 'Nightingale, two minutes out. Hammer flight is with us. Keep them off that wall, Bastion.'],
-    [82, CALL.kovac, 'They know. God help us, they know we are leaving. Everything is coming over that ridge — hold!'],
+    [288, CALL.nightingale, 'Bastion-7, Nightingale. Extraction flight is airborne, three lifters and escort. Hold that wall until we are overhead.'],
+    [128, CALL.nightingale, 'Nightingale, two minutes out. Hammer flight is with us. Keep them off that wall, Bastion.'],
+    [112, CALL.kovac, 'They know. God help us, they know we are leaving. Everything is coming over that ridge — hold!'],
     [40, CALL.reaper, 'Bastion-7, Reaper one-one, inbound with the lifters. Forty seconds. Just hold on.'],
     [12, CALL.nightingale, 'Ten seconds, Bastion. Get your heads down.'],
   ],
 };
 
-// The extraction cutscene, voiced like ENDING (same fields). Shots: see SHOTS in extraction.js.
+// The extraction cutscene, voiced like ENDING (same fields), plus silent beats ({ hold: s })
+// that only hold a shot. Shots: see SHOTS in extraction.js.
 export const EXTRACT_ENDING = [
-  { shot: 'overrun', who: CALL.nightingale, radio: true, gap: 0.6, text: 'Bastion-7, Nightingale. We are over the ridge. Hammer flight, you are cleared hot. Everything past the wire.' },
-  { who: CALL.kovac, radio: true, text: 'Bring it down on them! Everyone off the wall — get your heads down!' },
-  { shot: 'bombers', who: CALL.hammer, radio: true, gap: 0.4, text: 'Hammer flight, in hot. Walking it up the valley. Bombs away, bombs away.' },
-  { shot: 'helos', who: CALL.reaper, radio: true, gap: 3.2, text: 'Reaper one-one, on station. We have the wall. Anything that moves down there is ours.' },
-  { shot: 'lz', who: CALL.nightingale, radio: true, gap: 1.6, text: 'Nightingale is on the ground. Ramp is down. Move, move, move!' },
+  { shot: 'bombersIn', who: CALL.nightingale, radio: true, gap: 1.8, text: 'Bastion-7, Nightingale. We are over the ridge. Hammer flight, you are cleared hot. Everything past the wire.' },
+  { who: CALL.hammer, radio: true, gap: 0.5, text: 'Hammer flight, in hot. Walking it up the valley. Bombs away, bombs away.' },
+  { shot: 'bombing', who: CALL.kovac, radio: true, gap: 0.4, text: 'Bring it down on them! Everyone off the wall — get your heads down!' },
+  { hold: 4.2, gap: 0 },
+  { shot: 'helosIn', who: CALL.reaper, radio: true, gap: 0.9, text: 'Reaper one-one, on station. We have the wall. Anything that moves down there is ours.' },
+  { shot: 'helosFire', hold: 6.5, gap: 0.3 },
+  { shot: 'liftersIn', hold: 7.5, gap: 0 },
+  { shot: 'landing', hold: 6.2, gap: 0 },
+  { who: CALL.nightingale, radio: true, gap: 0, text: 'Nightingale is on the ground. Ramp is down. Move, move, move!' },
   { shot: 'run', who: CALL.narrator, gap: 0.6, text: 'For ten nights we had held that wall. Now we ran from it, past the fires, toward the red light at the back of the ramp.' },
   { shot: 'ramp', who: CALL.kovac, radio: true, gap: 0.8, text: "That's everyone. Bastion-7 is off the wall. Go, go!" },
-  { shot: 'liftoff', who: CALL.narrator, gap: 1.2, text: 'We left the gun on the wall, still pointed down the valley. By the time we cleared the ridge, the dead were on the walkway where we had stood.' },
-  { shot: 'away', who: CALL.narrator, gap: 1.0, text: 'Command had called us Bastion-7. The people we carried out of that valley called it something else. They called it the Last Bastion.', title: true },
+  { shot: 'doorClose', hold: 4.4, gap: 0.3 },
+  { shot: 'liftoff', who: CALL.narrator, gap: 0.6, text: 'We left the gun on the wall, still pointed down the valley. By the time we cleared the ridge, the dead were on the walkway where we had stood.' },
+  { shot: 'helosLeave', hold: 7, gap: 0.6 },
+  { shot: 'away', who: CALL.narrator, gap: 0.4, text: 'Command had called us Bastion-7. The people we carried out of that valley called it something else. They called it the Last Bastion.', title: true },
   { who: CALL.narrator, gap: 2.0, text: 'And for seventy-two hours... it held.' },
 ];
 
@@ -713,7 +722,7 @@ export function allRadioLines() {
   }
   for (const t of chronicleLines()) add(CALL.narrator, t);
   for (const c of ENDING) add(c.who, c.text);
-  for (const c of EXTRACT_ENDING) add(c.who, c.text);
+  for (const c of EXTRACT_ENDING) if (c.text) add(c.who, c.text);
   for (const [, w, t] of EXTRACTION.lines) add(w, t);
   return out;
 }

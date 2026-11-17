@@ -90,26 +90,15 @@ export function buildProps(env) {
     if (burnt && rng() < 0.35) fire.add(x, groundH(x, z) + 0.9, z, 1.0, 1.4, 1.5, { smoke: 0.8, embers: 0.6 });
   }
 
-  // ── czech hedgehogs (L-section beams) ────────────────────────────────────
-  const beamL = (rx, rz) => merge([
-    xf(new THREE.BoxGeometry(0.2, 2.6, 0.03), 0, 0, -0.085, rx, 0, rz),
-    xf(new THREE.BoxGeometry(0.03, 2.6, 0.2), -0.085, 0, 0, rx, 0, rz),
-  ]);
-  const hedgeGeo = merge([
-    xf(beamL(0, 0), 0, 0, 0, 0.955, 0, 0),
-    xf(beamL(0, 0), 0, 0, 0, 0.955, Math.PI * 2 / 3, 0),
-    xf(beamL(0, 0), 0, 0, 0, 0.955, Math.PI * 4 / 3, 0),
-  ]);
-  hedgeGeo.rotateX(0); // keep
-  const hedgeMs = [];
+  // ── czech hedgehogs (app/models/hedgehog.glb), each lying as it was dropped ──
   for (let i = 0; i < 46; i++) {
     const x = (rng() - 0.5) * 230, zz = -32 - rng() * 190;
     if (wallDist(x, zz) < 20 || Math.abs(x - roadX(zz)) < 4.5) continue;
-    _q.setFromEuler(new THREE.Euler((rng() - 0.5) * 0.25, rng() * 6.28, (rng() - 0.5) * 0.25));
-    _m.compose(_v.set(x, groundH(x, zz) + 0.75, zz), _q, _s.set(1, 1, 1));
-    hedgeMs.push(_m.clone());
+    const o = new THREE.Object3D();
+    o.rotation.set((rng() - 0.5) * 0.25, rng() * 6.28, (rng() - 0.5) * 0.25);
+    o.position.set(x, groundH(x, zz) - 0.05, zz);
+    placeModel(env, 'hedgehog', o);
   }
-  scene.add(instanced(hedgeGeo, mats.steel, hedgeMs));
 
   // ── wire fence lines in the field (broken, sagging) ──────────────────────
   const coilGeo = concertinaGeo(3, 0.45, 0.16, 0.007);

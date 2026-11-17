@@ -6,11 +6,11 @@ import { MeshoptDecoder } from 'three/examples/jsm/libs/meshopt_decoder.module.j
 const FILES = {
   m2hb: 'models/m2hb.glb', ac130: 'models/ac130.glb', b36: 'models/b36.glb',
   soldier: 'models/soldier.glb', survivor_man: 'models/survivor_man.glb', survivor_woman: 'models/survivor_woman.glb',
-  survivor_man2: 'models/survivor_man2.glb', survivor_child: 'models/survivor_child.glb', grenade: 'models/grenade.glb', molotov: 'models/molotov.glb', crate: 'models/crate.glb', sandbags: 'models/sandbags.glb',
+  survivor_man2: 'models/survivor_man2.glb', survivor_child: 'models/survivor_child.glb', grenade: 'models/grenade.glb', molotov: 'models/molotov.glb', sandbags: 'models/sandbags.glb',
   // vehicles and field props (scripts/models/build_vehicles.mjs)
   ch47: 'models/ch47.glb', apache: 'models/apache.glb', ural: 'models/ural.glb', ural_burnt: 'models/ural_burnt.glb',
   heliwreck: 'models/heliwreck.glb', container: 'models/container.glb', bale: 'models/bale.glb', bomb: 'models/bomb.glb',
-  house: 'models/house.glb', mcrate: 'models/mcrate.glb',
+  house: 'models/house.glb', mcrate: 'models/mcrate.glb', church: 'models/church.glb', hedgehog: 'models/hedgehog.glb',
 };
 /** The wrecked cars on the roads, each its own model (long axis +x, base at 0). */
 export const CARS = ['car_sedan', 'car_police', 'car_police_flip', 'car_hatch', 'car_saloon'];

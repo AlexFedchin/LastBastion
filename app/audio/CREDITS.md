@@ -35,6 +35,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Horrific Zombie Growl](https://freesound.org/people/MrPokephile/sounds/133974/) | MrPokephile | groan |
 | [Distant Boom.wav](https://freesound.org/people/Henrythetrain/sounds/142598/) | Henrythetrain | boom_far |
 | [Muffled Distant Explosion](https://freesound.org/people/NenadSimic/sounds/149966/) | NenadSimic | boom_far |
+| [blackhawk.wav](https://freesound.org/people/John%20Sipos/sounds/156678/) | John%20Sipos | heli_a |
 | [Halloween - Graveyard At Night Howling Wind.mp3](https://freesound.org/people/mistersherlock/sounds/159509/) | mistersherlock | wind_howl |
 | [Air Defense Artillery Avenger Training .50cal (tH4YBTw8vk8).flac](https://freesound.org/people/qubodup/sounds/160355/) | qubodup | hmg, hmg_tail |
 | [Agony](https://freesound.org/people/Mediapaja2009/sounds/162157/) | Mediapaja2009 | burn |
@@ -116,6 +117,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Foley_Mechanism_Light_Buzz_Short_Loop_Mono_DR05.wav](https://freesound.org/people/Nox_Sound/sounds/553075/) | Nox_Sound | lamp |
 | [Zombie Growl 5.wav](https://freesound.org/people/tonsil5/sounds/555417/) | tonsil5 | groan |
 | [Zombie Hit 1.wav](https://freesound.org/people/tonsil5/sounds/555420/) | tonsil5 | flesh |
+| [Helicopter good overhead pass 77mel 190918.flac](https://freesound.org/people/TRP/sounds/573942/) | TRP | heli_b |
 | [Distant Thunder 3](https://freesound.org/people/Fission9/sounds/581124/) | Fission9 | thunder |
 | [Distant Thunder 4](https://freesound.org/people/Fission9/sounds/581125/) | Fission9 | thunder |
 | [Ammo Box, Open-Close, Moving Handle.wav](https://freesound.org/people/DanielPickens/sounds/586544/) | DanielPickens | ui_buy |
@@ -140,8 +142,11 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [St Peters Church, Kinver - Distant Tolling Bell](https://freesound.org/people/TicAshfield/sounds/824588/) | TicAshfield | bell |
 | [Factory Warning Buzzer](https://freesound.org/people/qubodup/sounds/832414/) | qubodup | klaxon |
 | [Bullet casings falling](https://freesound.org/people/barryshamir/sounds/834236/) | barryshamir | casing |
+| [Autocannon Three Shot Burst](https://freesound.org/people/qubodup/sounds/854186/) | qubodup | chain |
+| [M142 HIMARS Rocket Launch 8](https://freesound.org/people/qubodup/sounds/854476/) | qubodup | rocket |
 | [Distant Machine Gun Firing](https://freesound.org/people/qubodup/sounds/854635/) | qubodup | distant_mg |
 | [Pulling and Releasing Barrett M82A1 Charging Handle to Load Round 2](https://freesound.org/people/qubodup/sounds/855599/) | qubodup | charge |
+| [Rocket Launch](https://freesound.org/people/gracenew/sounds/857959/) | gracenew | rocket |
 | [torturedscream](https://freesound.org/people/mr-str4nger.d4nger/sounds/863442/) | mr-str4nger.d4nger | burn |
 | [Anguished Zombie Moans 02](https://freesound.org/people/MalikArsYasakani/sounds/876576/) | MalikArsYasakani | burn |
 

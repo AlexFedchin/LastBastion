@@ -17,7 +17,7 @@ meshopt-compressed.
 | `survivor_child.glb` | Child ("Leo") | _TODO_ | _TODO_ | _TODO_ |
 | `grenade.glb` | Hand grenade, pin and ring | _TODO_ (Sketchfab) | _TODO_ | _TODO_ |
 | `molotov.glb` | Molotov bottle with rag | _TODO_ (Sketchfab) | _TODO_ | _TODO_ |
-| `crate.glb` | Wooden ammunition crate | _TODO_ | _TODO_ | _TODO_ |
+| `crate.glb` | Wooden ammunition crate (no longer used: the weapons crate replaced it) | _TODO_ | _TODO_ | _TODO_ |
 | `sandbags.glb` | Two scanned sandbag piles ("Low poly Sandbag" 01, 02) | _TODO_ | _TODO_ | _TODO_ |
 | `car_sedan.glb` | Rusted, stripped sedan (Car-1) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | CC BY 4.0 |
 | `car_police.glb`, `car_police_flip.glb` | Burnt police sedan, upright and on its roof (Car-2) | [Sketchfab](https://sketchfab.com/kryik1023) | Renafox | CC BY 4.0 |
@@ -30,7 +30,9 @@ meshopt-compressed.
 | `bale.glb` | Round hay bale | [Sketchfab](https://sketchfab.com/FrodoUndead) | FrodoUndead | CC BY 4.0 |
 | `bomb.glb` | General-purpose aircraft bomb: the B-36s' sticks and the air strike | [Sketchfab](https://sketchfab.com/Youssef.Loukili) | Youssef.Loukili | CC BY 4.0 |
 | `house.glb` | Single-storey house: the farmhouses and the village houses | [Sketchfab: House](https://sketchfab.com/3d-models/house-cfaf9a6c3a304dd9948044f8a63e391f) | Mateusz Woliński | CC BY 4.0 |
-| `mcrate.glb` | Weapons crate: what each man of the recovery team carries home | [Sketchfab: Weapons Crate](https://sketchfab.com/3d-models/weapons-crate-6597d3858df94da698ece8e0038f50b7) | Sousinho | CC BY 4.0 |
+| `mcrate.glb` | Weapons crate: what each man of the recovery team carries home, the supply drop's load, the stacks on the nest roof | [Sketchfab: Weapons Crate](https://sketchfab.com/3d-models/weapons-crate-6597d3858df94da698ece8e0038f50b7) | Sousinho | CC BY 4.0 |
+| `church.glb` | The village church and its bell tower, on the far hills | [Sketchfab: Church](https://sketchfab.com/3d-models/church-867a847b67364484bf44912e1af190af) | Tiago Lopes | CC BY 4.0 |
+| `hedgehog.glb` | Czech hedgehogs in the killing field | [Sketchfab: Rusted Czech Hedgehog](https://sketchfab.com/3d-models/rusted-czech-hedgehog-cfa712e8851a4881989ea890bfc6910e) | GrostyBoi | CC BY 4.0 |
 
 ## What was changed
 
@@ -77,6 +79,11 @@ meshopt-compressed.
   - House: the ground plane dropped, scaled to 12 m, the roof a node of its own so burnt-out houses can stand
     open; simplified to ~5k triangles.
   - Weapons crate: scaled to 0.9 m long, ~1.5k triangles.
+  - Church: the interior (pews, altar, candles, chalices) and the ground plate dropped, scaled up by half to a
+    village church (12.6 x 18.8 m tall), ~3.8k triangles.
+  - Czech hedgehog: scaled to 2.1 m across, simplified to ~1.8k triangles, a light night grade and rust.
+  - CH-47 (second pass): the whole rear ramp is now a node hinged at the cabin floor, so it lowers to the ground and
+    shuts; its treadway boards are a child node that slides back up it.
   - Night grade: every colour texture is darkened and desaturated in the build so the models sit in the night
     scene. The car wrecks, the burnt Ural, the crashed helicopter and the containers also get rust laid over
     them from ambientCG's CC0 [Rust009](https://ambientcg.com/a/Rust009) (colour), with

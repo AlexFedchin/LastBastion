@@ -28,6 +28,7 @@ const SFX = {
   flare_launch: [0, 44100], flare_ignite: [0, 32000], throw: [2, 32000], heartbeat: [0, 22050],
   grenade_pin: [0, 44100], grenade_spoon: [0, 44100], glass: [3, 44100], molotov_whoosh: [0, 32000],
   tinnitus: [0, 32000], crow: [5, 32000], bell: [0, 32000], dog: [3, 22050], distant_mg: [4, 22050],
+  heli_a: [0, 32000], heli_b: [0, 32000], chain: [3, 44100], rocket: [2, 44100],
 };
 const BEDS = {
   rain_far: 32000, rain_near: 32000, wind: 32000, wind_howl: 32000, fire_roar: 32000, fire_crackle: 32000, fire_pool: 32000,
@@ -323,6 +324,7 @@ export class AudioEngine {
       this.B.jet = [makeJet(ctx)];
       // helicopters (the extraction): the gunships' quick slap, the lifters' slow deep one
       this.B.rotor = [makeRotor(ctx, { rate: 19, seed: 1, depth: 0.8 }), makeRotor(ctx, { rate: 9.5, seed: 2, depth: 1.6 })];
+
       this.B.power_down = [makePower(ctx, false)];
       this.B.power_up = [makePower(ctx, true)];
       // one take per GAU burst length the gunship fires
@@ -341,7 +343,7 @@ export class AudioEngine {
     this.master.gain.setTargetAtTime(this.settings.master * OUTPUT_TRIM, t, 0.05);
     this.music.gain.setTargetAtTime(this.settings.music * MUSIC_TRIM, t, 0.05);
     this.sfx.gain.setTargetAtTime(this.settings.sfx, t, 0.05);
-    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM, t, 0.05);
+    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM * (this._cine ? 1.35 : 1), t, 0.05);
   }
 
   /** Outdoor impulse response: the wall and bunker up close, the valley sides
@@ -788,6 +790,42 @@ export class AudioEngine {
     this.play(this.B.gau_hits[k], { x: tx, z: tz, gain: 1.0, rate: 1.2, ref: 60, sos: true, delay: 0.15, reverb: 0.4, force: true, duration: 1.0, fadeOut: 0.2 });
   }
 
+  /** A rotor loop: 0 the gunships', 1 the lifters'. The recordings once loaded, else the synthesized ones. */
+  rotorBuf(k) {
+    const r = k ? this.B.heli_b : this.B.heli_a;
+    return (r && r[0]) || (this.B.rotor && this.B.rotor[k]) || null;
+  }
+
+  /** One round from an AH-64's 30 mm chain gun (about ten a second): a heavy, spaced thud, not the GAU's buzz. */
+  chainShot(x, y, z, last = false) {
+    if (!this.ready || !this.B.chain || !this.B.chain.length) return;
+    const b = last ? this.B.chain[2] || this.B.chain[0] : this.B.chain[(Math.random() * Math.min(2, this.B.chain.length)) | 0];
+    this.play(b, { x, y, z, gain: 1.5, rate: rand(0.9, 1.0), ref: 140, sos: true, reverb: last ? 0.6 : 0.35, force: true, key: 'chain', max: 6 });
+  }
+
+  /** A 30 mm HEDP round landing: a small sharp blast. */
+  chainHit(x, z) {
+    this.play(this.pickVar('boom'), { gain: 0.38, rate: rand(1.5, 1.9), x, z, ref: 60, sos: true, reverb: 0.25, key: 'chainhit', max: 5 });
+  }
+
+  /** A 2.75 in rocket leaving its pod: the motor's roar going away. */
+  rocketLaunch(x, y, z) {
+    if (!this.ready || !this.B.rocket || !this.B.rocket.length) return;
+    this.play(this.pickVar('rocket'), { x, y, z, gain: 1.7, rate: rand(0.95, 1.1), ref: 150, sos: true, reverb: 0.5, force: true });
+  }
+
+  /**
+   * The cutscenes: the world mix up front (the score's victory snapshot would sit it back)
+   * and the voice a little higher, so the radio carries over the bombs and the rotors.
+   */
+  setCine(on) {
+    this._cine = !!on;
+    if (!this.ready) return;
+    const t = this.ctx.currentTime;
+    this.snap.gain.setTargetAtTime(on ? 1.35 : (SNAP[this.musicMode] ?? 1), t, 0.6);
+    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM * (on ? 1.35 : 1), t, 0.3);
+  }
+
   /** A heavier 25 mm HE round on the ground (layered on the burst's crackle now and then). */
   gunshipImpact(x, z) {
     this.play(this.pickVar('boom'), { gain: 0.45, rate: rand(1.3, 1.7), x, z, ref: 55, sos: true, reverb: 0.3, key: 'gsi', max: 6 });
@@ -993,7 +1031,7 @@ export class AudioEngine {
     if (!this.ready || (prev === mode && !force)) return;
     const T = this.tracks;
     const only = (keep) => { for (const [k, tr] of Object.entries(T)) if (!keep.includes(k)) tr.set(0, 1.4); };
-    this.snap.gain.setTargetAtTime(SNAP[mode] ?? 1, this.ctx.currentTime, 1.2);
+    this.snap.gain.setTargetAtTime(this._cine ? 1.35 : (SNAP[mode] ?? 1), this.ctx.currentTime, 1.2);
     if (mode === 'menu') { only(['menu']); T.menu.set(1.2, 2.5); }
     else if (mode === 'night') {
       this.tide = false; this._tideOn = false; this._mi = 0;

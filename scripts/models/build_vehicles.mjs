@@ -237,24 +237,28 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     const Minv = M.clone().invert();
     xformAll(doc, M);
     const root = rootNode(doc, 'ch47');
-    // the ramp is modelled lowered to level, its top welded into the cabin floor, so it
-    // stays put (lifters fly ramp-level); what moves are the two treadway boards on its
-    // tip, which reach down to the ground: node 'ramp', hinged at their root, laid level
-    const hinge = P(0.25, 5.35, -76.65);
-    const drop = Math.atan2(5.35 - 1.3, 97.8 - 76.65); // the boards' slope as modelled
-    splitByTriangles(doc, (tri) => tri.every((v) => new THREE.Vector3(...v).applyMatrix4(Minv).z < -76.4) ? 0 : -1, [{ name: 'ramp', pivot: hinge.toArray() }], root);
-    const ramp = doc.getRoot().listNodes().find((n) => n.getName() === 'ramp');
-    transformMesh(ramp.getMesh(), new THREE.Matrix4().makeRotationX(drop).elements); // level at rotation 0; lowered at -drop
+    // the ramp is modelled lowered, its boards on the ground. The whole ramp (everything
+    // aft of the cabin floor's end and below the floor line) is node 'ramp', hinged at the
+    // floor's end: rotation 0 is down as modelled, +rampShut closes it against the tail
+    const RZ = -50, RY = 15, RX = 13;
+    const hinge = P(0.25, 9, RZ), boardsAt = P(0.25, 1.3, -76.4);
+    const inRamp = (c) => c.z < RZ && c.y < RY && Math.abs(c.x - 0.25) < RX;
+    // the treadway boards first (they slide back up the ramp as it shuts), then the ramp
+    splitByTriangles(doc, (tri) => { const c = centre3(tri).applyMatrix4(Minv); return inRamp(c) && c.z < -76.4 ? 0 : -1; }, [{ name: 'boards', pivot: boardsAt.toArray() }], root);
+    splitByTriangles(doc, (tri) => inRamp(centre3(tri).applyMatrix4(Minv)) ? 0 : -1, [{ name: 'ramp', pivot: hinge.toArray() }], root);
+    const nodes = doc.getRoot().listNodes(), rampN = nodes.find((n) => n.getName() === 'ramp'), boardsN = nodes.find((n) => n.getName() === 'boards');
+    root.removeChild(boardsN);
+    rampN.addChild(boardsN.setTranslation(boardsAt.clone().sub(hinge).toArray()));
     // rotors (whole meshes): fore = Object_6 + 9, aft = Object_7 + 8
     pivotGroup(doc, root, 'rotor_fore', (n) => n === 'Object_6' || n === 'Object_9');
     pivotGroup(doc, root, 'rotor_aft', (n) => n === 'Object_7' || n === 'Object_8');
     anchors(doc, {
-      rampFoot: P(0.25, 1.0, -98), inside: P(0.25, 6, -40),
+      rampFoot: P(0.25, 1.0, -98), inside: P(0.25, 6, -40), rampAxis: boardsAt.clone().sub(hinge).normalize(),
       lightPort: P(26, 12, 4), lightStbd: P(-25, 12, 4), lightTail: P(0.4, 72, -86), hold: P(0.25, 20, -70),
     });
     await grade(doc, { dark: 0.68, sat: 0.7 });
     await texWebp(doc, 2048);
-    console.log('ch47 scale', s.toFixed(4), 'ramp drop', drop.toFixed(3), 'tris', triCount(doc));
+    console.log('ch47 scale', s.toFixed(4), 'tris', triCount(doc));
     await finish(doc, 'ch47.glb', { ratio: 0.8, error: 0.001 });
   }
 
@@ -426,5 +430,40 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     await finish(doc, 'mcrate.glb', { ratio: Math.min(1, 1500 / triCount(doc)), error: 0.002 });
   }
 
-  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate };
+  // ── the village church: nave and bell tower, 16 m, base at 0. The interior
+  // (pews, altar, candles, chalices) and the ground plate are dropped: it is seen
+  // from the wall, half a kilometre off. Grade like the houses.
+  async function church() {
+    const doc = await readRigid(V('Church.glb'));
+    const drop = new Set(['ground', 'bancos', 'altar', 'calices', 'velas', 'lambert1']);
+    for (const n of meshNodes(doc)) {
+      const mesh = n.getMesh();
+      for (const p of mesh.listPrimitives()) if (drop.has(p.getMaterial()?.getName())) { mesh.removePrimitive(p); p.dispose(); }
+      if (!mesh.listPrimitives().length) { n.setMesh(null); mesh.dispose(); }
+    }
+    await doc.transform(prune());
+    const b0 = getBounds(scene(doc));
+    fit(doc, 2, (b0.max[2] - b0.min[2]) * 1.5); // bigger than modelled: a village church, not a chapel
+    rootNode(doc, 'church');
+    await grade(doc, { dark: 0.45, sat: 0.6, soot: 0.4 });
+    await texWebp(doc, 1024, { normalSize: 512 });
+    const bb = getBounds(scene(doc));
+    console.log('church size', bb.max.map((v, i) => (v - bb.min[i]).toFixed(2)).join(' x '), 'tris', triCount(doc));
+    await finish(doc, 'church.glb', { ratio: Math.min(1, 12000 / triCount(doc)), error: 0.002 });
+  }
+
+  // ── a czech hedgehog: three steel angles, about 2 m across, base at 0
+  async function hedgehog() {
+    const doc = await readRigid(V('Czech-Hedgehog.glb'));
+    const b = getBounds(scene(doc)), d = b.max.map((v, i) => v - b.min[i]);
+    fit(doc, d[0] > d[2] ? 0 : 2, 2.1);
+    rootNode(doc, 'hedgehog');
+    await grade(doc, { dark: 0.8, sat: 0.7, rust: 0.35 });
+    await texWebp(doc, 512);
+    const bb = getBounds(scene(doc));
+    console.log('hedgehog size', bb.max.map((v, i) => (v - bb.min[i]).toFixed(2)).join(' x '), 'tris', triCount(doc));
+    await finish(doc, 'hedgehog.glb', { ratio: Math.min(1, 1200 / triCount(doc)), error: 0.002 });
+  }
+
+  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog };
 }

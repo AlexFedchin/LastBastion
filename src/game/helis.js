@@ -1,7 +1,7 @@
 // The extraction's helicopters: an AH-64 attack gunship (app/models/apache.glb: chin
 // gun, rocket pods, a searchlight under the nose) and a CH-47 tandem-rotor lifter
-// (app/models/ch47.glb) with its ramp. Nose +z, up +y, metres. The rotors and the
-// ramp's treadway boards are nodes of their own; anchors in the root's extras mark
+// (app/models/ch47.glb) with its ramp, which lowers to the ground and shuts. Nose +z, up +y, metres. The rotors and the
+// ramp (with its treadway boards) are nodes of their own; anchors in the root's extras mark
 // where the game hangs its lights, guns and paths (scripts/models/build_vehicles.mjs).
 import * as THREE from 'three';
 import { cloneModel } from '../world/models.js';
@@ -93,9 +93,13 @@ export function makeLifter() {
   hold.position.set(0, -1.05, 1.5);
   hold.rotation.y = Math.PI;
   g.add(hold);
+  // the ramp (node 'ramp', hinged at the cabin floor): rotation 0 is down on the ground as
+  // modelled, +1.35 rad shuts it; its treadway boards are a child that slides back up it
+  const ramp = g.getObjectByName('ramp'), boards = ramp.getObjectByName('boards');
+  ramp.traverse((o) => { if (o.isMesh) o.material.side = THREE.DoubleSide; });
   return {
-    group: g, rotors: [fore, aft], ramp: g.getObjectByName('ramp'), gear: 2.4, // ground to the model's origin on its wheels
-    rampUp: 0, rampDown: -0.19, // the boards: level with the ramp in flight, down on the ground (as modelled)
+    group: g, rotors: [fore, aft], ramp, boards, boardsHome: boards ? boards.position.clone() : null,
+    gear: 2.4, // ground to the model's origin on its wheels
     rampFoot: anchor(g, 'rampFoot'), inside: anchor(g, 'inside'),
     lights: { port: anchor(g, 'lightPort'), stbd: anchor(g, 'lightStbd'), tail: anchor(g, 'lightTail') },
   };

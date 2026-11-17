@@ -303,6 +303,24 @@ class Game {
     try {
       if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera);
       else this.renderer.compile(this.scene, this.camera);
+      // compiling doesn't upload textures or build the shadow-pass shaders: the first sight of
+      // a helicopter or a bomber still hitched for a third of a second. Upload every texture
+      // now, and draw one frame offscreen with everything showing and nothing culled.
+      const seen = new Set();
+      this.scene.traverse((o) => {
+        if (!o.material) return;
+        for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
+          for (const k in m) { const v = m[k]; if (v && v.isTexture && !seen.has(v)) { seen.add(v); this.renderer.initTexture(v); } }
+        }
+      });
+      const culled = [];
+      for (const h of hidden) h.traverse((o) => { if (o.frustumCulled) { culled.push(o); o.frustumCulled = false; } });
+      const rt = this.warmRT || (this.warmRT = new THREE.WebGLRenderTarget(64, 64, { type: THREE.HalfFloatType }));
+      const prev = this.renderer.getRenderTarget();
+      this.renderer.setRenderTarget(rt);
+      this.renderer.render(this.scene, this.camera);
+      this.renderer.setRenderTarget(prev);
+      for (const o of culled) o.frustumCulled = true;
     } catch (err) { console.warn('[precompile]', err); }
     for (const o of hidden) o.visible = false;
   }
@@ -779,6 +797,8 @@ class Game {
     this.stateT += rdt;
     this.barkCd = Math.max(0, this.barkCd - rdt);
 
+    // the gun left in the nest for the victory screen goes back on the camera when it closes
+    if (this.victoryGun && this.state !== 'victory') { this.victoryGun = false; this.ending.restoreGun(); this.player.gun.visible = true; }
     switch (this.state) {
       case 'menu': this.updateMenu(dt, rdt); break;
       case 'intro': this.updateIntro(dt, rdt); break;
@@ -788,7 +808,7 @@ class Game {
       case 'fallen': this.updateFallen(dt, rdt); break;
       case 'ending': this.ending.update(dt, rdt); break;
       case 'extraction': this.extraction.update(dt, rdt); break;
-      case 'victory': this.updateShop(dt, rdt); break;
+      case 'victory': this.updateVictory(dt, rdt); break;
       default: break;
     }
 
@@ -1119,7 +1139,9 @@ class Game {
     this.stateT = 0;
     this.hud.show(false);
     this.letterboxTarget = 0;
-    this.player.gun.visible = true;
+    // behind the summary: the bastion at first light, the gun still in the nest where they left it
+    this.ending.placeGun();
+    this.victoryGun = true;
     this.env.dawn = Math.max(this.env.dawn, 0.6);
     this.screens.buildVictory(this.run, loadBest(), extracted);
     this.screens.show('victory');
@@ -1132,6 +1154,20 @@ class Game {
     this.player.yaw = damp(this.player.yaw, Math.sin(this.time * 0.04) * 0.4, 0.5, rdt);
     this.player.pitch = damp(this.player.pitch, -0.17, 0.5, rdt);
     this.player.update(dt, rdt, this.input, this.stats, false, this.time);
+    this.horde.update(dt, this.time);
+  }
+
+  /** The summary after the last night: a slow crane over the empty bastion at first light. */
+  updateVictory(dt, rdt) {
+    this.env.dawn = damp(this.env.dawn, 0.85, 0.3, rdt);
+    const t = this.stateT, cam = this.camera;
+    cam.position.set(-26 + Math.sin(t * 0.025) * 12, 22 + Math.sin(t * 0.04) * 2, 30 + Math.cos(t * 0.025) * 4);
+    cam.up.set(0, 1, 0);
+    cam.lookAt(Math.sin(t * 0.018) * 10, 6, -70);
+    const f = fitFov(52, cam.aspect);
+    if (Math.abs(cam.fov - f) > 0.01) { cam.fov = f; cam.updateProjectionMatrix(); }
+    // the dead still walk the field below
+    if (this.horde.n < 380 && Math.random() < dt * 8) this.spawnMenuZombie(rand(-150, -50));
     this.horde.update(dt, this.time);
   }
 

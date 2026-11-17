@@ -306,7 +306,7 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   // ready ammo for the fifty, stacked behind the nest
   // (the crates themselves are model crates: env.roofCrates, placed in dressWithModels)
   env.roofCrates = [];
-  for (let k = 0; k < 3; k++) for (let r = 0; r < (k === 1 ? 3 : 2); r++) env.roofCrates.push([-4.6 + r * 0.03, top + r * 0.21, -0.5 + k * 0.36, (rng() - 0.5) * 0.08]);
+  for (let k = 0; k < 3; k++) for (let r = 0; r < (k === 1 ? 3 : 2); r++) env.roofCrates.push([-4.6 + r * 0.03, top + r * 0.245, -0.5 + k * 0.36, (rng() - 0.5) * 0.08]);
   for (let k = 0; k < 5; k++) kit('ammo', R(2.2 + (k % 3) * 0.36, -0.3 + Math.floor(k / 3) * 0.2, (rng() - 0.5) * 0.3, top + (k >= 3 ? 0.23 : 0)));
   B.put(P.barrelBag(), R(3.6, 0.4, 0.3));
   B.put(P.barrelBag(), R(3.65, 0.62, 0.25));
@@ -381,7 +381,7 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   for (let k = 0; k < 6; k++) kit('ammo', R(5.1 + (k % 3) * 0.36, -0.9 + Math.floor(k / 3) * 0.13, (rng() - 0.5) * 0.15, top + 0.31));
   // a hand searchlight on the crate stack, for when the towers can't reach
   kit('searchlight', R(7.3, 0.6, Math.PI + 0.3, top + 0.63));
-  env.roofCrates.push([7.3, top, 0.6, 0.05], [7.3, top + 0.21, 0.62, -0.05], [7.3, top + 0.42, 0.58, 0.03]);
+  env.roofCrates.push([7.3, top, 0.6, 0.05], [7.3, top + 0.245, 0.62, -0.05], [7.3, top + 0.49, 0.58, 0.03]);
   kit('crateSmall', R(6.5, 1.5, Math.PI / 2 + 0.3));
   kit('rations', R(6.4, 1.4, 0.4, top + 0.46)); kit('foodCans', R(6.75, 1.65, 1.2, top + 0.46));
   kit('jerry', R(7.55, 2.3, 0.2)); kit('jerry', R(7.55, 2.68, -0.1));
