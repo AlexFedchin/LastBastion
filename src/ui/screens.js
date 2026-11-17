@@ -95,6 +95,7 @@ export class Screens {
       <label>EFFECTS</label>${slider('sfx', 0, 1, 0.01, pct)}
       <label>MACHINE GUN</label>${seg('gunSound', [['new', 'NEW'], ['classic', 'CLASSIC']])}
       <label>SHOW FPS</label>${seg('showFps', [[false, 'OFF'], [true, 'ON']])}
+      <label>FIRST-NIGHT TIPS</label>${seg('tips', [[true, 'ON'], [false, 'OFF']])}
       ${window.bastion ? `<label>FULLSCREEN</label>${seg('fullscreen', [['toggle', 'TOGGLE (F11)']])}` : ''}
     `;
     const note = $('settings-note');

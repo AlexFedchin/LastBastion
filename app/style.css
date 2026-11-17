@@ -128,6 +128,30 @@ b { color: var(--bone); font-weight: 600; }
 .alert.fade { opacity: 0; }
 #hint { position: absolute; bottom: 112px; left: 50%; transform: translateX(-50%); font-size: 12px; letter-spacing: 0.16em; color: var(--bone-dim); opacity: 0; transition: opacity 0.4s; white-space: nowrap; background: rgba(0,0,0,0.45); padding: 5px 14px; }
 #hint.show { opacity: 1; }
+.mods { margin-top: 3px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--amber-dim); min-height: 12px; }
+/* the night's requisition card (main.js startNight) */
+.loadout { position: absolute; top: calc(30% + 150px); left: 50%; transform: translate(-50%, 8px); opacity: 0; transition: opacity 0.5s, transform 0.5s; background: linear-gradient(180deg, rgba(10,11,8,0.82), rgba(10,11,8,0.6)); border-top: 2px solid var(--amber-dim); padding: 10px 18px 12px; min-width: 380px; text-shadow: 0 1px 2px #000; }
+.loadout.show { opacity: 1; transform: translate(-50%, 0); }
+.loadout .lo-head { font-size: 11px; letter-spacing: 0.32em; color: var(--amber); margin-bottom: 6px; }
+.loadout .lo-row { display: grid; grid-template-columns: auto auto 1fr; gap: 4px 12px; align-items: center; padding: 3px 0; }
+.loadout .lo-row b { font-size: 14px; letter-spacing: 0.14em; font-weight: 600; }
+.loadout .lo-pips { display: flex; gap: 3px; }
+.loadout .lo-pips i { width: 12px; height: 4px; background: rgba(211,201,174,0.18); transform: skewX(-20deg); }
+.loadout .lo-pips i.on { background: var(--amber); }
+.loadout .lo-what { font-family: var(--mono); font-size: 11px; color: var(--bone-dim); text-align: right; }
+/* the first night's coaching (src/ui/coach.js) */
+.coach { position: absolute; top: 118px; left: 50%; transform: translate(-50%, -6px); width: min(560px, 90vw); opacity: 0; transition: opacity 0.4s, transform 0.4s; background: rgba(10,11,8,0.82); border: 1px solid rgba(211,201,174,0.16); border-left: 3px solid var(--amber); padding: 10px 16px 11px; text-shadow: 0 1px 2px #000; }
+.coach.show { opacity: 1; transform: translate(-50%, 0); }
+.coach.warn { border-left-color: var(--red); }
+.coach-tag { font-size: 10px; letter-spacing: 0.3em; color: var(--amber); margin-bottom: 4px; }
+.coach.warn .coach-tag { color: #ff6a52; }
+.coach-text { font-size: 16px; line-height: 1.4; letter-spacing: 0.04em; color: var(--bone); }
+.coach-key { margin-top: 6px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.12em; color: var(--muted); }
+.coach-key kbd { font-family: var(--mono); color: var(--amber); border: 1px solid var(--amber-dim); padding: 0 4px; }
+.wm-sec.coach { animation: coachpulse 0.8s ease-in-out infinite alternate; }
+@keyframes coachpulse { from { stroke: var(--amber); } to { stroke: #fff2c0; } }
+.mk.coach { color: var(--amber); }
+.alert.wire { color: var(--olive); }
 #fps { position: fixed; top: 4px; left: 50%; transform: translateX(-50%); font-family: var(--mono); font-size: 11px; color: #7f7; pointer-events: none; text-shadow: 0 0 2px #000; }
 
 @keyframes blink { 50% { opacity: 0.35; } }
@@ -244,6 +268,10 @@ table.keys td:first-child { font-family: var(--mono); color: var(--amber); width
 .bays button:hover { color: var(--bone); border-bottom-color: var(--amber-dim); }
 .bays button.on { color: var(--amber); border-bottom-color: var(--amber); background: rgba(40,34,20,0.85); }
 .bays button.on kbd { color: var(--amber); border-color: var(--amber-dim); }
+.hangar-radio { position: absolute; left: 40px; bottom: 156px; max-width: min(460px, 40vw); pointer-events: none; opacity: 0; transform: translateY(6px); transition: opacity 0.35s, transform 0.35s; background: rgba(10,11,9,0.84); border-left: 3px solid var(--olive); padding: 9px 14px 10px; text-shadow: 0 1px 2px #000; }
+.hangar-radio.show { opacity: 1; transform: none; }
+.hangar-radio .hr-who { font-size: 11px; letter-spacing: 0.28em; color: var(--olive); margin-bottom: 3px; }
+.hangar-radio .hr-text { font-size: 16px; line-height: 1.4; color: var(--bone); }
 .shop-foot { position: absolute; left: 40px; right: 40px; bottom: 26px; display: flex; justify-content: space-between; pointer-events: none; }
 .shop-foot button { pointer-events: auto; background: rgba(14,15,11,0.82); }
 .shop-foot button.primary { border-color: var(--amber); color: var(--amber); font-size: 22px; padding: 12px 34px; }

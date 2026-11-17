@@ -1,7 +1,7 @@
 // Everything that kills besides your own gun: artillery, Molotovs,
 // grenades, danger-close, wall gunners, riflemen, claymores and wire.
 import * as THREE from 'three';
-import { WORLD, wallZ, wallDist, WING_COS, WING_SIN, ABILITY, CLAYMORE } from '../config.js';
+import { WORLD, wallZ, wallDist, WING_COS, WING_SIN, ABILITY, CLAYMORE, sectionOf } from '../config.js';
 import { clamp, rand } from '../core/util.js';
 import { PF, DF } from '../world/textures.js';
 import { groundH, raycastGround } from '../world/terrain.js';
@@ -628,7 +628,7 @@ export class Arsenal {
 
   // ── Wire ─────────────────────────────────────────────────────────────────
   buildWire() {
-    this.wireBands = [22, 45].map((d) => ({ d, active: false, segs: new Float32Array(20), maxHp: 1 }));
+    this.wireBands = [22, 45].map((d) => ({ d, active: false, segs: new Float32Array(20), maxHp: 1, load: new Float32Array(20), told: new Float32Array(20) }));
     const coilGeo = new THREE.TorusGeometry(0.5, 0.014, 3, 16);
     const coilMat = new THREE.MeshStandardMaterial({ color: 0x5a554c, metalness: 0.85, roughness: 0.45 });
     const stakeGeo = new THREE.BoxGeometry(0.08, 1.3, 0.08);
@@ -672,6 +672,7 @@ export class Arsenal {
       b.active = i < bands;
       b.maxHp = hp;
       b.segs.fill(hp);
+      b.load.fill(0); b.told.fill(0);
       b.coils.visible = b.stakes.visible = b.active;
       if (b.active) {
         b.coilMs.forEach((mm, k) => b.coils.setMatrixAt(k, mm));
@@ -687,13 +688,23 @@ export class Arsenal {
       const s = Math.floor((x + 100) / 10);
       if (s < 0 || s >= 20 || b.segs[s] <= 0) continue;
       b.segs[s] -= weight * dt * 10;
+      // a crowd caught on it: worth a word on the HUD, once in a while per stretch of wire
+      b.load[s] += weight * dt;
+      if (b.load[s] > 7 && b.told[s] <= 0 && this.onMessage) { b.told[s] = 25; b.load[s] = 0; this.onMessage('', 'wireHold', `${this.wireLabel(s)} · ${b.d} M`); }
       if (b.segs[s] <= 0) this.breakWire(b, s);
       return 0.32;
     }
     return 1;
   }
 
+  /** The wall section in front of a stretch of wire (or the gate). */
+  wireLabel(s) {
+    const sec = sectionOf(-100 + s * 10 + 5);
+    return sec < 0 ? 'GATE' : ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'][sec];
+  }
+
   breakWire(b, s) {
+    if (this.onMessage) this.onMessage('', 'wireCut', `${this.wireLabel(s)} · ${b.d} M`);
     const zero = new THREE.Matrix4().makeScale(0, 0, 0);
     for (let k = 0; k < b.perSeg; k++) b.coils.setMatrixAt(s * b.perSeg + k, zero);
     b.coils.instanceMatrix.needsUpdate = true;
@@ -723,6 +734,11 @@ export class Arsenal {
   // ── Per-frame ────────────────────────────────────────────────────────────
   update(dt, time) {
     const fx = this.fx;
+    for (const b of this.wireBands) {
+      if (!b.active) continue;
+      const k = Math.exp(-dt * 0.5);
+      for (let s = 0; s < 20; s++) { b.load[s] *= k; if (b.told[s] > 0) b.told[s] -= dt; }
+    }
     this.artyCd = Math.max(0, this.artyCd - dt);
     this.grenadeCd = Math.max(0, this.grenadeCd - dt);
     this.molotovCd = Math.max(0, this.molotovCd - dt);

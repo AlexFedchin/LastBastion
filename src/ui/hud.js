@@ -23,6 +23,7 @@ export class HUD {
       edgeL: $('edge-l'), edgeR: $('edge-r'),
       obj: $('h-obj'), objTitle: $('h-obj-title'), objText: $('h-obj-text'), objBar: $('h-obj-bar'),
       boss: $('h-boss'), bossName: $('h-boss-name'), bossBar: $('h-boss-bar'), markers: $('h-markers'),
+      mods: $('h-mods'), loadout: $('h-loadout'),
     };
     this.markerEls = [];
     this._mv = new THREE.Vector3();
@@ -170,6 +171,22 @@ export class HUD {
 
   hint(text) { this.el.hint.textContent = text; this.el.hint.classList.toggle('show', !!text); }
 
+  /** What is fitted to the gun tonight, under the heat bar ('' for nothing). */
+  mods(text) { this.el.mods.textContent = text; }
+
+  /**
+   * The card at the start of a night: what was requisitioned at dawn, each with what it
+   * does now. items: [{ name, rank, max, what }]; shown after `delay` s for `dur` s.
+   */
+  loadout(items, delay = 1.2, dur = 7.5) {
+    const el = this.el.loadout;
+    if (!items.length) { el.className = 'loadout'; this.loadoutT = 0; return; }
+    const pip = (r, m) => Array.from({ length: m }, (_, i) => `<i class="${i < r ? 'on' : ''}"></i>`).join('');
+    el.innerHTML = `<div class="lo-head">REQUISITIONED AT DAWN</div>${items.map((it) => `<div class="lo-row"><b>${it.name}</b><span class="lo-pips">${pip(it.rank, it.max)}</span><span class="lo-what">${it.what}</span></div>`).join('')}`;
+    el.className = 'loadout';
+    this.loadoutWait = delay; this.loadoutT = dur;
+  }
+
   /** Night events: objective panel, boss bar and world markers. */
   updateEvents(g) {
     const el = this.el, ev = g.events;
@@ -186,7 +203,9 @@ export class HUD {
       this.set('bossn', el.bossName, boss.name);
       this.set('bossb', el.bossBar.style, `${clamp01(boss.hp) * 100}%`, 'width');
     }
-    const mk = ev && g.inPlay() ? ev.markers() : [];
+    let mk = ev && g.inPlay() ? ev.markers() : [];
+    const cm = g.coach && g.coach.marker();
+    if (cm) mk = [...mk, cm];
     const W = window.innerWidth, H = window.innerHeight, v = this._mv;
     while (this.markerEls.length < mk.length) {
       const d = document.createElement('div');
@@ -338,6 +357,10 @@ export class HUD {
       if (g.audio) g.audio.radioStatic(this.radioVoice > 0 ? this.radioVoice + 0.1 : this.radioDur);
     }
 
+    if (this.loadoutWait > 0) { this.loadoutWait -= dt; if (this.loadoutWait <= 0) el.loadout.className = 'loadout show'; } else if (this.loadoutT > 0) {
+      this.loadoutT -= dt;
+      if (this.loadoutT <= 0) el.loadout.className = 'loadout';
+    }
     if (this.announceT > 0) {
       this.announceT -= dt;
       if (this.announceT <= 0) el.announce.className = '';

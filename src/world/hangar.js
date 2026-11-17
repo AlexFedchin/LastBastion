@@ -11,7 +11,7 @@
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { UPGRADES, UPGRADE_GROUPS, CLAYMORE, isUnlocked, UNLOCKS } from '../config.js';
+import { UPGRADES, UPGRADE_GROUPS, CLAYMORE, isUnlocked, UNLOCKS, DELIVERY_LINES, CALL } from '../config.js';
 import { cloneModel } from './models.js';
 import { fileTex } from './texlib.js';
 import { concertinaGeo } from './kit.js';
@@ -273,7 +273,7 @@ export class Hangar {
 
   buildLights() {
     const scene = this.scene, q = this.g.quality;
-    scene.add(new THREE.HemisphereLight(0xc4bdb0, 0x4a4034, 1.25));
+    scene.add(new THREE.HemisphereLight(0xc4bdb0, 0x4a4034, 1.45));
     // the sun's patch on the floor throws warm light back up into the hall
     const bounce = new THREE.PointLight(0xffb880, 26, 22, 1.4);
     bounce.position.set(2, 1.2, -7.5);
@@ -311,6 +311,24 @@ export class Hangar {
       p.position.set(0, 6.4, z);
       scene.add(p);
     }
+    // work lights on stands in front of each bay, low, throwing light into it: the bays read from across the hall
+    this.workLights = [];
+    for (const b of BAYS) {
+      const w = new THREE.SpotLight(0xffe6c2, 95, 16, 0.6, 0.75, 1.4);
+      w.position.set(b.x + (b.x < 0 ? 1.6 : -1.6), 2.6, BAY_Z + 5.4);
+      w.target.position.set(b.x, 0.6, BAY_Z - 0.6);
+      scene.add(w, w.target);
+      this.workLights.push(w);
+    }
+    // warm washes along the side walls (the cladding and the shelving), a cool fill by the open door
+    for (const x of [-W + 1.2, W - 1.2]) for (const z of [-6, 6]) {
+      const p = new THREE.PointLight(0xffc890, 8, 9, 1.6);
+      p.position.set(x * 0.9, 4.6, z);
+      scene.add(p);
+    }
+    const doorFill = new THREE.PointLight(0xd0d4dc, 18, 18, 1.4);
+    doorFill.position.set(0, 4.2, -10.5);
+    scene.add(doorFill);
     // the front of the hall, where the overview looks down from
     const front = new THREE.PointLight(0xffe2c4, 40, 26, 1.4);
     front.position.set(0, 5.6, 7.5);
@@ -576,7 +594,7 @@ export class Hangar {
   mapBoard() {
     const c = document.createElement('canvas'); c.width = 1024; c.height = 640;
     const x = c.getContext('2d');
-    x.fillStyle = '#d8cfae'; x.fillRect(0, 0, 1024, 640);
+    x.fillStyle = '#b9b092'; x.fillRect(0, 0, 1024, 640);
     x.strokeStyle = 'rgba(120,90,50,0.55)'; x.lineWidth = 1.5;
     for (let k = 0; k < 22; k++) {
       x.beginPath();
@@ -863,6 +881,7 @@ export class Hangar {
     const first = s.rank < 0;
     if (!first && rank > s.rank && this.active) {
       for (let i = s.rank; i < rank; i++) this.deliver(s, s.units[i], (i - s.rank) * 0.18);
+      this.say(s.id);
     } else {
       s.units.forEach((u, i) => { u.visible = i < rank; u.position.copy(u.userData.home); u.userData.drop = null; });
     }
@@ -877,6 +896,20 @@ export class Hangar {
     s.flash = 1;
   }
 
+  /** Whoever brought it in says a word (the line shows over the hangar, with the radio's click). */
+  say(id) {
+    const l = DELIVERY_LINES[id];
+    if (!l) return;
+    const who = CALL[l[0]] || l[0], el = document.getElementById('hangar-radio');
+    document.getElementById('hr-who').textContent = who;
+    document.getElementById('hr-text').textContent = l[1];
+    el.classList.remove('show'); void el.offsetWidth; el.classList.add('show');
+    clearTimeout(this._sayT);
+    this._sayT = setTimeout(() => el.classList.remove('show'), 5200);
+    const A = this.g.audio;
+    if (A) { const v = A.radioVoice(who, l[1], 0.35); A.radioStatic(Math.max(0.5, v ? v + 0.1 : 0.5)); }
+  }
+
   enter(run, report) {
     this.build();
     this.active = true;
@@ -888,6 +921,7 @@ export class Hangar {
 
   exit() {
     this.active = false;
+    const hr = document.getElementById('hangar-radio'); if (hr) hr.classList.remove('show');
     if (this.tagLayer) this.tagLayer.classList.remove('on');
     this.setHot(null);
   }
@@ -897,7 +931,7 @@ export class Hangar {
     this.view = view;
     const b = BAYS.find((x) => x.id === view);
     // (the bay and the board are framed in the left of the screen: the panel is on the right)
-    if (b) { this.wantPos = V(b.x * 0.9 + 1.35, 3.15, BAY_Z + 6.6); this.wantLook = V(b.x + 1.4, 0.8, BAY_Z - 0.4); this.wantFov = 48; } else if (view === 'report') { this.wantPos = V(BOARD.x + 4.4, 2.45, BOARD.z - 1.45); this.wantLook = V(BOARD.x, BOARD.y - 0.1, BOARD.z - 1.5); this.wantFov = 46; } else { this.wantPos = V(0, 7.0, 12.2); this.wantLook = V(0, 0.9, -5.2); this.wantFov = 60; }
+    if (b) { this.wantPos = V(b.x * 0.9 + 1.35, 3.15, BAY_Z + 6.6); this.wantLook = V(b.x + 1.4, 0.8, BAY_Z - 0.4); this.wantFov = 48; } else if (view === 'report') { this.wantPos = V(BOARD.x + 4.4, 2.45, BOARD.z - 1.45); this.wantLook = V(BOARD.x, BOARD.y - 0.1, BOARD.z - 1.5); this.wantFov = 46; } else { this.wantPos = V(0, 5.9, 11.6); this.wantLook = V(0, 1.1, -5.2); this.wantFov = 64; }
     if (snap) { this.camPos.copy(this.wantPos); this.camLook.copy(this.wantLook); this.fov = this.wantFov; }
     const el = document.getElementById('s-shop');
     if (el) el.dataset.bay = view;
@@ -967,7 +1001,11 @@ export class Hangar {
     const mx = this.mouseIn ? this.mouse.x : 0, my = this.mouseIn ? this.mouse.y : 0;
     cam.position.copy(this.camPos);
     cam.position.x += Math.sin(t * 0.31) * 0.05 + mx * 0.25; cam.position.y += Math.sin(t * 0.43) * 0.03 + my * 0.12;
-    cam.lookAt(_v.copy(this.camLook).add(_w.set(mx * 0.35, my * 0.2, 0)));
+    // a delivery landing jolts the camera, like a weight set down on the floor you stand on
+    this.kick = Math.max(0, (this.kick || 0) * Math.exp(-dt * 5.5));
+    const kk = this.kick;
+    cam.position.y += Math.sin(t * 46) * 0.035 * kk - 0.04 * kk; cam.position.x += Math.sin(t * 39 + 1) * 0.02 * kk;
+    cam.lookAt(_v.copy(this.camLook).add(_w.set(mx * 0.35, my * 0.2 - 0.05 * kk, 0)));
     const el = this.g.canvas, aspect = el.clientWidth / Math.max(1, el.clientHeight);
     const f = fitFov(this.fov, aspect);
     if (Math.abs(cam.aspect - aspect) > 1e-3 || Math.abs(cam.fov - f) > 0.01) { cam.aspect = aspect; cam.fov = f; cam.updateProjectionMatrix(); }
@@ -989,6 +1027,7 @@ export class Hangar {
           d.landed = true; u.userData.drop = null;
           u.position.copy(u.userData.home);
           this.g.audio.delivery && this.g.audio.delivery();
+          this.kick = Math.min(1.2, (this.kick || 0) + 0.7);
           u.updateMatrixWorld(true);
           this.puff(u.getWorldPosition(_v).clone());
         }

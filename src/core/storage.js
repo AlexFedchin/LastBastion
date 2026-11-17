@@ -22,6 +22,7 @@ export const QUALITY = {
 export const DEFAULT_SETTINGS = {
   quality: 'high', sensitivity: 1, invertY: false, fov: 64,
   master: 0.8, music: 0.55, sfx: 0.9, showFps: false, gunSound: 'new',
+  tips: true, // the first night's coaching (src/ui/coach.js); turns itself off once it has run
 };
 
 const SETTINGS_KEY = 'lastbastion.settings.v1';

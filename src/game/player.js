@@ -237,7 +237,13 @@ export class Player {
       fx.fleshHit(px, py, pz, _d.x, _d.y, _d.z, head ? 1.5 : 1);
       fx.bulletFlesh(px, py, pz, _d.x, _d.y, _d.z, clamp(t / 45, 1, 3), head);
       this.audio.flesh(px, pz, head && killed);
-      if (stats.hmgIncendiary > 0 && Math.random() < stats.hmgIncendiary && !killed) horde.ignite(i, 4, 28);
+      // AP-T: a round that went through the one in front comes out the back in a spray of white sparks
+      if (k > 0) for (let q = 0; q < 4; q++) fx.spark(px, py, pz, _d.x * 9 + (Math.random() - 0.5) * 4, _d.y * 9 + Math.random() * 3, _d.z * 9 + (Math.random() - 0.5) * 4, 7, 6.4, 5, 0.22);
+      if (stats.hmgIncendiary > 0 && Math.random() < stats.hmgIncendiary && !killed) {
+        horde.ignite(i, 4, 28);
+        // the incendiary going off in him: a flash of orange before the flames take
+        fx.glowDot(px, py, pz, 1.1, 10, 3.4, 0.7, 0.12);
+      }
       if (stats.hmgHE) {
         fx.explosion(px, py, pz, 0.22, { dirt: false, scorch: false, light: false });
         horde.explode(px, py, pz, 2.2, 32, 'he', { push: 0.4 });
@@ -253,8 +259,15 @@ export class Player {
     // visuals
     this.muzzle.getWorldPosition(_m);
     const ex = o.x + _d.x * endT, ey = Math.max(0, o.y + _d.y * endT), ez = o.z + _d.z * endT;
-    // every round is a tracer; alternate brightness like a real belt mix
-    fx.tracer(_m.x, _m.y, _m.z, ex, ey, ez, 560, this.shots % 3 === 0 ? 1.4 : 0.75);
+    // every round is a tracer, and the belt shows what is loaded in it: a bright tracer every
+    // third round (white-hot once AP-T is in the belt), red incendiaries between them once
+    // the incendiary belt is, plain ball the rest
+    const n = this.shots % 3;
+    if (n === 0) {
+      if (stats.hmgPen) fx.tracer(_m.x, _m.y, _m.z, ex, ey, ez, 600, 1.45, 6.4, 5.8, 4.8, 0.075, 0.013);
+      else fx.tracer(_m.x, _m.y, _m.z, ex, ey, ez, 560, 1.4);
+    } else if (n === 1 && stats.hmgIncendiary > 0) fx.tracer(_m.x, _m.y, _m.z, ex, ey, ez, 560, 1.15, 9.5, 2.0, 0.5);
+    else fx.tracer(_m.x, _m.y, _m.z, ex, ey, ez, 560, 0.75);
     // the round's path, faintly, so you can see where the burst is going
     fx.bulletPath(_m.x, _m.y, _m.z, ex, ey, ez, this.zoom > 0.5 ? 0.6 : 1, this.zoom > 0.5 ? 20 : 12);
     if (!stopped && groundT < 600) fx.bulletGround(ex, ez, clamp(endT / 45, 1, 3));

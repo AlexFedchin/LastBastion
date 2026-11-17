@@ -996,6 +996,12 @@ export class AudioEngine {
   ui() { this.play(this.B.ui_click[0], { gain: 0.38, rate: rand(0.97, 1.03), force: true }); }
   uiHover() { this.play(this.B.ui_hover[0], { gain: 0.14, rate: rand(0.95, 1.05), force: true }); }
   uiBuy() { this.play(this.B.ui_buy[0], { gain: 0.55, force: true }); }
+  /** A stretch of wire giving way out in the approach: a far metallic snap. */
+  wireSnap() {
+    if (!this.ready) return;
+    this.play(this.B.latch[0], { gain: 0.3, rate: rand(1.5, 1.7), reverb: 0.6, lowpass: 2600, force: true });
+  }
+
   /** The hangar: a requisition set down in its bay, a heavy thud on concrete and a rattle of metal. */
   delivery() {
     if (!this.ready) return;

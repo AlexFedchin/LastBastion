@@ -38,6 +38,9 @@ PERSONA = {
                    "precise and warm, unflappable, the calm voice that has done this many times.",
     'REAPER 1-1': "Male, about thirty, an American attack helicopter pilot: fast, dry, confident tenor with a Texan edge, "
                   "speaking over rotor noise, steady under fire.",
+    # the hangar's quartermaster, signing out the requisitions at dawn (src/world/hangar.js)
+    'CPL. VOSS': "Male, early fifties, a quartermaster corporal: dry, unhurried, slightly nasal mid-range voice, Dutch accent, "
+                 "a practical man who has counted every crate twice, deadpan humour.",
     # the chronicle at every dawn: not on the radio, told years later
     'NARRATOR': "Male, about seventy, an old soldier telling the story of the siege decades later: a deep, warm, weathered "
                 "baritone with soft gravel, slow and measured, intimate and haunted, a storyteller by a fire; clear, unhurried diction.",
@@ -61,6 +64,7 @@ REF_TEXT = {
     'THE QUARRY': "This is the quarry. We've a tractor, a trailer and forty souls. The road down's clear as far as the old mill.",
     'NIGHTINGALE': "Nightingale flight, check in. Three lifters, escort is with us. We are low level, following the river north.",
     'REAPER 1-1': "Reaper one-one, guns are hot, fuel is good. We'll keep the lifters covered all the way in.",
+    'CPL. VOSS': "Two crates of belted fifty, one case of grenades, pins in. Sign here, and here. Bring the empty cans back.",
     'NARRATOR': "It was a long time ago now. But some nights, when the wind comes down the valley, I can still hear the gun.",
 }
 
@@ -86,6 +90,7 @@ DEFAULT = {
     'REACH 3-1': ("Calm, warm, professional pilot radio call.", 0.3),
     'NIGHTINGALE': ("Clear, calm and controlled helicopter radio call.", 0.4),
     'REAPER 1-1': ("Fast, confident attack pilot radio call over rotor noise.", 0.55),
+    'CPL. VOSS': ("Dry and matter-of-fact over a handheld radio, a tired craftsman pleased with the work.", 0.3),
     'NARRATOR': ("Slow, low and measured, an old man remembering; quiet gravity, unhurried pauses between the sentences.", 0.22),
 }
 

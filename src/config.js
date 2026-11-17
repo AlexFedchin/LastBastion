@@ -194,6 +194,36 @@ export const UPGRADES = [
     apply: (s, r) => { s.molotovRadius *= 1 + 0.25 * r; s.molotovBurn += 3 * r; s.molotovDps *= 1 + 0.2 * r; } },
 ];
 
+// What came out of the hangar at dawn, as Kovac puts it at the start of the night
+// (main.js startNight), and the short names of the gun's own upgrades on the HUD.
+export const ISSUE_LINES = {
+  hmgDmg: 'a new match-grade barrel on the fifty', hmgRate: 'a stiffer buffer spring in the fifty', hmgCool: 'fresh water in the jacket',
+  hmgPen: 'AP-T in the belt', hmgInc: 'incendiaries in the belt', hmgHE: 'HE-I in the belt',
+  artyShells: 'another gun section on the battery', artyCd: 'the fire direction centre plotting faster', artyHeavy: 'heavy charges for the one-oh-fives',
+  gunners: 'another M240 up on the wall', crews: 'the gun crews back from the range', wire: 'more wire out in the approach',
+  grenades: 'another crate of grenades', molotov: 'more bottles', molotovFuel: 'thickened fuel in the bottles', claymores: 'claymores dug in out front',
+};
+// The hangar, as a requisition is set down in its bay: a word from whoever brought it in.
+export const DELIVERY_LINES = {
+  hmgDmg: ['qm', "New barrel's on the bench, Sarge. Headspace and timing are set."],
+  hmgRate: ['qm', "Stiffer buffer spring's in. She'll cycle faster, so mind the heat."],
+  hmgCool: ['qm', "Jacket's topped up. That barrel will run cooler tonight."],
+  hmgPen: ['qm', "AP-T, belted and boxed. It'll go through two of them, maybe three."],
+  hmgInc: ['qm', 'Incendiary belts. Anything you hit tonight might start burning.'],
+  hmgHE: ['qm', "HE-I. Every round goes off when it hits. Don't drop that crate."],
+  artyShells: ['battery', "Bastion, Battery. Second section's laid and ready. More tubes on every mission."],
+  artyCd: ['battery', "Fire direction's set up properly now. We'll turn your calls around faster."],
+  artyHeavy: ['battery', 'Heavy charges are in. A bigger bang where you want it.'],
+  gunners: ['kovac', 'Another crew for the wall. Put them on a gun and keep them fed.'],
+  crews: ['kovac', "The crews spent the morning on the range. They'll shoot straighter tonight."],
+  wire: ['aran', 'More wire going out, Sarge. Mind your feet past the ditch.'],
+  grenades: ['qm', 'Another crate of grenades. Pins in, please.'],
+  molotov: ['qm', "More bottles. Don't ask what was in them before."],
+  molotovFuel: ['qm', 'Thickened the fuel with soap flakes. It sticks now.'],
+  claymores: ['aran', 'Claymores going out. Front toward enemy, I checked twice.'],
+};
+export const GUN_MODS = { hmgDmg: 'MATCH BARREL', hmgRate: 'BUFFER', hmgCool: 'WATER JACKET', hmgPen: 'AP-T', hmgInc: 'INCENDIARY', hmgHE: 'HE-I' };
+
 // Consumable purchase
 export const CLAYMORE = { cost: 150, perBuy: 6, max: 36, triggerR: 2.6, radius: 5.5, damage: 300 };
 
@@ -279,6 +309,8 @@ export const CALL = {
   narrator: 'NARRATOR', ridge: 'THE RIDGE', quarry: 'THE QUARRY',
   // the extraction: the lifters, and the gunship helicopters escorting them
   nightingale: 'NIGHTINGALE', reaper: 'REAPER 1-1',
+  // the hangar's quartermaster, who signs the requisitions out at dawn
+  qm: 'CPL. VOSS',
 };
 export const COMMS = {
   battery: {
@@ -713,6 +745,7 @@ export function allRadioLines() {
   for (const t of [COMMS.spectreIntro, ...COMMS.spectre]) add(CALL.spectre, t);
   for (const t of [COMMS.spectreIntro2, ...COMMS.spectre]) add(CALL.spectre2, t);
   for (const lines of Object.values(UNLOCK_LINES)) for (const [w, t] of lines) add(w, t);
+  for (const [w, t] of Object.values(DELIVERY_LINES)) add(CALL[w], t);
   for (const ev of Object.values(EVENT_LINES)) {
     for (const lines of Object.values(ev)) {
       for (const [w, t] of lines) {

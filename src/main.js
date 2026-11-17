@@ -6,6 +6,7 @@ import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
   nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, ABILITY, CALL, COMMS,
   UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines, CHRONICLE, NIGHT_EVENTS, EXTRACTION,
+  ISSUE_LINES, GUN_MODS,
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
@@ -31,6 +32,7 @@ import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
 import { DevTools } from './ui/devtools.js';
 import { Hangar } from './world/hangar.js';
+import { Coach } from './ui/coach.js';
 import { Ending } from './game/ending.js';
 import { obstacles } from './world/obstacles.js';
 import { ExtractionHold, ExtractionScene } from './game/extraction.js';
@@ -127,6 +129,7 @@ class Game {
     this.chronicle = new Chronicle(this);
     this.dev = new DevTools(this);
     this.hangar = new Hangar(this);
+    this.coach = new Coach(this);
     this.ending = new Ending(this);
     this.extraction = new ExtractionScene(this);
     this.input = new Input(canvas);
@@ -348,6 +351,12 @@ class Game {
     h.onBreach = (sec, x, y, z) => this.onBreach(sec, x, y, z, 'climb');
     h.onBloaterWall = (sec, x, z) => this.onBloaterWall(sec, x, z);
     h.onIgnite = (i) => { if (this.inPlay()) this.audio.ignited(h.x[i], h.z[i], h.type[i]); };
+    // the wire: it catching a crowd, and a section of it going
+    this.arsenal.onMessage = (text, kind, item) => {
+      if (!this.inPlay()) return;
+      if (kind === 'wireHold') this.hud.alert('', 'wire', { key: 'wireHold', item, format: (s) => `WIRE HOLDING — ${s.join(' · ')}`, priority: 0, life: 2.6 });
+      else if (kind === 'wireCut') { this.hud.alert('', '', { key: 'wireCut', item, format: (s) => `WIRE CUT — ${s.join(' · ')}` }); this.audio.wireSnap && this.audio.wireSnap(); }
+    };
     this.player.onHit = (killed, head) => { this.hud.hitmarker(killed, head); };
     this.player.onOverheat = () => { this.bark('overheat', 0.5); this.telemetry.overheat(); };
     this.arsenal.onExplosionKills = (kills, x, z, cause) => this.onExplosionKills(kills, x, z, cause);
@@ -380,6 +389,7 @@ class Game {
       if (this.state === 'ending' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.ending.skipPress(); return; }
       if (this.state === 'extraction' && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { this.extraction.skipPress(); return; }
       if (this.state === 'shop' && !e.repeat && this.screens.current === 'shop' && this.hangar.key(e.code)) { e.preventDefault(); return; }
+      if (e.code === 'KeyH' && this.coach.active) { this.coach.dismiss(); return; }
       if (e.code === 'Escape') {
         if (this.state === 'paused' && performance.now() - (this.pausedAt || 0) > 350) this.resume();
         else if (this.screens.current === 'settings' || this.screens.current === 'howto') this.onAction('back');
@@ -558,7 +568,32 @@ class Game {
     const sub = run.endless || run.night > FINAL_NIGHT ? 'NOBODY IS COMING'
       : run.night === FINAL_NIGHT ? (this.extracting ? 'HOLD FOR THE EXTRACTION FLIGHT' : 'THE LAST NIGHT') : `${hoursLeft} HOURS UNTIL EXTRACTION`;
     this.hud.announce(`NIGHT ${String(run.night).padStart(2, '0')}`, sub, 4.2);
+    this.issueLoadout(run);
+    this.coach.start();
     this.audio.init();
+  }
+
+  /**
+   * What came out of the hangar at the last dawn: a card under the night's title, Kovac
+   * reading it out on the radio, and the gun's fitted upgrades under its heat bar.
+   * run.issued is the kit as it stood at the start of the last night (the save keeps it).
+   */
+  issueLoadout(run) {
+    const roman = ['', 'I', 'II', 'III', 'IV', 'V'];
+    this.hud.mods(Object.keys(GUN_MODS).filter((id) => run.upgrades[id]).map((id) => `${GUN_MODS[id]} ${roman[run.upgrades[id]] || run.upgrades[id]}`).join(' · '));
+    const prev = run.issued;
+    run.issued = { ...run.upgrades, claymores: run.minesOwned };
+    if (!prev) { this.hud.loadout([]); return; } // a save from before this: nothing to compare with
+    const fresh = UPGRADES.filter((u) => (run.upgrades[u.id] || 0) > (prev[u.id] || 0));
+    const items = fresh.map((u) => ({ name: u.name, rank: run.upgrades[u.id], max: u.costs.length, what: u.total(run.upgrades[u.id]) }));
+    const mines = run.minesOwned > (prev.claymores || 0);
+    if (mines) items.push({ name: 'CLAYMORES', rank: 0, max: 0, what: `${run.minesOwned} in the approach` });
+    this.hud.loadout(items);
+    if (!items.length) return;
+    const said = [...fresh.map((u) => ISSUE_LINES[u.id]), ...(mines ? [ISSUE_LINES.claymores] : [])].filter(Boolean);
+    const list = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}` : said[0];
+    this.radioScript.push({ at: 6.5, who: CALL.kovac, text: `New on the line tonight: ${list}.`, done: false });
+    this.radioScript.sort((a, b) => a.at - b.at);
   }
 
   pause() {
@@ -635,6 +670,7 @@ class Game {
     this.audio.scream(x, z);
     this.hud.alert('', 'red', { key: 'breach', item: SECTION_LABELS[sec] ?? 'WALL', format: (s, n) => `BREACH — ${s.join(' · ')} — ${n === 1 ? 'WE LOST ONE' : `WE LOST ${n}`}` });
     this.bark('breach', 0.35);
+    this.coach.breach(sec);
     // the climber is cut down on the walkway: blood on the parapet
     this.fx.headshot(x, WORLD.WALL_H + 1, z, 0, 0.4, 1);
     if (run.survivors <= 0) this.fall();
@@ -809,6 +845,7 @@ class Game {
 
     // the gun left in the nest for the victory screen goes back on the camera when it closes
     if (this.victoryGun && this.state !== 'victory') { this.victoryGun = false; this.ending.restoreGun(); this.player.gun.visible = true; }
+    if (this.coach) this.coach.update(dt);
     switch (this.state) {
       case 'menu': this.updateMenu(dt, rdt); break;
       case 'intro': this.updateIntro(dt, rdt); break;

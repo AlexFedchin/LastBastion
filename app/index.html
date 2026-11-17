@@ -53,6 +53,7 @@
       <div class="weapon-name">M2HB <b>.50 CAL</b></div>
       <div class="heat"><div id="h-heat"></div></div>
       <div id="h-gunstate" class="small">READY</div>
+      <div id="h-mods" class="mods"></div>
     </div>
 
     <div class="hud-br" id="h-abilities"></div>
@@ -69,6 +70,8 @@
     <div id="announce"><div id="announce-big"></div><div id="announce-small"></div></div>
     <div id="alerts"></div>
     <div id="hint"></div>
+    <div id="h-loadout" class="loadout"></div>
+    <div id="coach" class="coach"><div class="coach-tag" id="coach-tag"></div><div class="coach-text" id="coach-text"></div><div class="coach-key" id="coach-key"></div></div>
   </div>
   <div id="fps"></div>
 
@@ -185,6 +188,7 @@
         <button data-act="bay" data-bay="support"><kbd>4</kbd>SUPPORT</button>
         <button data-act="bay" data-bay="report"><kbd>5</kbd>DUTY BOARD</button>
       </nav>
+      <div class="hangar-radio" id="hangar-radio"><div class="hr-who" id="hr-who"></div><div class="hr-text" id="hr-text"></div></div>
       <footer class="shop-foot">
         <button data-act="shop-menu" class="ghost">SAVE &amp; EXIT</button>
         <button data-act="begin" class="primary" id="btn-begin">BEGIN NIGHT 2 ▸</button>
