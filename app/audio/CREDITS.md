@@ -35,7 +35,6 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Horrific Zombie Growl](https://freesound.org/people/MrPokephile/sounds/133974/) | MrPokephile | groan |
 | [Distant Boom.wav](https://freesound.org/people/Henrythetrain/sounds/142598/) | Henrythetrain | boom_far |
 | [Muffled Distant Explosion](https://freesound.org/people/NenadSimic/sounds/149966/) | NenadSimic | boom_far |
-| [blackhawk.wav](https://freesound.org/people/John%20Sipos/sounds/156678/) | John%20Sipos | heli_a |
 | [Halloween - Graveyard At Night Howling Wind.mp3](https://freesound.org/people/mistersherlock/sounds/159509/) | mistersherlock | wind_howl |
 | [Air Defense Artillery Avenger Training .50cal (tH4YBTw8vk8).flac](https://freesound.org/people/qubodup/sounds/160355/) | qubodup | hmg, hmg_tail |
 | [Agony](https://freesound.org/people/Mediapaja2009/sounds/162157/) | Mediapaja2009 | burn |
@@ -117,7 +116,6 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Foley_Mechanism_Light_Buzz_Short_Loop_Mono_DR05.wav](https://freesound.org/people/Nox_Sound/sounds/553075/) | Nox_Sound | lamp |
 | [Zombie Growl 5.wav](https://freesound.org/people/tonsil5/sounds/555417/) | tonsil5 | groan |
 | [Zombie Hit 1.wav](https://freesound.org/people/tonsil5/sounds/555420/) | tonsil5 | flesh |
-| [Helicopter good overhead pass 77mel 190918.flac](https://freesound.org/people/TRP/sounds/573942/) | TRP | heli_b |
 | [Distant Thunder 3](https://freesound.org/people/Fission9/sounds/581124/) | Fission9 | thunder |
 | [Distant Thunder 4](https://freesound.org/people/Fission9/sounds/581125/) | Fission9 | thunder |
 | [Ammo Box, Open-Close, Moving Handle.wav](https://freesound.org/people/DanielPickens/sounds/586544/) | DanielPickens | ui_buy |
@@ -150,8 +148,8 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [torturedscream](https://freesound.org/people/mr-str4nger.d4nger/sounds/863442/) | mr-str4nger.d4nger | burn |
 | [Anguished Zombie Moans 02](https://freesound.org/people/MalikArsYasakani/sounds/876576/) | MalikArsYasakani | burn |
 
-"50cal.mp3" (the M2HB take-two report, hmg2) and "incoming_shell.mp3" (the artillery shell coming in,
-shell_in) were supplied by the developer.
+"50cal.mp3" (the M2HB take-two report, hmg2), "incoming_shell.mp3" (the artillery shell coming in,
+shell_in) and "helicopter.mp3" (the extraction's rotors, heli_a and heli_b) were supplied by the developer.
 
 ## Radio voice-over
 

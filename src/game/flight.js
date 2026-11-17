@@ -34,7 +34,7 @@ export class FlightPath {
   get start() { return this.keys.length ? this.keys[0].t : 0; }
   get end() { return this.keys.length ? this.keys[this.keys.length - 1].t : 0; }
 
-  /** Catmull-Rom tangents for uneven key spacing (zero at the two ends: it starts and stops smoothly unless keyed on). */
+  /** Catmull-Rom tangents for uneven key spacing (one-sided at the two ends: it flies in and on; zero at a hold). */
   tangents() {
     const K = this.keys;
     this.tan = K.map((k, i) => {
@@ -49,9 +49,12 @@ export class FlightPath {
   pos(t, out) {
     const K = this.keys;
     if (!K.length) return out.set(0, -999, 0);
-    if (t <= K[0].t) return out.copy(K[0].p);
-    if (t >= K[K.length - 1].t) return out.copy(K[K.length - 1].p);
     const T = this.tan || this.tangents();
+    // past either end: straight on at the end's velocity. (Held still there, the attitude's
+    // differences on the first frame saw it stopped a moment ago: a huge acceleration, and
+    // the airframe snapped 23 degrees nose-up as it appeared; at the last, a dead stop.)
+    if (t <= K[0].t) return out.copy(K[0].p).addScaledVector(T[0], t - K[0].t);
+    if (t >= K[K.length - 1].t) return out.copy(K[K.length - 1].p).addScaledVector(T[K.length - 1], t - K[K.length - 1].t);
     let i = 0;
     while (i < K.length - 2 && t > K[i + 1].t) i++;
     const a = K[i], b = K[i + 1], h = b.t - a.t, u = (t - a.t) / h;
@@ -82,7 +85,8 @@ export class Attitude {
    * (its attitude in the hover: a lifter sits a touch nose-up), maxBank.
    */
   constructor(opts = {}) {
-    this.o = { drag: 0.0009, turn: 2.6, yawTurn: 1.6, fastYaw: 9, pitch0: 0, maxBank: 0.85, maxPitch: 0.4, ...opts };
+    // (rates in rad/s: how fast the airframe can actually swing, however hard the path asks)
+    this.o = { drag: 0.0009, turn: 2.6, yawTurn: 1.6, fastYaw: 9, pitch0: 0, maxBank: 0.85, maxPitch: 0.4, yawRate: 0.9, pitchRate: 0.35, rollRate: 0.6, ...opts };
     this.yaw = 0; this.pitch = 0; this.roll = 0;
     this.vel = new THREE.Vector3(); this.acc = new THREE.Vector3(); this.pos = new THREE.Vector3();
     this.ready = false;
@@ -104,7 +108,8 @@ export class Attitude {
       yawT = want + wrap(track - want) * (sp > 1.5 ? k : 0);
     }
     if (!this.ready) { this.yaw = yawT; }
-    this.yaw += wrap(yawT - this.yaw) * (1 - Math.exp(-o.yawTurn * dt));
+    const step = (d, rate) => Math.max(-rate * dt, Math.min(rate * dt, d));
+    this.yaw += step(wrap(yawT - this.yaw) * (1 - Math.exp(-o.yawTurn * dt)), o.yawRate);
     // the rotor's tilt: forward and sideways acceleration in the airframe's frame, plus the drag it leans against
     const fx = Math.sin(this.yaw), fz = Math.cos(this.yaw);  // nose
     const lx = fz, lz = -fx;                                 // port (+x of the model)
@@ -116,8 +121,8 @@ export class Attitude {
     const rollT = Math.max(-o.maxBank, Math.min(o.maxBank, -Math.atan2(al, Math.max(4, lift))));
     if (!this.ready) { this.pitch = pitchT; this.roll = rollT; this.ready = true; }
     const e = 1 - Math.exp(-o.turn * dt);
-    this.pitch += (pitchT - this.pitch) * e;
-    this.roll += (rollT - this.roll) * e;
+    this.pitch += step((pitchT - this.pitch) * e, o.pitchRate);
+    this.roll += step((rollT - this.roll) * e, o.rollRate);
     return this;
   }
 
@@ -149,6 +154,10 @@ export function racetrack(path, { t0, t1, side, inner, outer, zNear, zFar, alt, 
   arc(zFar, side > 0 ? Math.PI : 0, side > 0 ? 2 * Math.PI : -Math.PI, alt[1] + 4);
   leg(xo, zFar, zNear, alt[1] + 6, alt[2]);
   arc(zNear, side > 0 ? 0 : Math.PI, side > 0 ? Math.PI : 0, alt[2]);
+  // the speed eased between the legs and the turns (over ~40 m each way, round the loop):
+  // a step in speed is a jolt of the nose up and down
+  const W = 40, sp0 = pts.map((p) => p[3]), N = pts.length;
+  for (let i = 0; i < N; i++) { let a = 0; for (let j = -W; j <= W; j++) a += sp0[(i + j + N) % N]; pts[i][3] = a / (2 * W + 1); }
   // arc-length timing, then keys every dt
   const tt = [0];
   for (let i = 1; i < pts.length; i++) tt.push(tt[i - 1] + Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]) / pts[i][3]);

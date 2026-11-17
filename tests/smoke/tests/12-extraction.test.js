@@ -14,7 +14,7 @@ module.exports = {
     t.log(JSON.stringify(info));
     t.eq(info.state, 'extraction', 'the extraction starts');
     t.eq(info.missing, [], 'every line of the extraction is recorded');
-    t.eq(info.shots, ['bombersIn', 'bombing', 'helosIn', 'helosFire', 'liftersIn', 'landing', 'run', 'ramp', 'doorClose', 'liftoff', 'helosLeave', 'away'], 'the shots in order');
+    t.eq(info.shots, ['bombersIn', 'bombersClose', 'bombing', 'helosIn', 'helosFire', 'liftersIn', 'landing', 'run', 'ramp', 'doorClose', 'liftoff', 'helosLeave', 'away'], 'the shots in order');
     t.assert(info.end > 90 && info.end < 160, `a cutscene of sensible length (${Math.round(info.end)} s)`);
 
     // step through it, watching what happens when
@@ -43,7 +43,7 @@ module.exports = {
     t.log(JSON.stringify(r));
     t.assert(r.bombersSeen && r.bomberZ > 150, 'the bombers come in from the south, all three in sight');
     t.assert(r.blasts >= 20, `the field erupts (${r.blasts} bombs down)`);
-    t.assert(r.heloY < 13.5 && r.heloZ > -20, 'the gunships come in under the nest roof camera');
+    t.assert(r.heloY < 13.5 && r.heloZ > -20, 'the gunships come in low over the wall');
     t.assert(r.rockets >= 1, 'rockets in the air on the gun run');
     t.assert(Math.abs(r.down) < 0.2 && r.open > 0.9, 'the lead lifter is on its wheels with the ramp down');
     t.assert(r.shut > 0.99, 'the ramp is shut before it lifts');

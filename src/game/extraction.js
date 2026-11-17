@@ -3,7 +3,8 @@
 // flight is inbound, the radio counts it down, and for the last minute and a half
 // everything in the valley comes over the ridge at once. If the wall still stands when
 // the flight is overhead, ExtractionScene plays, still at night: the bombers come in
-// head-on and carpet the field, two gunship helicopters come in low over the nest and
+// head-on and carpet the field (a wide shot, then riding with the lead bomber), two gunship
+// helicopters come in low over the wall, seen from out on the field, and
 // make running passes with rockets and the chain gun, the lifters come round over the
 // field and land behind the wall in their own dust, the garrison runs for the ramps,
 // the ramps shut, and the lifters climb away with the dead coming over the wall under
@@ -76,7 +77,7 @@ export class ExtractionHold {
     // the flight, heard before it is seen: rotors coming up the valley behind the wall
     if (left < 30) {
       const A = g.audio;
-      if (!this.rotor && A.ready && A.B.rotor) this.rotor = A.loop(A.B.rotor[1], { ref: 260, reverb: 0.4 });
+      if (!this.rotor && A.ready) { const b = A.rotorBuf(1); if (b) this.rotor = A.loop(b, { ref: 260, reverb: 0.4 }); }
       if (this.rotor) { const z = 40 + left * 22; this.rotor.update(0, 120, z, 0, 0, -22, 1.6 * (1 - left / 30)); }
     }
     if (left <= 0 && !this.done) {
@@ -136,10 +137,29 @@ const SHOTS = {
     const tgt = S.bomberRuns[1].b.group.visible ? lead.clone() : V(0, 120, 700);
     return { pos, look: follow(S, '_lk', clampLook(pos, tgt, 1.05), 2.2, dt), fov: 56, shake: 0.12 };
   },
+  // riding with the lead bomber: bolted on just off its port wingtip, looking ahead past the
+  // engines and down at the bastion and the field coming up under the nose; the first bombs
+  // leave the bay at the end of it. Rigid (no follow lag): it flies dead straight and level.
+  bombersClose: (k, st, S) => {
+    const g = S.bomberRuns[1].b.group;
+    g.updateMatrixWorld();
+    const pos = _v.set(lerp(46, 41, ease(k)), lerp(9, 7, ease(k)), lerp(-10, -17, ease(k))).applyMatrix4(g.matrixWorld).clone();
+    const look = _w.set(-4, -26, 70).applyMatrix4(g.matrixWorld).clone();
+    return { pos, look, fov: 54, shake: 0.06 };
+  },
   // high behind the left wing: the sticks walking up the field, wide enough to see all three
   bombing: (k) => ({ pos: V(-58, 31, 16).lerp(V(-54, 29, 10), ease(k)), look: V(2, 0, -100).lerp(V(-6, 0, -110), ease(k)), fov: 52, shake: 0.2 }),
-  // from the nest roof: the gunships come in low behind us and out from under the frame
-  helosIn: (k) => ({ pos: NEST(), look: V(0, 6.5, -70).lerp(V(0, 9, -80), ease(k)), fov: 60, shake: 0.08 }),
+  // out on the field, on the city side, low among the dead and the fires: looking back at the
+  // bastion as the gunships come in over the wall at us, past us, and on up the field
+  helosIn: (k, st, S, dt) => {
+    const pos = V(-30, 0, -72).lerp(V(-31, 0, -76), ease(k));
+    pos.y = groundH(pos.x, pos.z) + 5.5;
+    const a = S.helos[0].att.pos, b = S.helos[1].att.pos, mid = a.clone().add(b).multiplyScalar(0.5);
+    // the tower to start with, then the pair as they come close
+    const near = 1 - clamp((Math.hypot(mid.x - pos.x, mid.z - pos.z) - 35) / 70, 0, 1);
+    const tgt = V(0, 9, 4).lerp(mid, S.helos[0].group.visible ? smoother(near) : 0);
+    return { pos, look: follow(S, '_lk1', clampLook(pos, tgt, 0.9), 2.6, dt), fov: 58, shake: 0.12 };
+  },
   // riding behind the lead gunship on its run: rockets and the gun into the crowd
   helosFire: (k, st, S, dt) => {
     const h = S.helos[0], p = h.att.pos;
@@ -372,10 +392,11 @@ export class ExtractionScene {
       const tl = T.helosLeave;
       racetrack(P, { t0: tA + 1.6, t1: tl, side: s, inner: 13 + k * 2, outer: 72, zNear: -14, zFar: -205, alt: [16, 13, 26], speed: 23, turnSpeed: 16.5 });
       // break off: slow to a hover over the field, turn round in it, and go after the lifters
+      // (a pedal turn takes its time: a heavy airframe swings at most ~50 degrees a second)
       P.hold(tl + 2.4, s * 16, 24, -40, Math.PI);
-      P.add(tl + 3.4, s * 16.2, 24.3, -40.2, s * Math.PI / 2);
-      P.hold(tl + 4.4, s * 16, 24.6, -40, 0);
-      P.add(tl + 6.6, s * 14, 31, -8).add(tl + 9, s * 12, 46, 60).add(tl + 14.5, s * 10, 80, 300).add(tl + 24, s * 8, 112, 760);
+      P.add(tl + 3.9, s * 16.2, 24.3, -40.2, s * Math.PI / 2);
+      P.hold(tl + 5.6, s * 16, 24.6, -40, 0);
+      P.add(tl + 7.8, s * 14, 31, -8).add(tl + 10.2, s * 12, 46, 60).add(tl + 15.7, s * 10, 80, 300).add(tl + 25.2, s * 8, 112, 760);
       h.att.ready = false;
       h.group.visible = false; h.beam.visible = false;
       h.burst = 0; h.nextBurst = tA + 2 + k * 0.9; h.round = 0; h.rounds = 0;

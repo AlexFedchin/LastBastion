@@ -675,7 +675,7 @@ export const EXTRACTION = {
 // that only hold a shot. Shots: see SHOTS in extraction.js.
 export const EXTRACT_ENDING = [
   { shot: 'bombersIn', who: CALL.nightingale, radio: true, gap: 1.8, text: 'Bastion-7, Nightingale. We are over the ridge. Hammer flight, you are cleared hot. Everything past the wire.' },
-  { who: CALL.hammer, radio: true, gap: 0.5, text: 'Hammer flight, in hot. Walking it up the valley. Bombs away, bombs away.' },
+  { shot: 'bombersClose', who: CALL.hammer, radio: true, gap: 0.5, text: 'Hammer flight, in hot. Walking it up the valley. Bombs away, bombs away.' },
   { shot: 'bombing', who: CALL.kovac, radio: true, gap: 0.4, text: 'Bring it down on them! Everyone off the wall — get your heads down!' },
   { hold: 4.2, gap: 0 },
   { shot: 'helosIn', who: CALL.reaper, radio: true, gap: 0.9, text: 'Reaper one-one, on station. We have the wall. Anything that moves down there is ours.' },

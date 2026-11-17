@@ -273,8 +273,8 @@ def write_credits():
         m = meta.get(sid, {})
         lines.append(f'| [{m.get("title", sid)}]({m.get("url", "https://freesound.org/s/" + sid)}) | {m.get("user", "?")} | '
                      f'{", ".join(sorted(used[sid]))} |')
-    lines += ['', '"50cal.mp3" (the M2HB take-two report, hmg2) and "incoming_shell.mp3" (the artillery shell coming in,',
-              'shell_in) were supplied by the developer.']
+    lines += ['', '"50cal.mp3" (the M2HB take-two report, hmg2), "incoming_shell.mp3" (the artillery shell coming in,',
+              'shell_in) and "helicopter.mp3" (the extraction\'s rotors, heli_a and heli_b) were supplied by the developer.']
     lines += [''] + ['## Radio voice-over', '', 'Every radio line is performed by [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign)', '(Qwen team, Alibaba Cloud; 1.7B VoiceDesign model and 12 Hz tokenizer), released under the', '[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), each line directed from a written', 'character description and delivery note. Some takes were re-voiced onto one reference voice per', 'character with the voice-conversion model of [Chatterbox](https://github.com/resemble-ai/chatterbox)', '(Resemble AI, MIT). The takes were processed into radio transmissions for the game by', '`scripts/audio/build_voice.py`.']
     open(os.path.join(OUT, 'CREDITS.md'), 'w', encoding='utf8').write('\n'.join(lines) + '\n')
 
@@ -496,10 +496,12 @@ loop('amb/lamp', 553075, 2, 8, ch=1, X=1.0)
 loop('amb/radio_static', 50750, 40, 10, ch=1, sr=22050, X=1.0, bp=(1200, 0.7))
 
 # ── the extraction's helicopters (2026-11-17): real rotors in place of the synthesized ones ──
-# the gunships: a UH-60's steady slap from a long take; the lifters: an overhead pass, slowed
-# a fifth for the CH-47's heavier, slower blades
-loop('sfx/heli_a', 156678, 9.0, 9.0, X=1.2, sr=32000, ch=1, target=-18, hp=40)
-loop('sfx/heli_b', 573942, 30.0, 10.0, X=1.5, sr=32000, ch=1, target=-18, rate=0.8, hp=30, lp=6000)
+# Both from the developer's own recording (scripts/audio/user/helicopter.mp3: a steady 20 s take,
+# blade slap at ~10.8 Hz, faded in and out at the ends, so the loop is cut from 1 s to 18 s).
+# The gunships: as recorded; the lifters: slowed a fifth and darker, for the CH-47's heavier, slower blades.
+UHELI = os.path.join(HERE, 'user', 'helicopter.mp3')
+loop('sfx/heli_a', UHELI, 1.0, 15.5, X=1.5, sr=32000, ch=1, target=-18, hp=40)
+loop('sfx/heli_b', UHELI, 1.0, 12.0, X=1.5, sr=32000, ch=1, target=-18, rate=0.8, hp=30, lp=6000)
 # the AH-64's 30 mm chain gun: single rounds cut from an autocannon burst, fired one by one at ~10 a second
 for k, ss in enumerate((0.0, 0.276, 0.551)):
     clip(f'sfx/chain_{k + 1}', 854186, ss, 0.26 if k < 2 else 0.8, fi=0.001, fo=0.12 if k < 2 else 0.5, hp=60, target=-12)
