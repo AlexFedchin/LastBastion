@@ -176,7 +176,8 @@ export function heightParts(x, z, out = _parts) {
   out.wd = wd;
   // killing field undulation
   const amp = S(5, 55, wd);
-  let base = amp * ((fbm(x * 0.017, z * 0.017, 3) - 0.5) * 2.3 + (vnoise(x * 0.085, z * 0.085) - 0.5) * 0.4);
+  const broad = amp * (fbm(x * 0.017, z * 0.017, 3) - 0.5) * 2.3, fine = amp * (vnoise(x * 0.085, z * 0.085) - 0.5) * 0.4;
+  let base = broad + fine;
   // craters & ditches
   const crater = craterAt(x, z);
   let trench = 0;
@@ -189,10 +190,12 @@ export function heightParts(x, z, out = _parts) {
     const m = S(-68, -58, x) * S(80, 70, x);
     trench += m * (-0.9 * S(1.15, 0.55, Math.abs(dz)) + 0.42 * Math.exp(-Math.pow((dz + 2.4) / 1.1, 2)));
   }
-  // road: smooth the fine detail, keep potholes
+  // road: a laid surface. It follows the valley's broad rise and fall, but not the lumps or
+  // the shell craters (its potholes are in the shader), with a low crown down the middle
   const rd = Math.abs(x - roadX(z));
   const road = z < wallZ(x) - 1 ? S(6.8, 3.9, rd) : 0;
-  let h = base * (1 - road * 0.55) + crater * (1 - road * 0.55) + trench * (1 - road * 0.7) + road * 0.04;
+  const crown = 0.07 * Math.max(0, 1 - (rd / 4.2) ** 2);
+  let h = broad * (1 - road * 0.3) + fine * (1 - road) + crater * (1 - road * 0.92) + trench * (1 - road * 0.7) + road * (0.06 + crown);
 
   // cliffs continuing the wall line beyond the wings
   // (behind the base they die away into the rear hills)
@@ -430,6 +433,71 @@ vec2 rippleN(vec2 p, float t){
   }
   return acc;
 }
+// ── the asphalt: cracks and potholes ──
+// Cracks are the borders of a Voronoi pattern (after Quilez, "Voronoi edges"): the exact
+// distance to the nearest border, and the direction across it, so a crack can be drawn
+// as a groove of a set width in metres and lit from its own slope.
+vec3 crackVor(vec2 x){
+  vec2 n = floor(x), f = fract(x);
+  vec2 mg = vec2(0.0), mr = vec2(0.0); float md = 8.0;
+  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++){
+    vec2 g = vec2(float(i), float(j));
+    vec2 o = vec2(tHash(n + g), tHash(n + g + 17.31));
+    vec2 r = g + o - f;
+    float d = dot(r, r);
+    if (d < md){ md = d; mr = r; mg = g; }
+  }
+  md = 8.0; vec2 dir = vec2(1.0, 0.0);
+  for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++){
+    vec2 g = mg + vec2(float(i), float(j));
+    vec2 o = vec2(tHash(n + g), tHash(n + g + 17.31));
+    vec2 r = g + o - f;
+    vec2 e = r - mr;
+    if (dot(e, e) > 1e-5){ vec2 nd = normalize(e); float d = dot(0.5 * (mr + r), nd); if (d < md){ md = d; dir = nd; } }
+  }
+  return vec3(md, dir);
+}
+// One family of cracks: cells of 'cell' metres, the line 'width' metres wide, antialiased
+// against the pixel's footprint 'fp' (metres) so a crack thinner than a pixel fades out
+// instead of crawling. Returns (coverage, groove slope x, z): the slope is for the normal.
+vec3 crackLayer(vec2 p, float cell, float width, float fp, float jag){
+  vec2 q = p / cell;
+  q += (vec2(tNoise(q * 2.3 + 1.3), tNoise(q * 2.3 + 6.1)) - 0.5) * jag; // jagged, not ruler-straight
+  vec3 v = crackVor(q);
+  float d = v.x * cell;                                                    // metres to the crack
+  float w = width * (0.6 + 0.8 * tNoise(p * 1.7));                        // opens and closes along its length
+  float cov = 1.0 - smoothstep(w * 0.5, w * 0.5 + fp, d);
+  cov *= min(1.0, w / max(fp, 1e-4));                                      // thinner than a pixel: fainter
+  // the groove's walls: they face the crack (towards it on either side)
+  float wall = smoothstep(w * 0.5 + fp + 0.006, w * 0.5, d) * (1.0 - cov * 0.7);
+  return vec3(cov, -v.yz * wall);
+}
+// Potholes: in each 7 m square of road a one-in-three chance of one, of 0.4-1.2 m, with a
+// ragged edge. Returns (inside 0..1, rim, slope x, z, water): broken steep walls, a flat
+// bottom of wet gravel, and some of them full of rain.
+vec4 pothole(vec2 p, float fp, out float water){
+  vec2 cell = floor(p / 7.0);
+  vec3 h = vec3(tHash(cell + 3.3), tHash(cell + 8.1), tHash(cell + 1.9));
+  water = 0.0;
+  if (h.x > 0.34) return vec4(0.0);
+  vec2 c = (cell + 0.25 + vec2(h.y, h.z) * 0.5) * 7.0; // (far enough in that R x 1.9 stays in the square)
+  vec2 dv = p - c;
+  float R = 0.4 + 0.8 * tHash(cell + 5.7);
+  float dist = length(dv);
+  if (dist > R * 1.9) return vec4(0.0);
+  float a = atan(dv.y, dv.x);
+  float rag = 1.0 + (tNoise(vec2(a * 2.2, 0.0) + cell * 3.1) - 0.5) * 0.55 + (tNoise(dv * 6.0) - 0.5) * 0.18;
+  float Re = R * rag;
+  float q = dist / Re;
+  float inside = 1.0 - smoothstep(1.0 - fp / Re, 1.0 + fp / Re, q);
+  // depth: steep walls in the outer quarter, a flat floor
+  float depth = 0.09 * smoothstep(1.0, 0.72, q);
+  float slope = 0.09 * 6.0 * smoothstep(0.72, 0.86, q) * smoothstep(1.0, 0.9, q) / Re; // d(depth)/d(dist), roughly
+  vec2 nrm = -normalize(dv + 1e-5) * slope;                                // the walls face inward
+  float rim = smoothstep(1.35, 1.0, q) * (1.0 - inside);                   // crumbled asphalt round it
+  water = tHash(cell + 9.4) < 0.6 ? smoothstep(0.78, 0.66, q) : 0.0;
+  return vec4(inside, rim, nrm);
+}
 `;
 
 export class Terrain {
@@ -606,13 +674,41 @@ ${T_COMMON}
     rockC = ntSample(tRockA, ntRx).rgb * bw.x + ntSample(tRockA, ntRock).rgb * bw.y + ntSample(tRockA, ntRz).rgb * bw.z;
   }
   vec3 asphC = vec3(0.0);
+  // the road's own relief and wetness, for the roughness and normal sections below
+  vec2 rdN = vec2(0.0); float rdWater = 0.0, rdCrack = 0.0, rdHole = 0.0;
   if (hasRoad) {
     ntAsph = ntSetupD(tw.xz / ${f(TS.asph)} - 17.0, gX / ${f(TS.asph)}, gY / ${f(TS.asph)});
     asphC = ntSample(tAsphA, ntAsph).rgb;
+    // old asphalt: darker patched stretches, paler worn ones
+    asphC *= 0.82 + 0.32 * tNoise(tw.xz * 0.045 + 4.0);
     // faded centre line on the road
     float along = tw.z;
     float paint = (1.0 - tS(0.07, 0.12, abs(tw.x - roadXg(tw.z)))) * step(0.45, fract(along / 7.0)) * tS(0.35, 0.6, tNoise(tw.xz * 0.9));
     asphC = mix(asphC, vec3(0.32, 0.29, 0.2), paint * 0.7);
+    // potholes, then cracks: long ones in patches, fine "alligator" cracking in others and round the holes
+    float fp = max(length(gX), length(gY)) * 1.2;   // metres a pixel covers here
+    float hw;
+    vec4 ph = pothole(tw.xz, fp, hw);
+    rdHole = ph.x;
+    float near = 1.0 - tS(35.0, 90.0, distC);       // cracks only where they can be seen
+    if (near > 0.0) {
+      float longK = tS(0.38, 0.6, tNoise(tw.xz * 0.06 + 2.0));
+      // (crazing kept rare and faint: a whole road of it reads as dried mud again)
+      float alliK = max(tS(0.72, 0.86, tNoise(tw.xz * 0.11 + 9.0)) * 0.6, ph.y * 1.2);
+      vec3 cl = crackLayer(tw.xz + 31.0, 2.6, 0.022, fp, 0.55);
+      vec3 ca = alliK > 0.0 ? crackLayer(tw.xz - 13.0, 0.42, 0.0075, fp, 0.35) : vec3(0.0);
+      rdCrack = clamp(cl.x * longK + ca.x * alliK, 0.0, 1.0) * near * (1.0 - rdHole);
+      // (a gentle groove: steeper, every crack caught the lamps like a filament)
+      rdN += (cl.yz * longK + ca.yz * alliK) * 0.3 * near * (1.0 - rdHole);
+    }
+    asphC *= 1.0 - 0.7 * rdCrack;
+    asphC *= 1.0 - 0.22 * ph.y;                     // the broken edge round a hole
+    // in the hole: wet gravel and mud, and rain water in some
+    vec3 holeC = mudC * vec3(0.62, 0.6, 0.58);
+    rdWater = hw * rdHole;
+    holeC *= 1.0 - 0.45 * rdWater;
+    asphC = mix(asphC, holeC, rdHole);
+    rdN += ph.zw;
   }
   // ── behind the base: a patchwork of fields on the valley floor, a dirt track ──
   float rz = tS(40.0, 95.0, tw.z);
@@ -682,7 +778,7 @@ ${T_COMMON}
         .replace('#include <roughnessmap_fragment>', /* glsl */`
   float roughnessFactor = ntSample(tMudR, ntMud).${mud.file ? 'a' : 'g'};
   roughnessFactor = mix(roughnessFactor, 0.93, tGrass);
-  roughnessFactor = mix(roughnessFactor, 0.62, tRoad);
+  roughnessFactor = mix(roughnessFactor, mix(mix(0.6, 0.85, rdCrack), mix(0.8, 0.04, rdWater), rdHole), tRoad);
   roughnessFactor = mix(roughnessFactor, 0.78, tRock);
   roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.72, tTrample);
   roughnessFactor = max(roughnessFactor, 0.55) * mix(1.0, 0.86, uRain);
@@ -697,9 +793,15 @@ ${T_COMMON}
   vec3 nMud = ntSampleN(normalMap, ntSetupD(tw.xz / ${f(TS.mudN)} + 41.0, gX / ${f(TS.mudN)}, gY / ${f(TS.mudN)}));
   vec3 mapN = nMud;
   if (hasTurf) mapN = mix(mapN, ntSampleN(tTurfN, ntTurf), tGrass);
-  // the road: the asphalt's own fine grain over the broken ground under it (the asphalt's
-  // normal map alone is nearly flat, and a wet road reads by its bumps catching the lamps)
-  if (hasRoad) mapN = mix(mapN, ntSampleN(tAsphN, ntAsph) + vec3(nMud.xy * 0.6, 0.0), tRoad);
+  // the road: smooth asphalt, its own fine grain, the cracks' grooves and the holes' walls;
+  // standing water in a hole lies flat (rippled by the rain)
+  if (hasRoad) {
+    vec3 aN = ntSampleN(tAsphN, ntAsph);
+    aN.xy = aN.xy * 0.85 + rdN;
+    aN.xy *= 1.0 - rdWater;
+    if (rdWater > 0.01 && distC < 90.0) aN.xy += rippleN(tw.xz * 1.6, uTime) * rdWater * 0.7 * uRain;
+    mapN = mix(mapN, aN, tRoad);
+  }
   if (hasRock) mapN = mix(mapN, ntSampleN(tRockN, ntRock) * vec3(1.6, 1.6, 1.0), tRock);
   mapN.xy *= (1.0 - puddle) * (1.0 - 0.35 * tWet);
   if (puddle > 0.01 && distC < 90.0) mapN.xy += rippleN(tw.xz * 1.6, uTime) * puddle * 0.9 * uRain;
