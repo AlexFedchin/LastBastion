@@ -50,6 +50,7 @@ CAST = {
     'UNKNOWN': dict(voice='af_nicole', speed=1.12, radio='broken'),
     'AUTOMATED': dict(voice='bf_emma', speed=0.9, radio='hf_clean'),
     'BATTERY': dict(voice='am_eric', speed=1.1, radio='field'),
+    'CPL. VOSS': dict(voice='bm_daniel', speed=0.98, radio='handheld'),  # the quartermaster, in the hangar
     'SPECTRE 2-1': dict(voice='am_michael', speed=1.02, radio='aircraft'),
     'HAMMER 1-1': dict(voice='am_adam', speed=1.06, radio='jet'),
     'SPECTRE 2-2': dict(voice={'am_eric': 0.5, 'am_michael': 0.5}, speed=1.0, radio='aircraft'),
@@ -82,6 +83,9 @@ PROFILES = {
 SPOKEN = [
     (r'Bastion-(\d)', lambda m: 'Bastion ' + ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'][int(m.group(1))]),
     (r'\b0300\b', 'zero three hundred'),
+    (r'\bHE-I\b', 'H.E.I'),   # ammunition names, spelled out as soldiers say them
+    (r'\bAP-T\b', 'A.P.T'),
+    (r'\bM240\b', 'M two-forty'),
     (r'\bHE\b', 'high explosive'),
     (r'\bGBU\b', 'G.B.U.'),
     (r'\bklicks\b', 'clicks'),

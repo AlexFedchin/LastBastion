@@ -77,7 +77,7 @@ export class HUD {
    * opts.valid: checked when its turn comes; false drops it (the bomb already fell...).
    */
   radio(who, text, prio = false, opts = {}) {
-    const m = { who, text, at: this.clock || 0, ttl: opts.ttl ?? (prio ? 6 : 40), valid: opts.valid || null };
+    const m = { who, text, at: this.clock || 0, ttl: opts.ttl ?? (prio ? 6 : 40), valid: opts.valid || null, parts: opts.parts || null };
     if (prio) this.radioQueue.unshift(m); else this.radioQueue.push(m);
     if (this.radioQueue.length > 4) this.radioQueue.length = 4;
   }
@@ -346,9 +346,9 @@ export class HUD {
       this.set('rtext', el.radioText, full.slice(0, shown));
       if (this.radioT <= 0) el.radio.classList.remove('show');
     } else if (this.radioQueue.length && (this._rm = this.nextRadio())) {
-      const { who, text } = this._rm;
+      const { who, text, parts } = this._rm;
       this.radioFull = text;
-      this.radioVoice = g.audio ? g.audio.radioVoice(who, text) : 0;
+      this.radioVoice = !g.audio ? 0 : parts ? g.audio.radioParts(who, parts) : g.audio.radioVoice(who, text);
       this.radioDur = this.radioT = Math.max(4.5, text.length * 0.065 + 2.5, this.radioVoice + 1.4);
       el.radioWho.textContent = who;
       el.radioText.textContent = '';

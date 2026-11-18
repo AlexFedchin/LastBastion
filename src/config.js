@@ -203,6 +203,10 @@ export const ISSUE_LINES = {
   gunners: 'another M240 up on the wall', crews: 'the gun crews back from the range', wire: 'more wire out in the approach',
   grenades: 'another crate of grenades', molotov: 'more bottles', molotovFuel: 'thickened fuel in the bottles', claymores: 'claymores dug in out front',
 };
+// The same line spoken: it is assembled from what was bought, so Kovac's voice is recorded in
+// pieces, an opener and one short sentence per item, played back to back (audio.radioParts).
+export const ISSUE_OPEN = 'New on the line tonight.';
+export const issueSpoken = (phrase) => phrase[0].toUpperCase() + phrase.slice(1) + '.';
 // The hangar, as a requisition is set down in its bay: a word from whoever brought it in.
 export const DELIVERY_LINES = {
   hmgDmg: ['qm', "New barrel's on the bench, Sarge. Headspace and timing are set."],
@@ -763,6 +767,8 @@ export function allRadioLines() {
   for (const t of [COMMS.spectreIntro2, ...COMMS.spectre]) add(CALL.spectre2, t);
   for (const lines of Object.values(UNLOCK_LINES)) for (const [w, t] of lines) add(w, t);
   for (const [w, t] of Object.values(DELIVERY_LINES)) add(CALL[w], t);
+  add(CALL.kovac, ISSUE_OPEN);
+  for (const t of Object.values(ISSUE_LINES)) add(CALL.kovac, issueSpoken(t));
   for (const ev of Object.values(EVENT_LINES)) {
     for (const lines of Object.values(ev)) {
       for (const [w, t] of lines) {

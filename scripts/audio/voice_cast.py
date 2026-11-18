@@ -632,6 +632,20 @@ DIRECTION = {
         ("Earnest and slightly nervous, a young soldier proud he got it right; a small hurried laugh at the end.", 0.3),
 }
 
+# ── Kovac's night-start list (ISSUE_OPEN / ISSUE_LINES): recorded in pieces and played back to
+# back, so every piece is read the same way: a sergeant reading items off a list to his men ──
+_ISSUE = ("Flat, steady and unhurried, reading one item off a list to his men over the radio; "
+          "a plain statement with a level, finished ending, no emphasis, no question.", 0.3)
+DIRECTION['New on the line tonight.'] = (
+    "Flat and businesslike, a sergeant starting to read the night's kit list over the radio; "
+    "steady, a small pause after it.", 0.32)
+for _p in ['A new match-grade barrel on the fifty.', 'A stiffer buffer spring in the fifty.', 'Fresh water in the jacket.',
+           'AP-T in the belt.', 'Incendiaries in the belt.', 'HE-I in the belt.', 'Another gun section on the battery.',
+           'The fire direction centre plotting faster.', 'Heavy charges for the one-oh-fives.', 'Another M240 up on the wall.',
+           'The gun crews back from the range.', 'More wire out in the approach.', 'Another crate of grenades.',
+           'More bottles.', 'Thickened fuel in the bottles.', 'Claymores dug in out front.']:
+    DIRECTION[_p] = _ISSUE
+
 
 def direction(who, text):
     d, intensity = DIRECTION.get(text, DEFAULT[who])

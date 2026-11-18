@@ -6,7 +6,7 @@ import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
   nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, wallDist, ABILITY, CALL, COMMS,
   UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines, CHRONICLE, NIGHT_EVENTS, EXTRACTION,
-  ISSUE_LINES, GUN_MODS,
+  ISSUE_LINES, ISSUE_OPEN, issueSpoken, GUN_MODS,
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
@@ -622,7 +622,7 @@ class Game {
     if (!items.length) return;
     const said = [...fresh.map((u) => ISSUE_LINES[u.id]), ...(mines ? [ISSUE_LINES.claymores] : [])].filter(Boolean);
     const list = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}` : said[0];
-    this.radioScript.push({ at: 6.5, who: CALL.kovac, text: `New on the line tonight: ${list}.`, done: false });
+    this.radioScript.push({ at: 6.5, who: CALL.kovac, text: `New on the line tonight: ${list}.`, parts: [ISSUE_OPEN, ...said.map(issueSpoken)], done: false });
     this.radioScript.sort((a, b) => a.at - b.at);
   }
 
@@ -1121,7 +1121,7 @@ class Game {
 
     // radio script
     for (const r of this.radioScript) {
-      if (!r.done && this.director.t >= r.at) { r.done = true; this.hud.radio(r.who, r.text); }
+      if (!r.done && this.director.t >= r.at) { r.done = true; this.hud.radio(r.who, r.text, false, { parts: r.parts }); }
     }
 
     // carnage counter
