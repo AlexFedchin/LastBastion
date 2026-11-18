@@ -32,7 +32,7 @@ SETS = {
     'mud':      ('brown_mud_02',          (64, 58, 51),    1.0, 0.4, (2048, 1024, 512), {'alpha_rough': True}),
     'turf':     ('forest_leaves_02',      (97, 85, 50),    1.0, 0.3, (2048, 1024, 512), {}),
     'rock':     ('rock_face_03',          (67, 66, 61),    0.8, 0.5, (2048, 1024, 512), {}),
-    'asphalt':  ('asphalt_02',            (43, 43, 44),    0.6, 0.5, (2048, 1024, 512), {}),
+    # (asphalt: from ambientCG now, build_ambientcg.py)
     'track':    ('rocky_trail',           (72, 63, 53),    0.9, 0.4, (1024, 512), {}),
     'plough':   ('aerial_mud_1',          (58, 50, 43),    0.9, 0.4, (1024, 512), {}),
     'concrete': ('concrete_wall_006',     (105, 105, 107), 0.5, 0.5, (2048, 1024, 512), {}),

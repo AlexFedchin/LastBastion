@@ -528,7 +528,7 @@ export class Terrain {
     const scan = (n) => !!(fileTex(n) && fileTex(n).file);
     const TS = {
       mud: mud.file ? 2.2 : 9, mudMacro: mud.file ? 23 : 41, turf: scan('turf') ? 3.4 : 5.5,
-      rock: scan('rock') ? 6.5 : 13, asph: scan('asphalt') ? 3.6 : 7, track: 2.4, plough: 9,
+      rock: scan('rock') ? 6.5 : 13, asph: scan('asphalt') ? 2.6 : 7, track: 2.4, plough: 9,
       // the mud's relief at the size it always had on screen (9 m a tile): smaller, its bumps
       // turn to mush past a few metres and the field reads flat
       mudN: 9,
@@ -677,7 +677,9 @@ ${T_COMMON}
   // the road's own relief and wetness, for the roughness and normal sections below
   vec2 rdN = vec2(0.0); float rdWater = 0.0, rdCrack = 0.0, rdHole = 0.0;
   if (hasRoad) {
-    ntAsph = ntSetupD(tw.xz / ${f(TS.asph)} - 17.0, gX / ${f(TS.asph)}, gY / ${f(TS.asph)});
+    // the asphalt's wear runs along the road, the way the traffic went: the texture turned so
+    // its streaks lie along z (u along the road), each tile turned only a few degrees off that
+    ntAsph = ntSetupR(tw.zx / ${f(TS.asph)} - 17.0, gX.yx / ${f(TS.asph)}, gY.yx / ${f(TS.asph)}, 0.05);
     asphC = ntSample(tAsphA, ntAsph).rgb;
     // old asphalt: darker patched stretches, paler worn ones
     asphC *= 0.82 + 0.32 * tNoise(tw.xz * 0.045 + 4.0);
@@ -778,7 +780,7 @@ ${T_COMMON}
         .replace('#include <roughnessmap_fragment>', /* glsl */`
   float roughnessFactor = ntSample(tMudR, ntMud).${mud.file ? 'a' : 'g'};
   roughnessFactor = mix(roughnessFactor, 0.93, tGrass);
-  roughnessFactor = mix(roughnessFactor, mix(mix(0.6, 0.85, rdCrack), mix(0.8, 0.04, rdWater), rdHole), tRoad);
+  roughnessFactor = mix(roughnessFactor, mix(mix(0.7, 0.88, rdCrack), mix(0.8, 0.04, rdWater), rdHole), tRoad);
   roughnessFactor = mix(roughnessFactor, 0.78, tRock);
   roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.72, tTrample);
   roughnessFactor = max(roughnessFactor, 0.55) * mix(1.0, 0.86, uRain);
@@ -797,7 +799,8 @@ ${T_COMMON}
   // standing water in a hole lies flat (rippled by the rain)
   if (hasRoad) {
     vec3 aN = ntSampleN(tAsphN, ntAsph);
-    aN.xy = aN.xy * 0.85 + rdN;
+    aN.xy = aN.yx; // (sampled with x and z swapped: back to the world's)
+    aN.xy = aN.xy * 1.1 + rdN;
     aN.xy *= 1.0 - rdWater;
     if (rdWater > 0.01 && distC < 90.0) aN.xy += rippleN(tw.xz * 1.6, uTime) * rdWater * 0.7 * uRain;
     mapN = mix(mapN, aN, tRoad);

@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
-"""Builds the hangar's surface textures (app/textures/<size>/hg*_{c,n,r}.webp) from
-ambientCG CC0 materials (https://ambientcg.com), downloaded as 2K JPG zips into
-scripts/textures/source/ambientcg/.
+"""Builds surface textures from ambientCG CC0 materials (https://ambientcg.com), downloaded
+as 2K JPG zips into scripts/textures/source/ambientcg/: the hangar's (SETS) and the
+valley's own terrain layers (TERRAIN).
 
 Each set ships like the Poly Haven ones (src/world/texlib.js):
   <name>_c  colour, ambient occlusion baked in (the materials have no aoMap)
   <name>_n  OpenGL normal map
   <name>_r  G roughness, B metalness (three.js reads them from those channels)
 at 2048 (the floor and walls only), 1024 and 512 px.
+
+A terrain set ships the way the Poly Haven terrain sets do (build_textures.py), because the
+terrain shader reads them the same way: <name>_c (AO baked in, its mean brightness matched
+to the palette the valley was tuned against, its hue pulled part of the way there) and
+<name>_n.
 
     python3 scripts/textures/build_ambientcg.py [name ...]
 
@@ -36,6 +41,14 @@ SETS = {
     'hgPlate': ('DiamondPlate008C', (1024, 512), 0.8),         # tread plate for the stands
     'hgRubber': ('Rubber004', (1024, 512), 0.5),               # the mats under the kit
     'hgWood': ('Wood089', (1024, 512), 0.5),                   # bench tops, boards
+}
+
+# The valley: name: (ambientCG id, target mean sRGB, saturation kept, hue pull, sizes)
+TERRAIN = {
+    # old road asphalt, its top layer worn through in streaks: rough at every distance (the fine
+    # grain of smoother sets filters away a few metres out). The terrain shader lays its streaks
+    # along the road, the way the traffic wore it
+    'asphalt': ('Asphalt018', (43, 43, 44), 0.6, 0.5, (2048, 1024, 512)),
 }
 
 
@@ -81,15 +94,49 @@ def build(name):
     return aid
 
 
+def build_terrain(name):
+    sys.path.insert(0, HERE)
+    from build_textures import LIN, W, gain, lin_means  # the Poly Haven sets' colour matching
+    from PIL import ImageEnhance
+    aid, target, sat, hue, sizes = TERRAIN[name]
+    d = fetch(aid)
+    col = find(d, 'Color').convert('RGB')
+    ao = find(d, 'AmbientOcclusion')
+    if ao is not None:
+        aol = ao.convert('L').resize(col.size).point(lambda v: int(255 * (0.55 + 0.45 * v / 255)))
+        col = Image.merge('RGB', [ImageChops.multiply(ch, aol) for ch in col.split()])
+    if sat < 1:
+        col = ImageEnhance.Color(col).enhance(sat)
+    tgt = [LIN[int(v)] for v in target]
+    m = lin_means(col)
+    g = [(tgt[c] / m[c]) ** hue for c in range(3)]
+    m2 = [m[c] * g[c] for c in range(3)]
+    k = sum(W[c] * tgt[c] for c in range(3)) / sum(W[c] * m2[c] for c in range(3))
+    col = gain(col, [g[c] * k for c in range(3)])
+    nor = find(d, 'NormalGL').convert('RGB')
+    for s in sizes:
+        os.makedirs(os.path.join(OUT, str(s)), exist_ok=True)
+        col.resize((s, s), Image.LANCZOS).save(os.path.join(OUT, str(s), f'{name}_c.webp'), quality=84, method=6)
+        nor.resize((s, s), Image.LANCZOS).save(os.path.join(OUT, str(s), f'{name}_n.webp'), quality=90, method=6)
+    print(f'{name:10} {aid}  mean {[round(v) for v in col.resize((1, 1), Image.BOX).getpixel((0, 0))]}')
+    # the shipped sets' record (texlib reads nothing from it; it is the list of sources)
+    mp = os.path.join(OUT, 'textures.json')
+    allm = json.load(open(mp)) if os.path.exists(mp) else {}
+    allm[name] = {'id': aid, 'source': 'ambientCG', 'authors': ['ambientCG']}
+    json.dump(allm, open(mp, 'w'), indent=1)
+    return aid
+
+
 def credits(built):
     p = os.path.join(OUT, 'CREDITS.md')
     s = open(p, encoding='utf8').read()
     start, end = '<!-- ambientcg -->', '<!-- /ambientcg -->'
-    block = [start, '', '## The hangar (ambientCG)', '',
-             'The dawn resupply hangar\'s surfaces are CC0 materials from [ambientCG](https://ambientcg.com),',
-             'converted by `scripts/textures/build_ambientcg.py` (AO baked into the colour, roughness and metalness packed).', '',
+    block = [start, '', '## From ambientCG', '',
+             'The road and the dawn resupply hangar\'s surfaces are CC0 materials from [ambientCG](https://ambientcg.com),',
+             'converted by `scripts/textures/build_ambientcg.py` (AO baked into the colour; the hangar\'s with roughness',
+             'and metalness packed, the road\'s brightness matched to the valley like the Poly Haven sets).', '',
              '| Set | Source | License |', '|---|---|---|']
-    for name, (aid, *_rest) in SETS.items():
+    for name, (aid, *_rest) in {**TERRAIN, **SETS}.items():
         block.append(f'| `{name}` | [{aid}](https://ambientcg.com/view?id={aid}) | CC0 1.0 |')
     block += ['', end]
     if start in s:
@@ -100,7 +147,10 @@ def credits(built):
 
 
 if __name__ == '__main__':
-    want = sys.argv[1:] or list(SETS)
+    want = sys.argv[1:] or [*TERRAIN, *SETS]
     for n in want:
-        build(n)
+        if n in TERRAIN:
+            build_terrain(n)
+        else:
+            build(n)
     credits(want)

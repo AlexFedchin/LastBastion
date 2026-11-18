@@ -22,10 +22,10 @@
   ]
  },
  "asphalt": {
-  "id": "asphalt_02",
-  "metres": 3.0,
+  "id": "Asphalt018",
+  "source": "ambientCG",
   "authors": [
-   "Rob Tuytel"
+   "ambientCG"
   ]
  },
  "track": {
