@@ -45,10 +45,10 @@ SETS = {
 
 # The valley: name: (ambientCG id, target mean sRGB, saturation kept, hue pull, sizes)
 TERRAIN = {
-    # old road asphalt, its top layer worn through in streaks: rough at every distance (the fine
-    # grain of smoother sets filters away a few metres out). The terrain shader lays its streaks
-    # along the road, the way the traffic wore it
-    'asphalt': ('Asphalt018', (43, 43, 44), 0.6, 0.5, (2048, 1024, 512)),
+    # coarse old asphalt, the stone chips standing proud: rough at every distance (the fine grain of
+    # smoother sets filters away a few metres out) and the same in every direction, so the
+    # terrain shader can turn each tile freely (a streaked set, Asphalt018, read as stretched)
+    'asphalt': ('Asphalt004', (43, 43, 44), 0.6, 0.5, (2048, 1024, 512)),
 }
 
 

@@ -37,7 +37,7 @@ and metalness packed, the road's brightness matched to the valley like the Poly 
 
 | Set | Source | License |
 |---|---|---|
-| `asphalt` | [Asphalt018](https://ambientcg.com/view?id=Asphalt018) | CC0 1.0 |
+| `asphalt` | [Asphalt004](https://ambientcg.com/view?id=Asphalt004) | CC0 1.0 |
 | `hgFloor` | [Concrete031](https://ambientcg.com/view?id=Concrete031) | CC0 1.0 |
 | `hgWall` | [CorrugatedSteel005](https://ambientcg.com/view?id=CorrugatedSteel005) | CC0 1.0 |
 | `hgSteel` | [Metal041B](https://ambientcg.com/view?id=Metal041B) | CC0 1.0 |

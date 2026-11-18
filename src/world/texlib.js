@@ -18,7 +18,7 @@ const SETS = {
 };
 /** Real-world width of one tile, in metres (from Poly Haven's scan dimensions). */
 export const TILE_M = {
-  mud: 1.3, turf: 3.0, rock: 2.7, asphalt: 2.6, track: 2.0, plough: 8.0, concrete: 2.0, slab: 3.0,
+  mud: 1.3, turf: 3.0, rock: 2.7, asphalt: 2.0, track: 2.0, plough: 8.0, concrete: 2.0, slab: 3.0,
   metal: 1.0, corr: 2.0, plaster: 1.85, bark: 2.0, planks: 1.87, burlap: 0.27,
   hgFloor: 3.0, hgWall: 2.0, hgSteel: 2.0, hgHazard: 1.0, hgPlate: 1.0, hgRubber: 1.0, hgWood: 2.0,
 };
