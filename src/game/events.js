@@ -5,7 +5,7 @@
 // objective, a boss bar and markers on the HUD.
 import * as THREE from 'three';
 import {
-  WORLD, ZT, ZOMBIE_TYPES, CALL, EVENTS, EVENT_LINES, NIGHT_EVENTS, ENDLESS_EVENTS, wallZ, wallDist, WING_COS,
+  WORLD, ZT, ZOMBIE_TYPES, CALL, EVENTS, EVENT_LINES, NIGHT_EVENTS, ENDLESS_EVENTS, wallZ, WING_COS,
 } from '../config.js';
 import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';

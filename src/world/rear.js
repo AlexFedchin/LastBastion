@@ -8,7 +8,7 @@ import {
   heightFn, groundNormal, vnoise, valleyEdge, rearRoadX, rearValleyX,
   fieldCoords, fieldToWorld, fieldKind,
 } from './terrain.js';
-import { box, cylY, merge, xf, makeHouseGeo, makeRuin, sagWire, weather } from './kit.js';
+import { box, cylY, merge, makeHouseGeo, makeRuin, sagWire, weather } from './kit.js';
 import { placeModel } from './vehicles.js';
 import { makeConiferGeo, makeDeadPineGeo, makePineMat } from './far.js';
 

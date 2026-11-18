@@ -6,7 +6,6 @@ import { clamp, damp, rand, fitFov } from '../core/util.js';
 import { cloneModel } from '../world/models.js';
 
 const DEG = Math.PI / 180;
-const _v = new THREE.Vector3();
 const _d = new THREE.Vector3();
 const _m = new THREE.Vector3();
 const _right = new THREE.Vector3();

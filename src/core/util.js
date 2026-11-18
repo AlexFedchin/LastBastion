@@ -2,13 +2,11 @@
 
 export const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 export const lerp = (a, b, t) => a + (b - a) * t;
-export const invLerp = (a, b, v) => clamp((v - a) / (b - a), 0, 1);
 export const smoothstep = (a, b, v) => {
   const t = clamp((v - a) / (b - a), 0, 1);
   return t * t * (3 - 2 * t);
 };
 export const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
-export const randInt = (a, b) => Math.floor(a + Math.random() * (b - a + 1));
 export const chance = (p) => Math.random() < p;
 export const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 export const damp = (current, target, lambda, dt) => lerp(current, target, 1 - Math.exp(-lambda * dt));
@@ -16,12 +14,6 @@ export const TAU = Math.PI * 2;
 
 // Gaussian-ish random in [-1,1]
 export const randn = () => (Math.random() + Math.random() + Math.random() - 1.5) / 1.5;
-
-// Deterministic hash -> [0,1)
-export function hash1(n) {
-  const s = Math.sin(n * 127.1 + 311.7) * 43758.5453123;
-  return s - Math.floor(s);
-}
 
 // Seeded PRNG (mulberry32)
 export function makeRng(seed = 1) {

@@ -452,8 +452,6 @@ clip('sfx/steam_long', 211096, 0.0, 5.0, sr=32000, fi=0.1, fo=2.5, target=-22)
 clip('sfx/ui_click', 448394, 0.52, 0.28, target=-16)
 clip('sfx/ui_hover', 256116, 0.0, 0.045, fi=0.0003, fo=0.02, target=-20, norm='peak')
 oneshot('sfx/ui_buy', [dict(src=586544, ss=28.46, t=0.2), dict(src=320353, ss=2.69, t=0.3, vol=-3, delay=0.06)], target=-14)
-oneshot('sfx/flare_launch', [dict(src=529239, ss=0.28, t=1.4, rate=1.5, fo=0.6),
-                             dict(src=463763, ss=2.09, t=0.46, vol=-4, delay=0.05)], target=-14)
 oneshot('sfx/flare_ignite', [dict(src=348766, ss=0.72, t=0.4), dict(src=348766, ss=2.0, t=3.0, fi=0.2, fo=2.0, vol=-6)],
         sr=32000, target=-16)
 # grenade: the pin drawn out of the ring (a blade drawn short and small, with a clip's

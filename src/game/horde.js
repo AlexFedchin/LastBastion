@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import {
   ZOMBIE_TYPES, ZT, WORLD, wallZ, wallDist, wallFacing, sectionOf, PILE,
-  ZOMBIE_HEIGHT, HEADSHOT_FRAC, WING_COS,
+  ZOMBIE_HEIGHT, WING_COS,
 } from '../config.js';
 import { nearObstacle, steer, pushOut } from '../world/obstacles.js';
 import { createZombieGeometry, createGiantGeometry, createZombieMaterial, createZombieDepthMaterial, createEyeMesh } from './zombieModel.js';
@@ -710,8 +710,6 @@ export class Horde {
     }
     return cnt;
   }
-
-  isHeadshot(frac) { return frac > HEADSHOT_FRAC; }
 
   // ── simulation ───────────────────────────────────────────────────────────
   update(dt, time) {

@@ -16,12 +16,6 @@ const SETS = {
   hgFloor: ['c', 'n', 'r'], hgWall: ['c', 'n', 'r'], hgSteel: ['c', 'n', 'r'], hgHazard: ['c', 'n', 'r'],
   hgPlate: ['c', 'n', 'r'], hgRubber: ['c', 'n', 'r'], hgWood: ['c', 'n', 'r'],
 };
-/** Real-world width of one tile, in metres (from Poly Haven's scan dimensions). */
-export const TILE_M = {
-  mud: 1.3, turf: 3.0, rock: 2.7, asphalt: 2.0, track: 2.0, plough: 8.0, concrete: 2.0, slab: 3.0,
-  metal: 1.0, corr: 2.0, plaster: 1.85, bark: 2.0, planks: 1.87, burlap: 0.27,
-  hgFloor: 3.0, hgWall: 2.0, hgSteel: 2.0, hgHazard: 1.0, hgPlate: 1.0, hgRubber: 1.0, hgWood: 2.0,
-};
 
 const loaded = {};
 let loading = null;
@@ -57,15 +51,3 @@ export function loadTextures(quality) {
 
 /** The scanned set by name ({map, normalMap, roughnessMap, file: true}), or null. */
 export function fileTex(name) { return loaded[name] || null; }
-
-/**
- * A copy of a texture with its own repeat (and offset): shares the image and the GPU
- * upload, so a material can fit a scan to its own UVs without touching anyone else's.
- */
-export function fitTex(tex, rx, ry = rx) {
-  if (!tex) return tex;
-  const t = tex.clone();
-  t.repeat.set(rx, ry);
-  t.needsUpdate = true;
-  return t;
-}

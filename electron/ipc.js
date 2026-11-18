@@ -18,7 +18,6 @@ function registerIpc({ ipcMain, app, shell, getWindow, appDir }) {
     const win = getWindow();
     if (win) win.setFullScreen(typeof value === 'boolean' ? value : !win.isFullScreen());
   });
-  ipcMain.handle('app:isFullscreen', () => { const win = getWindow(); return win ? win.isFullScreen() : false; });
 
   // Game audio lives in app/audio; the renderer asks for files by relative path.
   const AUDIO_DIR = path.join(appDir, 'audio');

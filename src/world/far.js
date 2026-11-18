@@ -13,7 +13,6 @@ const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
 const _v = new THREE.Vector3();
 const _s = new THREE.Vector3();
-const UP = new THREE.Vector3(0, 1, 0);
 
 // ── smoke plume shader (cylindrical billboard, wind-bent) ───────────────────
 const PLUME_VERT = /* glsl */`

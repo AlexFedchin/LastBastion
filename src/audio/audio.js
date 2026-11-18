@@ -25,7 +25,7 @@ const SFX = {
   death: [4, 32000], thunder: [7, 22050], siren: [0, 32000], klaxon: [0, 32000], radio_in: [0, 22050],
   radio_out: [2, 22050], latch: [0, 44100], barrel_seat: [0, 44100], charge: [0, 44100], steam: [0, 32000],
   steam_long: [0, 32000], ui_click: [0, 44100], ui_hover: [0, 44100], ui_buy: [0, 44100],
-  flare_launch: [0, 44100], flare_ignite: [0, 32000], throw: [2, 32000], heartbeat: [0, 22050],
+  flare_ignite: [0, 32000], throw: [2, 32000], heartbeat: [0, 22050],
   grenade_pin: [0, 44100], grenade_spoon: [0, 44100], glass: [3, 44100], molotov_whoosh: [0, 32000],
   tinnitus: [0, 32000], crow: [5, 32000], bell: [0, 32000], dog: [3, 22050], distant_mg: [4, 22050],
   heli_a: [0, 32000], heli_b: [0, 32000], chain: [3, 44100], rocket: [2, 44100],
@@ -1126,8 +1126,6 @@ export class AudioEngine {
   }
 
   // ── compatibility setters (the game also writes the fields directly) ───────
-  setHordeLevel(level) { this.hordeAlive = level * 350; }
-  setRain() { /* rain follows the dawn */ }
   setTide(on) { this.tide = !!on; }
 
   // ── score ──────────────────────────────────────────────────────────────────

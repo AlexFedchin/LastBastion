@@ -112,7 +112,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [glass - baby food jar - smashed on concrete.wav](https://freesound.org/people/Anthousai/sounds/447699/) | Anthousai | glass |
 | [Fuze Switch Flick](https://freesound.org/people/LordForklift/sounds/448394/) | LordForklift | ui_click |
 | [box.wav](https://freesound.org/people/1urker/sounds/456977/) | 1urker | crate |
-| [throw swish x12 HZA 07-03-2019.wav](https://freesound.org/people/hz37/sounds/463763/) | hz37 | flare_launch, throw |
+| [throw swish x12 HZA 07-03-2019.wav](https://freesound.org/people/hz37/sounds/463763/) | hz37 | throw |
 | [R22-07-Big Battle Ambience.wav](https://freesound.org/people/craigsmith/sounds/479568/) | craigsmith | war |
 | [R29-26-Molotov Cocktails through Windows and Explode.wav](https://freesound.org/people/craigsmith/sounds/483288/) | craigsmith | fire_pool |
 | [R28-08-Torch or Molotov Cocktail.wav](https://freesound.org/people/craigsmith/sounds/483322/) | craigsmith | molotov, molotov_whoosh |
@@ -126,7 +126,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Outdoors_Night_RainOnRoofing.wav](https://freesound.org/people/MrFossy/sounds/521841/) | MrFossy | hangar_rain |
 | [Hard Swing 1](https://freesound.org/people/magnuswaker/sounds/523230/) | magnuswaker | throw |
 | [Radio Sign Off / Squelch](https://freesound.org/people/JovianSounds/sounds/524205/) | JovianSounds | radio_out |
-| [Mortar](https://freesound.org/people/Mozfoo/sounds/529239/) | Mozfoo | flare_launch, mortar |
+| [Mortar](https://freesound.org/people/Mozfoo/sounds/529239/) | Mozfoo | mortar |
 | [male scream pain torture.wav](https://freesound.org/people/martian/sounds/530471/) | martian | burn |
 | [Growl.ogg](https://freesound.org/people/egomassive/sounds/536761/) | egomassive | brute |
 | [Male increasing scream - horror yelling in pain.wav](https://freesound.org/people/gtrempe/sounds/542128/) | gtrempe | burn |

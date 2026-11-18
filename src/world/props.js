@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { WORLD, wallZ, wallDist } from '../config.js';
 import { makeRng } from '../core/util.js';
 import { groundH, groundNormal, roadX, trenchZ, valleyEdge, NAPALM_OFFSET, craterList } from './terrain.js';
-import { box, cylY, merge, xf, sandbagGeo, concertinaGeo, sagWire, makeTank, makeRuin } from './kit.js';
+import { box, cylY, merge, sandbagGeo, concertinaGeo, sagWire, makeTank, makeRuin } from './kit.js';
 import { CAR_SIZE, TRUCK_SIZE, placeModel } from './vehicles.js';
 import { addObstacle } from './obstacles.js';
 

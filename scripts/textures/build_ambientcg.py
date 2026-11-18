@@ -7,7 +7,7 @@ Each set ships like the Poly Haven ones (src/world/texlib.js):
   <name>_c  colour, ambient occlusion baked in (the materials have no aoMap)
   <name>_n  OpenGL normal map
   <name>_r  G roughness, B metalness (three.js reads them from those channels)
-at 2048 (the floor and walls only), 1024 and 512 px.
+at 2048 and 1024 px (the floor and walls), or 1024 and 512 px (the rest).
 
 A terrain set ships the way the Poly Haven terrain sets do (build_textures.py), because the
 terrain shader reads them the same way: <name>_c (AO baked in, its mean brightness matched
@@ -34,8 +34,8 @@ UA = {'User-Agent': 'LastBastion-texture-build/1.0'}
 
 # name: (ambientCG id, sizes, AO strength, notes)
 SETS = {
-    'hgFloor': ('Concrete031', (2048, 1024, 512), 0.8),        # poured slab with saw-cut joints
-    'hgWall': ('CorrugatedSteel005', (2048, 1024, 512), 0.9),  # weathered corrugated cladding
+    'hgFloor': ('Concrete031', (2048, 1024), 0.8),        # poured slab with saw-cut joints
+    'hgWall': ('CorrugatedSteel005', (2048, 1024), 0.9),  # weathered corrugated cladding
     'hgSteel': ('Metal041B', (1024, 512), 0.7),                # rust-streaked structural steel
     'hgHazard': ('PaintedMetal016', (1024, 512), 0.6),         # yellow-and-black hazard stripes
     'hgPlate': ('DiamondPlate008C', (1024, 512), 0.8),         # tread plate for the stands
@@ -48,7 +48,7 @@ TERRAIN = {
     # coarse old asphalt: rough at every distance (the fine grain of smoother sets filters away
     # a few metres out) and the same in every direction, so the terrain shader turns each tile
     # freely (a streaked set read as stretched). Chosen from eight rendered in the game.
-    'asphalt': ('Asphalt006', (43, 43, 44), 0.6, 0.5, (2048, 1024, 512)),
+    'asphalt': ('Asphalt006', (43, 43, 44), 0.6, 0.5, (2048, 1024)),
 }
 
 

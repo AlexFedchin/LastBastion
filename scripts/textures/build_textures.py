@@ -29,15 +29,15 @@ OUT = os.path.join(HERE, '..', '..', 'app', 'textures')
 # name: poly haven id, target mean sRGB (the procedural texture's), saturation kept,
 #       hue pull (0 keep the scan's, 1 the target's), sizes, extras
 SETS = {
-    'mud':      ('brown_mud_02',          (64, 58, 51),    1.0, 0.4, (2048, 1024, 512), {'alpha_rough': True}),
-    'turf':     ('forest_leaves_02',      (97, 85, 50),    1.0, 0.3, (2048, 1024, 512), {}),
-    'rock':     ('rock_face_03',          (67, 66, 61),    0.8, 0.5, (2048, 1024, 512), {}),
+    'mud':      ('brown_mud_02',          (64, 58, 51),    1.0, 0.4, (2048, 1024), {'alpha_rough': True}),
+    'turf':     ('forest_leaves_02',      (97, 85, 50),    1.0, 0.3, (2048, 1024), {}),
+    'rock':     ('rock_face_03',          (67, 66, 61),    0.8, 0.5, (2048, 1024), {}),
     # (asphalt: from ambientCG now, build_ambientcg.py)
     'track':    ('rocky_trail',           (72, 63, 53),    0.9, 0.4, (1024, 512), {}),
     'plough':   ('aerial_mud_1',          (58, 50, 43),    0.9, 0.4, (1024, 512), {}),
-    'concrete': ('concrete_wall_006',     (105, 105, 107), 0.5, 0.5, (2048, 1024, 512), {}),
-    'slab':     ('dirty_concrete',        (112, 109, 106), 0.5, 0.5, (2048, 1024, 512), {}),
-    'metal':    ('rusty_metal_02',        (83, 59, 44),    0.6, 0.5, (2048, 1024, 512), {'rough_map': True}),
+    'concrete': ('concrete_wall_006',     (105, 105, 107), 0.5, 0.5, (2048, 1024), {}),
+    'slab':     ('dirty_concrete',        (112, 109, 106), 0.5, 0.5, (2048, 1024), {}),
+    'metal':    ('rusty_metal_02',        (83, 59, 44),    0.6, 0.5, (2048, 1024), {'rough_map': True}),
     'corr':     ('rusty_corrugated_iron', (138, 124, 116), 0.35, 0.6, (1024, 512), {}),
     'plaster':  ('damaged_plaster',       (93, 82, 72),    0.8, 0.4, (1024, 512), {}),
     'bark':     ('pine_bark',             (38, 33, 29),    0.7, 0.5, (1024, 512), {'no_normal': True}),

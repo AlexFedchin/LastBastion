@@ -146,8 +146,3 @@ export function createSceneFog(color) {
   return fog;
 }
 
-/** CPU version (used to fade far geometry sprites etc.). */
-export function fogAmountCPU(d, dawn) {
-  const Db = NIGHT.Db + (DAWN.Db - NIGHT.Db) * dawn;
-  return 1 - Math.exp(-Db * d);
-}

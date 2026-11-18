@@ -174,9 +174,6 @@ export class FireSystem {
   set(i, intensity) { if (i >= 0 && this.alive[i]) this.k[i] = intensity; }
   move(i, x, y, z) { if (i >= 0 && this.alive[i]) { this.x[i] = x; this.y[i] = y; this.z[i] = z; } }
   remove(i) { if (i >= 0 && this.alive[i]) { this.alive[i] = 0; this.free.push(i); } }
-  clearTemporary() {
-    for (let i = 0; i < this.cap; i++) if (this.alive[i] && this.life[i] !== Infinity) this.remove(i);
-  }
 
   /** A one-frame flame (burning zombies etc.). */
   transient(x, y, z, w, h, intensity, seed) {

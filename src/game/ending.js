@@ -14,7 +14,6 @@ import { walkStep } from '../world/obstacles.js';
 const $ = (id) => document.getElementById(id);
 const ease = (k) => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-const pickOne = (a) => a[(Math.random() * a.length) | 0];
 const TOP = WORLD.TOWER_TOP;
 const GATE_Z = -10.5;
 const ROAD_FROM = -104, ROAD_TO = GATE_Z + 0.4; // the column walks this stretch, then goes in

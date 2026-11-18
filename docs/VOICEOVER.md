@@ -20,8 +20,8 @@ build_voice.py     radio chain → app/audio/voice/*.ogg + lines.json           
 
 ## Why this pipeline
 
-Tested in November 2026 on six lines spanning the emotional range (see
-`docs/VOICEOVER_OPTIONS.md` for the candidates). Measured arousal (audEERING
+Tested in November 2026 on six lines spanning the emotional range, against Kokoro, the
+engine it replaced. Measured arousal (audEERING
 wav2vec2 emotion model; 0 = calm, 1 = screaming), mean over three takes:
 
 | Line | Qwen3-TTS directed (A) | Qwen3-TTS clone (B) | Chatterbox (C) | A + voice conversion (D) |

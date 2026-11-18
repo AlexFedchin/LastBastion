@@ -283,23 +283,6 @@ export function makeGlowTexture(size = 128, falloff = 2.0) {
   return t;
 }
 
-// ── City windows (emissive) ─────────────────────────────────────────────────
-export function makeWindowTexture(size = 256) {
-  const c = canvas(size), ctx = c.getContext('2d');
-  ctx.fillStyle = '#000';
-  ctx.fillRect(0, 0, size, size);
-  const rng = makeRng(4242);
-  const cols = 16, rows = 32;
-  for (let y = 0; y < rows; y++) for (let x = 0; x < cols; x++) {
-    if (rng() < 0.11) {
-      const warm = 0.6 + rng() * 0.4;
-      ctx.fillStyle = `rgba(255,${Math.floor(120 * warm)},${Math.floor(40 * warm)},${0.5 + rng() * 0.5})`;
-      ctx.fillRect(x * (size / cols) + 3, y * (size / rows) + 2, size / cols - 6, size / rows - 4);
-    }
-  }
-  return toTexture(c);
-}
-
 // ── Tattered flag ───────────────────────────────────────────────────────────
 export function makeFlagTexture() {
   const c = canvas(256), ctx = c.getContext('2d');
