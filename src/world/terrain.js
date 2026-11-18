@@ -678,7 +678,10 @@ ${T_COMMON}
   roughnessFactor = mix(roughnessFactor, 0.035, puddle);
   roughnessFactor = mix(roughnessFactor, 0.4, rRut * 0.7);
 `)
-        .replace('vec3 mapN = texture2D( normalMap, vNormalMapUv ).xyz * 2.0 - 1.0;', /* glsl */`
+        // (the include itself: its contents are only pasted in after onBeforeCompile, so a
+        // line inside it can't be matched here; matching one left the plain normal map, tiled
+        // every 9 m with no anti-tiling, as the repeat everyone could see on the road)
+        .replace('#include <normal_fragment_maps>', /* glsl */`
   vec3 nMud = ntSampleN(normalMap, ntMud);
   vec3 mapN = nMud;
   if (hasTurf) mapN = mix(mapN, ntSampleN(tTurfN, ntTurf), tGrass);
@@ -686,6 +689,8 @@ ${T_COMMON}
   if (hasRock) mapN = mix(mapN, ntSampleN(tRockN, ntRock) * vec3(1.6, 1.6, 1.0), tRock);
   mapN.xy *= (1.0 - puddle) * (1.0 - 0.35 * tWet);
   if (puddle > 0.01 && distC < 90.0) mapN.xy += rippleN(tw.xz * 1.6, uTime) * puddle * 0.9 * uRain;
+  mapN.xy *= normalScale;
+  normal = normalize( tbn * mapN );
 `);
     };
     mat.customProgramCacheKey = () => 'lb-terrain';

@@ -47,7 +47,7 @@ const clock = (u) => { const m = Math.round((18 * 60 + u * 720) / 10) * 10 % 144
 const CINES = { prologue: 'THE PROLOGUE', extraction: 'THE EXTRACTION', ending: 'THE ENDING' };
 
 const STYLE = `
-body.freecam #hud, body.freecam #screens { visibility: hidden; }
+body.freecam #hud, body.freecam #screens { display: none !important; }
 #freecam, #fc-panel { position: fixed; top: 16px; z-index: 80; display: none; background: rgba(8, 9, 8, 0.8); border: 1px solid var(--line);
   color: var(--bone); font: 12px/1.5 var(--mono); }
 #freecam { left: 16px; pointer-events: none; max-width: min(720px, calc(100vw - 360px)); padding: 10px 12px; white-space: pre-wrap; }
