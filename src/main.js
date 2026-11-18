@@ -857,19 +857,23 @@ class Game {
       if (this.slowmo <= 0 && this.state !== 'fallen') this.audio.setMuffle(0);
     } else this.timeScale = damp(this.timeScale, 1, 6, rdt);
     this.slowmoCd = Math.max(0, this.slowmoCd - rdt);
-    // the night holds its breath until you take the gun
-    // the developer's free camera: the game holds still and only the ambient world goes on
+    // the developer's free camera: the game holds still and only the ambient world goes on;
+    // a cutscene plays on under it (at the camera's pace: paused, slowed, sped up)
     const flying = this.freecam.on;
-    const paused = !flying && (this.state === 'paused' || (this.state === 'night' && !this.input.locked && !TEST));
-    const dt = paused ? 0 : flying ? rdt : rdt * this.timeScale;
+    const cine = flying && this.freecam.cine ? this.freecam.cineStep(rdt) : -1;
+    // the night holds its breath until you take the gun
+    const paused = cine === 0 || (!flying && (this.state === 'paused' || (this.state === 'night' && !this.input.locked && !TEST)));
+    const dt = paused ? 0 : cine > 0 ? cine : flying ? rdt : rdt * this.timeScale;
     this.time += dt;
     setSoldierClock(this.time);
     if (!flying) this.stateT += rdt;
+    else if (cine > 0) this.stateT += cine;
     this.barkCd = Math.max(0, this.barkCd - rdt);
 
     // the gun left in the nest for the victory screen goes back on the camera when it closes
     if (this.victoryGun && this.state !== 'victory') { this.victoryGun = false; this.ending.restoreGun(); this.player.gun.visible = true; }
     if (this.coach && !flying) this.coach.update(dt);
+    if (cine > 0) this[this.state].update(cine, cine); // this.prologue / this.ending / this.extraction
     if (flying) this.freecam.update(rdt);
     else switch (this.state) {
       case 'menu': this.updateMenu(dt, rdt); break;
@@ -886,13 +890,13 @@ class Game {
     }
 
     if (!paused) {
-      if (!flying) this.horde.syncRender();
+      if (!flying || cine > 0) this.horde.syncRender();
       this.env.update(dt, this.time, this.horde, this.fx, this.audio);
       this.fx.update(dt);
     }
     this.audio.setListener(this.camera.position.x, this.camera.position.z, this.camera.rotation.y, this.camera.position.y);
     this.audio.dawn = this.env.dawn;
-    this.audio.hordeAlive = flying ? 0 : this.horde.alive;
+    this.audio.hordeAlive = flying && cine < 0 ? 0 : this.horde.alive;
     this.audio.update(rdt);
     if (!this.noRender) this.render(rdt);
     this.input.endFrame();
@@ -909,7 +913,8 @@ class Game {
 
   render(rdt) {
     const u = this.post.u;
-    this.letterbox = this.freecam.on ? 0 : damp(this.letterbox, this.letterboxTarget || 0, 3, rdt);
+    const freeView = this.freecam.on && !this.freecam.follow;
+    this.letterbox = freeView ? 0 : damp(this.letterbox, this.letterboxTarget || 0, 3, rdt);
     this.damagePulse = Math.max(0, this.damagePulse - rdt * 0.9);
     this.flashPulse = Math.max(0, this.flashPulse - rdt * 3);
     this.radial = Math.max(0, this.radial - rdt * 1.4);
@@ -939,6 +944,7 @@ class Game {
     this.uniforms.uLampPow.value = this.env.power * Math.max(0, 1 - this.env.dawn * 1.6);
     this.uniforms.uRim.value.setRGB(0.032, 0.014, 0.006).multiplyScalar(1 - this.env.dawn * 0.5);
     if (this.freecam.on) u.uExposure.value *= this.freecam.bright;
+    if (freeView) u.uFade.value = 1; // a cutscene's dips to black are for its own cuts
     this.post.render(rdt, this.time);
     if (this.settings.showFps) {
       this.fps.acc += rdt; this.fps.n++;

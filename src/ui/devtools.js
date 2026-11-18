@@ -65,12 +65,17 @@ export class DevTools {
       <div class="sub">F10 opens and closes this panel. Dev runs never save over your campaign.</div>
       <h3>LOOK AROUND</h3>
       <div class="acts"><button data-dev="freecam">FREE CAMERA</button></div>
-      <div class="sub">F9 anywhere. Fly over the map with the game held still and the dead hidden; the readout lists the keys.</div>
+      <div class="sub">F9 anywhere. Fly over the map with the game held still and the dead hidden; set the time of day, the generator, fog. Over a cutscene it plays on, with pause and seek.</div>
       <h3>WATCH A CUTSCENE</h3>
       <div class="acts">
         <button data-dev="watch-prologue">THE PROLOGUE</button>
         <button data-dev="watch-extract">THE EXTRACTION</button>
         <button data-dev="watch-ending">THE ENDING</button>
+      </div>
+      <div class="acts">
+        <button data-dev="fly-prologue">FLY THE PROLOGUE</button>
+        <button data-dev="fly-extract">FLY THE EXTRACTION</button>
+        <button data-dev="fly-ending">FLY THE ENDING</button>
       </div>
       <div class="inrun" id="dv-inrun" hidden>
         <h3>THIS RUN</h3>
@@ -119,6 +124,9 @@ export class DevTools {
       case 'watch-prologue': this.watch('prologue'); break;
       case 'watch-extract': this.watch('extraction'); break;
       case 'watch-ending': this.watch('ending'); break;
+      case 'fly-prologue': this.watch('prologue', { freecam: true }); break;
+      case 'fly-extract': this.watch('extraction', { freecam: true }); break;
+      case 'fly-ending': this.watch('ending', { freecam: true }); break;
       case 'end': if (g.state === 'night') { g.horde.clearLiving(); g.director.spawningDone = true; } this.toggle(false); break;
       case 'clear': g.horde.clearLiving(); break;
       case 'supplies': if (g.run) g.run.supplies += 500; break;
@@ -149,8 +157,9 @@ export class DevTools {
    * Jump straight into a cutscene from anywhere: a throwaway dev run on the final night
    * (with enough survivors for the flight, so the extraction's cast is built and
    * precompiled during the load), then the cutscene starts as soon as the run does.
+   * opts.freecam: under the free camera (looking through the cutscene's own to begin with).
    */
-  watch(which) {
+  watch(which, opts = {}) {
     const g = this.g;
     if (g.deploying) return;
     this.toggle(false);
@@ -161,7 +170,7 @@ export class DevTools {
       const save = { difficulty: d.id, night: 1, survivors: d.survivors, supplies: 0, kills: 0, upgrades: {}, minesOwned: 0, endless: false, atShop: false, totals: { shots: 0, hits: 0, headshots: 0 }, log: [], dev: true };
       g.devSave = save;
       if (g.state !== 'menu') g.enterMenu();
-      g.deploy(save, () => g.startRun(save, { prologue: true }));
+      g.deploy(save, () => { g.startRun(save, { prologue: true }); if (opts.freecam) g.freecam.enter({ follow: true, deploy: true }); });
       return;
     }
     const save = {
@@ -174,6 +183,7 @@ export class DevTools {
       g.startRun(save);
       if (which === 'extraction') g.playExtraction();
       else { g.victory = true; g.playEnding(); }
+      if (opts.freecam) g.freecam.enter({ follow: true, deploy: true });
     });
   }
 

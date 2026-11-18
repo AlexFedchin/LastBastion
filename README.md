@@ -95,7 +95,15 @@ goes on. Click (or hold the right button) to look, `WASD` to fly, `E`/`Space` up
 faster, the wheel for cruise speed, `1`–`4` for viewpoints (the nest, the tower from the road, the
 valley from above, the base) and `0` back to the start. `X` reports and copies the point and object
 under the crosshair, `C` copies the camera pose, `G` lays a metre grid at the last `X` point, `L`
-brightens the night, `H` hides the readout. `F9` or `Esc` leaves and puts everything back.
+brightens the night, `Z` shows or hides the dead, `H` hides the readout and the panel. The panel on the
+right sets the world: the time of day (18:00 sunset to 06:00 dawn, also `[` `]`), the generator, a
+fog bank, the city as on any night (burning or burnt out), a lightning strike.
+
+Cutscenes play on under it: press `F9` during one, or *Fly the prologue / extraction / ending* in
+the developer panel (or the free-camera panel) to load one straight into it. It starts on the
+cutscene's own camera; move or press `V` to take over, `V` again to go back. `P` pauses, `,` `.` seek
+5 s, the panel has a timeline, restart and ×0.25–×2 speed. It holds at the end instead of handing
+over to what follows. `F9` or `Esc` leaves and puts everything back.
 
 The graphics preset is chosen automatically on first launch with a short benchmark
 of a heavy night; *Settings ▸ Quality ▸ AUTO* runs it again.

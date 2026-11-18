@@ -526,6 +526,7 @@ export class Environment {
    * dies down; by the seventh "the city stopped burning" — embers and dark plumes only.
    */
   setStory(night, endless = false) {
+    this.storyNight = night; this.storyEndless = endless; // (the developer's free camera restores it)
     const n = endless ? 99 : night;
     this.burn = n <= 5 ? 1 : n === 6 ? 0.5 : n <= 10 ? 0.05 : 0.03;
     this.war = n <= 4 ? 1 : n <= 6 ? 0.45 : 0;
