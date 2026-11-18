@@ -76,6 +76,7 @@
   <div id="fps"></div>
 
   <!-- ─────────────────────────── SCREENS ─────────────────────────── -->
+  <div id="medal-toast"></div>
   <div id="screens">
     <section id="s-menu" class="screen">
       <div class="title-block">
@@ -86,6 +87,7 @@
       <nav class="menu">
         <button data-act="continue" id="btn-continue">CONTINUE <small id="continue-info"></small></button>
         <button data-act="new">NEW CAMPAIGN</button>
+        <button data-act="medals">SERVICE RECORD <small id="medals-info"></small></button>
         <button data-act="howto">FIELD MANUAL</button>
         <button data-act="settings">SETTINGS</button>
         <button data-act="dev" class="dev-btn">DEVELOPER <small>F10</small></button>
@@ -135,6 +137,22 @@
         <p class="small muted credits">MUSIC: “Night Vigil”, “Echoes of Time v2”, “Ossuary 6 - Air”, “Satiate”, “Steel Rods”, “Stormfront”, “Peaceful Desolation”, “Thunder Dreams”, “Lost Time”, “Long Road Ahead” — Kevin MacLeod (incompetech.com), licensed under Creative Commons: By Attribution 4.0 (creativecommons.org/licenses/by/4.0). SOUND: field recordings from Freesound contributors, CC0 — full list in audio/CREDITS.md. RADIO VOICES: Qwen3-TTS (Qwen team, Alibaba Cloud), Apache 2.0; voice conversion by Chatterbox (Resemble AI), MIT.</p>
         <div class="row"><button data-act="back">BACK</button></div>
       </div>
+    </section>
+
+    <section id="s-medals" class="screen panel-screen">
+      <div class="panel medals-panel">
+        <div class="md-head">
+          <div>
+            <div class="md-kicker">BASTION-7 · DECORATIONS</div>
+            <h2>SERVICE RECORD</h2>
+          </div>
+          <div class="md-summary" id="md-summary"></div>
+        </div>
+        <div class="md-rack-wrap"><div class="md-rack-lbl">RIBBONS</div><div class="md-rack" id="md-rack"></div></div>
+        <div id="md-list"></div>
+        <div class="row"><button data-act="back">BACK</button></div>
+      </div>
+      <div class="md-zoom" id="md-zoom"></div>
     </section>
 
     <section id="s-settings" class="screen panel-screen">

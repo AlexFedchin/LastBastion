@@ -2,6 +2,8 @@
 import { DIFFICULTY, UPGRADES, UPGRADE_GROUPS, CLAYMORE, FINAL_NIGHT, UNLOCKS, isUnlocked } from '../config.js';
 import { QUALITY } from '../core/storage.js';
 import { formatInt } from '../core/util.js';
+import { MEDALS, GRADES } from '../game/medals.js';
+import { medalSVG, ribbonBar } from './medalArt.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -58,6 +60,8 @@ export class Screens {
 
   // ── Main menu ────────────────────────────────────────────────────────────
   refreshMenu(save) {
+    const medals = this.game.medals;
+    if (medals) $('medals-info').textContent = `${medals.count()} / ${MEDALS.length}`;
     const btn = $('btn-continue');
     if (save) {
       btn.disabled = false;
@@ -68,6 +72,73 @@ export class Screens {
       $('continue-info').textContent = '';
     }
   }
+
+  // ── The service record: every medal, won or not ──────────────────────────
+  buildMedals(medals) {
+    const won = MEDALS.filter((m) => medals.earned(m.id));
+    const byGrade = Object.keys(GRADES).map((g) => {
+      const all = MEDALS.filter((m) => m.grade === g);
+      return `<span class="md-g ${g}"><i></i>${GRADES[g].label} <b>${all.filter((m) => medals.earned(m.id)).length}/${all.length}</b></span>`;
+    }).join('');
+    $('md-summary').innerHTML = `<div class="md-total"><b>${won.length}</b> / ${MEDALS.length} AWARDED</div><div class="md-grades">${byGrade}</div>`;
+    // the rack: won ribbons, highest grade first, four to a row (the way they are worn)
+    const rack = [...won].sort((a, b) => GRADES[b.grade].order - GRADES[a.grade].order);
+    $('md-rack').innerHTML = rack.length ? rack.map((m) => `<span title="${m.name}">${ribbonBar(m)}</span>`).join('')
+      : '<span class="md-rack-empty">No ribbons yet. Hold the first night.</span>';
+    const fmt = (v, unit) => (unit === '%' ? `${v}%` : `${formatInt(v)}${unit}`);
+    const card = (m) => {
+      const got = medals.earned(m.id), pr = medals.progress(m);
+      let bar = '';
+      if (pr) {
+        const k = Math.min(1, pr.value / pr.target);
+        bar = `<div class="md-prog"><div class="md-bar"><i style="width:${(k * 100).toFixed(1)}%"></i></div>
+          <div class="md-nums">${pr.kind === 'best' ? 'BEST ' : ''}<b>${fmt(Math.min(pr.value, pr.target), pr.unit)}</b> / ${fmt(pr.target, pr.unit)}</div></div>`;
+      }
+      const when = got ? new Date(medals.state.earned[m.id]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }).toUpperCase() : '';
+      return `<div class="md-card ${m.grade}${got ? ' won' : ''}" data-medal="${m.id}" tabindex="0" role="button" aria-label="${m.name}: look closer">
+        <div class="md-art">${medalSVG(m)}</div>
+        <div class="md-text">
+          <div class="md-grade">${GRADES[m.grade].label}${got ? ` · <span class="md-when">AWARDED ${when}</span>` : ''}</div>
+          <div class="md-name">${m.name}</div>
+          <div class="md-req">${m.req}</div>
+          ${bar}
+        </div>
+      </div>`;
+    };
+    $('md-list').innerHTML = Object.keys(GRADES).map((g) => `
+      <h3 class="md-sec ${g}">${GRADES[g].label}<span>${{ bronze: 'the first steps', silver: 'holding it together', gold: 'the campaign', valor: 'for the very few' }[g]}</span></h3>
+      <div class="md-grid">${MEDALS.filter((m) => m.grade === g).map(card).join('')}</div>`).join('');
+    // a card opens the medal close up
+    if (!this._mdBound) {
+      this._mdBound = true;
+      const open = (e) => { const c = e.target.closest('[data-medal]'); if (c) this.medalZoom(this.game.medals, c.dataset.medal); };
+      $('md-list').addEventListener('click', open);
+      $('md-list').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); open(e); } });
+      $('md-zoom').addEventListener('click', () => this.medalZoom(null));
+    }
+  }
+
+  /** One medal, large: the art, its grade, the requirement and how far along it is. */
+  medalZoom(medals, id) {
+    const el = $('md-zoom');
+    if (!medals) { el.classList.remove('on'); return; }
+    const m = MEDALS.find((x) => x.id === id);
+    const got = medals.earned(id), pr = medals.progress(m);
+    const fmt = (v, unit) => (unit === '%' ? `${v}%` : `${formatInt(v)}${unit}`);
+    el.className = `md-zoom on ${m.grade}${got ? ' won' : ''}`;
+    el.innerHTML = `<div class="mz-inner">
+      <div class="mz-art">${medalSVG(m, { suffix: '-zoom' })}</div>
+      <div class="mz-text">
+        <div class="md-grade">${GRADES[m.grade].label} ${m.grade === 'valor' ? 'STAR' : 'MEDAL'}</div>
+        <div class="mz-name">${m.name}</div>
+        <div class="mz-req">${m.req}</div>
+        ${pr ? `<div class="md-prog"><div class="md-bar"><i style="width:${(Math.min(1, pr.value / pr.target) * 100).toFixed(1)}%"></i></div><div class="md-nums">${pr.kind === 'best' ? 'BEST SO FAR ' : ''}<b>${fmt(Math.min(pr.value, pr.target), pr.unit)}</b> / ${fmt(pr.target, pr.unit)}</div></div>` : ''}
+        <div class="mz-status">${got ? `AWARDED ${new Date(medals.state.earned[id]).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }).toUpperCase()}` : 'NOT YET AWARDED'}</div>
+        <div class="mz-close">CLICK OR ESC TO CLOSE</div>
+      </div></div>`;
+  }
+
+  medalZoomOpen() { return $('md-zoom').classList.contains('on'); }
 
   buildDifficulty() {
     const list = $('diff-list');

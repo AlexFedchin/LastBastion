@@ -1448,6 +1448,7 @@ export class NightEvents {
   report(kind, phase, data = {}) {
     (this.log || (this.log = [])).push({ kind, phase, data });
     if (this.g.telemetry) this.g.telemetry.event(kind, phase, data);
+    if (phase === 'end' && this.g.medals) this.g.medals.event(this.g.run, kind, data);
   }
 
   /** Radio a line from EVENT_LINES. prio: jump the queue (it's happening now). */

@@ -32,6 +32,8 @@ import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
 import { DevTools } from './ui/devtools.js';
 import { FreeCam } from './ui/freecam.js';
+import { Medals } from './game/medals.js';
+import { medalSVG } from './ui/medalArt.js';
 import { Hangar } from './world/hangar.js';
 import { Coach } from './ui/coach.js';
 import { Ending } from './game/ending.js';
@@ -132,6 +134,8 @@ class Game {
     this.dev = new DevTools(this);
     this.hangar = new Hangar(this);
     this.freecam = new FreeCam(this);
+    this.medals = new Medals();
+    this.medals.onAward = (m) => this.medalToast(m);
     this.coach = new Coach(this);
     this.ending = new Ending(this);
     this.prologue = new Prologue(this);
@@ -362,7 +366,7 @@ class Game {
       else if (kind === 'wireCut') { this.hud.alert('', '', { key: 'wireCut', item, format: (s) => `WIRE CUT — ${s.join(' · ')}` }); }
     };
     this.player.onHit = (killed, head) => { this.hud.hitmarker(killed, head); };
-    this.player.onOverheat = () => { this.bark('overheat', 0.5); this.telemetry.overheat(); };
+    this.player.onOverheat = () => { this.bark('overheat', 0.5); this.telemetry.overheat(); this.medals.overheat(this.run); };
     this.arsenal.onExplosionKills = (kills, x, z, cause) => this.onExplosionKills(kills, x, z, cause);
     this.arsenal.air.onRadio = (who, text, opts) => { if (this.inPlay()) this.hud.radio(who, text, true, opts); };
     this.arsenal.onShake = (scale, x, z) => {
@@ -399,7 +403,8 @@ class Game {
       if (e.code === 'KeyH' && this.coach.active) { this.coach.dismiss(); return; }
       if (e.code === 'Escape') {
         if (this.state === 'paused' && performance.now() - (this.pausedAt || 0) > 350) this.resume();
-        else if (this.screens.current === 'settings' || this.screens.current === 'howto') this.onAction('back');
+        else if (this.screens.current === 'medals' && this.screens.medalZoomOpen()) this.screens.medalZoom(null);
+        else if (this.screens.current === 'settings' || this.screens.current === 'howto' || this.screens.current === 'medals') this.onAction('back');
       }
     });
     window.addEventListener('mousedown', () => this.audio.init(), { once: false });
@@ -449,6 +454,7 @@ class Game {
       case 'new': this.screens.show('new'); break;
       case 'start': this.deploy({ night: 1, difficulty: el.dataset.diff }, () => this.newCampaign(el.dataset.diff)); break;
       case 'howto': this.prevScreen = this.screens.current; this.screens.show('howto'); break;
+      case 'medals': this.prevScreen = this.screens.current; this.screens.buildMedals(this.medals); this.screens.show('medals'); break;
       case 'settings':
         this.prevScreen = this.screens.current;
         this.screens.buildSettings(this.settings, this.state !== 'menu');
@@ -489,6 +495,7 @@ class Game {
     };
     clearSave();
     writeSave(run);
+    this.medals.newCampaign();
     this.startRun(run, { prologue: true });
   }
 
@@ -557,6 +564,7 @@ class Game {
     this.env.setStory(run.night, run.endless);
     this.env.dawn = 0;
     this.ns = { kills: 0, headshots: 0, lost: 0, shots: 0, hits: 0, bestStreak: 0, supplies: 0, bonus: 0, fireKills: 0 };
+    this.medals.startNight(run);
     this.killTimes.length = 0;
     this.alertCd.fill(0);
     this.doneT = 0;
@@ -644,6 +652,22 @@ class Game {
     this.enterMenu();
   }
 
+  /** A medal won: a card slides in at the top right, wherever the game is (queued, one at a time). */
+  medalToast(m) {
+    (this._medalQ || (this._medalQ = [])).push(m);
+    if (this._medalQ.length > 1) return;
+    const next = () => {
+      const q = this._medalQ, cur = q[0];
+      if (!cur) return;
+      const el = document.getElementById('medal-toast');
+      el.innerHTML = `<div class="mt-art">${medalSVG(cur, { suffix: '-toast' })}</div><div class="mt-text"><div class="mt-kicker">MEDAL AWARDED</div><div class="mt-name">${cur.name}</div><div class="mt-req">${cur.req}</div></div>`;
+      el.className = `show ${cur.grade}`;
+      this.audio.uiBuy?.();
+      setTimeout(() => { el.className = cur.grade; setTimeout(() => { q.shift(); next(); }, 600); }, 5200);
+    };
+    next();
+  }
+
   // ── Events from the world ────────────────────────────────────────────────
   inPlay() { return this.state === 'night' || this.state === 'intro'; }
 
@@ -653,6 +677,7 @@ class Game {
     run.kills++;
     this.ns.kills++;
     this.telemetry.kill(type, cause, headshot);
+    this.medals.kill(run, type, cause, headshot);
     if (headshot) { this.ns.headshots++; run.totals.headshots++; }
     if (cause === 'fire') this.ns.fireKills++;
     const sup = ZOMBIE_TYPES[type].supplies * this.diff.supplyMul * this.plan.supplyMul;
@@ -669,6 +694,7 @@ class Game {
   onExplosionKills(kills, x, z, cause) {
     if (!this.inPlay() && this.state !== 'menu') return;
     if (kills >= 3 && this.state !== 'menu') this.audio.gib(x, z);
+    if (this.inPlay()) this.medals.blast(this.run, kills, cause);
     if (kills >= 14 && this.slowmoCd <= 0 && this.state === 'night') {
       this.slowmo = 0.75;
       this.slowmoCd = 6;
@@ -681,7 +707,7 @@ class Game {
   }
 
   onBreach(sec, x, y, z, cause = 'climb') {
-    if (this.inPlay()) this.telemetry.breach(sec, cause);
+    if (this.inPlay()) { this.telemetry.breach(sec, cause); this.medals.breach(this.run); }
     if (this.state === 'menu') return;
     if (!this.inPlay()) return;
     const run = this.run;
@@ -751,6 +777,7 @@ class Game {
     // endless: every dawn past the seventy-second hour counts toward the record
     if (run.endless && !run.dev && survived > FINAL_NIGHT) this.newRecord = recordBest(survived - FINAL_NIGHT, run.kills, run.difficulty) || this.newRecord;
     this.telemetry.endNight('survived');
+    this.medals.nightHeld(run, survived, this.report);
     return survived;
   }
 
@@ -803,6 +830,7 @@ class Game {
     run.supplies -= cost;
     run.upgrades[id] = rank + 1;
     this.telemetry.purchase(id, rank + 1, cost, run.supplies);
+    this.medals.purchase(run, id);
     this.audio.uiBuy();
     this.screens.buildShop(run, this.report);
   }
@@ -813,6 +841,7 @@ class Game {
     run.supplies -= CLAYMORE.cost;
     run.minesOwned += CLAYMORE.perBuy;
     this.telemetry.purchase('claymores', run.minesOwned, CLAYMORE.cost, run.supplies);
+    this.medals.purchase(run, 'claymores');
     this.audio.uiBuy();
     this.screens.buildShop(run, this.report);
   }
@@ -1045,6 +1074,7 @@ class Game {
         const p = this.player.aimPoint(330);
         const ok = this.arsenal.callArtillery(p);
         T.ability('artillery', ok);
+        this.medals.ability(run, 'artillery', ok);
         if (ok) {
           this.hud.alert(`FIRE MISSION — ${this.stats.artyShells} ROUNDS — SPLASH IN 3`);
           this.hud.radio(CALL.battery, COMMS.battery[this.stats.artyShells] || `Shot, over. ${this.stats.artyShells} rounds HE, splash in three.`, true, { valid: () => this.arsenal.shells.some((s) => s.kind === 'arty' && s.t > 1.2) });
@@ -1245,6 +1275,7 @@ class Game {
   }
 
   onEndingDone(extracted = false) {
+    this.medals.campaignEnd(this.run, extracted);
     this.state = 'victory';
     this.stateT = 0;
     this.hud.show(false);
