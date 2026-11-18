@@ -351,39 +351,41 @@ float tS(float a, float b, float v){ float t = clamp((v - a) / (b - a), 0.0, 1.0
 float roadXg(float z){ return -52.0 * tS(-110.0, -470.0, z) + 96.0 * tS(-540.0, -930.0, z); }
 float rearValleyXg(float z){ return tS(80.0, 320.0, z) * (45.0 * sin(z * 0.0055 + 0.4) - 10.0); }
 float rearRoadXg(float z){ return rearValleyXg(z) + tS(40.0, 160.0, z) * 15.0 * sin(z * 0.02); }
-// Anti-tiling: hex tiling with random rotation (after Mikkelsen 2022, "Practical
-// Real-Time Hex-Tiling"). The plane is cut into a triangle grid; every grid vertex
-// owns a randomly rotated, randomly offset copy of the texture, and each point blends
-// the copies of its triangle's three vertices with gaussian falloff weights. The blend
-// keeps the texture's contrast (variance-preserving, Heitz & Neyret), so the seams
-// don't wash out to a blur, and there is no grid or repeat left to see. rot: how much
-// of a full turn the copies may rotate (directional textures, like furrows, get little).
-struct NT { vec2 u0; vec2 u1; vec2 u2; vec2 c0; vec2 c1; vec2 c2; vec3 w; vec2 dx; vec2 dy; };
+// Anti-tiling: every tile of a texture is drawn whole, turned by its own random angle
+// (a hash of the tile, so a white noise over the tiles) and shifted by a random offset.
+// Inside a tile that is one plain texture read, as sharp as the texture itself; only in a
+// thin band at a seam (NT_BAND of a tile) does a tile fade into its neighbour, keeping
+// its contrast there (variance-preserving, Heitz & Neyret). The tile grid wobbles a little
+// (a slow noise moves the boundaries), so the seams don't run in ruler-straight lines.
+// rot: how much of a full turn the tiles may turn (directional textures, like furrows, get little).
+#define NT_BAND 0.08
+struct NT { vec2 u0; vec2 u1; vec2 u2; vec2 u3; vec2 c0; vec2 c1; vec2 c2; vec2 c3; vec4 w; vec2 dx; vec2 dy; };
 vec2 ntRot(vec2 v, vec2 cs){ return vec2(cs.x * v.x - cs.y * v.y, cs.y * v.x + cs.x * v.y); }
 vec3 ntHash3(vec2 p){
   vec3 q = vec3(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)), dot(p, vec2(419.2, 371.9)));
   return fract(sin(q) * 43758.5453);
 }
+// one tile: turned about its own centre, shifted
+void ntTile(vec2 cell, vec2 uv, float rot, out vec2 u, out vec2 cs){
+  vec3 h = ntHash3(cell);
+  float a = (h.z - 0.5) * 6.2831853 * rot;
+  cs = vec2(cos(a), sin(a));
+  u = ntRot(uv - cell - 0.5, cs) + h.xy * 9.0;
+}
 NT ntBuild(vec2 uv, vec2 dx, vec2 dy, float rot){
-  vec2 st = uv * 1.3;
-  vec2 sk = vec2(st.x, -0.57735027 * st.x + 1.15470054 * st.y);
-  vec2 base = floor(sk);
-  vec3 t = vec3(fract(sk), 0.0); t.z = 1.0 - t.x - t.y;
-  float s = step(0.0, -t.z), s2 = 2.0 * s - 1.0;
-  vec3 w = vec3(-t.z * s2, s - t.y * s2, s - t.x * s2);
-  vec2 v0 = base + vec2(s, s), v1 = base + vec2(s, 1.0 - s), v2 = base + vec2(1.0 - s, s);
-  vec3 h0 = ntHash3(v0), h1 = ntHash3(v1), h2 = ntHash3(v2);
   NT n;
-  float k = 6.2831853 * rot;
-  n.c0 = vec2(cos((h0.z - 0.5) * k), sin((h0.z - 0.5) * k));
-  n.c1 = vec2(cos((h1.z - 0.5) * k), sin((h1.z - 0.5) * k));
-  n.c2 = vec2(cos((h2.z - 0.5) * k), sin((h2.z - 0.5) * k));
-  n.u0 = ntRot(uv, n.c0) + h0.xy * 9.0;
-  n.u1 = ntRot(uv, n.c1) + h1.xy * 9.0;
-  n.u2 = ntRot(uv, n.c2) + h2.xy * 9.0;
-  // gaussian falloff from each vertex, zero on the far edge so nothing jumps there
-  w = w * exp(-(1.0 - w) * (1.0 - w) / 0.16);
-  n.w = w / (w.x + w.y + w.z);
+  // which tile: the grid wobbles by up to 0.35 of a tile, so the tiles are uneven and no row of
+  // seams runs straight (the wobble's slope stays under 1, so no tile folds over)
+  vec2 q = uv + (vec2(tNoise(uv * 0.55 + 3.1), tNoise(uv * 0.55 + 7.7)) - 0.5) * 0.7;
+  vec2 c = floor(q), f = fract(q);
+  vec2 side = vec2(f.x < 0.5 ? -1.0 : 1.0, f.y < 0.5 ? -1.0 : 1.0);
+  // half-and-half on a seam, nothing of the neighbour past the band
+  vec2 a = 0.5 * (1.0 - smoothstep(0.0, NT_BAND, min(f, 1.0 - f)));
+  n.w = vec4((1.0 - a.x) * (1.0 - a.y), a.x * (1.0 - a.y), (1.0 - a.x) * a.y, a.x * a.y);
+  ntTile(c, uv, rot, n.u0, n.c0);
+  ntTile(c + vec2(side.x, 0.0), uv, rot, n.u1, n.c1);
+  ntTile(c + vec2(0.0, side.y), uv, rot, n.u2, n.c2);
+  ntTile(c + side, uv, rot, n.u3, n.c3);
   n.dx = dx; n.dy = dy;
   return n;
 }
@@ -393,16 +395,23 @@ NT ntSetupR(vec2 uv, vec2 dx, vec2 dy, float rot){ return ntBuild(uv, dx, dy, ro
 NT ntSetup(vec2 uv){ return ntBuild(uv, dFdx(uv), dFdy(uv), 1.0); }
 vec4 ntTap(sampler2D t, NT n, vec2 u, vec2 c){ return textureGrad(t, u, ntRot(n.dx, c), ntRot(n.dy, c)); }
 vec4 ntSample(sampler2D t, NT n){
-  vec4 a = ntTap(t, n, n.u0, n.c0), b = ntTap(t, n, n.u1, n.c1), c = ntTap(t, n, n.u2, n.c2);
+  vec4 a = ntTap(t, n, n.u0, n.c0);
+  if (n.w.x > 0.999) return a; // inside the tile: one read
+  vec4 b = ntTap(t, n, n.u1, n.c1), c = ntTap(t, n, n.u2, n.c2), d = ntTap(t, n, n.u3, n.c3);
   vec4 mean = textureLod(t, vec2(0.5), 12.0);
-  vec4 v = (a - mean) * n.w.x + (b - mean) * n.w.y + (c - mean) * n.w.z;
-  return clamp(mean + v * inversesqrt(dot(n.w, n.w)) * 0.85 + v * 0.15, 0.0, 1.0);
+  vec4 v = (a - mean) * n.w.x + (b - mean) * n.w.y + (c - mean) * n.w.z + (d - mean) * n.w.w;
+  return clamp(mean + v * inversesqrt(dot(n.w, n.w)), 0.0, 1.0);
 }
-// a normal map through the same tiling: each copy's normal turned back by its rotation
+// a normal map through the same tiles: each tile's normal turned back by its rotation
+vec3 ntTapN(sampler2D t, NT n, vec2 u, vec2 c){
+  vec3 m = ntTap(t, n, u, c).xyz * 2.0 - 1.0;
+  m.xy = ntRot(m.xy, vec2(c.x, -c.y));
+  return m;
+}
 vec3 ntSampleN(sampler2D t, NT n){
-  vec3 a = ntTap(t, n, n.u0, n.c0).xyz * 2.0 - 1.0, b = ntTap(t, n, n.u1, n.c1).xyz * 2.0 - 1.0, c = ntTap(t, n, n.u2, n.c2).xyz * 2.0 - 1.0;
-  a.xy = ntRot(a.xy, vec2(n.c0.x, -n.c0.y)); b.xy = ntRot(b.xy, vec2(n.c1.x, -n.c1.y)); c.xy = ntRot(c.xy, vec2(n.c2.x, -n.c2.y));
-  return a * n.w.x + b * n.w.y + c * n.w.z;
+  vec3 a = ntTapN(t, n, n.u0, n.c0);
+  if (n.w.x > 0.999) return a;
+  return a * n.w.x + ntTapN(t, n, n.u1, n.c1) * n.w.y + ntTapN(t, n, n.u2, n.c2) * n.w.z + ntTapN(t, n, n.u3, n.c3) * n.w.w;
 }
 vec2 rippleN(vec2 p, float t){
   vec2 acc = vec2(0.0);
@@ -452,6 +461,9 @@ export class Terrain {
     const TS = {
       mud: mud.file ? 2.2 : 9, mudMacro: mud.file ? 23 : 41, turf: scan('turf') ? 3.4 : 5.5,
       rock: scan('rock') ? 6.5 : 13, asph: scan('asphalt') ? 3.6 : 7, track: 2.4, plough: 9,
+      // the mud's relief at the size it always had on screen (9 m a tile): smaller, its bumps
+      // turn to mush past a few metres and the field reads flat
+      mudN: 9,
     };
     const f = (v) => v.toFixed(2);
     this.TS = TS;
@@ -682,10 +694,12 @@ ${T_COMMON}
         // line inside it can't be matched here; matching one left the plain normal map, tiled
         // every 9 m with no anti-tiling, as the repeat everyone could see on the road)
         .replace('#include <normal_fragment_maps>', /* glsl */`
-  vec3 nMud = ntSampleN(normalMap, ntMud);
+  vec3 nMud = ntSampleN(normalMap, ntSetupD(tw.xz / ${f(TS.mudN)} + 41.0, gX / ${f(TS.mudN)}, gY / ${f(TS.mudN)}));
   vec3 mapN = nMud;
   if (hasTurf) mapN = mix(mapN, ntSampleN(tTurfN, ntTurf), tGrass);
-  if (hasRoad) mapN = mix(mapN, ntSampleN(tAsphN, ntAsph), tRoad);
+  // the road: the asphalt's own fine grain over the broken ground under it (the asphalt's
+  // normal map alone is nearly flat, and a wet road reads by its bumps catching the lamps)
+  if (hasRoad) mapN = mix(mapN, ntSampleN(tAsphN, ntAsph) + vec3(nMud.xy * 0.6, 0.0), tRoad);
   if (hasRock) mapN = mix(mapN, ntSampleN(tRockN, ntRock) * vec3(1.6, 1.6, 1.0), tRock);
   mapN.xy *= (1.0 - puddle) * (1.0 - 0.35 * tWet);
   if (puddle > 0.01 && distC < 90.0) mapN.xy += rippleN(tw.xz * 1.6, uTime) * puddle * 0.9 * uRain;
