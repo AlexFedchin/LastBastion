@@ -578,6 +578,58 @@ DIRECTION = {
         ("Warm, proud and measured, a storyteller's pause before 'the Last Bastion'.", 0.3),
     'And for seventy-two hours... it held.':
         ("Very slow and quiet, final and proud, a long pause before 'it held'.", 0.25),
+
+    # ── the prologue: sunset before the first night (PROLOGUE, src/game/prologue.js) ──
+    'When the cities fell, Command drew a line across the hills: a string of walls on the valley roads, to hold the dead back while the last flights got out.':
+        ("Slow and grave, the very first words of a long story; unhurried, a small pause at the colon, quiet weight on 'the last flights'.", 0.22),
+    'Ours was the seventh. A wall of concrete across the road, a gate, one heavy gun, and whoever was left to man it.':
+        ("Measured, a dry, fond understatement, listing it plainly; a wry softness on 'whoever was left'.", 0.2),
+    'Seventy-two hours, Command told us. Hold the valley for seventy-two hours, and the birds would come for us.':
+        ("Quiet, a faint bitterness under it, an old man repeating a promise he no longer trusts.", 0.22),
+    "Sarge... sun's going down.":
+        ("Uneasy and quiet, half to himself, a young soldier watching the horizon; a nervous pause after 'Sarge'.", 0.25),
+    "Then they'll be up soon. Lights on. Everybody on the wall.":
+        ("Flat and steady, orders he has given many times before; no hurry, no drama, firm on 'Everybody on the wall'.", 0.35),
+    'Every night the sun went down behind the burning city. And every night, the dead came out of it.':
+        ("Low and haunted, slow; the second sentence colder and quieter.", 0.2),
+    'Movement on the road. Here they come. Gunner — on the fifty.':
+        ("Calm, clipped and controlled, tension under the steadiness; a short pause, then a firm order on 'on the fifty'.", 0.45),
+    'That first night, there was only the wall, the dark, and the gun.':
+        ("Very slow and quiet, a slow cadence on the last three things, a pause before 'and the gun'.", 0.2),
+
+    # ── the hangar: a word as each requisition is set down at dawn (DELIVERY_LINES) ──
+    "New barrel's on the bench, Sarge. Headspace and timing are set.":
+        ("Dry and matter-of-fact, a craftsman quietly pleased with a job done properly.", 0.28),
+    "Stiffer buffer spring's in. She'll cycle faster, so mind the heat.":
+        ("Matter-of-fact, then a dry warning on 'mind the heat'.", 0.3),
+    "Jacket's topped up. That barrel will run cooler tonight.":
+        ("Calm and practical, unhurried, a small satisfied note at the end.", 0.25),
+    "AP-T, belted and boxed. It'll go through two of them, maybe three.":
+        ("Dry and deadpan, a grim little professional pride on 'maybe three'.", 0.3),
+    'Incendiary belts. Anything you hit tonight might start burning.':
+        ("Deadpan, a faint dark amusement under the practicality.", 0.3),
+    "HE-I. Every round goes off when it hits. Don't drop that crate.":
+        ("Matter-of-fact, then sharper and wary on 'Don't drop that crate', a man who means it.", 0.38),
+    "Bastion, Battery. Second section's laid and ready. More tubes on every mission.":
+        ("Brisk radio procedure with an upbeat edge, good news delivered quickly.", 0.4),
+    "Fire direction's set up properly now. We'll turn your calls around faster.":
+        ("Brisk and confident, clipped, a little pride in the work.", 0.38),
+    'Heavy charges are in. A bigger bang where you want it.':
+        ("Clipped and businesslike, a hint of a grin on 'a bigger bang'.", 0.4),
+    'Another crew for the wall. Put them on a gun and keep them fed.':
+        ("Gruff and plain, a sergeant handing out a practical order, steady, not loud.", 0.35),
+    "The crews spent the morning on the range. They'll shoot straighter tonight.":
+        ("Gruff, steady, a quiet note of approval he would never say outright.", 0.32),
+    'More wire going out, Sarge. Mind your feet past the ditch.':
+        ("Quiet and a little earnest, a young soldier trying to be helpful.", 0.25),
+    'Another crate of grenades. Pins in, please.':
+        ("Dry and tired, deadpan; 'please' as a weary, pointed request.", 0.25),
+    "More bottles. Don't ask what was in them before.":
+        ("Deadpan, dry gallows humour, unhurried.", 0.25),
+    'Thickened the fuel with soap flakes. It sticks now.':
+        ("Matter-of-fact, a quiet craftsman's satisfaction on 'It sticks now'.", 0.25),
+    'Claymores going out. Front toward enemy, I checked twice.':
+        ("Earnest and slightly nervous, a young soldier proud he got it right; a small hurried laugh at the end.", 0.3),
 }
 
 
