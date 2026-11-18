@@ -216,7 +216,11 @@ export class Ending {
       const x = 2.6;
       M.position.set(x, groundH(x, T.z), T.z);
       M.rotation.set(0, -Math.PI / 2, Math.sin(this.t * 7) * 0.006 * T.sp);
-    }
+      // its diesel, labouring in low gear up the road (idling once it stops at the gate)
+      const A = this.g.audio;
+      if (!T.loop && A.ready) T.loop = A.truckLoop({ rate: 0.95 });
+      if (T.loop) T.loop.update(x, groundH(x, T.z) + 1, T.z, 0, 0, T.sp, (T.sp > 0 ? 1.0 : 0.6) * A.truckGain);
+    } else if (T.loop) { T.loop.stop(1.5); T.loop = null; }
   }
 
   /** Space / Enter / Esc / click: first press offers to skip, the second skips. */
@@ -307,6 +311,7 @@ export class Ending {
     this.active = false;
     const g = this.g;
     g.audio.stopVoice();
+    if (this.truck && this.truck.loop) { this.truck.loop.stop(1.5); this.truck.loop = null; }
     this.showColumn(false);
     this.restoreGun();
     g.post.u.uFade.value = 1;

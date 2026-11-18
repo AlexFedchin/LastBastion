@@ -917,10 +917,12 @@ export class Hangar {
     this.sync(run, report);
     this.go('overview', true);
     this.tagLayer.classList.add('on');
+    if (this.g.audio) this.g.audio.inside = true; // rain on the roof, the valley shut out
   }
 
   exit() {
     this.active = false;
+    if (this.g.audio) this.g.audio.inside = false;
     const hr = document.getElementById('hangar-radio'); if (hr) hr.classList.remove('show');
     if (this.tagLayer) this.tagLayer.classList.remove('on');
     this.setHot(null);

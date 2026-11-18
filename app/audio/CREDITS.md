@@ -29,12 +29,17 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [flys-I.wav](https://freesound.org/people/galeku/sounds/46938/) | galeku | flies |
 | [End radio transmission](https://freesound.org/people/ReadeOnly/sounds/47646/) | ReadeOnly | radio_out |
 | [zippo_light_5shots.wav](https://freesound.org/people/vibe_crc/sounds/47988/) | vibe_crc | molotov_light |
+| [spotlight-stereo.aif](https://freesound.org/people/reidmangan/sounds/49023/) | reidmangan | searchlight_on |
 | [Radio Noise.wav](https://freesound.org/people/RutgerMuller/sounds/50750/) | RutgerMuller | radio_static |
+| [SIREN AIR RAID BIRDS.mp3](https://freesound.org/people/stifa10/sounds/52040/) | stifa10 | siren_far |
 | [A Moaning Zombie.wav](https://freesound.org/people/kathol/sounds/58626/) | kathol | groan |
 | [Bottle Smash.aif](https://freesound.org/people/MegaPenguin13/sounds/118198/) | MegaPenguin13 | molotov |
+| [Diesel Truck Idling Front.wav](https://freesound.org/people/ibirdfilm/sounds/128160/) | ibirdfilm | truck |
 | [Horrific Zombie Growl](https://freesound.org/people/MrPokephile/sounds/133974/) | MrPokephile | groan |
 | [Distant Boom.wav](https://freesound.org/people/Henrythetrain/sounds/142598/) | Henrythetrain | boom_far |
+| [Wind blowing and howling in an antenna and its wire on the top of the chilean cliff.](https://freesound.org/people/felix.blume/sounds/147599/) | felix.blume | wire_wind |
 | [Muffled Distant Explosion](https://freesound.org/people/NenadSimic/sounds/149966/) | NenadSimic | boom_far |
+| [A flag flapping in the wind, at the small village of Assem Souk, in the High Atlas (Morocco).](https://freesound.org/people/felix.blume/sounds/154794/) | felix.blume | flag |
 | [Halloween - Graveyard At Night Howling Wind.mp3](https://freesound.org/people/mistersherlock/sounds/159509/) | mistersherlock | wind_howl |
 | [Air Defense Artillery Avenger Training .50cal (tH4YBTw8vk8).flac](https://freesound.org/people/qubodup/sounds/160355/) | qubodup | hmg, hmg_tail |
 | [Agony](https://freesound.org/people/Mediapaja2009/sounds/162157/) | Mediapaja2009 | burn |
@@ -50,6 +55,8 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Explosion](https://freesound.org/people/qubodup/sounds/182429/) | qubodup | boom |
 | [Mortar Shots.flac](https://freesound.org/people/qubodup/sounds/184382/) | qubodup | mortar |
 | [M-327 Mortar Shots.flac](https://freesound.org/people/qubodup/sounds/187542/) | qubodup | mortar |
+| [M16 Rifle Shots.flac](https://freesound.org/people/qubodup/sounds/187677/) | qubodup | rifle |
+| [Fence Rattle 1 Front.wav](https://freesound.org/people/Starvolt/sounds/189220/) | Starvolt | wire |
 | [Shuffling 3 Rear.wav](https://freesound.org/people/Starvolt/sounds/189231/) | Starvolt | shuffle |
 | [thunder](https://freesound.org/people/netaj/sounds/193170/) | netaj | thunder |
 | [SZ_Zombies_06.wav](https://freesound.org/people/PaulMorek/sounds/196722/) | PaulMorek | groan |
@@ -58,13 +65,17 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Brass bullet shell casing drop onto concrete, multiple takes](https://freesound.org/people/GrayJoy/sounds/210102/) | GrayJoy | casing |
 | [Pressure Hiss](https://freesound.org/people/unfa/sounds/211096/) | unfa | steam_long |
 | [Breaking a glass bottle](https://freesound.org/people/dasebr/sounds/212698/) | dasebr | glass |
+| [Metallic fence squeaking and clattering in the wind](https://freesound.org/people/felix.blume/sounds/217769/) | felix.blume | wire_creak |
 | [Deep Monster Growl](https://freesound.org/people/uagadugu/sounds/222523/) | uagadugu | brute |
 | [Tank Explosion](https://freesound.org/people/unfa/sounds/231765/) | unfa | boom |
 | [Steam/hiss](https://freesound.org/people/wubitog/sounds/234782/) | wubitog | steam |
 | [Rifle Shooting](https://freesound.org/people/qubodup/sounds/238916/) | qubodup | mg |
+| [Artillery Gunfire](https://freesound.org/people/qubodup/sounds/239137/) | qubodup | arty |
 | [50 Cal MG](https://freesound.org/people/qubodup/sounds/239138/) | qubodup | hmg, hmg_tail |
+| [abandoned warehouse](https://freesound.org/people/Kostrava/sounds/240895/) | Kostrava | hangar_room |
 | [burning air](https://freesound.org/people/sergeeo/sounds/242721/) | sergeeo | molotov_flight, molotov_whoosh |
 | [zombie sounds](https://freesound.org/people/Thanra/sounds/245466/) | Thanra | groan |
+| [Group running in sync on concrete](https://freesound.org/people/jhumbucker/sounds/250538/) | jhumbucker | run |
 | [Cinematic_Boom_Rhapsodize.wav](https://freesound.org/people/rhapsodize/sounds/255111/) | rhapsodize | boom_sub |
 | [Click.wav](https://freesound.org/people/kwahmah_02/sounds/256116/) | kwahmah_02 | ui_hover |
 | [knife pulls.wav](https://freesound.org/people/nicktermer/sounds/259557/) | nicktermer | grenade_pin |
@@ -74,6 +85,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [AR15 Various Sounds](https://freesound.org/people/wadaltmon/sounds/263513/) | wadaltmon | barrel_seat |
 | [Metal Ammo Box](https://freesound.org/people/theshaggyfreak/sounds/320353/) | theshaggyfreak | ui_buy |
 | [zombie growl](https://freesound.org/people/adharca/sounds/323819/) | adharca | groan |
+| [Animation Rostrum 001.WAV](https://freesound.org/people/cartoonrob/sounds/327900/) | cartoonrob | sl_motor |
 | [Alarm, Air Raid Siren, Test, Devonport, Sony PCM M-10.wav](https://freesound.org/people/audiojacked/sounds/336640/) | audiojacked | siren |
 | [Monster - deep growl.wav](https://freesound.org/people/Aegersum/sounds/344903/) | Aegersum | brute |
 | [ROAD FLARE.wav](https://freesound.org/people/frankelmedico/sounds/348766/) | frankelmedico | flare_ignite |
@@ -86,16 +98,20 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Bomb Dropping.wav](https://freesound.org/people/morganpurkis/sounds/398255/) | morganpurkis | incoming |
 | [Bottle Smash](https://freesound.org/people/Roxis_Boy/sounds/401619/) | Roxis_Boy | molotov |
 | [Hooded crow.wav](https://freesound.org/people/straget/sounds/404687/) | straget | crow |
+| [water pump motor (or could be generator) sharp start stop close 1st one false start great choking catch Gaza 2016.wav](https://freesound.org/people/kyles/sounds/406892/) | kyles | gen_start, gen_stop |
 | [bottle break.wav](https://freesound.org/people/DeezSoundzTho/sounds/407431/) | DeezSoundzTho | glass |
 | [goreSplat.wav](https://freesound.org/people/ThefitzyG/sounds/414296/) | ThefitzyG | bloater, gib |
 | [VisceralBulletImpacts.wav](https://freesound.org/people/u1769092/sounds/423301/) | u1769092 | flesh |
 | [Zombie Moan.wav](https://freesound.org/people/mrh4hn/sounds/426628/) | mrh4hn | groan |
 | [Air Tone - School Yard - Dawn Empty City Air - Faint Bird Chirps](https://freesound.org/people/leonelmail/sounds/427840/) | leonelmail | dawn |
+| [evening grassland.WAV](https://freesound.org/people/cupido-1/sounds/434858/) | cupido-1 | dusk |
 | [Zombie Demon Scream](https://freesound.org/people/Wakerone/sounds/435651/) | Wakerone | shriek |
+| [G08-28-Bombers Fly in Formation.wav](https://freesound.org/people/craigsmith/sounds/437892/) | craigsmith | bomber |
 | [G33-07-Bomb Whistle and Hit Debris.wav](https://freesound.org/people/craigsmith/sounds/438513/) | craigsmith | incoming |
 | [Angry big dog barking - Far [d15].wav](https://freesound.org/people/v23/sounds/440865/) | v23 | dog |
 | [glass - baby food jar - smashed on concrete.wav](https://freesound.org/people/Anthousai/sounds/447699/) | Anthousai | glass |
 | [Fuze Switch Flick](https://freesound.org/people/LordForklift/sounds/448394/) | LordForklift | ui_click |
+| [box.wav](https://freesound.org/people/1urker/sounds/456977/) | 1urker | crate |
 | [throw swish x12 HZA 07-03-2019.wav](https://freesound.org/people/hz37/sounds/463763/) | hz37 | flare_launch, throw |
 | [R22-07-Big Battle Ambience.wav](https://freesound.org/people/craigsmith/sounds/479568/) | craigsmith | war |
 | [R29-26-Molotov Cocktails through Windows and Explode.wav](https://freesound.org/people/craigsmith/sounds/483288/) | craigsmith | fire_pool |
@@ -107,6 +123,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Falling Bomb.wav](https://freesound.org/people/Daleonfire/sounds/506313/) | Daleonfire | incoming |
 | [Heavy Rain Sound - Inu Etc.mp3](https://freesound.org/people/inuetc/sounds/507902/) | inuetc | rain_near |
 | [Headshot.wav](https://freesound.org/people/Pablobd/sounds/511194/) | Pablobd | headshot |
+| [Outdoors_Night_RainOnRoofing.wav](https://freesound.org/people/MrFossy/sounds/521841/) | MrFossy | hangar_rain |
 | [Hard Swing 1](https://freesound.org/people/magnuswaker/sounds/523230/) | magnuswaker | throw |
 | [Radio Sign Off / Squelch](https://freesound.org/people/JovianSounds/sounds/524205/) | JovianSounds | radio_out |
 | [Mortar](https://freesound.org/people/Mozfoo/sounds/529239/) | Mozfoo | flare_launch, mortar |
@@ -121,6 +138,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Ammo Box, Open-Close, Moving Handle.wav](https://freesound.org/people/DanielPickens/sounds/586544/) | DanielPickens | ui_buy |
 | [Flame Burst](https://freesound.org/people/magnuswaker/sounds/592572/) | magnuswaker | molotov |
 | [Grenade Explosion SFX (medium-sized, meaty, realistic)](https://freesound.org/people/unfa/sounds/609587/) | unfa | boom |
+| [121003 Pigeon flock fly away, wing flaps, Toronto.wav](https://freesound.org/people/TRP/sounds/616623/) | TRP | flock |
 | [flame burst ignite bbq barbecue.flac](https://freesound.org/people/kyles/sounds/637533/) | kyles | ignite, molotov_light |
 | [Zombie](https://freesound.org/people/Hoxton_Freeman/sounds/640217/) | Hoxton_Freeman | burn |
 | [Gore Impact - "LOT OF HEART"](https://freesound.org/people/magnuswaker/sounds/641046/) | magnuswaker | headshot |
@@ -130,6 +148,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [SKULLCRUSH](https://freesound.org/people/magnuswaker/sounds/697829/) | magnuswaker | headshot |
 | [Rain at night medium.wav](https://freesound.org/people/jgxxx/sounds/704395/) | jgxxx | rain_far |
 | [230405 Thunder DRY rolling distant low rumbles, roof, EM272s, Toronto 7am](https://freesound.org/people/TRP/sounds/717845/) | TRP | thunder |
+| [An M16 Rifle being reloaded while empty; full sequence](https://freesound.org/people/ser%C3%B8ut%C5%8Dnin--depriv%C9%99d/sounds/725397/) | ser%C3%B8ut%C5%8Dnin--depriv%C9%99d | m240_load |
 | [Zombie Groan 0](https://freesound.org/people/OwNathan/sounds/754438/) | OwNathan | groan |
 | [Zombie Groan 3](https://freesound.org/people/OwNathan/sounds/754441/) | OwNathan | groan |
 | [Walkie-talkie end of transmission](https://freesound.org/people/LukaCafuka/sounds/760245/) | LukaCafuka | radio_in |

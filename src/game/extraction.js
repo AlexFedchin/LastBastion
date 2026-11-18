@@ -349,8 +349,8 @@ export class ExtractionScene {
       const face = Math.pow(clamp(-dz / dd, 0, 1), 3);
       if (face > 0.02) for (const sx of [-9, 9]) { _v.set(sx, -2.4, 6).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3.2 + face * 3, 9 * face, 8.6 * face, 7.5 * face, 0.05); }
       if (((t + 5 + r.x * 0.01) % 1.1) < 0.09) { _v.copy(r.b.lights.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3, 9, 9, 9, 0.05); }
-      if (!r.loop && g.audio.ready && g.audio.B.jet) r.loop = g.audio.loop(g.audio.B.jet[0], { ref: 170, reverb: 0.4 });
-      if (r.loop) r.loop.update(x, y, z, 0, 0, -r.v, 3.4);
+      if (!r.loop && g.audio.ready) r.loop = g.audio.loop(g.audio.bomberBuf(), { ref: 170, reverb: 0.4, rate: 0.96 + (r.x % 7) * 0.01 });
+      if (r.loop) r.loop.update(x, y, z, 0, 0, -r.v, 3.4 * g.audio.bomberGain);
     }
     for (const d of this.drops) {
       if (d.done || t < d.trel) continue;

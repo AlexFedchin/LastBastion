@@ -234,7 +234,11 @@ export class Prologue {
     const add = (t, fn) => ev.push({ t, fn, done: false });
     const amb = (buf, o) => buf && A.play(buf, { bus: 'amb', force: true, ...o });
     const tele = this.shotAt('sunTele');
-    add(tele + 0.4, () => amb(B.siren?.[0], { gain: 0.08, rate: 0.8, pan: -0.4, lowpass: 1400, reverb: 0.95, fadeIn: 3, fadeOut: 4 }));
+    // an air-raid siren winding down, far off in the dead city behind the sun
+    if (B.siren_far?.[0]) add(tele + 0.2, () => amb(B.siren_far[0], { gain: 0.11, pan: -0.35, lowpass: 2400, reverb: 0.9 }));
+    else add(tele + 0.4, () => amb(B.siren?.[0], { gain: 0.08, rate: 0.8, pan: -0.4, lowpass: 1400, reverb: 0.95, fadeIn: 3, fadeOut: 4 }));
+    // the flock's wings as it crosses the sun, left to right
+    add(tele + 0.6, () => amb(B.flock?.[0], { gain: 0.22, pan: -0.2, lowpass: 7000, reverb: 0.4 }));
     // the flock: caws drifting left to right with it, then a few stragglers
     [1.1, 1.9, 2.4, 3.3, 4.0, 4.6, 5.5, 6.4, 7.6].forEach((dt, i, a) => add(tele + dt, () => amb(A.pickVar('crow'), {
       gain: rand(0.14, 0.28), rate: rand(0.93, 1.07), pan: lerp(-0.7, 0.75, i / (a.length - 1)), lowpass: rand(5000, 9000), reverb: 0.45,
@@ -249,17 +253,23 @@ export class Prologue {
     add(wall + 4.4, () => amb(A.pickVar('dog'), { gain: 0.06, pan: -0.72, lowpass: 1500, reverb: 0.85 }));
     // the gunner opens the feed cover, lays a belt in, shuts it
     const sen = this.shotAt('sentry'), G = this.sentryAt, at = { x: G.x, z: G.z, y: G.y + 1, ref: 5, force: true };
-    add(sen + 1.0, () => B.latch && A.play(B.latch[0], { ...at, gain: 0.42, rate: 1.25, reverb: 0.2 }));
-    add(sen + 2.1, () => A.play(A.pickVar('casing'), { ...at, gain: 0.16, rate: 0.7, reverb: 0.2 }));
-    add(sen + 2.6, () => B.latch && A.play(B.latch[0], { ...at, gain: 0.5, rate: 0.95, reverb: 0.25 }));
+    const load = B.m240_load || [];
+    if (load.length === 3) {
+      add(sen + 1.0, () => A.play(load[0], { ...at, gain: 0.5, reverb: 0.2 }));
+      add(sen + 1.9, () => A.play(load[1], { ...at, gain: 0.42, rate: 0.95, reverb: 0.2 }));
+      add(sen + 2.9, () => A.play(load[2], { ...at, gain: 0.5, reverb: 0.25 }));
+    } else {
+      add(sen + 1.0, () => B.latch && A.play(B.latch[0], { ...at, gain: 0.42, rate: 1.25, reverb: 0.2 }));
+      add(sen + 2.1, () => A.play(A.pickVar('casing'), { ...at, gain: 0.16, rate: 0.7, reverb: 0.2 }));
+      add(sen + 2.6, () => B.latch && A.play(B.latch[0], { ...at, gain: 0.5, rate: 0.95, reverb: 0.25 }));
+    }
     // the searchlights: a contactor slamming in on each tower and the arc striking, one after the other
     const L = this.lightsAt;
     for (const [k, d] of [[0, 0.05], [1, 0.75]]) {
       const sl = g.env.searchlights[k];
       if (!sl) continue;
-      const p = { x: sl.spot.position.x, z: sl.spot.position.z, y: sl.spot.position.y, force: true };
-      add(L + d, () => B.latch && A.play(B.latch[0], { ...p, gain: 0.9, rate: 0.42, ref: 22, reverb: 0.5 }));
-      add(L + d + 0.12, () => B.steam && A.play(B.steam[0], { ...p, gain: 0.22, rate: 1.7, ref: 18, reverb: 0.3, duration: 0.9, fadeOut: 0.4 }));
+      const P = sl.spot.position;
+      add(L + d, () => A.searchlightOn(P.x, P.y, P.z, 0.9));
     }
     // the dead: a heartbeat under the cut, one strike of lightning over the rise
     const dead = this.shotAt('dead');
@@ -279,7 +289,10 @@ export class Prologue {
     const g = this.g, A = g.audio, f = Math.min(1, this.t / this.end);
     const near = s.name === 'wall' || s.name === 'sentry';
     A.scape = {
-      dawn: 0.26 * (1 - ease(f / 0.55)), // evening birds
+      dawn: 0, dusk: 0.3 * (1 - ease(f / 0.55)), // evening birds and the first crickets
+      // the flag in the foreground of the pull-out from the sun; the wind in the wire as the dark comes
+      flag: s.name === 'sun' ? 0.11 : s.name === 'nest' ? 0.06 : 0.015,
+      wire_wind: 0.015 + 0.05 * ease(f), wire_creak: 0.004 + 0.01 * ease(f),
       wind_howl: 0.03 + 0.12 * ease(f),
       rain_far: 0.2 * ease((f - 0.55) / 0.45),
       rain_near: 0.1 * ease((f - 0.72) / 0.28),

@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
-  nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, ABILITY, CALL, COMMS,
+  nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, wallDist, ABILITY, CALL, COMMS,
   UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines, CHRONICLE, NIGHT_EVENTS, EXTRACTION,
   ISSUE_LINES, GUN_MODS,
 } from './config.js';
@@ -357,7 +357,7 @@ class Game {
     this.arsenal.onMessage = (text, kind, item) => {
       if (!this.inPlay()) return;
       if (kind === 'wireHold') this.hud.alert('', 'wire', { key: 'wireHold', item, format: (s) => `WIRE HOLDING — ${s.join(' · ')}`, priority: 0, life: 2.6 });
-      else if (kind === 'wireCut') { this.hud.alert('', '', { key: 'wireCut', item, format: (s) => `WIRE CUT — ${s.join(' · ')}` }); this.audio.wireSnap && this.audio.wireSnap(); }
+      else if (kind === 'wireCut') { this.hud.alert('', '', { key: 'wireCut', item, format: (s) => `WIRE CUT — ${s.join(' · ')}` }); }
     };
     this.player.onHit = (killed, head) => { this.hud.hitmarker(killed, head); };
     this.player.onOverheat = () => { this.bark('overheat', 0.5); this.telemetry.overheat(); };
@@ -1110,6 +1110,7 @@ class Game {
     this.audio.lowLife = this.run.survivors <= 5;
     this.groans(dt);
     this.burnScreams(dt);
+    this.footfalls(dt);
 
     this.hud.update(rdt, this);
 
@@ -1133,6 +1134,27 @@ class Game {
       const i = h.randomAlive();
       if (i >= 0) this.audio.groan(h.x[i], h.z[i], h.type[i]);
     }
+  }
+
+  /**
+   * The runners' feet: how many are sprinting at the wall near enough to hear (a brute stampede
+   * counts heavier), and from which side, for the audio's running bed. Counted a few times a second.
+   */
+  footfalls(dt) {
+    if ((this.footAcc = (this.footAcc || 0) + dt) < 0.25) return;
+    this.footAcc = 0;
+    const h = this.horde, A = this.audio, lx = A.listenerX, lz = A.listenerZ, yaw = A.listenerYaw;
+    let w = 0, pan = 0;
+    for (let i = 0; i < h.n; i++) {
+      const t = h.type[i];
+      if (h.dead[i] || (t !== ZT.RUNNER && t !== ZT.BRUTE)) continue;
+      const dx = h.x[i] - lx, dz = h.z[i] - lz, d = Math.hypot(dx, dz);
+      if (d < 14 || d > 170 || wallDist(h.x[i], h.z[i]) < 3) continue; // (not the ones already on the pile)
+      const k = (t === ZT.BRUTE ? 1.6 : 1) / (1 + d / 35);
+      w += k; pan += k * Math.sin(Math.atan2(dx, -dz) - yaw);
+    }
+    A.runners = clamp(w / 4, 0, 1);
+    A.runnersPan = w > 0 ? pan / w : 0;
   }
 
   /** The ones still burning keep screaming until the fire or a bullet ends it. */

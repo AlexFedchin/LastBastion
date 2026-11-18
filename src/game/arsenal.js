@@ -146,9 +146,10 @@ export class Arsenal {
         t: 2.4 + k * 0.22 + R() * 0.25, r: s.artyRadius, dmg: s.artyDamage, scale: 2.2, whistled: false, streak: false,
       });
     }
-    // red marker smoke on the target
+    // red marker smoke on the target; the battery fires from far behind the base
     this.marker = { x: target.x, z: target.z, t: 3.2 };
     this.audio.radioStatic(0.3);
+    this.audio.artyFire && this.audio.artyFire(n);
     return true;
   }
 
@@ -165,6 +166,7 @@ export class Arsenal {
       });
     }
     this.audio.klaxon();
+    this.audio.artyFire && this.audio.artyFire(D.shells);
     return true;
   }
 
@@ -690,6 +692,8 @@ export class Arsenal {
       b.segs[s] -= weight * dt * 10;
       // a crowd caught on it: worth a word on the HUD, once in a while per stretch of wire
       b.load[s] += weight * dt;
+      // the wire straining and rattling under them (rationed in the audio engine)
+      if (b.load[s] > 1.5 && R() < dt * 0.5) this.audio.wireRattle(x, offsetZ(x, b.d), Math.min(1, b.load[s] / 6));
       if (b.load[s] > 7 && b.told[s] <= 0 && this.onMessage) { b.told[s] = 25; b.load[s] = 0; this.onMessage('', 'wireHold', `${this.wireLabel(s)} · ${b.d} M`); }
       if (b.segs[s] <= 0) this.breakWire(b, s);
       return 0.32;
@@ -709,6 +713,7 @@ export class Arsenal {
     for (let k = 0; k < b.perSeg; k++) b.coils.setMatrixAt(s * b.perSeg + k, zero);
     b.coils.instanceMatrix.needsUpdate = true;
     const x = -100 + s * 10 + 5;
+    this.audio.wireSnap(x, offsetZ(x, b.d));
     for (let k = 0; k < 10; k++) this.fx.spark(x + rand(-5, 5), 0.8, offsetZ(x, b.d), rand(-3, 3), rand(2, 6), rand(-3, 3), 5, 4, 3, 0.4);
   }
 

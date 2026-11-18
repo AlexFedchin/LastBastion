@@ -509,6 +509,53 @@ for k, ss in enumerate((0.0, 0.276, 0.551)):
 clip('sfx/rocket_1', 857959, 0.0, 2.6, fi=0.002, fo=1.2, hp=50, target=-13)
 clip('sfx/rocket_2', 854476, 0.0, 2.2, fi=0.002, fo=1.0, hp=50, target=-13)
 
+# ── the sound shortlist (2026-11-18) ─────────────────────────────────────────
+# Picked by ear by the developer from Freesound CC0 candidates (docs/SOUNDS_NEEDED.md), replacing
+# the stand-ins: the searchlights, the generator, the prologue's beds and one-shots, the bombers,
+# the convoy truck, the riflemen, the wire, our own battery firing, the hangar and the runners' feet.
+
+# a large searchlight switching on outdoors: the contactor's clunk and the arc settling into its hum
+clip('sfx/searchlight_on', 49023, 0.0, 3.8, fi=0.002, fo=1.2, hp=40, target=-14)
+# the searchlight's mount traversing: an electric motor (an animation rostrum) running, from its steady part
+loop('sfx/sl_motor', 327900, 1.0, 5.5, X=0.8, ch=1, target=-20, hp=120)
+# the generator behind the wall (a pump motor, sharp start and stop): a false start, the catch and the
+# rev as it takes the load; and running, then dying away
+GEN = 406892
+clip('sfx/gen_start', GEN, 26.8, 7.2, fi=0.02, fo=1.6, hp=50, target=-16)
+clip('sfx/gen_stop', GEN, 52.6, 4.2, fi=0.5, fo=1.0, hp=50, target=-16)
+# the prologue: an air-raid siren winding down far off in the dead city, a pigeon flock going up
+# (the crows' wings), and the evening grassland the sun goes down over
+clip('sfx/siren_far', 52040, 0.0, 40.0, ch=2, sr=32000, fi=2.0, fo=6.0, lp=5000, target=-16, q=4)
+clip('sfx/flock', 616623, 0.3, 7.0, ch=2, sr=32000, fi=0.3, fo=2.0, hp=150, target=-16)
+loop('amb/dusk', 434858, 2.0, 40)
+# the M240 gunner loading (an M16's empty reload, cut in three): the cover up, the belt in, shut and charged
+for k, (ss, t) in enumerate([(0.10, 0.65), (1.95, 0.85), (4.0, 1.25)]):
+    clip(f'sfx/m240_load_{k + 1}', 725397, ss, t, fi=0.003, fo=min(0.3, t * 0.35), target=-15, limit=4)
+# the B-7 flag on the nest, and the wind singing in an antenna's wire (with a fence creaking, kept faint)
+loop('amb/flag', 154794, 13.5, 26)
+loop('amb/wire_wind', 147599, 19.5, 34)
+loop('amb/wire_creak', 217769, 28.5, 34)
+# the bombers: a formation of multi-engine bombers, from where the pass settles (the first 1.5 s swell is cut)
+loop('sfx/bomber', 437892, 1.5, 19, X=1.5, ch=1, target=-12, hp=30)
+# the convoy's truck: a diesel truck idling, pitched down to an army truck's heavy, slow beat
+loop('sfx/truck', 128160, 1.5, 20, X=1.5, ch=1, target=-14, rate=0.78, hp=30)
+# the riflemen: M16 single shots recorded outdoors, each with its own echo
+for k, ss in enumerate([0.16, 1.73, 3.22, 5.07, 6.50]):
+    clip(f'sfx/rifle_{k + 1}', 187677, ss, 1.3, fi=0.001, fo=0.6, target=-13, limit=5)
+# the wire: a fence shaken (the voices at the start of the take are cut, and high-passed out of the rest)
+for k, (ss, t) in enumerate([(2.15, 1.05), (5.95, 0.95), (6.95, 3.25)]):
+    clip(f'sfx/wire_{k + 1}', 189220, ss, t, fi=0.01, fo=min(0.6, t * 0.3), hp=900, hp_order=2, target=-16)
+# our battery firing behind the base: three howitzer reports (played far off, low-passed, in the game)
+for k, (ss, t) in enumerate([(0.0, 2.9), (2.98, 2.0), (4.98, 1.9)]):
+    clip(f'sfx/arty_{k + 1}', 239137, ss, t, ch=2, sr=32000, fi=0.002, fo=t * 0.45, lp=6000, target=-12, limit=5)
+# the hangar: rain on a corrugated roof from inside, an empty warehouse's air, and a heavy crate set down
+loop('amb/hangar_rain', 521841, 55.5, 30)
+loop('amb/hangar_room', 240895, 53.0, 40)
+for k, (ss, t) in enumerate([(1.2, 0.9), (6.33, 1.2), (11.55, 0.9)]):
+    clip(f'sfx/crate_{k + 1}', 456977, ss, t, fi=0.002, fo=t * 0.4, hp=40, target=-13, limit=5)
+# the runners' feet: a group running in step on hard ground (mono: placed toward the runners in the game)
+loop('amb/run', 250538, 1.0, 24, ch=1)
+
 # ── score ────────────────────────────────────────────────────────────────────
 music('music/menu', 'Night Vigil', -19)
 music('music/night_bed_1', 'Echoes of Time v2', -21)

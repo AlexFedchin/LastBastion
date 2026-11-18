@@ -29,12 +29,20 @@ const SFX = {
   grenade_pin: [0, 44100], grenade_spoon: [0, 44100], glass: [3, 44100], molotov_whoosh: [0, 32000],
   tinnitus: [0, 32000], crow: [5, 32000], bell: [0, 32000], dog: [3, 22050], distant_mg: [4, 22050],
   heli_a: [0, 32000], heli_b: [0, 32000], chain: [3, 44100], rocket: [2, 44100],
+  // the shortlist (docs/SOUNDS_NEEDED.md): recordings in place of the stand-ins
+  searchlight_on: [0, 44100], sl_motor: [0, 32000], gen_start: [0, 44100], gen_stop: [0, 44100],
+  siren_far: [0, 32000], flock: [0, 32000], m240_load: [3, 44100], bomber: [0, 32000], truck: [0, 32000],
+  rifle: [5, 44100], wire: [3, 44100], arty: [3, 32000], crate: [3, 44100],
 };
 const BEDS = {
   rain_far: 32000, rain_near: 32000, wind: 32000, wind_howl: 32000, fire_roar: 32000, fire_crackle: 32000, fire_pool: 32000,
   horde_far: 32000, horde_mid: 32000, horde_near: 32000, horde_surge: 32000, shuffle: 32000, war: 22050,
   dawn: 32000, flies: 32000, lamp: 32000, radio_static: 22050,
+  dusk: 32000, flag: 32000, wire_wind: 32000, wire_creak: 32000, hangar_rain: 32000, hangar_room: 32000, run: 32000,
 };
+// beds placed on their own source (the flag on the nest, the runners' feet): each through its own panner
+const PANNED_BEDS = ['flag', 'run'];
+const FLAG_AT = [-6.8, 1.5]; // the B-7 flag's mast beside the nest (world x, z)
 const HORDE_BEDS = ['horde_far', 'horde_mid', 'horde_near', 'horde_surge', 'shuffle'];
 // score: file -> loops?
 const SCORE = {
@@ -180,6 +188,9 @@ export class AudioEngine {
     this.night = 1;
     this.tide = false;
     this.lowLife = false;
+    this.inside = false;  // the hangar: under a roof, the valley shut out
+    this.runners = 0;     // 0..1 how many runners are sprinting at the wall, near enough to hear
+    this.runnersPan = 0;  // and from which side (-1 left .. 1 right)
 
     this.musicMode = 'menu';
     this._mi = 0;         // smoothed music intensity
@@ -278,8 +289,10 @@ export class AudioEngine {
     this.ambBus = ctx.createGain(); this.ambBus.connect(this.ambDuck);
     this.frontPan = ctx.createStereoPanner(); this.frontPan.connect(this.ambBus);
     this.beds = {};
+    this.bedPan = {};
+    for (const name of PANNED_BEDS) { const p = ctx.createStereoPanner(); p.connect(this.ambBus); this.bedPan[name] = p; }
     for (const name of Object.keys(BEDS)) {
-      const out = HORDE_BEDS.includes(name) || name === 'war' ? this.frontPan : this.ambBus;
+      const out = HORDE_BEDS.includes(name) || name === 'war' ? this.frontPan : this.bedPan[name] || this.ambBus;
       this.beds[name] = new Bed(this, name, out);
     }
 
@@ -623,8 +636,11 @@ export class AudioEngine {
     this.play(this.B.steam_long[0], { gain: 0.45, delay: 0.25, force: true });
   }
 
-  // the riflemen: the same rifle report, pitched up and kept back in the mix
-  rifle(x, z) { this.play(this.pickVar('mg'), { gain: 0.13, rate: rand(1.18, 1.34), x, z, ref: 22, reverb: 0.5, key: 'rifle', max: 4 }); }
+  // the riflemen: M16 single shots recorded outdoors (the M240 take pitched up until they load), kept back in the mix
+  rifle(x, z) {
+    if (this.B.rifle.length) this.play(this.pickVar('rifle'), { gain: 0.15, rate: rand(0.94, 1.06), x, z, ref: 22, reverb: 0.35, key: 'rifle', max: 4 });
+    else this.play(this.pickVar('mg'), { gain: 0.13, rate: rand(1.18, 1.34), x, z, ref: 22, reverb: 0.5, key: 'rifle', max: 4 });
+  }
   wallGun(x, z) { this.play(this.pickVar('mg'), { gain: 0.3, rate: rand(0.94, 1.08), x, z, ref: 25, reverb: 0.45, key: 'mg', max: 10 }); }
 
   // ── ordnance ───────────────────────────────────────────────────────────────
@@ -859,8 +875,52 @@ export class AudioEngine {
     this.duck(0.3, 0.15, 0.5);
   }
 
-  powerDown() { if (this.B.power_down) this.play(this.B.power_down[0], { gain: 0.55, x: -9, z: 16, ref: 30, reverb: 0.4, force: true }); }
-  powerUp() { if (this.B.power_up) this.play(this.B.power_up[0], { gain: 0.5, x: -9, z: 16, ref: 30, reverb: 0.4, force: true }); }
+  /** The generator behind the wall dies (it runs down and stops), or is started again (a false start, then it catches). */
+  powerDown() {
+    const b = this.B.gen_stop[0] || (this.B.power_down && this.B.power_down[0]);
+    this.play(b, { gain: 0.7, x: -9, z: 16, ref: 30, reverb: 0.4, force: true });
+  }
+  powerUp() {
+    const b = this.B.gen_start[0] || (this.B.power_up && this.B.power_up[0]);
+    this.play(b, { gain: 0.65, x: -9, z: 16, ref: 30, reverb: 0.4, force: true });
+  }
+
+  /** A searchlight coming on at (x, y, z): the contactor slamming in, the arc settling into its hum. */
+  searchlightOn(x, y, z, gain = 0.9) {
+    const b = this.B.searchlight_on[0];
+    if (b) this.play(b, { x, y, z, gain, rate: rand(0.95, 1.03), ref: 22, reverb: 0.45, force: true });
+    else if (this.B.latch[0]) this.play(this.B.latch[0], { x, y, z, gain, rate: 0.42, ref: 22, reverb: 0.5, force: true });
+  }
+
+  /** A searchlight's traversing motor, as a moving source (environment.js drives its level from the beam's slew). */
+  slMotor() { return this.B.sl_motor[0] ? this.loop(this.B.sl_motor[0], { ref: 18, reverb: 0.2, rate: rand(0.94, 1.06) }) : null; }
+
+  /** The bombers' engines (the recording, or the synthesized roar until it loads). */
+  bomberBuf() { return this.B.bomber[0] || (this.B.jet && this.B.jet[0]) || null; }
+  /** The convoy truck's diesel, with the rate to play it at (the stand-in was the prop loop slowed right down). */
+  truckLoop(o = {}) {
+    if (this.B.truck[0]) return this.loop(this.B.truck[0], { ref: 30, reverb: 0.2, ...o });
+    return this.B.prop ? this.loop(this.B.prop[0], { ref: 30, rate: 0.45, ...o }) : null;
+  }
+  /** How much louder the recorded loops play than the synthesized ones they replace, at the same level. */
+  get bomberGain() { return this.B.bomber[0] ? 1.35 : 1; }
+  get truckGain() { return this.B.truck[0] ? 2.2 : 1; }
+
+  /** Our battery firing from far behind the base: `n` guns, the reports a beat apart, low and rolling. */
+  artyFire(n = 4) {
+    if (!this.ready || !this.B.arty.length) return;
+    const guns = clamp(Math.round(n / 2), 1, 4);
+    for (let k = 0; k < guns; k++) {
+      this.play(this.pickVar('arty'), { gain: rand(0.26, 0.34), rate: rand(0.82, 0.95), pan: rand(-0.35, 0.35), delay: k * rand(0.18, 0.4), lowpass: rand(700, 1100), reverb: 0.9, bus: 'amb', force: true });
+    }
+  }
+
+  /** Wire out in the approach: shaken by a crowd caught on it (strength 0..1), at (x, z). */
+  wireRattle(x, z, strength = 0.5) {
+    if (!this.ready || this.ctx.currentTime - (this._wireT ?? -9) < 0.9) return;
+    this._wireT = this.ctx.currentTime;
+    this.play(this.pickVar('wire'), { gain: 0.35 + 0.4 * strength, rate: rand(0.85, 1.1), x, z, ref: 22, reverb: 0.35, key: 'wire', max: 2 });
+  }
 
   /** The rescue party is torn down out in the field. */
   scream2(x, z) {
@@ -998,17 +1058,20 @@ export class AudioEngine {
   uiHover() { this.play(this.B.ui_hover[0], { gain: 0.14, rate: rand(0.95, 1.05), force: true }); }
   uiBuy() { this.play(this.B.ui_buy[0], { gain: 0.55, force: true }); }
   /** A stretch of wire giving way out in the approach: a far metallic snap. */
-  wireSnap() {
+  wireSnap(x, z) {
     if (!this.ready) return;
-    this.play(this.B.latch[0], { gain: 0.3, rate: rand(1.5, 1.7), reverb: 0.6, lowpass: 2600, force: true });
+    const at = x !== undefined ? { x, z, ref: 30 } : { lowpass: 2600 };
+    this.play(this.B.latch[0], { ...at, gain: 0.22, rate: rand(1.5, 1.7), reverb: 0.6, force: true });
+    // the stretch whipping loose
+    if (this.B.wire.length) this.play(this.B.wire[0], { ...at, gain: 0.7, rate: rand(1.05, 1.2), reverb: 0.5, delay: 0.03, force: true });
   }
 
   /** The hangar: a requisition set down in its bay, a heavy thud on concrete and a rattle of metal. */
   delivery() {
     if (!this.ready) return;
-    this.play(this.B.latch[0], { gain: 0.5, rate: rand(0.5, 0.6), reverb: 0.55, force: true });
-    if (this.B.barrel_seat[0]) this.play(this.B.barrel_seat[0], { gain: 0.35, rate: rand(0.7, 0.8), reverb: 0.5, delay: 0.02, force: true });
-    if (this.B.bodyfall && this.B.bodyfall[0]) this.play(this.B.bodyfall[0], { gain: 0.45, rate: rand(0.85, 0.95), reverb: 0.4, force: true });
+    if (this.B.crate.length) this.play(this.pickVar('crate'), { gain: 0.7, rate: rand(0.8, 0.95), reverb: 0.55, force: true });
+    else this.play(this.B.latch[0], { gain: 0.5, rate: rand(0.5, 0.6), reverb: 0.55, force: true });
+    if (this.B.barrel_seat[0]) this.play(this.B.barrel_seat[0], { gain: 0.3, rate: rand(0.7, 0.8), reverb: 0.5, delay: 0.03, force: true });
   }
 
   thunder(delay = 2) {
@@ -1054,7 +1117,7 @@ export class AudioEngine {
     } else if (mode === 'dawn') {
       only(['dawn']);
       T.dawn.set(1.1, 1.2, true);
-      this._bellDone = false; this._bellT = 2.5; this._crowT = rand(3, 7);
+      this._bellDone = false; this._bellT = 2.5; this._crowT = rand(3, 7); this._flockT = rand(6, 10);
     } else if (mode === 'gameover') { only(['fallen']); T.fallen.set(1.15, 1.5, true); }
     else if (mode === 'victory') { only(['victory']); T.victory.set(1.15, 2, true); }
   }
@@ -1117,7 +1180,29 @@ export class AudioEngine {
     b.dawn.set(lv('dawn', 0.3 * day), 2.5);
     b.flies.set(lv('flies', 0.1 * day), 3);
     b.radio_static.set(lv('radio_static', this.ctx.currentTime < this._radioUntil ? 0.03 : 0), 0.08);
+    // the set dressing (the flag, the wire singing, the dusk) sits under everything and steps
+    // further back while the fighting is on: under pressure, and for a moment after each burst
+    const firing = this.ctx.currentTime - this._hmgLast < 1.2;
+    const calm = (1 - 0.55 * clamp(this.intensity, 0, 1)) * (firing ? 0.55 : 1);
+    const out = m === 'menu' || this.inside ? 0 : 1; // (the menu's camera is nowhere near the nest)
+    b.flag.set(lv('flag', out * (0.045 + 0.05 * this._gust) * calm), 1.2);
+    b.wire_wind.set(lv('wire_wind', out * (0.03 + 0.05 * this._gust * this._gust) * (0.5 + 0.5 * night) * calm), 1.5);
+    b.wire_creak.set(lv('wire_creak', out * 0.012 * (0.3 + this._gust) * calm), 1.5);
+    b.dusk.set(lv('dusk', 0), 2.5);
+    // the runners' feet, toward the runners (they are action, not dressing: not calmed)
+    b.run.set(lv('run', inPlay ? 0.26 * clamp(this.runners, 0, 1) : 0), 0.5);
+    // the hangar: under a tin roof in the rain, the valley shut outside
+    b.hangar_rain.set(this.inside ? 0.2 : 0, 1.5);
+    b.hangar_room.set(this.inside ? 0.16 : 0, 1.5);
+    if (this.inside) {
+      for (const k of ['rain_far', 'rain_near', 'dawn', 'flies', 'horde_far', 'horde_mid', 'fire_crackle', 'lamp']) b[k].set(0, 1.5);
+      b.wind.set(0.04, 1.5); b.wind_howl.set(0, 1.5); b.war.set(0.03, 3);
+    }
     for (const bed of Object.values(b)) bed.tick(dt);
+    const t = this.ctx.currentTime;
+    const [fx, fz] = FLAG_AT;
+    this.bedPan.flag.pan.setTargetAtTime(clamp(Math.sin(Math.atan2(fx - this.listenerX, -(fz - this.listenerZ)) - this.listenerYaw) * 0.7, -0.7, 0.7), t, 0.15);
+    this.bedPan.run.pan.setTargetAtTime(clamp(this.runnersPan, -0.8, 0.8), t, 0.3);
     this.frontPan.pan.setTargetAtTime(clamp(Math.sin(-this.listenerYaw) * 0.5, -0.5, 0.5), this.ctx.currentTime, 0.2);
   }
 
@@ -1151,6 +1236,10 @@ export class AudioEngine {
       if (this._crowT <= 0) {
         this._crowT = rand(5, 14);
         this.play(this.pickVar('crow'), { gain: rand(0.12, 0.25), rate: rand(0.95, 1.05), pan: rand(-0.8, 0.8), lowpass: rand(5000, 12000), reverb: 0.35, bus: 'amb' });
+      }
+      // the crows coming down to the field: their wings, once, a while after first light
+      if (this._flockT > 0 && this.musicMode === 'dawn' && (this._flockT -= dt) <= 0 && this.B.flock[0]) {
+        this.play(this.B.flock[0], { gain: 0.12, rate: rand(0.95, 1.05), pan: rand(-0.6, 0.6), lowpass: 5000, reverb: 0.5, bus: 'amb' });
       }
       if (!this._bellDone && this.musicMode === 'dawn') {
         this._bellT -= dt;

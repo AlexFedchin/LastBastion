@@ -14,7 +14,7 @@ import {
   makeMetalTextures, makePlasterTextures, makeSlabTextures, makeBarkTexture, makeHescoTextures,
   makePlankTextures, makeCorrugatedTextures, makeRockTextures,
 } from './textures2.js';
-import { lerp } from '../core/util.js';
+import { lerp, clamp } from '../core/util.js';
 import { patchFogChunks, patchLightChunks, fogUniforms, createSceneFog } from '../render/atmosphere.js';
 import { Terrain, groundH } from './terrain.js';
 import { FireSystem } from '../fx/fire.js';
@@ -33,6 +33,7 @@ patchLightChunks();
 
 const R = Math.random;
 const _dir = new THREE.Vector3();
+const _prev = new THREE.Vector3();
 const _down = new THREE.Vector3(0, -1, 0);
 
 export class Environment {
@@ -401,7 +402,17 @@ export class Environment {
         const gx = sl.side * -10 + Math.sin(t) * 75 + Math.sin(t * 2.3) * 20, gz = -95 + Math.cos(t * 0.7) * 70;
         sl.goal.set(gx, groundH(gx, gz), gz);
       }
+      _prev.subVectors(sl.aim, sl.spot.position).normalize();
       sl.aim.lerp(sl.goal, 1 - Math.exp(-dt * (sl.hunt > 0 ? 1.6 : 0.9)));
+      // the mount's motor: heard when the beam slews (jumping to a crowd, swinging out), not on the slow sweep
+      if (audio && audio.ready && dt > 0) {
+        const slew = _prev.angleTo(_dir.subVectors(sl.aim, sl.spot.position).normalize()) / dt;
+        sl.slew = (sl.slew || 0) + (slew - (sl.slew || 0)) * Math.min(1, dt * 6);
+        const on = this.power > 0.5 && !audio.inside && (audio.musicMode !== 'menu' || audio._cine);
+        const lvl = on ? clamp((sl.slew - 0.12) / 0.45, 0, 1) : 0;
+        if (!sl.motor && lvl > 0) sl.motor = audio.slMotor();
+        if (sl.motor) { const P = sl.spot.position; sl.motor.update(P.x, P.y, P.z, 0, 0, 0, 0.55 * lvl * lvl); }
+      }
       sl.spot.target.position.copy(sl.aim);
       sl.spot.target.updateMatrixWorld();
       _dir.subVectors(sl.aim, sl.spot.position).normalize();
@@ -438,7 +449,6 @@ export class Environment {
     this.rainUniforms.uIntensity.value = lerp(0.32, 0.18, d);
     for (const s of this.lampSprites) s.visible = d < 0.6 && this.power > 0.5;
     this.applyDusk();
-    void audio;
   }
 
   /**

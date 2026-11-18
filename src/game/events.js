@@ -1072,8 +1072,8 @@ class Convoy {
       const gy = groundH(this.x, this.z);
       const L = URAL_LAMPS;
       for (const s of [-L.side, L.side]) fx.glowDot(this.x + Math.cos(this.yaw) * s + Math.sin(this.yaw) * L.x, gy + L.y, this.z - Math.sin(this.yaw) * s + Math.cos(this.yaw) * L.x, 0.7, 6, 5.5, 4, 0.05);
-      if (!this.loop && g.audio.ready && g.audio.B.prop) this.loop = g.audio.loop(g.audio.B.prop[0], { ref: 30, rate: 0.45 });
-      if (this.loop) this.loop.update(this.x, gy + 1, this.z, 0, 0, this.sp, 1.2);
+      if (!this.loop && g.audio.ready) this.loop = g.audio.truckLoop();
+      if (this.loop) this.loop.update(this.x, gy + 1, this.z, 0, 0, this.sp, 1.2 * g.audio.truckGain);
       if (this.hp <= 0) return this.finish(false);
       if (this.z > GATE.z - 1.5 && Math.abs(this.x) < 6) return this.finish(true);
     }
@@ -1249,7 +1249,11 @@ class Blackout {
     if (this.t < 1.4) this.power(R() < 0.5 * (1 - this.t / 1.4) ? 1 : 0.08 * R());
     else if (this.t < P.duration) this.power(0);
     else if (this.t < P.duration + 1.2) {
-      if (!this.restored) { this.restored = true; g.audio.powerUp(); }
+      if (!this.restored) {
+        this.restored = true; g.audio.powerUp();
+        // the searchlights' contactors slam in as the generator takes the load, one tower after the other
+        g.env.searchlights.forEach((sl, k) => { const P = sl.spot.position; setTimeout(() => g.audio.searchlightOn(P.x, P.y, P.z, 0.8), 900 + k * 650); });
+      }
       this.power(R() < (this.t - P.duration) / 1.2 ? 1 : 0);
     } else {
       this.power(1);

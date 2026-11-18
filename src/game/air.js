@@ -277,8 +277,8 @@ export class AirSupport {
     _v.copy(L.stbd).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1.6, 0.3, 5, 0.8, 0.05);
     if ((performance.now() % 1000) < 90) { _v.copy(L.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3, 8, 8, 8, 0.05); }
     // sound: a roar that grows over the wall and tears away down the valley
-    if (!b.loop && this.audio.ready) b.loop = this.audio.loop(this.audio.B.jet && this.audio.B.jet[0], { ref: 140, reverb: 0.35 });
-    if (b.loop) b.loop.update(x, y, z, b.dx * B.speed, 0, b.dz * B.speed, 3.2);
+    if (!b.loop && this.audio.ready) b.loop = this.audio.loop(this.audio.bomberBuf(), { ref: 140, reverb: 0.35 });
+    if (b.loop) b.loop.update(x, y, z, b.dx * B.speed, 0, b.dz * B.speed, 3.2 * this.audio.bomberGain);
     // bomb away
     if (!b.released && -along <= b.release) {
       b.released = true;
