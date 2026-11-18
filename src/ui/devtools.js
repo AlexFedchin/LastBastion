@@ -1,7 +1,8 @@
 // Developer tools: F10 (or DEVELOPER in the main menu) opens a panel to start any night
 // with any difficulty, survivors, supplies and upgrades, and, during a run, to trigger
 // events, end the night or jump to the extraction; and, from anywhere, to watch either
-// cutscene (the prologue, the extraction or the ending) straight away. Dev runs never touch the campaign
+// cutscene (the prologue, the extraction or the ending) straight away, or fly the free camera
+// (F9, src/ui/freecam.js). Dev runs never touch the campaign
 // save or the endless record (run.dev).
 import { DIFFICULTY, UPGRADES, FINAL_NIGHT, EXTRACTION } from '../config.js';
 
@@ -62,6 +63,9 @@ export class DevTools {
       <button class="close" data-dev="close" aria-label="Close developer tools">×</button>
       <h2>DEVELOPER</h2>
       <div class="sub">F10 opens and closes this panel. Dev runs never save over your campaign.</div>
+      <h3>LOOK AROUND</h3>
+      <div class="acts"><button data-dev="freecam">FREE CAMERA</button></div>
+      <div class="sub">F9 anywhere. Fly over the map with the game held still and the dead hidden; the readout lists the keys.</div>
       <h3>WATCH A CUTSCENE</h3>
       <div class="acts">
         <button data-dev="watch-prologue">THE PROLOGUE</button>
@@ -108,6 +112,7 @@ export class DevTools {
     if (b.dataset.ev) { if (g.events && g.inPlay()) g.events.trigger(b.dataset.ev); this.toggle(false); return; }
     switch (b.dataset.dev) {
       case 'close': this.toggle(false); break;
+      case 'freecam': this.toggle(false); g.freecam.toggle(); break;
       case 'max': for (const u of UPGRADES) this.setLevel(u.id, u.costs.length); break;
       case 'none': for (const u of UPGRADES) this.setLevel(u.id, 0); break;
       case 'start': this.start(); break;
@@ -118,8 +123,8 @@ export class DevTools {
       case 'clear': g.horde.clearLiving(); break;
       case 'supplies': if (g.run) g.run.supplies += 500; break;
       case 'souls': if (g.run) g.run.survivors += 10; break;
-      case 'extract': if (g.run) { g.run.survivors = Math.max(g.run.survivors, EXTRACTION.souls); g.playExtraction(); } this.toggle(false); break;
-      case 'ending': if (g.run) { g.victory = true; g.playEnding(); } this.toggle(false); break;
+      case 'extract': g.freecam.exit(); if (g.run) { g.run.survivors = Math.max(g.run.survivors, EXTRACTION.souls); g.playExtraction(); } this.toggle(false); break;
+      case 'ending': g.freecam.exit(); if (g.run) { g.victory = true; g.playEnding(); } this.toggle(false); break;
       default: break;
     }
   }
@@ -134,6 +139,7 @@ export class DevTools {
     };
     this.toggle(false);
     const g = this.g;
+    g.freecam.exit();
     g.devSave = save;
     if (g.state !== 'menu') g.enterMenu();
     g.deploy(save, () => g.startRun(save));
@@ -148,6 +154,7 @@ export class DevTools {
     const g = this.g;
     if (g.deploying) return;
     this.toggle(false);
+    g.freecam.exit();
     if (which === 'prologue') {
       // a throwaway night 1: the prologue, then that night as a dev run
       const d = DIFFICULTY[this.$('#dv-diff').value] || DIFFICULTY.veteran;

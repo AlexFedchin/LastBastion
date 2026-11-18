@@ -31,6 +31,7 @@ import { loadTextures } from './world/texlib.js';
 import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
 import { DevTools } from './ui/devtools.js';
+import { FreeCam } from './ui/freecam.js';
 import { Hangar } from './world/hangar.js';
 import { Coach } from './ui/coach.js';
 import { Ending } from './game/ending.js';
@@ -130,6 +131,7 @@ class Game {
     this.chronicle = new Chronicle(this);
     this.dev = new DevTools(this);
     this.hangar = new Hangar(this);
+    this.freecam = new FreeCam(this);
     this.coach = new Coach(this);
     this.ending = new Ending(this);
     this.prologue = new Prologue(this);
@@ -374,16 +376,18 @@ class Game {
     this.env.onDistantGunfire = (delay) => this.audio.distantGunfire(delay);
     this.director.onEvent = (kind, e) => this.onDirectorEvent(kind, e);
     this.input.onLockChange = (locked) => {
+      if (this.freecam.on) return; // the free camera captures the mouse for itself
       if (!locked && this.state === 'night' && !this.ignoreUnlock) this.pause();
       if (locked && this.state === 'night') this.screens.show(null);
     };
     this.canvas.addEventListener('click', () => {
       this.audio.init();
+      if (this.freecam.on) return;
       if (this.state === 'night' && !this.input.locked) this.input.lock();
       if (this.state === 'shop') this.hangar.click();
     });
     // the hangar: what the cursor is over (only over the 3D view, not the panels)
-    window.addEventListener('mousemove', (e) => { if (this.state === 'shop') this.hangar.pointer(e.target === this.canvas ? e : null); });
+    window.addEventListener('mousemove', (e) => { if (this.state === 'shop' && !this.freecam.on) this.hangar.pointer(e.target === this.canvas ? e : null); });
     document.getElementById('s-click').addEventListener('click', () => { this.audio.init(); this.input.lock(); });
     document.addEventListener('keydown', (e) => {
       this.audio.init();
@@ -854,17 +858,20 @@ class Game {
     } else this.timeScale = damp(this.timeScale, 1, 6, rdt);
     this.slowmoCd = Math.max(0, this.slowmoCd - rdt);
     // the night holds its breath until you take the gun
-    const paused = this.state === 'paused' || (this.state === 'night' && !this.input.locked && !TEST);
-    const dt = paused ? 0 : rdt * this.timeScale;
+    // the developer's free camera: the game holds still and only the ambient world goes on
+    const flying = this.freecam.on;
+    const paused = !flying && (this.state === 'paused' || (this.state === 'night' && !this.input.locked && !TEST));
+    const dt = paused ? 0 : flying ? rdt : rdt * this.timeScale;
     this.time += dt;
     setSoldierClock(this.time);
-    this.stateT += rdt;
+    if (!flying) this.stateT += rdt;
     this.barkCd = Math.max(0, this.barkCd - rdt);
 
     // the gun left in the nest for the victory screen goes back on the camera when it closes
     if (this.victoryGun && this.state !== 'victory') { this.victoryGun = false; this.ending.restoreGun(); this.player.gun.visible = true; }
-    if (this.coach) this.coach.update(dt);
-    switch (this.state) {
+    if (this.coach && !flying) this.coach.update(dt);
+    if (flying) this.freecam.update(rdt);
+    else switch (this.state) {
       case 'menu': this.updateMenu(dt, rdt); break;
       case 'intro': this.updateIntro(dt, rdt); break;
       case 'night': if (!paused) this.updateNight(dt, rdt); else this.player.update(0, rdt, this.input, this.stats, false, this.time); break;
@@ -879,13 +886,13 @@ class Game {
     }
 
     if (!paused) {
-      this.horde.syncRender();
+      if (!flying) this.horde.syncRender();
       this.env.update(dt, this.time, this.horde, this.fx, this.audio);
       this.fx.update(dt);
     }
     this.audio.setListener(this.camera.position.x, this.camera.position.z, this.camera.rotation.y, this.camera.position.y);
     this.audio.dawn = this.env.dawn;
-    this.audio.hordeAlive = this.horde.alive;
+    this.audio.hordeAlive = flying ? 0 : this.horde.alive;
     this.audio.update(rdt);
     if (!this.noRender) this.render(rdt);
     this.input.endFrame();
@@ -902,7 +909,7 @@ class Game {
 
   render(rdt) {
     const u = this.post.u;
-    this.letterbox = damp(this.letterbox, this.letterboxTarget || 0, 3, rdt);
+    this.letterbox = this.freecam.on ? 0 : damp(this.letterbox, this.letterboxTarget || 0, 3, rdt);
     this.damagePulse = Math.max(0, this.damagePulse - rdt * 0.9);
     this.flashPulse = Math.max(0, this.flashPulse - rdt * 3);
     this.radial = Math.max(0, this.radial - rdt * 1.4);
@@ -931,6 +938,7 @@ class Game {
     this.uniforms.uEyeGlowBillboard.value = 1 - this.env.dawn;
     this.uniforms.uLampPow.value = this.env.power * Math.max(0, 1 - this.env.dawn * 1.6);
     this.uniforms.uRim.value.setRGB(0.032, 0.014, 0.006).multiplyScalar(1 - this.env.dawn * 0.5);
+    if (this.freecam.on) u.uExposure.value *= this.freecam.bright;
     this.post.render(rdt, this.time);
     if (this.settings.showFps) {
       this.fps.acc += rdt; this.fps.n++;

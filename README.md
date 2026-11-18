@@ -87,7 +87,17 @@ launches in a couple of seconds.
 **Developer tools:** `F10` (or *Developer* in the main menu) opens a panel to start any night with any
 difficulty, survivors, supplies, claymores and upgrades; during a run, to end the night, clear the
 field, trigger any event or jump to an ending; and, from anywhere, to **watch any cutscene** (the
-prologue, the extraction or the ending) straight away. Dev runs never save over your campaign or the endless record. The graphics preset is chosen automatically on first launch with a short benchmark
+prologue, the extraction or the ending) straight away. Dev runs never save over your campaign or the endless record.
+
+**Free camera:** `F9` (or *Free camera* in the developer panel), from anywhere, lifts the camera off
+the gun to fly over the map. The game holds still and the dead are hidden; only the ambient world
+goes on. Click (or hold the right button) to look, `WASD` to fly, `E`/`Space` up, `Q` down, `Shift`
+faster, the wheel for cruise speed, `1`–`4` for viewpoints (the nest, the tower from the road, the
+valley from above, the base) and `0` back to the start. `X` reports and copies the point and object
+under the crosshair, `C` copies the camera pose, `G` lays a metre grid at the last `X` point, `L`
+brightens the night, `H` hides the readout. `F9` or `Esc` leaves and puts everything back.
+
+The graphics preset is chosen automatically on first launch with a short benchmark
 of a heavy night; *Settings ▸ Quality ▸ AUTO* runs it again.
 
 ---
