@@ -17,14 +17,14 @@ module.exports = {
       F.keys.add('KeyW'); G.test.advance(1, 1/30, false); F.keys.clear(); G.test.advance(0.3, 1/30, false);
       const c = G.camera.position;
       return { on: F.on, cam: [c.x, c.y, c.z], hx: G.horde.x[0], dir: G.director.t, time: G.time, state: G.state,
-        hidden: F.hordeMeshes().every((m) => !m.visible), gun: G.player.gun.visible, ui: document.body.classList.contains('freecam'), audioDead: G.audio.hordeAlive };
+        hidden: F.hordeMeshes().every((m) => !m.visible), gun: G.player.gun.visible && G.player.gun.parent === G.scene && +G.player.gun.position.z.toFixed(1), ui: document.body.classList.contains('freecam'), audioDead: G.audio.hordeAlive };
     })()`);
     t.log(JSON.stringify(fly));
     t.assert(fly.on && fly.state === 'night', 'flying, the night underneath');
     t.assert(Math.hypot(fly.cam[0] - before.cam[0], fly.cam[1] - before.cam[1], fly.cam[2] - before.cam[2]) > 8, 'W flies the camera forward');
     t.eq([fly.hx, fly.dir], [before.hx, before.dir], 'the dead and the night hold still');
     t.assert(fly.time > before.time, 'the ambient clock goes on');
-    t.eq([fly.hidden, fly.gun, fly.ui, fly.audioDead], [true, false, true, 0], 'the dead, the gun and the game UI hidden, the horde quiet');
+    t.eq([fly.hidden, fly.gun, fly.ui, fly.audioDead], [true, -4.1, true, 0], 'the dead and the game UI hidden, the horde quiet, the fifty set down in the nest');
 
     const pick = await t.get(`(() => { const G = __LB, F = G.freecam;
       F.onKey({ code: 'Digit2', repeat: false, target: document.body, preventDefault() {}, stopImmediatePropagation() {} }, true);
@@ -34,6 +34,9 @@ module.exports = {
     })()`);
     t.log(JSON.stringify(pick));
     t.assert(pick.pick && Math.abs(pick.pick.p[2] - -1.5) < 0.5, 'from the road, the crosshair lands on the tower face');
+    await t.js(`(() => { const F = __LB.freecam; F.bright = 4; F.go(__LB.camera.position.clone().set(2.8, 13.4, -4.6), __LB.camera.position.clone().set(0, 12.1, -5.2)); __LB.test.advance(0.05, 1/30, false); })()`);
+    await t.shot('freecam-gun');
+    await t.js(`(() => { const F = __LB.freecam; F.go(__LB.camera.position.clone().set(0, 8, -34), __LB.camera.position.clone().set(0, 7, 0)); __LB.test.advance(0.05, 1/30, false); })()`);
     await t.js(`__LB.freecam.toggleGrid(); __LB.freecam.bright = 2`);
     await t.shot('freecam-tower');
 
@@ -54,11 +57,11 @@ module.exports = {
     await t.shot('freecam-fog');
 
     const back = await t.get(`(() => { const G = __LB, F = G.freecam; F.exit(); const c = G.camera.position;
-      return { on: F.on, cam: [c.x, c.y, c.z], shown: F.hordeMeshes().every((m) => m.visible), gun: G.player.gun.visible, ui: document.body.classList.contains('freecam'), grid: F.grid.visible, state: G.state };
+      return { on: F.on, cam: [c.x, c.y, c.z], shown: F.hordeMeshes().every((m) => m.visible), gun: G.player.gun.visible && G.player.gun.parent === G.camera, ui: document.body.classList.contains('freecam'), grid: F.grid.visible, state: G.state };
     })()`);
     t.log(JSON.stringify(back));
     t.assert(!back.on && back.cam.every((v, i) => Math.abs(v - before.cam[i]) < 1e-3), 'the camera goes back to the gun');
-    t.eq([back.shown, back.gun, back.ui, back.grid], [true, true, false, false], 'the dead, the gun and the UI back, the grid gone');
+    t.eq([back.shown, back.gun, back.ui, back.grid], [true, true, false, false], 'the dead, the gun (on the camera) and the UI back, the grid gone');
     t.eq(back.state, 'paused', 'the night waits behind the pause screen for the mouse');
     const env = await t.get(`(() => { const e = __LB.env; return { dusk: e.dusk, dawn: e.dawn, fog: e.fogBank, power: e.power, story: e.storyNight, burn: e.burn }; })()`);
     t.eq([env.dusk, env.dawn, env.fog, env.power, env.story], [0, 0, 0, 1, 3], 'the world back as night 3 had it');

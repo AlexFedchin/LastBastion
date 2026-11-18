@@ -288,7 +288,9 @@ export class FreeCam {
     this.hidden = this.hordeMeshes().map((m) => [m, m.visible]);
     this.showDead(!!this.cine);
     this.setFollow(!!(this.cine && opts.follow));
-    if (!this.follow && g.player.gun.parent === g.camera) g.player.gun.visible = false;
+    // the fifty rides the camera in a night: set it down in the nest, where it stands (as the cutscenes do)
+    this.placedGun = !this.inHangar && g.player.gun.parent === g.camera;
+    if (this.placedGun) g.ending.placeGun();
     document.body.classList.add('freecam');
     this.say(this.cine ? (this.follow ? 'the cutscene plays · move or press V to fly' : 'the cutscene plays on · P pause · V its own camera') : 'click to look around · F9 to leave');
     this.syncPanel();
@@ -305,16 +307,15 @@ export class FreeCam {
       cam.position.copy(s.pos); cam.quaternion.copy(s.quat);
       if (cam.fov !== s.fov) { cam.fov = s.fov; cam.updateProjectionMatrix(); }
       cam.updateMatrixWorld(true);
-      g.player.gun.visible = s.gun;
       env.dawn = s.env.dawn; env.dusk = s.env.dusk; env.sunDir.copy(s.env.sun);
       env.power = s.env.power; g.player.nestLight.intensity = s.env.nest; g.audio.lampPower = s.env.lamp;
       env.fogBank = s.env.fog;
     } else {
       if (this.over.power !== null) { env.power = 1; g.player.nestLight.intensity = 1.6; g.audio.lampPower = 1; }
       if (this.over.fog !== null) env.fogBank = 0;
-      if (g.player.gun.parent === g.camera) g.player.gun.visible = true;
     }
     if (this.storyTouched) env.setStory(...s.env.story);
+    if (this.placedGun) { g.ending.restoreGun(); g.player.gun.visible = s.gun; }
     for (const [m, v] of this.hidden) m.visible = v;
     if (this.grid) this.grid.visible = false;
     document.body.classList.remove('freecam', 'fc-follow');
@@ -496,8 +497,6 @@ export class FreeCam {
       this.pos = cam.position.clone();
       cam.quaternion.setFromEuler(new THREE.Euler(this.pitch, this.yaw, 0, 'YXZ'));
       cam.updateMatrixWorld(true);
-      // the fifty rides the camera in a night: not in front of a free one
-      if (g.player.gun.parent === g.camera) g.player.gun.visible = false;
     }
     if (this.noteT > 0) { this.noteT -= rdt; if (this.noteT <= 0) this.note = ''; }
     this.syncCineBar();
