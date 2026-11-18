@@ -318,8 +318,8 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   B.add(M.steel, box(1.1, 0.06, 1.1, 4.4, top + 0.75, 2.62, -1.25));
   for (const s of [-0.3, 0.3]) B.add(M.dark, box(0.04, 0.9, 0.04, 4.4 + s, top + 0.6, 1.62));
   B.add(M.dark, box(0.64, 0.04, 0.04, 4.4, top + 1.02, 1.62));
-  // ventilators and the cable runs on the roof
-  for (const [x, z] of [[-6.2, 5.6], [6.6, 6.4], [-3.8, 6.8]]) {
+  // a ventilator (the model has two more at the back corners) and the cable runs on the roof
+  for (const [x, z] of [[-3.8, 6.8]]) {
     B.add(M.steel, cylY(0.16, 0.9, 10, x, top + 0.45, z));
     B.add(M.steel, xf(new THREE.ConeGeometry(0.34, 0.22, 10), x, top + 1.0, z));
   }
@@ -351,12 +351,12 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   }
   net.computeVertexNormals();
   B.add(M.canvasDark, xf(net, -0.5, top + 1.3, z0 + 7.4, -Math.PI / 2));
-  // sandbags along the side and back parapets of the roof
+  // sandbags along the side and back parapets of the roof, on the parapet's top (0.95 m up)
   for (const sx of [-8.05, 8.05]) for (let k = 0; k < 14; k++) {
     const z = z0 + 0.4 + k * 0.62;
-    bagMs.push(place(sx, top + 0.79, z, Math.PI / 2 + (rng() - 0.5) * 0.2 + (rng() < 0.5 ? Math.PI : 0)));
+    bagMs.push(place(sx, top + 1.04, z, Math.PI / 2 + (rng() - 0.5) * 0.2 + (rng() < 0.5 ? Math.PI : 0)));
   }
-  for (let k = 0; k < 25; k++) bagMs.push(place(-7.5 + k * 0.62, top + 0.79, z0 + 8.8, (rng() - 0.5) * 0.2 + (rng() < 0.5 ? Math.PI : 0)));
+  for (let k = 0; k < 25; k++) bagMs.push(place(-7.5 + k * 0.62, top + 1.04, z0 + 8.9, (rng() - 0.5) * 0.2 + (rng() < 0.5 ? Math.PI : 0)));
   // a low blast wall in front of the shelter door
   for (let r = 0; r < 3; r++) for (let k = 0; k < 4; k++) bagMs.push(place(-1.7 + k * 0.62 + (r % 2) * 0.3, top + 0.09 + r * 0.155, z0 + 4.95, (rng() - 0.5) * 0.15 + (rng() < 0.5 ? Math.PI : 0)));
   // a dim, shaded work lamp over the shelter door: just enough to see the roof by
@@ -371,9 +371,7 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   // a spotter at the scope and a loader on the right, both watching the field
   // (soldier models, placed in env.dressWithModels)
   env.roofSoldiers = [[-6.55, top, -0.25, Math.PI + 0.15, -0.12], [5.6, top, -0.7, Math.PI - 0.35, -0.2]];
-  // expansion joints, a drain and tar patches in the roof slab
-  for (let z = z0 + 0.1; z < z0 + 9; z += 3.0) B.add(M.rubber, box(16.2, 0.012, 0.06, 0, top + 0.006, z));
-  for (const x of [-5.4, 5.4]) B.add(M.rubber, box(0.06, 0.012, 9, x, top + 0.006, z0 + 4.5));
+  // drains and tar patches on the roof (its plates and their joints are the model's)
   for (const [x, z] of [[-7.4, 3.2], [7.4, -0.8]]) { B.add(M.dark, box(0.5, 0.02, 0.5, x, top + 0.01, z)); for (let k = 0; k < 4; k++) B.add(M.steel, box(0.04, 0.03, 0.46, x - 0.15 + k * 0.1, top + 0.02, z)); }
   for (const [x, z, s] of [[-3.6, 1.6, 1.2], [6.8, 2.6, 0.9], [-7.0, -1.0, 0.7]]) B.add(M.rubber, xf(new THREE.CircleGeometry(s, 10), x, top + 0.004, z, -Math.PI / 2, 0, 0, 1, 0.6, 1));
   // right side: a sandbagged ready rack of ammo, crates, a cot
@@ -399,8 +397,8 @@ function dressRoof(env, M, P, B, bagMs, rng) {
   for (let r = 0; r < 3; r++) for (let c = 0; c < 3 - r; c++) bagMs.push(place(-6.9 + r * 0.3 + c * 0.6 - 0.6, top + 0.09 + r * 0.155, 3.6, Math.PI / 2 + (rng() - 0.5) * 0.2));
   B.put(P.lantern(), R(-5.7, 0.9));
   // ladder down the back of the bunker
-  for (const s of [-0.25, 0.25]) B.add(M.dark, box(0.05, top + 1.0, 0.05, 6.2 + s, (top + 1.0) / 2, z0 + 9.1));
-  for (let y = 0.4; y < top + 0.9; y += 0.32) B.add(M.dark, box(0.5, 0.03, 0.03, 6.2, y, z0 + 9.1));
+  for (const s of [-0.25, 0.25]) B.add(M.dark, box(0.05, top + 1.2, 0.05, 6.2 + s, (top + 1.2) / 2, z0 + 9.35));
+  for (let y = 0.4; y < top + 1.1; y += 0.32) B.add(M.dark, box(0.5, 0.03, 0.03, 6.2, y, z0 + 9.35));
 }
 
 // ── the yard behind the wall ────────────────────────────────────────────────

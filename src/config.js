@@ -17,8 +17,8 @@ export const WORLD = {
   SPAWN_Z_NEAR: -205,
   SPAWN_Z_FAR: -240,
   SPAWN_X: 150,
-  CAM: { x: 0, y: 13.2, z: -3.3 },
-  TOWER_TOP: 11.6,
+  CAM: { x: 0, y: 10.6, z: -3.3 },
+  TOWER_TOP: 9.0,        // the tower model's roof and nest platform (app/models/tower.glb); CAM.y is 1.6 above it
 };
 
 const COS_WING = 1 / Math.sqrt(1 + WORLD.WING_SLOPE * WORLD.WING_SLOPE);

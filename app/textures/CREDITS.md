@@ -17,7 +17,6 @@ The game falls back to its procedural textures if a file is missing.
 | `track` | [rocky_trail](https://polyhaven.com/a/rocky_trail) | Amal Kumar | 2.0 m |
 | `plough` | [aerial_mud_1](https://polyhaven.com/a/aerial_mud_1) | Rob Tuytel | 8.0 m |
 | `concrete` | [concrete_wall_006](https://polyhaven.com/a/concrete_wall_006) | Dario Barresi, Charlotte Baglioni | 2.0 m |
-| `slab` | [dirty_concrete](https://polyhaven.com/a/dirty_concrete) | Rob Tuytel | 3.0 m |
 | `metal` | [rusty_metal_02](https://polyhaven.com/a/rusty_metal_02) | Rob Tuytel | 1.0 m |
 | `corr` | [rusty_corrugated_iron](https://polyhaven.com/a/rusty_corrugated_iron) | Charlotte Baglioni | 2.0 m |
 | `plaster` | [damaged_plaster](https://polyhaven.com/a/damaged_plaster) | Amal Kumar | 1.85 m |
@@ -31,13 +30,14 @@ All are licensed [CC0](https://polyhaven.com/license): no attribution is require
 
 ## From ambientCG
 
-The road and the dawn resupply hangar's surfaces are CC0 materials from [ambientCG](https://ambientcg.com),
+The road, the wall and tower concrete and the dawn resupply hangar's surfaces are CC0 materials from [ambientCG](https://ambientcg.com),
 converted by `scripts/textures/build_ambientcg.py` (AO baked into the colour; the hangar's with roughness
 and metalness packed, the road's brightness matched to the valley like the Poly Haven sets).
 
 | Set | Source | License |
 |---|---|---|
 | `asphalt` | [Asphalt006](https://ambientcg.com/view?id=Asphalt006) | CC0 1.0 |
+| `slab` | [Concrete044C](https://ambientcg.com/view?id=Concrete044C) | CC0 1.0 |
 | `hgFloor` | [Concrete031](https://ambientcg.com/view?id=Concrete031) | CC0 1.0 |
 | `hgWall` | [CorrugatedSteel005](https://ambientcg.com/view?id=CorrugatedSteel005) | CC0 1.0 |
 | `hgSteel` | [Metal041B](https://ambientcg.com/view?id=Metal041B) | CC0 1.0 |

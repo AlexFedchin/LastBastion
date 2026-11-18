@@ -10,7 +10,7 @@ import * as THREE from 'three';
 const BIG = ['mud', 'turf', 'rock', 'asphalt', 'concrete', 'slab', 'metal', 'hgFloor', 'hgWall'];
 const SETS = {
   mud: ['c', 'n'], turf: ['c', 'n'], rock: ['c', 'n'], asphalt: ['c', 'n'], track: ['c', 'n'], plough: ['c', 'n'],
-  concrete: ['c', 'n'], slab: ['c', 'n'], metal: ['c', 'n', 'r'], corr: ['c', 'n'], plaster: ['c', 'n'],
+  concrete: ['c', 'n'], slab: ['c', 'n', 'r'], metal: ['c', 'n', 'r'], corr: ['c', 'n'], plaster: ['c', 'n'],
   bark: ['c'], planks: ['c', 'n'], burlap: ['c'],
   // the hangar (ambientCG CC0, scripts/textures/build_ambientcg.py; the asphalt above comes from there too)
   hgFloor: ['c', 'n', 'r'], hgWall: ['c', 'n', 'r'], hgSteel: ['c', 'n', 'r'], hgHazard: ['c', 'n', 'r'],

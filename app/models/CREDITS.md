@@ -33,6 +33,7 @@ meshopt-compressed.
 | `mcrate.glb` | Weapons crate: what each man of the recovery team carries home, the supply drop's load, the stacks on the nest roof | [Sketchfab: Weapons Crate](https://sketchfab.com/3d-models/weapons-crate-6597d3858df94da698ece8e0038f50b7) | Sousinho | CC BY 4.0 |
 | `church.glb` | The village church and its bell tower, on the far hills | [Sketchfab: Church](https://sketchfab.com/3d-models/church-867a847b67364484bf44912e1af190af) | Tiago Lopes | CC BY 4.0 |
 | `hedgehog.glb` | Czech hedgehogs in the killing field | [Sketchfab: Rusted Czech Hedgehog](https://sketchfab.com/3d-models/rusted-czech-hedgehog-cfa712e8851a4881989ea890bfc6910e) | GrostyBoi | CC BY 4.0 |
+| `tower.glb` | The central tower: your gun position (concrete painted in game with ambientCG Concrete044C) | Hand-made for the game | the project | — |
 
 ## What was changed
 

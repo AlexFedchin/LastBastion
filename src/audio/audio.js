@@ -14,7 +14,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 import { clamp, rand } from '../core/util.js';
 import { makePunch, makeSizzle, makeTick, makeBlastSub, makeCrack, makeRotor, makeProp, makeJet, makePower, makeGau, makeGauImpacts } from './synth.js';
-import { GUNSHIP } from '../config.js';
+import { GUNSHIP, WORLD } from '../config.js';
 
 // name -> [variants (0 = single file), decode rate]
 const SFX = {
@@ -167,7 +167,7 @@ export class AudioEngine {
     this.voices = 0;
     this.maxVoices = 96;
     this.listenerYaw = 0;
-    this.listenerX = 0; this.listenerZ = 0; this.listenerY = 13.2;
+    this.listenerX = 0; this.listenerZ = 0; this.listenerY = WORLD.CAM.y;
     this.settings = { master: 0.8, music: 0.55, sfx: 0.9 };
     this.B = {};       // one-shots: name -> AudioBuffer[]
     for (const k of Object.keys(SFX)) this.B[k] = [];

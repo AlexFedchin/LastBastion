@@ -51,10 +51,10 @@
   ]
  },
  "slab": {
-  "id": "dirty_concrete",
-  "metres": 3.0,
+  "id": "Concrete044C",
+  "source": "ambientCG",
   "authors": [
-   "Rob Tuytel"
+   "ambientCG"
   ]
  },
  "metal": {

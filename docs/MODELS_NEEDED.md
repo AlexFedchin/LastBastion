@@ -12,6 +12,7 @@ The game already loads real models for:
 - the czech hedgehogs in the field
 - the weapons crates (the recovery team's loads, the supply drop, the stacks on the nest roof)
 - the grenade and the molotov
+- the central tower (your own model)
 - the sandbags
 - 48 Poly Haven props in the yard and on the walkway
 - 17 more Poly Haven props for the dawn resupply hangar: the overhead crane, steel shelving, hanging and wall lamps, the tool chest, drill press, office desk, storage cart, extinguishers, a flood light and crates
@@ -52,37 +53,19 @@ Everything below is still built from boxes, cylinders and cones in code. The lis
 
 **Note:** this is the biggest visual upgrade, but also the biggest engineering job. The renderer has to move from shader-posed parts to baked skinned animation.
 
-## 2. The central tower (the bastion's bunker, your gun position)
+## 2. The central tower — done (your own model)
 
-**Where:** the heart of the base. You sit on its roof behind the M2 all game. It is the centre of the gun view's foreground and of almost every cutscene shot: overrun, bombers, ramp, liftoff, flyaway and the ending's crane.
+The tower is the hand-made `3D Models/Tower/Tower.glb` (the folder next to the repo), built into `app/models/tower.glb` by
+`node scripts/models/build_models.mjs tower` (it reads the file straight from that folder, so after an
+edit in Blender just export over it and run that command). The build keeps the model's frame and prints a
+warning if a new export moves what the game is laid out to:
+- the front face of the body (`Cube`) at z = −4.64 (the game puts it on the wall line)
+- the roof (`Cube.006`) and the nest platform (`Cube.001`) at 9.0 m (`WORLD.TOWER_TOP`; the gun camera is 1.6 m above)
+- the parapet top at 9.95 m (the roof's sandbags sit on it)
 
-**Now:** a single concrete box with:
-- a stepped blast plinth and two buttresses
-- a roof parapet
-- two firing-slit frames on the front
-- a ladder down the back
-
-It uses one tiled concrete material.
-
-**Need:** a fortified reinforced-concrete bunker or blockhouse tower:
-- weathered, rain-stained and scarred by fire and bullets, with exposed rebar here and there
-- firing slits (embrasures) in the front face
-- a flat roof that serves as the gun position: walkable, with a low parapet
-
-Nice to have:
-- blast plinth or buttresses at the base
-- a steel door at the back
-- an external ladder or stairs up to the roof
-- vents, cable runs and drainage stains
-
-The roof stays mostly clear: the nest deck, the sandbag ring, the shelter, crates and the crew are placed on it by the game.
-
-**Fixed dimensions** (the gun camera, the nest and the roof dressing are placed relative to them; a model that differs will be scaled or adapted to fit):
-- footprint about 16.5 m wide (along the wall) × 9 m deep
-- roof deck 11.6 m above the ground
-- the front face is flush with the wall line, and the wall wings join its two front corners at a 29° sweep back
-
-**Budget:** about 20–50k triangles. It is seen from metres away (from the roof) up to a few hundred metres (from the air), so a high-resolution or trim-sheet concrete texture matters more than polygons.
+Its concrete is painted in the game with the wall's own (`slab`: ambientCG Concrete044C, the texture the
+model was made with), so materials named `…Concrete…` can keep any texture in Blender. Every other
+material ships as exported, graded darker for the night.
 
 ## 3. Trees and vegetation set
 

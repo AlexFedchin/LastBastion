@@ -17,6 +17,15 @@ const _x = new THREE.Vector3(), _y = new THREE.Vector3(0, 1, 0), _z = new THREE.
 
 export const GUNNER_POSTS = [-27, 27, -52, 52];
 
+/**
+ * The central tower: the user's model (app/models/tower.glb, scripts/models/build_vehicles.mjs),
+ * modelled front face towards -z at z = FRONT, roof deck and nest platform at WORLD.TOWER_TOP.
+ * TILE: metres to one tile of its concrete (the wall slabs are laid at the same).
+ */
+export const TOWER = { FRONT: -4.64, TILE: 10 };
+/** The concrete's tint, the wall's and the tower's alike. */
+const CONCRETE = 0xa7a39b;
+
 /** Local frame of a wing: X along the wall, Y up, Z inward (towards the base). */
 function wingFrames() {
   const out = [];
@@ -59,8 +68,8 @@ export function buildFortification(env) {
     box(1, 0.12, 0.3, 0, H + 0.04, 0.18),
   ]);
   const slabMat = new THREE.MeshStandardMaterial({
-    map: tex.slab.map, normalMap: tex.slab.normalMap, normalScale: new THREE.Vector2(1.2, 1.2),
-    color: 0xa7a39b, roughness: 0.9, metalness: 0, envMapIntensity: 0.35,
+    map: tex.slab.map, normalMap: tex.slab.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), roughnessMap: tex.slab.roughnessMap,
+    color: CONCRETE, roughness: 1, metalness: 0, envMapIntensity: 0.35,
   });
   slabMat.onBeforeCompile = (sh) => {
     sh.vertexShader = 'attribute vec2 aSlab;\nvarying vec2 vSlab;\nvarying vec3 vSW;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
@@ -94,7 +103,8 @@ export function buildFortification(env) {
   let slabCount = 0;
   const slabsPer = wings.map((w) => Math.round(w.len / 1.52));
   slabsPer.forEach((n) => { slabCount += n; });
-  if (tex.slab.file) worldUV(slabGeo, 2.6);
+  // the concrete at the tower model's own scale (about 10 m to a tile), so the two read as one pour
+  if (tex.slab.file) worldUV(slabGeo, TOWER.TILE);
   const slabs = new THREE.InstancedMesh(slabGeo, slabMat, slabCount);
   const aSlab = new THREE.InstancedBufferAttribute(new Float32Array(slabCount * 2), 2);
   slabGeo.setAttribute('aSlab', aSlab);
@@ -301,44 +311,13 @@ function buildBunker(env) {
   const { scene, mats, tex } = env;
   const top = WORLD.TOWER_TOP;
   const z0 = WORLD.BASE_Z;
-  const conc = weather(new THREE.MeshStandardMaterial({ map: tex.slab.map, normalMap: tex.slab.normalMap, color: 0x9a968e, roughness: 0.92 }), { soot: 0.6, rust: 0.15, scale: 0.35, key: 'bunker' });
-  const G = [];
-  const body = new THREE.BoxGeometry(16.5, top, 9);
-  const buv = body.attributes.uv;
-  for (let i = 0; i < buv.count; i++) buv.setXY(i, buv.getX(i) * 8, buv.getY(i) * 1.6);
-  body.translate(0, top / 2, z0 + 4.5);
-  G.push(body);
-  // stepped blast plinth & buttresses
-  G.push(box(17.6, 2.2, 1.6, 0, 1.1, z0 - 0.6));
-  G.push(box(17.0, 0.9, 0.7, 0, 2.6, z0 - 0.2));
-  for (const sx of [-8.4, 8.4]) G.push(box(1.0, top + 0.4, 1.8, sx, (top + 0.4) / 2, z0 + 0.5));
-  // roof parapet
-  G.push(box(16.5, 0.7, 0.4, 0, top + 0.35, z0 + 8.8));
-  for (const sx of [-8.05, 8.05]) G.push(box(0.4, 0.7, 9, sx, top + 0.35, z0 + 4.5));
-  // firing slit frames (slits themselves are dark insets)
-  const slits = [];
-  for (const sx of [-5.5, 5.5]) {
-    G.push(box(3.6, 0.25, 0.3, sx, 8.25, z0 - 0.1));
-    G.push(box(3.6, 0.25, 0.3, sx, 9.05, z0 - 0.1));
-    slits.push(box(3.2, 0.55, 0.05, sx, 8.65, z0 + 0.02));
-  }
-  const bunker = new THREE.Mesh(tex.slab.file ? worldUV(merge(G), 3.0) : merge(G), conc);
-  bunker.castShadow = true;
-  bunker.receiveShadow = true;
-  scene.add(bunker);
-  const slitMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.06, 0.025, 0.01) });
-  scene.add(new THREE.Mesh(merge(slits), slitMat));
-
-  // the nest deck
-  const deckMat = weather(new THREE.MeshStandardMaterial({ color: 0x3a3c37, roughness: 0.55, metalness: 0.65, normalMap: tex.metal.normalMap }), { soot: 0.5, rust: 0.3, key: 'deck' });
-  const D = [];
-  // cantilevered off the tower's face (z0), not overlapping its roof: the two tops are level and would fight
-  D.push(box(5.6, 0.3, z0 + 4.2, 0, top - 0.15, (-4.2 + z0) / 2));
-  for (const sx of [-2.4, 2.4]) D.push(xf(new THREE.BoxGeometry(0.22, 0.3, 4.2), sx, top - 1.6, -2.2, -0.75));
-  D.push(box(5.8, 0.08, 0.08, 0, top - 0.02, -4.22));
-  const deck = new THREE.Mesh(merge(D), deckMat);
-  deck.receiveShadow = true;
-  scene.add(deck);
+  // the tower itself: the model, its concrete painted with the wall's (same texture, tint and weathering)
+  const conc = weather(new THREE.MeshStandardMaterial({
+    map: tex.slab.map, normalMap: tex.slab.normalMap, roughnessMap: tex.slab.roughnessMap, color: CONCRETE, roughness: 1,
+  }), { soot: 0.35, rust: 0, scale: 0.35, key: 'bunker' });
+  const o = new THREE.Object3D();
+  o.position.set(0, 0, z0 - TOWER.FRONT);
+  placeModel(env, 'tower', o, { swap: { concrete: conc } });
 
   // sandbag ring around the nest: the scanned piles go here once the models are in
   // (env.dressWithModels); until then, nothing (the loading screen is up)

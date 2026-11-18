@@ -190,13 +190,13 @@ export class Environment {
       });
     }
     // whole models: one instanced mesh per mesh of the model (vehicles keep their part nodes)
-    for (const { name, skip, tint, list } of this.placed.values()) {
+    for (const { name, skip, tint, swap, list } of this.placed.values()) {
       const src = modelScene(name);
       src.updateMatrixWorld(true);
       src.traverse((o) => {
         if (!o.isMesh) return;
         for (let p = o; p; p = p.parent) if (skip && p.name === skip) return;
-        let mat = o.material;
+        let mat = (swap && swap[o.material.name]) || o.material;
         if (tint != null) { mat = mat.clone(); mat.color.multiply(new THREE.Color(tint)); }
         const im = new THREE.InstancedMesh(o.geometry, mat, list.length);
         list.forEach((mm, j) => im.setMatrixAt(j, m.multiplyMatrices(mm, o.matrixWorld)));
@@ -211,11 +211,12 @@ export class Environment {
   /**
    * Ask for a model (app/models/<name>.glb) at a placement matrix, instanced once the
    * models are in. skip: a node whose meshes are left out (the Ural's 'canvas');
-   * tint: a colour the materials are multiplied by.
+   * tint: a colour the materials are multiplied by; swap: material name -> a material of the
+   * game's to use instead (the tower's 'concrete' gets the wall's).
    */
-  addModel(name, matrix, { skip = null, tint = null } = {}) {
+  addModel(name, matrix, { skip = null, tint = null, swap = null } = {}) {
     const key = `${name}|${skip || ''}|${tint ?? ''}`;
-    if (!this.placed.has(key)) this.placed.set(key, { name, skip, tint, list: [] });
+    if (!this.placed.has(key)) this.placed.set(key, { name, skip, tint, swap, list: [] });
     this.placed.get(key).list.push(matrix.clone());
   }
 

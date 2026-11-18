@@ -36,7 +36,7 @@ SETS = {
     'track':    ('rocky_trail',           (72, 63, 53),    0.9, 0.4, (1024, 512), {}),
     'plough':   ('aerial_mud_1',          (58, 50, 43),    0.9, 0.4, (1024, 512), {}),
     'concrete': ('concrete_wall_006',     (105, 105, 107), 0.5, 0.5, (2048, 1024), {}),
-    'slab':     ('dirty_concrete',        (112, 109, 106), 0.5, 0.5, (2048, 1024), {}),
+    # (slab: ambientCG's Concrete044C now, build_ambientcg.py: the tower model's concrete)
     'metal':    ('rusty_metal_02',        (83, 59, 44),    0.6, 0.5, (2048, 1024), {'rough_map': True}),
     'corr':     ('rusty_corrugated_iron', (138, 124, 116), 0.35, 0.6, (1024, 512), {}),
     'plaster':  ('damaged_plaster',       (93, 82, 72),    0.8, 0.4, (1024, 512), {}),

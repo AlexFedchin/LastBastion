@@ -21,8 +21,8 @@ Requirements: Python 3, Pillow.
 import io
 import json
 import os
+import subprocess
 import sys
-import urllib.request
 import zipfile
 
 from PIL import Image, ImageChops
@@ -34,6 +34,8 @@ UA = {'User-Agent': 'LastBastion-texture-build/1.0'}
 
 # name: (ambientCG id, sizes, AO strength, notes)
 SETS = {
+    # the wall's T-slabs and the tower: board-formed concrete, the one the tower model was made with
+    'slab': ('Concrete044C', (2048, 1024), 0.8),
     'hgFloor': ('Concrete031', (2048, 1024), 0.8),        # poured slab with saw-cut joints
     'hgWall': ('CorrugatedSteel005', (2048, 1024), 0.9),  # weathered corrugated cladding
     'hgSteel': ('Metal041B', (1024, 512), 0.7),                # rust-streaked structural steel
@@ -58,7 +60,8 @@ def fetch(aid):
         return d
     os.makedirs(d, exist_ok=True)
     url = f'https://ambientcg.com/get?file={aid}_2K-JPG.zip'
-    data = urllib.request.urlopen(urllib.request.Request(url, headers=UA)).read()
+    # curl, not urllib: it uses the system's certificate store (an antivirus may sit in the middle)
+    data = subprocess.check_output(['curl', '-sSL', '-A', UA['User-Agent'], url])
     zipfile.ZipFile(io.BytesIO(data)).extractall(d)
     print('fetched', aid)
     return d
@@ -132,7 +135,7 @@ def credits(built):
     s = open(p, encoding='utf8').read()
     start, end = '<!-- ambientcg -->', '<!-- /ambientcg -->'
     block = [start, '', '## From ambientCG', '',
-             'The road and the dawn resupply hangar\'s surfaces are CC0 materials from [ambientCG](https://ambientcg.com),',
+             'The road, the wall and tower concrete and the dawn resupply hangar\'s surfaces are CC0 materials from [ambientCG](https://ambientcg.com),',
              'converted by `scripts/textures/build_ambientcg.py` (AO baked into the colour; the hangar\'s with roughness',
              'and metalness packed, the road\'s brightness matched to the valley like the Poly Haven sets).', '',
              '| Set | Source | License |', '|---|---|---|']

@@ -465,5 +465,57 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     await finish(doc, 'hedgehog.glb', { ratio: Math.min(1, 1200 / triCount(doc)), error: 0.002 });
   }
 
-  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog };
+  // ── the central tower: the user's own model (Blender), read straight from
+  // F:\LastBastion\3D Models\Tower\Tower.glb so a re-export only needs this build run
+  // again (falls back to source/vehicles/Tower.glb). Kept in its own frame (metres,
+  // front face towards -z, ground at y = 0); the game places it (structures.js, TOWER).
+  // Its concrete ships as one material named 'concrete' (a stand-in texture): the game paints it
+  // with the wall's own concrete (the `slab` set, ambientCG Concrete044C, the same one
+  // the model was made with) so the tower and the wall always match. Every texture set
+  // is moved to the first UV channel.
+  async function tower() {
+    const own = path.resolve(SRC, '..', '..', '..', '..', '3D Models', 'Tower', 'Tower.glb');
+    const fs = await import('node:fs');
+    const doc = await io.read(fs.existsSync(own) ? own : V('Tower.glb'));
+    const root = doc.getRoot();
+    await doc.transform(flatten());
+    // Blender's linked duplicates share a mesh: give each node its own before baking, or it moves twice
+    const seen = new Set();
+    for (const n of root.listNodes()) { const m = n.getMesh(); if (!m) continue; if (seen.has(m)) n.setMesh(m.clone()); else seen.add(m); }
+    bakeNodes(doc);
+    // one UV channel: a primitive whose textures read TEXCOORD_1 gets it as TEXCOORD_0
+    for (const mesh of root.listMeshes()) for (const p of mesh.listPrimitives()) {
+      const m = p.getMaterial();
+      const infos = m ? [m.getBaseColorTextureInfo(), m.getNormalTextureInfo(), m.getMetallicRoughnessTextureInfo(), m.getOcclusionTextureInfo(), m.getEmissiveTextureInfo()].filter(Boolean) : [];
+      const tc = infos.length ? infos[0].getTexCoord() : 0;
+      if (tc === 1 && p.getAttribute('TEXCOORD_1')) {
+        p.setAttribute('TEXCOORD_0', p.getAttribute('TEXCOORD_1'));
+        for (const i of infos) i.setTexCoord(0);
+      }
+      if (p.getAttribute('TEXCOORD_1')) p.setAttribute('TEXCOORD_1', null);
+    }
+    // the concrete: one material the game swaps for its own. It keeps a 2 px stand-in texture
+    // (two greys: prune flattens a single-colour one), or prune would drop its UVs as unused.
+    const stand = doc.createTexture('concrete').setMimeType('image/png')
+      .setImage(await sharp(Buffer.from([138, 135, 128, 128, 125, 118]), { raw: { width: 2, height: 1, channels: 3 } }).png().toBuffer());
+    const concrete = doc.createMaterial('concrete').setBaseColorTexture(stand).setRoughnessFactor(0.9).setMetallicFactor(0).setDoubleSided(true);
+    for (const mesh of root.listMeshes()) for (const p of mesh.listPrimitives()) if (/concrete/i.test(p.getMaterial()?.getName() || '')) p.setMaterial(concrete);
+    await doc.transform(prune());
+    rootNode(doc, 'tower');
+    await grade(doc, { dark: 0.62, sat: 0.7, soot: 0.25 });
+    await texWebp(doc, 1024, { normalSize: 1024 });
+    // the measurements the game is laid out to (structures.js): warn if a new export moves them
+    const node = (name) => meshNodes(doc).find((n) => n.getName() === name);
+    const yTop = (name) => { const vs = verts(doc, (n) => n === name); return vs.length ? Math.max(...vs.map((v) => v.y)) : NaN; };
+    const body = verts(doc, (n) => n === 'Cube');
+    const front = body.length ? Math.min(...body.map((v) => v.z)) : NaN;
+    const roof = yTop('Cube.006'), deck = Math.max(...verts(doc, (n) => n.startsWith('Cube.001')).map((v) => v.y));
+    const b = getBounds(scene(doc));
+    console.log('tower size', b.max.map((v, i) => (v - b.min[i]).toFixed(2)).join(' x '), 'front z', front.toFixed(2), 'roof y', roof.toFixed(2), 'deck y', deck.toFixed(2), 'tris', triCount(doc), node('Cube') ? '' : '(no "Cube" node: front unknown)');
+    const want = { front: -4.64, roof: 9.0, deck: 9.0 };
+    for (const [k, v] of Object.entries({ front, roof, deck })) if (!(Math.abs(v - want[k]) < 0.06)) console.warn(`tower: ${k} is ${v.toFixed(2)}, the game expects ${want[k]} (src/world/structures.js TOWER, src/config.js TOWER_TOP)`);
+    await finish(doc, 'tower.glb');
+  }
+
+  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog, tower };
 }
