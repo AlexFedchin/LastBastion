@@ -348,7 +348,9 @@ export class Environment {
       this.flash = 1;
       const dir = this.bolts.strike(_dir.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z));
       su.uFlashDir.value.copy(dir).setY(Math.max(0.3, dir.y)).normalize();
-      if (this.onThunder) this.onThunder(1.2 + Math.random() * 3);
+      // sound takes its time over the distance; it comes from where the bolt came down
+      const B = this.bolts, d = B.lastDist || 1000;
+      if (this.onThunder) this.onThunder(d / 343, d, Math.sin(B.lastAz || 0) * 0.8);
     }
     if (this.roofMen) for (const s of this.roofMen) s.idle(); // the spotter and loader by the nest
     this.bolts.update(dt, time);
@@ -432,8 +434,10 @@ export class Environment {
       _dir.subVectors(sl.aim, sl.spot.position).normalize();
       sl.beam.quaternion.setFromUnitVectors(_down, _dir);
       sl.beam.material.uniforms.uTime.value = time;
-      sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d) * this.power * this.beamBoost;
-      sl.spot.intensity = 650 * (1 - d * 0.85) * this.power;
+      // (sl.pw: one light on its own, the extraction's blackout takes them one at a time)
+      const pw = this.power * (sl.pw ?? 1);
+      sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d) * pw * this.beamBoost;
+      sl.spot.intensity = 650 * (1 - d * 0.85) * pw;
       if (sl.spot.castShadow && shadowNow) sl.spot.shadow.needsUpdate = true;
       const hs = this.towerHousings[k];
       if (hs) hs.lookAt(sl.aim);

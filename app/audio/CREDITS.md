@@ -74,6 +74,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [50 Cal MG](https://freesound.org/people/qubodup/sounds/239138/) | qubodup | hmg, hmg_tail |
 | [abandoned warehouse](https://freesound.org/people/Kostrava/sounds/240895/) | Kostrava | hangar_room |
 | [burning air](https://freesound.org/people/sergeeo/sounds/242721/) | sergeeo | molotov_flight, molotov_whoosh |
+| [Thunderstorm lightning strike](https://freesound.org/people/foad/sounds/243614/) | foad | thunder_close |
 | [zombie sounds](https://freesound.org/people/Thanra/sounds/245466/) | Thanra | groan |
 | [Group running in sync on concrete](https://freesound.org/people/jhumbucker/sounds/250538/) | jhumbucker | run |
 | [Cinematic_Boom_Rhapsodize.wav](https://freesound.org/people/rhapsodize/sounds/255111/) | rhapsodize | boom_sub |
@@ -128,11 +129,14 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Radio Sign Off / Squelch](https://freesound.org/people/JovianSounds/sounds/524205/) | JovianSounds | radio_out |
 | [Mortar](https://freesound.org/people/Mozfoo/sounds/529239/) | Mozfoo | mortar |
 | [male scream pain torture.wav](https://freesound.org/people/martian/sounds/530471/) | martian | burn |
+| [Thunderclap](https://freesound.org/people/Fission9/sounds/534023/) | Fission9 | thunder_close |
 | [Growl.ogg](https://freesound.org/people/egomassive/sounds/536761/) | egomassive | brute |
 | [Male increasing scream - horror yelling in pain.wav](https://freesound.org/people/gtrempe/sounds/542128/) | gtrempe | burn |
 | [Foley_Mechanism_Light_Buzz_Short_Loop_Mono_DR05.wav](https://freesound.org/people/Nox_Sound/sounds/553075/) | Nox_Sound | lamp |
 | [Zombie Growl 5.wav](https://freesound.org/people/tonsil5/sounds/555417/) | tonsil5 | groan |
 | [Zombie Hit 1.wav](https://freesound.org/people/tonsil5/sounds/555420/) | tonsil5 | flesh |
+| [200817 Thunder, pretty close crack 4pm.flac](https://freesound.org/people/TRP/sounds/567945/) | TRP | thunder_close |
+| [Thunder big crack explosive close ms 77mel 190903.flac](https://freesound.org/people/TRP/sounds/574412/) | TRP | thunder_close |
 | [Distant Thunder 3](https://freesound.org/people/Fission9/sounds/581124/) | Fission9 | thunder |
 | [Distant Thunder 4](https://freesound.org/people/Fission9/sounds/581125/) | Fission9 | thunder |
 | [Ammo Box, Open-Close, Moving Handle.wav](https://freesound.org/people/DanielPickens/sounds/586544/) | DanielPickens | ui_buy |
@@ -148,6 +152,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [SKULLCRUSH](https://freesound.org/people/magnuswaker/sounds/697829/) | magnuswaker | headshot |
 | [Rain at night medium.wav](https://freesound.org/people/jgxxx/sounds/704395/) | jgxxx | rain_far |
 | [230405 Thunder DRY rolling distant low rumbles, roof, EM272s, Toronto 7am](https://freesound.org/people/TRP/sounds/717845/) | TRP | thunder |
+| [230713 Thunder, close crack crash big, mixpre6 AT875r EM272s, Stratford ON 2am](https://freesound.org/people/TRP/sounds/717907/) | TRP | thunder_close |
 | [An M16 Rifle being reloaded while empty; full sequence](https://freesound.org/people/ser%C3%B8ut%C5%8Dnin--depriv%C9%99d/sounds/725397/) | ser%C3%B8ut%C5%8Dnin--depriv%C9%99d | m240_load |
 | [Zombie Groan 0](https://freesound.org/people/OwNathan/sounds/754438/) | OwNathan | groan |
 | [Zombie Groan 3](https://freesound.org/people/OwNathan/sounds/754441/) | OwNathan | groan |
@@ -159,6 +164,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [St Peters Church, Kinver - Distant Tolling Bell](https://freesound.org/people/TicAshfield/sounds/824588/) | TicAshfield | bell |
 | [Factory Warning Buzzer](https://freesound.org/people/qubodup/sounds/832414/) | qubodup | klaxon |
 | [Bullet casings falling](https://freesound.org/people/barryshamir/sounds/834236/) | barryshamir | casing |
+| [Closeup Thunder Strike 01](https://freesound.org/people/loganzsound/sounds/840628/) | loganzsound | thunder_close |
 | [Autocannon Three Shot Burst](https://freesound.org/people/qubodup/sounds/854186/) | qubodup | chain |
 | [M142 HIMARS Rocket Launch 8](https://freesound.org/people/qubodup/sounds/854476/) | qubodup | rocket |
 | [Distant Machine Gun Firing](https://freesound.org/people/qubodup/sounds/854635/) | qubodup | distant_mg |

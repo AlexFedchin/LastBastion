@@ -160,6 +160,7 @@ export class Bolts {
     const r = this.rng;
     const az = (r() - 0.5) * 2.4;
     const dist = 650 + r() * 700;
+    this.lastDist = dist; this.lastAz = az; // (the thunder: how long it takes, where it comes from)
     const gx = Math.sin(az) * dist, gz = -Math.cos(az) * dist;
     const top = new THREE.Vector3(gx + (r() - 0.5) * 120, 330 + r() * 100, gz + (r() - 0.5) * 60);
     const bottom = new THREE.Vector3(gx, groundH(gx, gz), gz);

@@ -22,7 +22,7 @@ const SFX = {
   boom: [5, 44100], boom_far: [3, 22050], boom_sub: [0, 22050], mortar: [3, 44100], incoming: [5, 32000], shell_in: [0, 44100],
   molotov: [4, 44100], molotov_light: [0, 44100], molotov_flight: [0, 32000], ignite: [0, 32000], burn: [12, 32000], flesh: [5, 32000], headshot: [3, 32000], gib: [4, 32000], bloater: [0, 32000],
   acid: [0, 32000], bodyfall: [0, 32000], groan: [27, 32000], brute: [5, 32000], shriek: [3, 32000],
-  death: [4, 32000], thunder: [7, 22050], siren: [0, 32000], klaxon: [0, 32000], radio_in: [0, 22050],
+  death: [4, 32000], thunder: [7, 22050], thunder_close: [6, 32000], siren: [0, 32000], klaxon: [0, 32000], radio_in: [0, 22050],
   radio_out: [2, 22050], latch: [0, 44100], barrel_seat: [0, 44100], charge: [0, 44100], steam: [0, 32000],
   steam_long: [0, 32000], ui_click: [0, 44100], ui_hover: [0, 44100], ui_buy: [0, 44100],
   flare_ignite: [0, 32000], throw: [2, 32000], heartbeat: [0, 22050],
@@ -535,9 +535,10 @@ export class AudioEngine {
   duck(amount, hold = 0.15, recover = 0.6) {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
-    for (const g of [this.ambDuck.gain, this.musicDuck.gain]) {
+    // (in a cutscene the bombs fall all through the score: it doesn't step back for each one)
+    for (const g of this._cine ? [this.ambDuck.gain] : [this.ambDuck.gain, this.musicDuck.gain]) {
       g.cancelScheduledValues(t);
-      g.setTargetAtTime(1 - amount, t, 0.015);
+      g.setTargetAtTime(1 - amount * (this._cine ? 0.4 : 1), t, 0.015);
       g.setTargetAtTime(1, t + hold, recover);
     }
   }
@@ -1052,7 +1053,7 @@ export class AudioEngine {
     const t = ctx.currentTime, end = t + delay + buf.duration;
     this._voiceEnd = end;
     this.speakDuck(t + delay, end);
-    for (const [g, lvl] of [[this.musicDuck.gain, 0.42], [this.ambDuck.gain, 0.55]]) {
+    for (const [g, lvl] of [[this.musicDuck.gain, this._cine ? 0.7 : 0.42], [this.ambDuck.gain, this._cine ? 0.8 : 0.55]]) {
       g.cancelScheduledValues(t);
       g.setTargetAtTime(lvl, t, 0.25);
       g.setTargetAtTime(1, end + 0.4, 1.2);
@@ -1095,8 +1096,21 @@ export class AudioEngine {
     if (this.B.barrel_seat[0]) this.play(this.B.barrel_seat[0], { gain: 0.3, rate: rand(0.7, 0.8), reverb: 0.5, delay: 0.03, force: true });
   }
 
-  thunder(delay = 2) {
-    this.play(this.pickVar('thunder'), { gain: 0.42 * (1 - this.dawn * 0.5), rate: rand(0.85, 1.05), delay, pan: rand(-0.7, 0.7), reverb: 0.12, bus: 'amb', force: true });
+  /**
+   * Thunder after a lightning strike: the crack and roll of a close one, its high end dulled by
+   * how far off it struck (dist, m), arriving when sound would (delay, s), from where it struck (pan).
+   * Not on the ambience bus: it has to come through the gunfire.
+   */
+  thunder(delay = 2, dist = 900, pan = rand(-0.7, 0.7)) {
+    if (!this.ready) return;
+    const near = Math.max(0, Math.min(1, (1500 - dist) / 900));
+    const close = this.B.thunder_close && this.B.thunder_close.length;
+    this.play(close ? this.pickVar('thunder_close') : this.pickVar('thunder'), {
+      gain: (0.5 + 0.45 * near) * (1 - this.dawn * 0.4), rate: rand(0.9, 1.04), delay, pan,
+      lowpass: 2200 + 7000 * near * near, reverb: 0.3, force: true,
+    });
+    // and the far rumble under it, rolling round the valley
+    this.play(this.pickVar('thunder'), { gain: 0.3 * (1 - this.dawn * 0.5), rate: rand(0.8, 0.95), delay: delay + rand(0.3, 0.9), pan: -pan * 0.5, reverb: 0.4, bus: 'amb', force: true });
   }
 
   distantBoom(delay = 3) {
@@ -1190,7 +1204,7 @@ export class AudioEngine {
     b.war.set(lv('war', 0.15 * (1 - 0.75 * day) * (m === 'menu' ? 0.2 : 1)), 3);
     b.horde_far.set(lv('horde_far', smooth(0, 70, alive) * 0.3), tc);
     b.horde_mid.set(lv('horde_mid', smooth(40, 300, alive) * 0.26), tc);
-    b.horde_near.set(inPlay ? clamp(p * 1.3 + alive / 1200, 0, 1) * 0.36 : 0, tc);
+    b.horde_near.set(lv('horde_near', inPlay ? clamp(p * 1.3 + alive / 1200, 0, 1) * 0.36 : 0), tc);
     b.horde_surge.set(lv('horde_surge', inPlay ? smooth(0.45, 0.85, p) * 0.42 : 0), 0.8);
     b.shuffle.set(lv('shuffle', inPlay ? clamp(p * 1.5, 0, 1) * 0.3 : 0), tc);
     b.fire_roar.set(lv('fire_roar', this.fireLevel * 0.4), 0.6);

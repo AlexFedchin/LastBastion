@@ -11,7 +11,7 @@
 // them; the gunships turn round and follow. Voiced and cut to the script like the
 // other ending (EXTRACT_ENDING in config.js).
 import * as THREE from 'three';
-import { WORLD, EXTRACTION, EXTRACT_ENDING, ZT, wallZ } from '../config.js';
+import { WORLD, EXTRACTION, EXTRACT_ENDING, ZT, wallZ, WING_COS } from '../config.js';
 import { clamp, lerp, rand, fitFov } from '../core/util.js';
 import { groundH } from '../world/terrain.js';
 import { Survivor, ADULTS } from './survivor.js';
@@ -193,7 +193,7 @@ const SHOTS = {
     L.group.updateMatrixWorld();
     const pos = _v.set(2.4, -0.9, -11.5).applyMatrix4(L.group.matrixWorld).clone();
     const look = V(lerp(-4, 4, ease(k)), WORLD.WALL_H + 0.4, -6);
-    return { pos, look, fov: 30, shake: 0.1, focus: pos.distanceTo(look), aperture: 1.6 };
+    return { pos, look, fov: 30, shake: 0.1 };
   },
   // behind the lifter: the ramp comes up and shuts, the dead already over the wall behind
   doorClose: (k, st, S) => {
@@ -218,7 +218,7 @@ const SHOTS = {
     return { pos, look: follow(S, '_lk5', clampLook(pos, mid, 1.0), 1.8, dt), fov: 58, shake: 0.08 };
   },
   // high and far: the flight going away over the hills, the bastion small and burning
-  away: (k) => ({ pos: V(70, 85, 210).lerp(V(40, 110, 300), ease(k)), look: V(0, 10, -30).lerp(V(0, 0, -90), ease(k)), fov: 46 }),
+  away: (k) => ({ pos: V(46, 52, 118).lerp(V(30, 78, 196), ease(k)), look: V(0, 4, -22).lerp(V(0, 0, -60), ease(k)), fov: 44 }),
 };
 
 export class ExtractionScene {
@@ -246,8 +246,8 @@ export class ExtractionScene {
     const rm = new THREE.MeshStandardMaterial({ color: 0x2a2c26, roughness: 0.6, metalness: 0.4 });
     this.rockets = Array.from({ length: 12 }, () => { const m = new THREE.Mesh(rg, rm); m.visible = false; scene.add(m); return { m, on: false, p: new THREE.Vector3(), v: new THREE.Vector3(), t: 0 }; });
     // the garrison: soldiers and the civilians who sheltered behind the wall
-    this.troops = Array.from({ length: 7 }, () => { const s = new Soldier(); s.root.visible = false; scene.add(s.root); return s; });
-    this.civs = Array.from({ length: 14 }, (_, k) => { const p = new Survivor(k % 4 === 3 ? 'child' : ADULTS[k % 3]); p.root.visible = false; scene.add(p.root); return p; });
+    this.troops = Array.from({ length: 14 }, () => { const s = new Soldier(); s.root.visible = false; scene.add(s.root); return s; });
+    this.civs = Array.from({ length: 4 }, (_, k) => { const p = new Survivor(k === 3 ? 'child' : ADULTS[k % 3]); p.root.visible = false; scene.add(p.root); return p; });
   }
 
   start() {
@@ -290,6 +290,8 @@ export class ExtractionScene {
     g.ending.placeGun();
     A.intensity = 1; A.pressure = 0.8;
     A.setCine(true);
+    A.setTide(true); // the score's climax over the bombing, until the run turns it (victory)
+    A.scape = { horde_near: 0.32, horde_surge: 0.3, shuffle: 0.22 };
     this.pileMul0 = g.horde.pileMul;
     g.horde.pileMul = Math.max(g.horde.pileMul, 1.6);
     for (let i = 0; i < 260 && g.horde.n < g.horde.cap - 200; i++) g.horde.spawn(R() < 0.45 ? ZT.RUNNER : ZT.SHAMBLER, rand(-130, 130), rand(-150, -40), 1, 1.1);
@@ -690,13 +692,14 @@ export class ExtractionScene {
   // ── the garrison running for the ramps ──
   stagePeople() {
     const g = this.g;
-    // how many come out: the garrison as it stands (cast caps it), soldiers first
+    // how many come out: the garrison as it stands (cast caps it). It is a military base: the
+    // soldiers, and the few civilians who made it in off the road
     const alive = g.run ? g.run.survivors : 20;
-    const nS = Math.min(this.troops.length, Math.max(4, Math.round(alive * 0.25)));
-    const nC = Math.min(this.civs.length, Math.max(8, Math.round(alive * 0.5)));
+    const nC = Math.min(this.civs.length, Math.max(2, Math.round(alive * 0.15)));
+    const nS = Math.min(this.troops.length, Math.max(8, alive - nC));
     const order = [];
     for (let i = 0; i < nS; i++) order.push([this.troops[i], true]);
-    for (let i = 0; i < nC; i++) order.splice(1 + ((i * 2.3) | 0) % (order.length + 1), 0, [this.civs[i], false]);
+    for (let i = 0; i < nC; i++) order.splice(2 + ((i * 3.7) | 0) % (order.length - 1), 0, [this.civs[i], false]);
     // they have to be up the ramps before it shuts: the gap between them shrinks with their number
     const gap = Math.min(0.55, 8.5 / order.length);
     this.runners = order.map(([f, soldier], k) => {
@@ -707,7 +710,9 @@ export class ExtractionScene {
       // behind them), so he runs into the frame past it
       const go = this.T.run - 2.2 + k * gap;
       const cz = this.runCamZ(go);
-      return { f, soldier, L, x: rand(-6.5, 5.5), z: cz - rand(3, 8), ph: R() * 6, sp: rand(4.4, 5.4) * (f.child ? 0.9 : 1), go, state: 'wait', yaw: 0, wp: 0, bias: k % 2 ? 1 : -1 };
+      // (soldiers at a hard run; the civilians slower, a child slowest)
+      const sp = soldier ? rand(4.6, 5.4) : rand(3.7, 4.3) * (f.child ? 0.85 : 1);
+      return { f, soldier, L, x: rand(-6.5, 5.5), z: cz - rand(3, 8), ph: R() * 6, sp, go, state: 'wait', yaw: 0, wp: 0, bias: k % 2 ? 1 : -1 };
     });
   }
 
@@ -775,24 +780,43 @@ export class ExtractionScene {
     const g = this.g, h = g.horde, t = this.t, T = this.T;
     if (t < T.ramp - 1.0 || t > T.away + 12) return; // the garrison is off the wall: nothing holds them now
     if (!h.overWall) {
-      h.overWall = (x, z, i) => this.chaseTarget(x, i ?? 0);
+      // over the top: a moment crouched on the parapet before the drop while the garrison boards
+      h.overWall = (x, z, i) => [...this.chaseTarget(x, i ?? 0), this.t < this.T.doorClose ? rand(1.6, 3.4) : rand(0, 0.5)];
       h.pileMul = 5;
       // the horde is at its cap by now: the far field (off camera from here on) makes room for the ones coming over
       h.cull((x, z) => z < -85 && R() < 0.75);
       for (let i = 0; i < 200; i++) h.spawn(R() < 0.55 ? ZT.RUNNER : ZT.SHAMBLER, rand(-70, 70), rand(-55, -12), 1, 1.25);
     }
-    // the first heads over the parapet as the last of the garrison boards (seen past the ramp),
-    // a trickle as the ramps come up, a flood as the lifters climb
+    // the first heads over the parapet as the last of the garrison boards (seen past the ramp):
+    // the mounds outside have reached the top under the wall's lamps, and the dead climb them
+    // (horde: the climb over the top, then overWall puts them on the parapet, crouched); from
+    // inside the yard all you see is heads and arms coming over the wall
     const early = t < T.doorClose;
-    this.intrudeAcc += dt * (early ? 4 : 3 + 20 * clamp((t - T.doorClose) / 10, 0, 1));
-    // (the early ones come up under the wall's lamps, so they show against the light)
-    const lamps = (g.env.wallLamps || []).filter((l) => Math.abs(l.x) > 9 && Math.abs(l.x) < 46);
+    if (!this.mounds) {
+      this.mounds = true;
+      h.pileMul = 9;
+      h.maxClimbers = 3; // (three at a time up each mound: the wall is lost)
+      const lamps = (g.env.wallLamps || []).filter((l) => Math.abs(l.x) > 24 && Math.abs(l.x) < 60);
+      for (const l of lamps) {
+        const side = l.x < 0 ? -1 : 1, al = (Math.abs(l.x) - WORLD.GATE_HALF) / WING_COS;
+        let p = h.nearestPile(side, al, 6);
+        if (p < 0) p = h.seedPile(side, al);
+        if (p < 0) continue;
+        h.pH[p] = Math.max(h.pH[p], WORLD.WALL_H - 0.3);
+        // the bodies that hold it up, and the ones crowding on to climb
+        for (let k = 0; k < 34; k++) {
+          const x = h.pX[p] + rand(-3.2, 3.2), i = h.spawn(R() < 0.6 ? ZT.RUNNER : ZT.SHAMBLER, x, wallZ(x) - rand(0.6, 5.5), 1, 1.2);
+          if (i >= 0) { h.fadeIn[i] = 0; h.joinPile(i, p, WORLD.WALL_H); }
+        }
+      }
+    }
+    // later, once the ramps are shutting, a flood over every section near the yard (wide shots)
+    this.intrudeAcc += dt * (early ? 0 : 15 + 18 * clamp((t - T.doorClose) / 10, 0, 1));
     while (this.intrudeAcc >= 1) {
       this.intrudeAcc -= 1;
-      const x = early && lamps.length ? lamps[(R() * lamps.length) | 0].x + rand(-2.2, 2.2)
-        : (R() < 0.5 ? -1 : 1) * (R() < 0.75 ? rand(10, 34) : rand(34, 62)); // over the near wing sections, closest to the yard
+      const x = (R() < 0.5 ? -1 : 1) * (R() < 0.75 ? rand(10, 34) : rand(34, 62)); // over the near wing sections, closest to the yard
       const i = h.spawn(R() < 0.8 ? ZT.RUNNER : ZT.SHAMBLER, x, wallZ(x) - 0.6, 1, 1.2);
-      if (i >= 0) { const [tx, tz] = this.chaseTarget(x, i); h.goInside(i, tx, tz, early ? rand(2.2, 4.2) : rand(0, 0.5)); }
+      if (i >= 0) { const [tx, tz] = this.chaseTarget(x, i); h.goInside(i, tx, tz, rand(0, 0.5)); }
     }
     // the ones in the yard: every half second, a fresh bearing on the lifters (and after them)
     this.chaseAcc = (this.chaseAcc || 0) + dt;
@@ -806,15 +830,48 @@ export class ExtractionScene {
     }
   }
 
+  /**
+   * The dead around the yard, heard under everything: the crowd at the wall, a roar as they come
+   * over it and flood the yard, falling away below as the lifters climb out.
+   */
+  updateScape(t) {
+    const T = this.T, A = this.g.audio;
+    const flood = clamp((t - T.doorClose + 1) / 3, 0, 1);
+    const gone = clamp((t - T.away) / 8, 0, 1);
+    A.scape = {
+      horde_near: (0.32 + 0.12 * flood) * (1 - gone * 0.8),
+      horde_surge: (0.28 + 0.3 * flood) * (1 - gone),
+      shuffle: (0.22 + 0.1 * flood) * (1 - gone),
+    };
+  }
+
   /** The bastion goes dark: the wall's lamps and searchlights stutter and die once the flight is away. */
   updateLights(dt) {
-    const g = this.g, t = this.t, at = (this.T.away + this.end) / 2; // half-way through the last wide, in plain view
+    const g = this.g, t = this.t, at = this.T.away + 2.2; // early in the last wide, the whole wall in frame
     if (t < at) return;
-    const u = t - at;
-    let p = 0;
-    if (u < 1.5) p = R() < 0.6 * (1 - u / 1.5) ? 1 : 0.06 * R();
-    if (!this.darkDone) { this.darkDone = true; g.audio.powerDown(); }
-    g.env.power = p;
+    const u = t - at, env = g.env;
+    // first the searchlights, one after another: each sags off its target and dies
+    const SL = env.searchlights || [];
+    SL.forEach((sl, k) => {
+      const d = u - k * 0.55;
+      sl.pw = d < 0 ? 1 : d < 0.35 ? (R() < 0.5 ? 1.3 : 0.1) : Math.max(0, 1 - (d - 0.35) * 3);
+      if (d > 0 && d < 1) sl.goal.y -= 40 * (1 / 60);
+    });
+    // then the lamps along the wall: a surge, three stutters with the arcing, and gone
+    const v = u - SL.length * 0.55 - 0.2;
+    let p = 1;
+    if (v > 0) {
+      if (v < 0.25) p = 1.6;
+      else if (v < 1.7) p = [1, 0, 1.2, 0, 0.7, 0, 0.4, 0][Math.floor((v - 0.25) / 0.18)] ?? 0;
+      else p = 0;
+      if (!this.darkDone) {
+        this.darkDone = true;
+        g.audio.powerDown();
+        // sparks off every lamp as it shorts
+        for (const l of env.wallLamps || []) for (let k = 0; k < 14; k++) g.fx.spark(l.x, l.y, l.z, rand(-3, 3), rand(0, 4), rand(-3, 3), 9, 6, 2, rand(0.4, 1.1));
+      }
+    }
+    env.power = p;
     if (g.player.nestLight) g.player.nestLight.intensity = 1.6 * p;
     g.audio.lampPower = p;
   }
@@ -857,6 +914,7 @@ export class ExtractionScene {
       for (const s of g.env.roofMen || []) s.root.visible = false;
     }
     if (t >= T.run + 1 && !this.scoreTurned) { this.scoreTurned = true; g.audio.setMusicMode('victory'); }
+    this.updateScape(t);
     if (onWall) g.arsenal.update(dt, g.time);
     g.horde.update(dt, g.time);
     this.updateBombers(dt);
@@ -888,9 +946,8 @@ export class ExtractionScene {
     cam.position.x += Math.sin(t * 17.3) * sh + Math.sin(t * 2.1) * (p.shake || 0) * 0.12;
     cam.position.y += Math.sin(t * 21.1 + 1) * sh + Math.sin(t * 1.7) * (p.shake || 0) * 0.08;
     cam.up.set(0, 1, 0);
-    cam.lookAt(p.look);
+    cam.lookAt(p.look);
     // the lens: focused where the shot looks (or on what it names), the blur growing with the focal length
-    g.post.focus(p.focus ?? p.pos.distanceTo(p.look), p.aperture ?? Math.min(3, 0.55 * 42 / p.fov));
     cam.rotateZ(Math.sin(t * 11.7) * sh * 0.05);
     const fov = fitFov(p.fov, cam.aspect);
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
@@ -939,6 +996,10 @@ export class ExtractionScene {
     g.arsenal.endNight();
     g.horde.overWall = null;
     g.horde.pileMul = this.pileMul0 ?? g.horde.pileMul;
+    this.mounds = false;
+    g.horde.maxClimbers = 0;
+    g.audio.scape = null;
+    for (const sl of g.env.searchlights || []) sl.pw = 1;
     g.horde.clearLiving();
     this.wallLeft = false; this.scoreTurned = false;
     for (const s of g.env.roofMen || []) s.root.visible = true;

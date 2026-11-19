@@ -12,7 +12,8 @@ export const ADULTS = ['man', 'woman', 'man2'];
 export const WALKS = ['walk_sad', 'walk_arm', 'walk_leg'];
 
 // ground speed (m/s) each in-place clip is played against: distance -> clip time
-const GAIT = { walk_sad: 1.0, walk_arm: 1.0, walk_leg: 0.55, run_1: 3.0, run_2: 3.0 };
+// (the runs measured off the clips' planted feet: played any faster, the legs blur like a cartoon)
+const GAIT = { walk_sad: 1.0, walk_arm: 1.0, walk_leg: 0.55, run_1: 4.6, run_2: 3.8 };
 
 const _qa = new THREE.Quaternion(), _qb = new THREE.Quaternion(), _v = new THREE.Vector3(), _w = new THREE.Vector3();
 const wrap = (t, d) => ((t % d) + d) % d;

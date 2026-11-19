@@ -824,7 +824,7 @@ export class Horde {
 
   breach(i) {
     if (this.dead[i]) return;
-    if (this.overWall) { const [tx, tz] = this.overWall(this.x[i], this.z[i], i); this.goInside(i, tx, tz); return; }
+    if (this.overWall) { const [tx, tz, perch = 0] = this.overWall(this.x[i], this.z[i], i); this.goInside(i, tx, tz, perch); return; }
     this.dead[i] = 1;
     this.alive--;
     // the men on the walkway fight back and shove the pile down before they fall
@@ -1169,7 +1169,7 @@ export class Horde {
         ty = Math.min(ph * Math.pow(k > 0 ? k : 0, 0.85) * (0.85 + 0.15 * this.pileJit[i]), sup);
         if (Y[i] > this.pTopN[pile]) this.pTopN[pile] = Y[i];
         // only one that has really reached the top of the mound (at the wall, at its peak) goes over
-        if (ph >= WALL_H - 0.5 && Y[i] >= WALL_H - 2.6 && pr < 1.4 + ph * 0.08 && (this.climb[i] > 0 || this.pClimb[pile] < PILE.MAX_CLIMBERS)) {
+        if (ph >= WALL_H - 0.5 && Y[i] >= WALL_H - 2.6 && pr < 1.4 + ph * 0.08 && (this.climb[i] > 0 || this.pClimb[pile] < (this.maxClimbers || PILE.MAX_CLIMBERS))) {
           this.pClimb[pile]++;
           this.climb[i] += dt;
           const c = this.climb[i] / this.climbDur[i];

@@ -384,7 +384,7 @@ class Game {
       if (d < 40) this.flashPulse = Math.max(this.flashPulse, 0.06 * scale);
     };
     this.fx.onShake = (a) => this.player.addTrauma(a);
-    this.env.onThunder = (delay) => this.audio.thunder(delay);
+    this.env.onThunder = (delay, dist, pan) => this.audio.thunder(delay, dist, pan);
     this.env.onDistantBoom = (delay) => this.audio.distantBoom(delay);
     this.env.onDistantGunfire = (delay) => this.audio.distantGunfire(delay);
     this.director.onEvent = (kind, e) => this.onDirectorEvent(kind, e);
@@ -538,6 +538,8 @@ class Game {
 
   /** The last evening before the first night (src/game/prologue.js); night 1 follows. */
   playPrologue() {
+    // (the menu's night has Spectre up: the evening before the first night has nothing in the sky)
+    this.arsenal.air.hide();
     this.state = 'prologue';
     this.stateT = 0;
     this.prologue.start();
@@ -1017,7 +1019,7 @@ class Game {
     u.uDesat.value = this.state === 'fallen' ? Math.min(0.85, 0.28 + this.stateT * 0.15) : lerp(0.28, 0.4, this.env.dawn) - this.env.dusk * 0.2;
     u.uExposure.value = lerp(1.25, 1.2, this.env.dawn);
     u.uWarm.value = this.env.dawn * 0.3 * (1 - this.env.dusk) + this.env.dusk * 0.45;
-    u.uCA.value = 0.008 + this.player.trauma * 0.008 + this.radial * 0.015;
+    u.uCA.value = 0.0025 + this.player.trauma * 0.005 + this.radial * 0.012;
     // the dawn resupply is drawn in the hangar: its own scene and camera through the same post chain
     const inHangar = this.state === 'shop' && this.hangar.active;
     if (!inHangar && this.hangar.active) this.hangar.exit();
@@ -1030,7 +1032,7 @@ class Game {
     this.post.bloom.strength = inHangar ? 0.2 : 0.42;
     if (inHangar) {
       u.uHeatN.value = 0; u.uShockN.value = 0;
-      u.uDesat.value = 0.28; u.uExposure.value = 1.0; u.uWarm.value = 0.1; u.uCA.value = 0.004;
+      u.uDesat.value = 0.28; u.uExposure.value = 1.0; u.uWarm.value = 0.1; u.uCA.value = 0.0015;
     } else this.post.updateDistortion(this.env.fire.heatSources, this.fx.shocks);
     // pixel size for eye billboards
     const h = this.renderer.getDrawingBufferSize(this._sz || (this._sz = new THREE.Vector2())).y;
@@ -1340,6 +1342,7 @@ class Game {
 
   /** The seventy-second hour is over: the ending, then the choice of endless nights or a new campaign. */
   playEnding() {
+    this.arsenal.air.hide(); // the gunship's gone home: no drone over the morning
     this.state = 'ending';
     this.stateT = 0;
     this.ending.start();

@@ -437,6 +437,10 @@ for k, (src, ss, t, fo) in enumerate([(581124, 0.45, 6.9, 2.0), (581125, 3.45, 7
                                       (486557, 1.85, 11.0, 4.0), (717845, 1.55, 7.0, 2.5), (717845, 20.1, 8.5, 3.0),
                                       (717845, 105.4, 10.0, 3.0)]):
     clip(f'sfx/thunder_{k + 1}', src, ss, t, ch=2, sr=22050, fi=0.15, fo=fo, target=-14, q=4)
+# a strike close by: the crack, then the roll (heard a few seconds after the flash, by distance)
+for k, (src, ss, t, fo) in enumerate([(574412, 1.6, 10.5, 4.0), (717907, 0.45, 13.0, 4.5), (534023, 0.55, 9.0, 3.5),
+                                      (840628, 0.4, 10.5, 4.0), (567945, 1.5, 12.0, 4.0), (243614, 7.5, 15.0, 5.0)]):
+    clip(f'sfx/thunder_close_{k + 1}', src, ss, t, ch=2, sr=32000, fi=0.01, fo=fo, target=-12, q=5)
 
 # ── base, gun handling, radio ────────────────────────────────────────────────
 clip('sfx/siren', 336640, 0.3, 9.0, ch=2, sr=32000, fi=0.2, fo=3.5, target=-14)
