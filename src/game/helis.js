@@ -82,7 +82,7 @@ export function makeAttackHeli() {
   };
 }
 
-/** Tandem-rotor heavy lifter, 15.5 m fuselage; its ramp flies level and the boards on it lower to the ground. */
+/** Tandem-rotor heavy lifter, 15.5 m fuselage; its ramp lowers to the ground with its boards run out, and shuts. */
 export function makeLifter() {
   M = M || materials();
   const g = cloneModel('ch47');
@@ -93,12 +93,16 @@ export function makeLifter() {
   hold.position.set(0, -1.05, 1.5);
   hold.rotation.y = Math.PI;
   g.add(hold);
-  // the ramp (node 'ramp', hinged at the cabin floor): rotation 0 is down on the ground as
-  // modelled, +1.35 rad shuts it; its treadway boards are a child that slides back up it
-  const ramp = g.getObjectByName('ramp'), boards = ramp.getObjectByName('boards');
-  ramp.traverse((o) => { if (o.isMesh) o.material.side = THREE.DoubleSide; });
+  // the ramp (node 'ramp', hinged at the cabin floor's end): rotation 0 is down on the ground
+  // as modelled, angles.x shuts it along the tail's lines; its treadway boards are a child that
+  // retracts into it (boardsSlide); the upper door (node 'door') folds up under the aft pylon
+  // when open (angles.y) and swings down onto the shut ramp's end
+  const ramp = g.getObjectByName('ramp'), boards = ramp.getObjectByName('boards'), door = g.getObjectByName('door');
+  for (const part of [ramp, door]) part.traverse((o) => { if (o.isMesh) o.material.side = THREE.DoubleSide; });
+  const ang = anchor(g, 'angles');
   return {
-    group: g, rotors: [fore, aft], ramp, boards, boardsHome: boards ? boards.position.clone() : null,
+    group: g, rotors: [fore, aft], ramp, boards, door, boardsHome: boards.position.clone(), boardsSlide: anchor(g, 'boardsSlide'),
+    rampShut: ang.x, doorOpen: ang.y,
     gear: 2.4, // ground to the model's origin on its wheels
     rampFoot: anchor(g, 'rampFoot'), inside: anchor(g, 'inside'),
     lights: { port: anchor(g, 'lightPort'), stbd: anchor(g, 'lightStbd'), tail: anchor(g, 'lightTail') },

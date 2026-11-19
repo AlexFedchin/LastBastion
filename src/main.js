@@ -394,7 +394,6 @@ class Game {
     });
     // the hangar: what the cursor is over (only over the 3D view, not the panels)
     window.addEventListener('mousemove', (e) => { if (this.state === 'shop' && !this.freecam.on) this.hangar.pointer(e, e.target === this.canvas); });
-    document.getElementById('s-click').addEventListener('click', () => { this.audio.init(); this.input.lock(); });
     document.addEventListener('keydown', (e) => {
       this.audio.init();
       if (this.chronicle.active && ['Space', 'Enter', 'NumpadEnter', 'Escape'].includes(e.code)) { if (!e.repeat) this.chronicle.advance(); return; }
@@ -447,6 +446,9 @@ class Game {
   }
 
   onAction(act, el) {
+    // the clicks that lead into a night take the mouse there and then (a pointer lock needs
+    // the click's gesture), so the night opens straight onto the gun with no "click to play"
+    if (!TEST && ['continue', 'start', 'begin', 'retry'].includes(act)) this.input.lock();
     switch (act) {
       case 'continue': {
         const s = loadSave();
@@ -596,6 +598,8 @@ class Game {
     this.stateT = 0;
     this.introFrom = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone() };
     this.introLen = 2.8;
+    this.introRaised = false;
+    this.player.gun.visible = false;
     if (this.fromCard) {
       // high over the base behind the tower, looking down the valley: it sinks into the nest
       const c = new THREE.Object3D();
@@ -647,7 +651,7 @@ class Game {
   resume() {
     if (this.state !== 'paused') return;
     this.state = 'night';
-    this.screens.show(this.input.locked ? null : 'click');
+    this.screens.show(null);
     this.audio.setMuffle(0);
     if (!TEST) this.input.lock();
   }
@@ -821,6 +825,7 @@ class Game {
 
   openShop() {
     this.state = 'shop';
+    this.input.unlock(); // (a "continue" click takes the mouse; the hangar wants it back)
     this.arsenal.air.hide();
     this.hud.show(false);
     const first = !this.hangar.built;
@@ -940,8 +945,7 @@ class Game {
     // a cutscene plays on under it (at the camera's pace: paused, slowed, sped up)
     const flying = this.freecam.on;
     const cine = flying && this.freecam.cine ? this.freecam.cineStep(rdt) : -1;
-    // the night holds its breath until you take the gun
-    const paused = cine === 0 || (!flying && (this.state === 'paused' || (this.state === 'night' && !this.input.locked && !TEST)));
+    const paused = cine === 0 || (!flying && this.state === 'paused');
     const dt = paused ? 0 : cine > 0 ? cine : flying ? rdt : rdt * this.timeScale;
     this.time += dt;
     setSoldierClock(this.time);
@@ -1083,7 +1087,9 @@ class Game {
   updateIntro(dt, rdt) {
     const T = this.introLen || 2.8;
     const k = Math.min(1, this.stateT / T);
-    const e = k * k * (3 - 2 * k);
+    // smootherstep: it comes to rest with no speed and no deceleration left, so the hand-off to
+    // the gun's own camera is seamless
+    const e = k * k * k * (k * (k * 6 - 15) + 10);
     // target pose = gunner pose
     const target = new THREE.Object3D();
     target.position.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z);
@@ -1092,7 +1098,17 @@ class Game {
     target.updateMatrixWorld();
     this.camera.position.lerpVectors(this.introFrom.pos, target.position, e);
     this.camera.quaternion.slerpQuaternions(this.introFrom.quat, target.quaternion, e);
-    this.player.gun.visible = k > 0.55;
+    // the gun is taken up from below as the camera settles behind it
+    // (an intro skipped straight past its end: the gun is simply there)
+    if (!this.introRaised && this.stateT >= T + 0.2) { this.introRaised = true; this.player.raise = 1; this.player.raising = false; this.player.gun.visible = true; }
+    if (!this.player.raising && this.player.raise >= 1 && !this.introRaised && this.stateT >= T - Math.min(1.1, T * 0.4)) {
+      this.introRaised = true;
+      this.player.takeUp(1.35);
+      const B = this.audio.B;
+      if (this.audio.ready && B && B.charge && B.charge[0]) { this.audio.play(B.charge[0], { gain: 0.45, reverb: 0.25, pan: 0.1, delay: 0.55, force: true }); this.audio.play(B.charge[0], { gain: 0.38, rate: 0.94, reverb: 0.25, pan: 0.1, delay: 1.2, force: true }); }
+    }
+    if (!this.introRaised) this.player.gun.visible = false;
+    this.player.poseGun(dt, rdt);
     const fov = fitFov(lerp(55, this.settings.fov, e), this.camera.aspect);
     if (Math.abs(this.camera.fov - fov) > 0.01) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     this.director.update(dt);
@@ -1104,7 +1120,7 @@ class Game {
       this.stateT = 0;
       this.camera.rotation.setFromQuaternion(this.camera.quaternion, 'YXZ');
       this.letterboxTarget = 0;
-      if (!this.input.locked && !TEST) this.screens.show('click');
+      if (!this.input.locked && !TEST) this.input.lock(); // (taken at the click that began it; Electron grants it here too)
       const n = this.run.night, keys = ['LMB FIRE', 'RMB OPTICS'];
       if (isUnlocked('artillery', n)) keys.push('Q ARTILLERY');
       if (isUnlocked('molotov', n)) keys.push('E MOLOTOV');

@@ -608,7 +608,7 @@ export class Horde {
 
   breach(i) {
     if (this.dead[i]) return;
-    if (this.overWall) { const [tx, tz] = this.overWall(this.x[i], this.z[i]); this.goInside(i, tx, tz); return; }
+    if (this.overWall) { const [tx, tz] = this.overWall(this.x[i], this.z[i], i); this.goInside(i, tx, tz); return; }
     this.dead[i] = 1;
     this.alive--;
     // the men on the walkway fight back and shove the pile down before they fall

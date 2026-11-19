@@ -272,10 +272,14 @@ export class AudioEngine {
     this.snap.gain.setTargetAtTime(SNAP[this.musicMode] ?? 1, ctx.currentTime + 0.4, 1.4);
     this.snap.connect(this.muffle);
     this.sfx = ctx.createGain(); this.sfx.gain.value = this.settings.sfx;
-    this.sfx.connect(this.snap);
-    // the radio is in your ear, not out in the valley: past the world mix, still deafened by blasts
+    // in the cutscenes the whole world mix steps back under a voice line (see speakDuck)
+    this.cineDuck = ctx.createGain();
+    this.sfx.connect(this.cineDuck); this.cineDuck.connect(this.snap);
+    // the radio is in your ear, not out in the valley: past the world mix and its glue
+    // compressor (a bomb going off must not pump the voice down with it), still deafened by blasts
     this.voiceBus = ctx.createGain(); this.voiceBus.gain.value = this.settings.sfx * VOICE_TRIM;
-    this.voiceBus.connect(this.deafen);
+    this.voiceDeafen = ctx.createBiquadFilter(); this.voiceDeafen.type = 'lowpass'; this.voiceDeafen.frequency.value = 20000; this.voiceDeafen.Q.value = 0.4;
+    this.voiceBus.connect(this.voiceDeafen); this.voiceDeafen.connect(this.master);
 
     // the valley answers every shot
     this.reverb = ctx.createConvolver();
@@ -543,10 +547,11 @@ export class AudioEngine {
     if (!this.ready || this._earT > 0) return;
     this._earT = 9;
     const t = this.ctx.currentTime;
-    const f = this.deafen.frequency;
-    f.cancelScheduledValues(t);
-    f.setTargetAtTime(700 + 900 * (1 - strength), t, 0.02);
-    f.setTargetAtTime(20000, t + 0.6, 1.1);
+    for (const f of [this.deafen.frequency, this.voiceDeafen.frequency]) {
+      f.cancelScheduledValues(t);
+      f.setTargetAtTime(700 + 900 * (1 - strength), t, 0.02);
+      f.setTargetAtTime(20000, t + 0.6, 1.1);
+    }
     this.play(this.B.tinnitus[0], { gain: 0.16 * strength, force: true });
     this.duck(0.55 * strength, 0.5, 1.2);
   }
@@ -840,7 +845,21 @@ export class AudioEngine {
     if (!this.ready) return;
     const t = this.ctx.currentTime;
     this.snap.gain.setTargetAtTime(on ? 1.35 : (SNAP[this.musicMode] ?? 1), t, 0.6);
-    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM * (on ? 1.35 : 1), t, 0.3);
+    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM * (on ? 1.6 : 1), t, 0.3);
+    if (!on) { this.cineDuck.gain.cancelScheduledValues(t); this.cineDuck.gain.setTargetAtTime(1, t, 0.3); }
+  }
+
+  /**
+   * A cutscene line: the world (bombs, rotors, rockets, the horde) steps back about 8 dB
+   * for its length, so every word carries; it comes back up after. Outside the cutscenes
+   * the radio sits on the guns as it always has.
+   */
+  speakDuck(start, end) {
+    if (!this._cine) return;
+    const g = this.cineDuck.gain, t = this.ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setTargetAtTime(0.4, Math.max(t, start - 0.15), 0.12);
+    g.setTargetAtTime(1, end + 0.25, 0.9);
   }
 
   /** A heavier 25 mm HE round on the ground (layered on the burst's crackle now and then). */
@@ -1006,6 +1025,7 @@ export class AudioEngine {
     src.onended = () => { try { p.disconnect(); } catch { /* noop */ } if (this._voice === src) this._voice = null; };
     this._voice = src;
     this._voiceEnd = ctx.currentTime + delay + buf.duration;
+    this.speakDuck(ctx.currentTime + delay, this._voiceEnd);
     // pull the score and the ambience back a little under the voice
     const t = ctx.currentTime;
     this.musicDuck.gain.cancelScheduledValues(t);
@@ -1031,6 +1051,7 @@ export class AudioEngine {
     this._voice = src;
     const t = ctx.currentTime, end = t + delay + buf.duration;
     this._voiceEnd = end;
+    this.speakDuck(t + delay, end);
     for (const [g, lvl] of [[this.musicDuck.gain, 0.42], [this.ambDuck.gain, 0.55]]) {
       g.cancelScheduledValues(t);
       g.setTargetAtTime(lvl, t, 0.25);

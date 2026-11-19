@@ -10,8 +10,11 @@ export class Input {
     this.enabled = true;
     this.onLockChange = null;
 
+    this.settle = 0; // movement events to drop just after the lock (Chromium's first ones can be a huge jump)
     document.addEventListener('mousemove', (e) => {
       if (!this.locked) return;
+      if (this.settle > 0) { this.settle--; return; }
+      if (Math.abs(e.movementX) > 600 || Math.abs(e.movementY) > 600) return;
       this.dx += e.movementX;
       this.dy += e.movementY;
     });
@@ -33,6 +36,7 @@ export class Input {
     document.addEventListener('pointerlockchange', () => {
       this.locked = document.pointerLockElement === this.canvas;
       if (!this.locked) this.buttons = 0;
+      else this.settle = 2;
       if (this.onLockChange) this.onLockChange(this.locked);
     });
   }

@@ -309,8 +309,6 @@ table.keys td:first-child { font-family: var(--mono); color: var(--amber); width
 .stats span { font-size: 11px; letter-spacing: 0.25em; color: var(--bone-dim); }
 .end-screen nav.menu { align-items: center; margin-top: 10px; }
 
-.click-screen { align-items: center; justify-content: center; background: rgba(0,0,0,0.25); cursor: pointer; }
-.click-box { font-size: 26px; letter-spacing: 0.4em; color: var(--bone); padding: 18px 34px; border: 1px solid var(--amber-dim); background: rgba(0,0,0,0.6); animation: blink 1.6s infinite; }
 
 #loading { position: fixed; inset: 0; z-index: 50; background: #050506; overflow: hidden; transition: opacity 1.1s ease; }
 #loading.done { opacity: 0; pointer-events: none; }

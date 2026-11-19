@@ -109,7 +109,6 @@ const LZ = [
   { x: 27, z: 66, yaw: -0.35 },
 ];
 const NEST = () => V(0, WORLD.TOWER_TOP + 1.9, 2);
-const RAMP_SHUT = 1.35; // the lifter's ramp node: 0 down on the ground (as modelled), this shut against the tail
 const smoother = (k) => { k = clamp(k, 0, 1); return k * k * k * (k * (k * 6 - 15) + 10); };
 const _f = new THREE.Vector3(), _s = new THREE.Vector3();
 
@@ -290,13 +289,13 @@ export class ExtractionScene {
     A.setCine(true);
     this.pileMul0 = g.horde.pileMul;
     g.horde.pileMul = Math.max(g.horde.pileMul, 1.6);
-    for (let i = 0; i < 260; i++) g.horde.spawn(R() < 0.45 ? ZT.RUNNER : ZT.SHAMBLER, rand(-110, 110), rand(-150, -40), 1, 1.1);
+    for (let i = 0; i < 420 && g.horde.n < g.horde.cap - 200; i++) g.horde.spawn(R() < 0.45 ? ZT.RUNNER : ZT.SHAMBLER, rand(-130, 130), rand(-240, -40), 1, 1.1);
     this.planBombs();
     this.stageHelos();
     this.stageLifters();
     this.stagePeople();
     for (const r of this.rockets) { r.on = false; r.m.visible = false; }
-    this.intrudeAcc = 0;
+    this.intrudeAcc = 0; this.chaseAcc = 0; this.fieldAcc = 0; this.darkDone = false;
     $('cine-sub').classList.remove('on');
     $('cine-title').classList.remove('on');
     $('cine-skip').classList.remove('on');
@@ -484,16 +483,30 @@ export class ExtractionScene {
       const due = h.salvos.length && t >= h.salvos[0];
       if (due || (onRun && t >= h.nextRocket)) {
         if (due) h.salvos.shift(); else h.nextRocket = t + rand(3.5, 6);
-        const j = this.pickNear(p.x + _f.x * 80, p.z + _f.z * 80, 40) || { x: p.x + _f.x * 80, z: p.z + _f.z * 80 };
-        h.pods.forEach((pod, n) => this.later(n * 0.14, () => this.fireRocket(h, pod, j.x + rand(-4, 4), j.z + rand(-4, 4))));
+        h.pods.forEach((pod, n) => this.later(n * 0.14, () => this.fireRocket(h, pod)));
       }
     }
   }
 
-  fireRocket(h, pod, tx, tz) {
+  /**
+   * A rocket off a pod, straight down the gunship's heading: boresighted along the nose,
+   * dipped just enough (for its height) to land 60-110 m ahead, where the gun is working.
+   */
+  fireRocket(h, pod) {
     const r = this.rockets.find((x) => !x.on);
     if (!r || !h.group.visible) return;
     r.p.copy(pod).applyMatrix4(h.group.matrixWorld);
+    h.att.axes(_f, _s);
+    const fl = Math.hypot(_f.x, _f.z) || 1, fx0 = _f.x / fl, fz0 = _f.z / fl;
+    const agl = Math.max(4, r.p.y - groundH(r.p.x, r.p.z));
+    const dip = clamp(Math.atan2(agl, 85), 0.07, 0.4);
+    const dir = _w.set(fx0 * Math.cos(dip), -Math.sin(dip), fz0 * Math.cos(dip));
+    // where that line meets the ground
+    let tx = r.p.x + dir.x * 300, tz = r.p.z + dir.z * 300;
+    for (let s = 4; s < 400; s += 2) {
+      const x = r.p.x + dir.x * s, y = r.p.y + dir.y * s, z = r.p.z + dir.z * s;
+      if (y <= groundH(x, z)) { tx = x; tz = z; break; }
+    }
     const ty = groundH(tx, tz);
     r.v.set(tx - r.p.x, ty - r.p.y, tz - r.p.z);
     const d = r.v.length();
@@ -571,10 +584,16 @@ export class ExtractionScene {
     });
   }
 
-  /** The ramp: 0 down on the ground, 1 shut; the treadway boards slide back up it as it closes. */
+  /**
+   * The ramp: 0 down on the ground, 1 shut. The treadway boards run back into it as it
+   * lifts off the ground; the upper door swings down from under the pylon to meet its end.
+   */
   setRamp(L, shut) {
-    L.ramp.rotation.x = RAMP_SHUT * shut;
-    if (L.boards) L.boards.position.copy(L.boardsHome).multiplyScalar(1 - 0.8 * shut);
+    L.ramp.rotation.x = L.rampShut * shut;
+    const k = smoother(Math.min(1, shut / 0.35));
+    L.boards.position.copy(L.boardsHome).addScaledVector(L.boardsSlide, k);
+    L.boards.visible = k < 0.99;
+    L.door.rotation.x = L.doorOpen * (1 - smoother(Math.max(0, (shut - 0.55) / 0.45)));
   }
 
   /** Rotor wash: dust rolling out along the ground from under the discs, thicker the lower it hovers. */
@@ -700,25 +719,62 @@ export class ExtractionScene {
     }
   }
 
-  // ── the dead over the wall: once the garrison has left it, they come up it and run for the lifters ──
+  /** Where one of the dead in the yard runs: for the lifters on the ground, after them once they lift. */
+  chaseTarget(x, i) {
+    let best = null, bd = Infinity;
+    for (const L of this.lifters) {
+      const lx = L.att.ready ? L.att.pos.x : L.lz.x, lz = L.att.ready ? L.att.pos.z : L.lz.z;
+      const d = Math.abs(lx - x);
+      if (d < bd) { bd = d; best = [lx, lz, L]; }
+    }
+    // a loose horde, not a queue: each keeps its own place in the crowd (by its id)
+    const id = this.g.horde.id[i] || i, a = (id * 2.399) % (Math.PI * 2), r = 4 + ((id * 7.31) % 1) * 14;
+    const up = best[2].att.ready && this.t > best[2].leave + 1.5;
+    return [best[0] + Math.cos(a) * r, best[1] + Math.sin(a) * r * (up ? 1.6 : 0.7) + (up ? 6 : -4)];
+  }
+
+  // ── the dead over the wall: as the ramps start up they come over it, and run for the lifters ──
   updateIntruders(dt) {
     const g = this.g, h = g.horde, t = this.t, T = this.T;
-    if (t < T.run + 2 || t > T.away) return; // the garrison is off the wall: nothing holds them now
+    if (t < T.doorClose - 0.4 || t > T.away + 12) return; // the garrison is off the wall: nothing holds them now
     if (!h.overWall) {
-      h.overWall = (x) => { const L = LZ.reduce((b, l) => (Math.abs(l.x - x) < Math.abs(b.x - x) ? l : b), LZ[0]); return [L.x + rand(-9, 9), L.z + rand(-10, 4)]; };
+      h.overWall = (x, z, i) => this.chaseTarget(x, i ?? 0);
       h.pileMul = 5;
       // the horde is at its cap by now: the far field (off camera from here on) makes room for the ones coming over
       h.cull((x, z) => z < -85 && R() < 0.75);
       for (let i = 0; i < 200; i++) h.spawn(R() < 0.55 ? ZT.RUNNER : ZT.SHAMBLER, rand(-70, 70), rand(-55, -12), 1, 1.25);
     }
-    // a steady stream topping the wings, more as the scene goes on
-    this.intrudeAcc += dt * (6 + 12 * clamp((t - T.run - 2) / 14, 0, 1));
+    // a trickle topping the wings as the ramps come up, a flood as the lifters climb
+    this.intrudeAcc += dt * (3 + 20 * clamp((t - T.doorClose) / 10, 0, 1));
     while (this.intrudeAcc >= 1) {
       this.intrudeAcc -= 1;
       const x = (R() < 0.5 ? -1 : 1) * (R() < 0.75 ? rand(10, 34) : rand(34, 62)); // mostly over the near wing sections, closest to the yard
       const i = h.spawn(R() < 0.8 ? ZT.RUNNER : ZT.SHAMBLER, x, wallZ(x) - 0.6, 1, 1.2);
-      if (i >= 0) { const [tx, tz] = h.overWall(x, 0); h.goInside(i, tx, tz); }
+      if (i >= 0) { const [tx, tz] = this.chaseTarget(x, i); h.goInside(i, tx, tz); }
     }
+    // the ones in the yard: every half second, a fresh bearing on the lifters (and after them)
+    this.chaseAcc = (this.chaseAcc || 0) + dt;
+    if (this.chaseAcc > 0.5) {
+      this.chaseAcc = 0;
+      for (let i = 0; i < h.n; i++) {
+        if (h.dead[i] || !h.inside[i]) continue;
+        const [tx, tz] = this.chaseTarget(h.x[i], i);
+        h.tgtX[i] = tx; h.tgtZ[i] = tz;
+      }
+    }
+  }
+
+  /** The bastion goes dark: the wall's lamps and searchlights stutter and die once the flight is away. */
+  updateLights(dt) {
+    const g = this.g, t = this.t, at = this.T.away + 2.2;
+    if (t < at) return;
+    const u = t - at;
+    let p = 0;
+    if (u < 1.5) p = R() < 0.6 * (1 - u / 1.5) ? 1 : 0.06 * R();
+    if (!this.darkDone) { this.darkDone = true; g.audio.powerDown(); }
+    g.env.power = p;
+    if (g.player.nestLight) g.player.nestLight.intensity = 1.6 * p;
+    g.audio.lampPower = p;
   }
 
   /** Space / Enter / Esc / click: first press offers to skip, the second skips. */
@@ -764,7 +820,16 @@ export class ExtractionScene {
     this.updateLifters(dt);
     this.updatePeople(dt);
     this.updateIntruders(dt);
-    if (t < T.ramp - 2 && g.horde.n < g.horde.cap - 40 && R() < dt * 25) g.spawnMenuZombie(rand(-200, -120));
+    // the valley keeps coming, all the way through, from further out than a night's spawn
+    // (room kept for the ones coming over the wall)
+    this.fieldAcc = (this.fieldAcc || 0) + dt * 40;
+    while (this.fieldAcc >= 1) {
+      this.fieldAcc -= 1;
+      if (g.horde.n >= g.horde.cap - (t > T.doorClose - 2 ? 260 : 90)) { this.fieldAcc = 0; break; }
+      const r = R(), type = r < 0.5 ? ZT.RUNNER : r < 0.92 ? ZT.SHAMBLER : ZT.BRUTE;
+      g.horde.spawn(type, rand(-150, 150), rand(-290, -110), 1, 1.1);
+    }
+    this.updateLights(dt);
 
     // the shot
     const s = this.shots.find((x) => t >= x.from && t < x.to) || this.shots[this.shots.length - 1];
@@ -831,6 +896,8 @@ export class ExtractionScene {
     g.horde.pileMul = this.pileMul0 ?? g.horde.pileMul;
     g.horde.clearLiving();
     this.wallLeft = false;
+    g.env.power = 1; g.audio.lampPower = 1;
+    if (g.player.nestLight) g.player.nestLight.intensity = 1.6;
     g.post.u.uFade.value = 1;
     $('cine-sub').classList.remove('on');
     $('cine-title').classList.remove('on');

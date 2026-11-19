@@ -18,6 +18,8 @@ const TOP = WORLD.TOWER_TOP;
 const GATE_Z = -10.5;
 const ROAD_FROM = -104, ROAD_TO = GATE_Z + 0.4; // the column walks this stretch, then goes in
 const TRACK = { z0: -66, speed: 1.15 };          // the tracking shot keeps pace with the column
+// the truck keeps the right of the road, the people the left (their lanes end short of it)
+const TRUCK_LANE = 2.6, TRUCK_HL = 3.7, TRUCK_HW = 1.3, LANE_MAX = 0.4;
 const GAP = 0.8;                                  // default silence between cues
 const TAIL = 5.5;                                 // after the last word, before the fade
 const FADE_OUT = 3;
@@ -151,7 +153,7 @@ export class Ending {
     const span = ROAD_TO - ROAD_FROM;
     const place = (f, soldier, kid) => {
       const z = ROAD_FROM + (k++ / n) * span + rand(-1.2, 1.2);
-      const lane = soldier ? rand(-2.8, -1.4) : rand(-2.2, 2.6);
+      const lane = soldier ? rand(-2.8, -1.4) : rand(-2.2, LANE_MAX);
       this.walkers.push({ f, soldier, kid, x: lane, lane, z, yaw: 0, bias: k % 2 ? 1 : -1, sp: rand(1.0, 1.35) * (kid ? 0.95 : 1), ph: Math.random() * 6 });
     };
     // families, stragglers, and soldiers with no unit
@@ -171,7 +173,7 @@ export class Ending {
     }
     for (const w of this.walkers) w.f.root.visible = false;
     // the quarry's tractor-trailer stand-in: the survivors' truck, crawling up behind them
-    this.truck = { z: -135, sp: 3.2, on: false };
+    this.truck = { x: TRUCK_LANE, z: -135, sp: 3.2, on: false, bias: 1, yaw: -Math.PI / 2 };
     // the gate squad, out on the road to bring them in
     this.guards = this.g.events.soldiers.slice(8, 12).map((s, i) => {
       const side = i % 2 ? 1 : -1, x = side * (i < 2 ? 4.2 : 6.6), z = GATE_Z - 2.5 - (i < 2 ? 0 : 1.2);
@@ -194,11 +196,19 @@ export class Ending {
   }
 
   updateColumn(dt) {
+    const T = this.truck;
     for (const w of this.walkers) {
-      // along the road, round the wrecks on it
-      const wv = walkStep(w, (w.lane - w.x) * 0.3, w.sp, dt, 0.35);
+      // along the road, round the wrecks on it; out of the truck's way when it comes up past them
+      let vx = (w.lane - w.x) * 0.3;
+      if (T.on) {
+        const dz = w.z - T.z, clear = T.x - TRUCK_HW - 0.9; // the truck's left side, and a step more
+        if (dz > -TRUCK_HL - 2 && dz < TRUCK_HL + 7 && w.x > clear) vx -= (w.x - clear + 0.4) * 2.2;
+      }
+      const wv = walkStep(w, vx, w.sp, dt, 0.35);
+      // never inside it
+      if (T.on && Math.abs(w.z - T.z) < TRUCK_HL + 0.3 && w.x > T.x - TRUCK_HW - 0.35) w.x = T.x - TRUCK_HW - 0.35;
       w.yaw = Math.atan2(wv[0], wv[1]);
-      if (Math.random() < dt * 0.05) w.lane = w.soldier ? rand(-2.8, -1.4) : rand(-2.2, 2.6);
+      if (Math.random() < dt * 0.05) w.lane = w.soldier ? rand(-2.8, -1.4) : rand(-2.2, LANE_MAX);
       // through the gate: walk on from the far end of the column
       if (w.z > ROAD_TO) { w.z -= ROAD_TO - ROAD_FROM; w.x = w.lane; }
       const f = w.f;
@@ -208,13 +218,19 @@ export class Ending {
       f.root.rotation.y += (w.yaw - f.root.rotation.y) * Math.min(1, dt * 5);
     }
     for (const s of this.guards) if (s.root.visible) s.idle();
-    const T = this.truck, M = this.g.events.truck;
+    const M = this.g.events.truck;
     if (T.on) {
-      T.z += T.sp * dt;
+      // up its own lane on the right, steering round the wrecks on the road like the walkers do
+      if (T.sp > 0) {
+        const v = walkStep(T, (TRUCK_LANE - T.x) * 0.5, T.sp, dt, TRUCK_HW + 0.2);
+        const want = Math.atan2(-v[1], v[0]); // the model's nose is +x
+        let d = want - T.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
+        T.yaw += d * Math.min(1, dt * 2.5);
+      }
       if (T.z > GATE_Z - 3) { T.z = GATE_Z - 3; T.sp = 0; }
-      const x = 2.6;
+      const x = T.x;
       M.position.set(x, groundH(x, T.z), T.z);
-      M.rotation.set(0, -Math.PI / 2, Math.sin(this.t * 7) * 0.006 * T.sp);
+      M.rotation.set(0, T.yaw, Math.sin(this.t * 7) * 0.006 * T.sp);
       // its diesel, labouring in low gear up the road (idling once it stops at the gate)
       const A = this.g.audio;
       if (!T.loop && A.ready) T.loop = A.truckLoop({ rate: 0.95 });

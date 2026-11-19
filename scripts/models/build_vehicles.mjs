@@ -237,23 +237,80 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     const Minv = M.clone().invert();
     xformAll(doc, M);
     const root = rootNode(doc, 'ch47');
-    // the ramp is modelled lowered, its boards on the ground. The whole ramp (everything
-    // aft of the cabin floor's end and below the floor line) is node 'ramp', hinged at the
-    // floor's end: rotation 0 is down as modelled, +rampShut closes it against the tail
-    const RZ = -50, RY = 15, RX = 13;
-    const hinge = P(0.25, 9, RZ), boardsAt = P(0.25, 1.3, -76.4);
-    const inRamp = (c) => c.z < RZ && c.y < RY && Math.abs(c.x - 0.25) < RX;
-    // the treadway boards first (they slide back up the ramp as it shuts), then the ramp
-    splitByTriangles(doc, (tri) => { const c = centre3(tri).applyMatrix4(Minv); return inRamp(c) && c.z < -76.4 ? 0 : -1; }, [{ name: 'boards', pivot: boardsAt.toArray() }], root);
+    // The ramp is modelled lowered, its treadway boards out on the ground. It is the whole
+    // plate aft of the cabin floor's end (source z -43.4): the tread on top, the belly skin
+    // under it, the full width of the belly (±22 tapering to ±17). Node 'ramp' is hinged at
+    // the floor's end; rotation 0 is down as modelled, +RAMP_SHUT lays it along the tail's
+    // upswept side contour (24° up; the plate lies 10.8° down). The plate's own plane:
+    const rampTop = (z) => 12.1 + (z + 43.4) * 0.19; // its tread surface (source units)
+    const RAMP_SHUT = Math.atan(0.19) + Math.atan(0.444);
+    const hinge = P(0.25, 12.05, -43.3), boardsAt = P(0.25, 1.3, -76.4);
+    const inRamp = (c) => c.z < -42.6 && Math.abs(c.x - 0.25) < 25 && c.y < rampTop(c.z) + 1.0 && c.y > rampTop(c.z) - 6.5;
+    // the treadway boards first (they slide into the ramp as it comes up), then the ramp
+    splitByTriangles(doc, (tri) => { const c = centre3(tri).applyMatrix4(Minv); return inRamp(c) && c.z < -76.4 && Math.abs(c.x - 0.25) < 12 ? 0 : -1; }, [{ name: 'boards', pivot: boardsAt.toArray() }], root);
     splitByTriangles(doc, (tri) => inRamp(centre3(tri).applyMatrix4(Minv)) ? 0 : -1, [{ name: 'ramp', pivot: hinge.toArray() }], root);
     const nodes = doc.getRoot().listNodes(), rampN = nodes.find((n) => n.getName() === 'ramp'), boardsN = nodes.find((n) => n.getName() === 'boards');
     root.removeChild(boardsN);
     rampN.addChild(boardsN.setTranslation(boardsAt.clone().sub(hinge).toArray()));
+    // the boards retract into the ramp along its plane (21 source units) as it comes up
+    const slide = P(0.25, rampTop(-43.4 + 21), -43.4 + 21).sub(P(0.25, rampTop(-43.4), -43.4));
+    // The upper ramp door: on the real aircraft a panel stows up under the aft pylon and
+    // swings down to close the opening above the shut ramp. The model has none, so it is
+    // built here: a trapezoid hinged at the pylon's lower rear edge (source z -91, y 33),
+    // reaching down to where the shut ramp's end lies, skinned with the belly's paint.
+    let doorOpen = 0;
+    {
+      const top = P(0.25, 33.4, -90.6);
+      const L = 33.6; // the ramp's tread length, along its plane
+      const endZ = -43.4 - L * Math.cos(Math.atan(0.444)), endY = 12.1 + L * Math.sin(Math.atan(0.444));
+      const bot = P(0.25, endY + 0.6, endZ + 1.2);
+      // a uv on the belly skin: the centre of the ramp's largest downward-facing triangle
+      let uv = [0.5, 0.5], best = 0, mat = null;
+      const rampMesh = rampN.getMesh();
+      for (const p of rampMesh ? rampMesh.listPrimitives() : []) {
+        const pos = p.getAttribute('POSITION'), tc = p.getAttribute('TEXCOORD_0'), idx = p.getIndices(), I = (k) => (idx ? idx.getScalar(k) : k), cnt = idx ? idx.getCount() : pos.getCount();
+        if (!tc) continue;
+        const a = [], b = [], c = [];
+        for (let i = 0; i < cnt; i += 3) {
+          pos.getElement(I(i), a); pos.getElement(I(i + 1), b); pos.getElement(I(i + 2), c);
+          const A = new THREE.Vector3(...a), B = new THREE.Vector3(...b), C = new THREE.Vector3(...c);
+          const nrm = B.clone().sub(A).cross(C.clone().sub(A)); const area = nrm.length() / 2; nrm.normalize();
+          if (nrm.y < -0.8 && area > best) {
+            best = area; mat = p.getMaterial();
+            const u = [], v = [], w = [];
+            tc.getElement(I(i), u); tc.getElement(I(i + 1), v); tc.getElement(I(i + 2), w);
+            uv = [(u[0] + v[0] + w[0]) / 3, (u[1] + v[1] + w[1]) / 3];
+          }
+        }
+      }
+      const s3 = s; // source units to metres
+      const wTop = 11 * s3, wBot = 16 * s3, th = 0.06;
+      // in the door's frame: hinge at the origin, the panel running from it to `bot`
+      const d = bot.clone().sub(top);
+      const pts = [[-wTop, 0, 0], [wTop, 0, 0], [wBot + 0, d.y, d.z], [-wBot, d.y, d.z]];
+      const nrm = new THREE.Vector3(0, d.z, -d.y).normalize(); // facing out and back
+      const P8 = [...pts.map((p) => p.map((v, i) => v + nrm.getComponent(i) * th / 2)), ...pts.map((p) => p.map((v, i) => v - nrm.getComponent(i) * th / 2))];
+      const posArr = new Float32Array(P8.flat()), uvArr = new Float32Array(16);
+      for (let i = 0; i < 8; i++) { uvArr[i * 2] = uv[0]; uvArr[i * 2 + 1] = uv[1]; }
+      const ind = new Uint16Array([0, 1, 2, 0, 2, 3, 4, 6, 5, 4, 7, 6, 0, 3, 7, 0, 7, 4, 1, 5, 6, 1, 6, 2, 0, 4, 5, 0, 5, 1, 3, 2, 6, 3, 6, 7]);
+      const buf = doc.getRoot().listBuffers()[0];
+      const prim = doc.createPrimitive()
+        .setAttribute('POSITION', doc.createAccessor().setType('VEC3').setArray(posArr).setBuffer(buf))
+        .setAttribute('TEXCOORD_0', doc.createAccessor().setType('VEC2').setArray(uvArr).setBuffer(buf))
+        .setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setArray(new Float32Array([0, 1, 2, 3, 4, 5, 6, 7].flatMap((i) => (i < 4 ? nrm : nrm.clone().negate()).toArray()))).setBuffer(buf))
+        .setIndices(doc.createAccessor().setType('SCALAR').setArray(ind).setBuffer(buf))
+        .setMaterial(mat);
+      const door = doc.createNode('door').setTranslation(top.toArray()).setMesh(doc.createMesh('door').addPrimitive(prim));
+      root.addChild(door);
+      // how far it swings up under the pylon when open (the pylon's underside rises 8.5° forward)
+      doorOpen = -(Math.atan2(-d.y, d.z) + Math.atan(7 / 47));
+      console.log('ch47 door', d.toArray().map((v) => v.toFixed(2)), 'uv', uv.map((v) => v.toFixed(3)), 'open', doorOpen.toFixed(3));
+    }
     // rotors (whole meshes): fore = Object_6 + 9, aft = Object_7 + 8
     pivotGroup(doc, root, 'rotor_fore', (n) => n === 'Object_6' || n === 'Object_9');
     pivotGroup(doc, root, 'rotor_aft', (n) => n === 'Object_7' || n === 'Object_8');
     anchors(doc, {
-      rampFoot: P(0.25, 1.0, -98), inside: P(0.25, 6, -40), rampAxis: boardsAt.clone().sub(hinge).normalize(),
+      rampFoot: P(0.25, 1.0, -98), inside: P(0.25, 6, -40), boardsSlide: slide, angles: [RAMP_SHUT, doorOpen, 0],
       lightPort: P(26, 12, 4), lightStbd: P(-25, 12, 4), lightTail: P(0.4, 72, -86), hold: P(0.25, 20, -70),
     });
     await grade(doc, { dark: 0.68, sat: 0.7 });

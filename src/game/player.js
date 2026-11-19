@@ -81,6 +81,29 @@ export class Player {
     this.heat = 0; this.overheatT = 0; this.fireAcc = 0; this.wasFiring = false;
     this.recoilP = 0; this.recoilY = 0; this.trauma = 0; this.bloom = 0;
     this.shots = 0; this.hits = 0;
+    this.raise = 1; this.raising = false;
+  }
+
+  /**
+   * Take up the gun: it comes up into view from below the frame, muzzle last, over
+   * `dur` seconds (the night's opening move ends on it). Driven by poseGun.
+   */
+  takeUp(dur = 1.25) { this.raise = 0; this.raiseDur = dur; this.raising = true; this.gun.visible = true; }
+
+  /** The gun's place in view: kickback, and how far through being taken up it is. */
+  poseGun(dt, rdt) {
+    const kick = this.gunKick || 0;
+    this.gunKick = damp(kick, 0, 18, dt);
+    if (this.raising) {
+      this.raise = Math.min(1, this.raise + rdt / (this.raiseDur || 1.25));
+      if (this.raise >= 1) this.raising = false;
+    }
+    // ease out: quick off the bottom, settling into the shoulder
+    const u = 1 - this.raise, r = u * u * u, m = u * u * u * u;
+    this.gun.position.set(this.gunBase.x + (Math.random() - 0.5) * kick * 0.15 + 0.12 * r,
+      this.gunBase.y + (Math.random() - 0.5) * kick * 0.1 - 0.95 * r,
+      this.gunBase.z + kick + 0.35 * r);
+    this.gun.rotation.set(kick * 0.6 - 0.75 * m, 0.1 * r, 0.22 * r);
   }
 
   addTrauma(a) { this.trauma = Math.min(1, this.trauma + a); }
@@ -151,7 +174,7 @@ export class Player {
     if (this.overheatT > 0) this.overheatT -= dt;
 
     // firing
-    const canFire = controlsActive && this.overheatT <= 0;
+    const canFire = controlsActive && this.overheatT <= 0 && this.raise > 0.85; // (not while still taking it up)
     this.firing = canFire && input.mouse(0);
     if (this.firing) {
       this.fireAcc += dt * stats.hmgRate;
@@ -182,13 +205,8 @@ export class Player {
     else this.heat = Math.max(0.6, this.heat - 0.12 * dt);
     this.bloom = damp(this.bloom, 0, this.firing ? 2 : 7, dt);
 
-    // gun visuals: kickback, sway, glowing barrel
-    const kick = this.gunKick || 0;
-    this.gunKick = damp(kick, 0, 18, dt);
-    this.gun.position.set(this.gunBase.x + (Math.random() - 0.5) * kick * 0.15,
-      this.gunBase.y + (Math.random() - 0.5) * kick * 0.1,
-      this.gunBase.z + kick);
-    this.gun.rotation.set(kick * 0.6, 0, 0);
+    // gun visuals: kickback, being taken up, glowing barrel
+    this.poseGun(dt, rdt);
     const h = this.heat;
     this.barrelMat.emissive.setRGB(h * h * 2.2, h * h * h * 0.55, h * h * h * h * 0.08);
     this.muzzleLight.intensity = damp(this.muzzleLight.intensity, 0, 40, dt);
