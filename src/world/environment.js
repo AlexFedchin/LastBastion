@@ -19,6 +19,7 @@ import { patchFogChunks, patchLightChunks, fogUniforms, createSceneFog } from '.
 import { Terrain, groundH } from './terrain.js';
 import { FireSystem } from '../fx/fire.js';
 import { makeMaterials, weather } from './kit.js';
+import { lampLit, setLamps, setLampPower } from './lamplight.js';
 import { buildFortification, buildTowers, buildBase, buildLightPools, updateWallBlood, wingMatrix } from './structures.js';
 import { buildProps } from './props.js';
 import { buildDressing } from './dressing.js';
@@ -104,6 +105,9 @@ export class Environment {
     this.bolts = new Bolts(scene);
     this.buildLights();
     buildFortification(this);
+    // the wall lamps light the ground for real (lamplight.js), not with a glow pasted on it
+    setLamps(this.wallLamps || [], this.wallLampAims || []);
+    lampLit(this.terrain.mesh.material);
     buildTowers(this);
     buildBase(this);
     buildDressing(this, wingMatrix);
@@ -326,6 +330,7 @@ export class Environment {
     if (this.plumeUniforms) { this.plumeUniforms.uTime.value = time; this.plumeUniforms.uDawn.value = d; }
     const pw = this.power;
     if (this.poolUniforms) this.poolUniforms.uScale.value = (1 - d * 0.85) * pw;
+    setLampPower(pw * Math.max(0, 1 - d * 1.6));
     if (this.lampGlass) this.lampGlass.color.setRGB(5 * pw + 0.05, 2.3 * pw + 0.03, 0.7 * pw + 0.02);
 
     // lightning: a bolt out on the horizon, the cloud deck lights up

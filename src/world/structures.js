@@ -9,6 +9,7 @@ import {
   box, cylY, cylZ, merge, xf, worldUV, sandbagGeo, concertinaGeo, extrude, weather,
 } from './kit.js';
 import { placeModel } from './vehicles.js';
+import { lampLit } from './lamplight.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -100,6 +101,7 @@ export function buildFortification(env) {
       roughnessFactor = mix(roughnessFactor, 0.22, slabBlood);`);
   };
   slabMat.customProgramCacheKey = () => 'lb-slab';
+  lampLit(slabMat); // the face under each lamp catches its light
   let slabCount = 0;
   const slabsPer = wings.map((w) => Math.round(w.len / 1.52));
   slabsPer.forEach((n) => { slabCount += n; });
@@ -265,7 +267,8 @@ export function buildFortification(env) {
       scene.add(g);
       env.lampSprites.push(g);
       (env.wallLamps || (env.wallLamps = [])).push(_v.clone());
-      env.lightPools.push({ x: _v.x - w.nx * 4.5, z: _v.z - w.nz * 4.5, r: 11, color: [1.0, 0.5, 0.16], k: 0.17 });
+      // its light: thrown down and out over the foot of the wall (src/world/lamplight.js)
+      (env.wallLampAims || (env.wallLampAims = [])).push(new THREE.Vector3(-w.nx * 4.5, -(_v.y - groundH(_v.x - w.nx * 4.5, _v.z - w.nz * 4.5)), -w.nz * 4.5).normalize());
     }
   }
   const poles = new THREE.Mesh(merge([...poleGeos, ...headGeos]), mats.darkSteel);

@@ -64,6 +64,8 @@ const FinalShader = {
     uRadial: { value: 0 },
     uFade: { value: 1 },
     uWarm: { value: 0 },
+    uCurve: { value: 0.35 }, // the S-curve's strength (contrast after the tone map)
+    uTint: { value: 1 },      // the split-tone's strength: cold shadows, warm highlights
     uFlare: { value: 0.035 },
     uStreak: { value: 0.025 },
     uDirt: { value: 0.07 },
@@ -80,7 +82,7 @@ const FinalShader = {
     uniform sampler2D tDiffuse, tB0, tB2, tB3, tDirt;
     uniform vec2 uRes;
     uniform float uTime, uExposure, uGrain, uVignette, uCA, uDamage, uFlash, uLetterbox, uDesat, uRadial, uFade, uWarm;
-    uniform float uFlare, uStreak, uDirt, uBarrel;
+    uniform float uFlare, uStreak, uDirt, uBarrel, uCurve, uTint;
     uniform vec4 uHeat[${MAX_HEAT}];
     uniform int uHeatN;
     uniform vec4 uShock[${MAX_SHOCK}];
@@ -184,11 +186,11 @@ const FinalShader = {
       float l = dot(col, vec3(0.2126, 0.7152, 0.0722));
       vec3 shadowTint = vec3(0.84, 0.97, 1.1);
       vec3 highTint = vec3(1.1, 0.98, 0.84);
-      col *= mix(shadowTint, highTint, smoothstep(0.03, 0.5, l));
+      col *= mix(vec3(1.0), mix(shadowTint, highTint, smoothstep(0.03, 0.5, l)), uTint);
       col = mix(vec3(l), col, clamp(1.0 - uDesat, 0.0, 1.2));
       col *= mix(vec3(1.0), vec3(1.06, 0.98, 0.9), uWarm);
       col = clamp(col, 0.0, 1.0);
-      col = mix(col, col * col * (3.0 - 2.0 * col), 0.35);
+      col = mix(col, col * col * (3.0 - 2.0 * col), uCurve);
 
       // vignette (+ a touch of optical falloff at the very corners)
       float vig = smoothstep(0.95, 0.22, length(c0 * vec2(1.0, 0.82)));

@@ -205,8 +205,19 @@ DIRECTION = {
         ("Satisfied, cocky, quick, a grin in the voice on 'Shack'.", 0.5),
     'Bomb impact. Hammer one-one off target, re-arming.':
         ("Calm, routine, quick pilot radio call.", 0.35),
-    "Bastion-7, Spectre two-one on station overhead. We'll work the crowds in the field — you hold that wall.":
-        ("Calm, cool and reassuring, a confident routine radio call with a hint of a smile.", 0.35),
+    # Spectre two-one's check-in, a different dark joke every night (COMMS.spectreIntro)
+    "Bastion-7, Spectre two-one on station overhead. Lovely valley you've got down there. Shame about the neighbours. We'll work the field — you hold that wall.":
+        ("Calm and cool, a dry deadpan joke told with a smile in the voice, then easy and confident on the last sentence.", 0.35),
+    "Spectre two-one, back on station. Same crowd as last night, Bastion. They don't learn, and they never tip.":
+        ("Relaxed, wry and deadpan, like a tired cab driver's joke, a small chuckle at the end.", 0.35),
+    "Spectre two-one on station. Good news, Bastion: we checked, and there's no rule against shooting people who are already dead. We'll take the field.":
+        ("Dry gallows humour, mock-official on 'we checked', amused, then cool and businesslike at the end.", 0.4),
+    "Spectre two-one overhead. Our navigator says we've killed more of them than live in his home town. He's from a big town. Rounds away.":
+        ("Deadpan dark joke, a beat of timing before 'He's from a big town', then cool and routine on 'Rounds away'.", 0.35),
+    "Evening, Bastion. Spectre two-one on station. Bad news, we're the cavalry. Good news, the cavalry brought a one-oh-five.":
+        ("Warm and wry, self-mocking on 'we're the cavalry', a grin in the voice on the punchline.", 0.4),
+    "Spectre two-one, overhead again. Fuel's low, coffee's cold, valley's full. If we ever go down out there, Bastion, don't let them make us walk.":
+        ("Tired and wry at first, a dark joke, then quieter and half serious on the last sentence, still with a faint smile.", 0.35),
     'Rifle, one-oh-five. Big group — splash in five.':
         ("Focused, crisp and calm radio call.", 0.4),
     'Good hits, good hits. Lot of movement down there, Bastion.':
@@ -219,8 +230,17 @@ DIRECTION = {
         ("Focused and alert, calm but quicker.", 0.45),
     'Sparkle on the treeline. Rounds away.':
         ("Cool, routine, quiet concentration.", 0.35),
-    "Bastion-7, Spectre two-two on station. Two-one were friends of ours. Let's make them pay for it.":
-        ("Steady and professional, then low and grieving on 'friends of ours', and cold, hard anger on the last sentence.", 0.45),
+    # Spectre two-two, after two-one went down: their jokes are what he misses (COMMS.spectreIntro2)
+    "Bastion-7, Spectre two-two on station. Two-one were friends of ours. Their pilot had a bad joke for every night over this valley. We'd give anything to hear one now. Let's make them pay for it.":
+        ("Steady and professional, then low and grieving on 'friends of ours', a sad fond warmth about the jokes, and cold, hard anger on the last sentence.", 0.45),
+    "Spectre two-two, on station for the last night. Two-one would have had a joke ready for this one. None of us can think of it. Let's finish it for them.":
+        ("Low, quiet and heavy, a sad half-smile about the joke, then steady resolve on the last sentence.", 0.4),
+    "Spectre two-two, back over the valley. Somebody has to tell two-one's jokes now. Here's one: the dead outnumber us a thousand to one. That's it, that's the joke. Rounds away.":
+        ("Bone-dry gallows humour from a serious man trying it out, flat delivery of the punchline, then cool and routine.", 0.35),
+    "Spectre two-two on station. Two-one used to say this valley was the only show where the crowd never leaves early. Still true, Bastion.":
+        ("Quiet and fond, remembering a friend's joke, a small sad smile, then dry and steady.", 0.35),
+    "Spectre two-two overhead. Two-one kept a tally on the cockpit wall. We kept painting over it. Tonight we start our own.":
+        ("Low and steady, a wistful memory, then grim determination on the last sentence.", 0.4),
     'We see it, Bastion. Putting everything we have on the big one.':
         ("Serious, focused and determined, the calm cracking a little.", 0.5),
     'Spectre is blind in this soup. Holding fire until it clears.':
@@ -230,15 +250,15 @@ DIRECTION = {
     "Mayday, mayday! Spectre two-one, fire in number three — we've lost hydraulics — we're going down!":
         ("Screaming a mayday call in terror, frantic and breathless, all the calm gone, alarms in the cockpit.", 1.0),
     # ── unlock briefings ──────────────────────────────────────────────────
-    "Engineers found a crate of bottles and a jerrycan in the depot. E throws a Molotov — put it on the wall base and let them burn. And there's a crate of grenades at your feet. G, for anything climbing.":
+    "Engineers found a crate of bottles and a jerrycan in the depot. Put a Molotov on the wall base and let them burn. And there's a crate of grenades at your feet, for anything climbing.":
         ("Practical, gruff briefing, with grim satisfaction, conversational.", 0.35),
-    'Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.':
+    'Bastion-7, Command. You now have a one-oh-five battery on call. Call a fire mission wherever you need it.':
         ("Composed, formal and businesslike briefing.", 0.3),
     'Flares came up with the shells. F puts one over the field — anything in the light goes down easier.':
         ("Practical gruff briefing, a little approving.", 0.35),
-    "Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it — that's T — and keep your heads down.":
+    "Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it, and keep your heads down.":
         ("Confident, crisp and friendly pilot radio call.", 0.4),
-    'Listen. If it all goes wrong, B brings the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.':
+    'Listen. If it all goes wrong, we can bring the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.':
         ("Low, slow and deadly serious, heavy with dread, every sentence a weight.", 0.3),
     # ── night events ──────────────────────────────────────────────────────
     "Bastion-7, this is Hollis, Recon Two. Four of us coming in hot down the road — they're right behind us. Cover us!":
@@ -631,21 +651,6 @@ DIRECTION = {
     'Claymores going out. Front toward enemy, I checked twice.':
         ("Earnest and slightly nervous, a young soldier proud he got it right; a small hurried laugh at the end.", 0.3),
 }
-
-# ── Kovac's night-start list (ISSUE_OPEN / ISSUE_LINES): recorded in pieces and played back to
-# back, so every piece is read the same way: a sergeant reading items off a list to his men ──
-_ISSUE = ("Flat, steady and unhurried, reading one item off a list to his men over the radio; "
-          "a plain statement with a level, finished ending, no emphasis, no question.", 0.3)
-DIRECTION['New on the line tonight.'] = (
-    "Flat and businesslike, a sergeant starting to read the night's kit list over the radio; "
-    "steady, a small pause after it.", 0.32)
-for _p in ['A new match-grade barrel on the fifty.', 'A stiffer buffer spring in the fifty.', 'Fresh water in the jacket.',
-           'AP-T in the belt.', 'Incendiaries in the belt.', 'HE-I in the belt.', 'Another gun section on the battery.',
-           'The fire direction centre plotting faster.', 'Heavy charges for the one-oh-fives.', 'Another M240 up on the wall.',
-           'The gun crews back from the range.', 'More wire out in the approach.', 'Another crate of grenades.',
-           'More bottles.', 'Thickened fuel in the bottles.', 'Claymores dug in out front.']:
-    DIRECTION[_p] = _ISSUE
-
 
 def direction(who, text):
     d, intensity = DIRECTION.get(text, DEFAULT[who])

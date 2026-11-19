@@ -130,15 +130,15 @@ b { color: var(--bone); font-weight: 600; }
 #hint.show { opacity: 1; }
 .mods { margin-top: 3px; font-family: var(--mono); font-size: 10px; letter-spacing: 0.1em; color: var(--amber-dim); min-height: 12px; }
 /* the night's requisition card (main.js startNight) */
-.loadout { position: absolute; top: calc(30% + 150px); left: 50%; transform: translate(-50%, 8px); opacity: 0; transition: opacity 0.5s, transform 0.5s; background: linear-gradient(180deg, rgba(10,11,8,0.82), rgba(10,11,8,0.6)); border-top: 2px solid var(--amber-dim); padding: 10px 18px 12px; min-width: 380px; text-shadow: 0 1px 2px #000; }
-.loadout.show { opacity: 1; transform: translate(-50%, 0); }
-.loadout .lo-head { font-size: 11px; letter-spacing: 0.32em; color: var(--amber); margin-bottom: 6px; }
+.loadout { position: absolute; top: 150px; right: 30px; width: 320px; transform: translateX(14px); opacity: 0; transition: opacity 0.6s, transform 0.6s; background: linear-gradient(270deg, rgba(10,11,8,0.78), rgba(10,11,8,0.42)); border-right: 2px solid var(--amber-dim); padding: 9px 14px 10px; text-shadow: 0 1px 2px #000; }
+.loadout.show { opacity: 1; transform: none; }
+.loadout .lo-head { font-size: 10px; letter-spacing: 0.3em; color: var(--amber); margin-bottom: 5px; text-align: right; }
 .loadout .lo-row { display: grid; grid-template-columns: auto auto 1fr; gap: 4px 12px; align-items: center; padding: 3px 0; }
-.loadout .lo-row b { font-size: 14px; letter-spacing: 0.14em; font-weight: 600; }
+.loadout .lo-row b { font-size: 12px; letter-spacing: 0.14em; font-weight: 600; }
 .loadout .lo-pips { display: flex; gap: 3px; }
-.loadout .lo-pips i { width: 12px; height: 4px; background: rgba(211,201,174,0.18); transform: skewX(-20deg); }
+.loadout .lo-pips i { width: 10px; height: 3px; background: rgba(211,201,174,0.18); transform: skewX(-20deg); }
 .loadout .lo-pips i.on { background: var(--amber); }
-.loadout .lo-what { font-family: var(--mono); font-size: 11px; color: var(--bone-dim); text-align: right; }
+.loadout .lo-what { font-family: var(--mono); font-size: 10px; color: var(--bone-dim); text-align: right; }
 /* the first night's coaching (src/ui/coach.js) */
 .coach { position: absolute; top: 118px; left: 50%; transform: translate(-50%, -6px); width: min(560px, 90vw); opacity: 0; transition: opacity 0.4s, transform 0.4s; background: rgba(10,11,8,0.82); border: 1px solid rgba(211,201,174,0.16); border-left: 3px solid var(--amber); padding: 10px 16px 11px; text-shadow: 0 1px 2px #000; }
 .coach.show { opacity: 1; transform: translate(-50%, 0); }
@@ -535,3 +535,39 @@ table.keys td:first-child { font-family: var(--mono); color: var(--amber); width
 .md-zoom.bronze .md-grade { color: var(--bronze); } .md-zoom.silver .md-grade { color: var(--silver); } .md-zoom.gold .md-grade { color: var(--gold); } .md-zoom.valor .md-grade { color: var(--valor); }
 @keyframes mzin { from { transform: translateY(18px) rotate(-3deg) scale(0.94); opacity: 0; } to { transform: none; opacity: 1; } }
 @media (prefers-reduced-motion: reduce) { .mz-art, .md-zoom.on { animation: none; } .md-art { transition: none; } }
+
+/* ── the night card: between the dawn resupply and the night (src/ui/nightcard.js) ── */
+.night-card { position: fixed; inset: 0; z-index: 60; pointer-events: none; opacity: 0; transition: opacity 1.2s ease-in;
+  background: radial-gradient(ellipse at 50% 45%, #0d0c0a 0%, #050504 55%, #000 100%); display: grid; place-items: center; }
+.night-card.black { opacity: 1; pointer-events: auto; }
+.night-card.out { opacity: 0; transition: opacity 1.6s ease-out; }
+.night-card .nc-in { display: grid; justify-items: center; gap: 14px; text-align: center; opacity: 0; }
+.night-card.on .nc-in { opacity: 1; transition: opacity 0.5s; }
+.night-card.out .nc-in { opacity: 0; transition: opacity 0.7s; }
+.nc-kicker { font-size: 12px; letter-spacing: 0.42em; color: var(--bone-dim); }
+.nc-title { font-size: clamp(64px, 11vw, 148px); font-weight: 700; line-height: 1; color: var(--bone); letter-spacing: 0.24em; margin-right: -0.24em; text-shadow: 0 0 40px rgba(224,165,66,0.12); }
+.nc-title .nc-num { color: var(--amber); font-weight: 700; }
+.night-card.on .nc-title { animation: ncTitle 2.6s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+@keyframes ncTitle { from { letter-spacing: 0.62em; margin-right: -0.62em; opacity: 0; filter: blur(6px); } 40% { opacity: 1; filter: blur(0); } to { letter-spacing: 0.24em; margin-right: -0.24em; } }
+.nc-rule { width: min(520px, 70vw); height: 1px; background: linear-gradient(90deg, transparent, rgba(224,165,66,0.7), transparent); transform: scaleX(0); }
+.night-card.on .nc-rule { transform: scaleX(1); transition: transform 1.4s 0.4s cubic-bezier(0.2, 0.7, 0.2, 1); }
+.nc-marks { display: flex; gap: 10px; margin-top: 4px; }
+.nc-marks i { position: relative; width: 26px; height: 34px; border: 1px solid rgba(211,201,174,0.22); display: grid; place-items: center; opacity: 0; }
+.nc-marks i span { font-family: var(--mono); font-size: 11px; font-style: normal; color: rgba(211,201,174,0.35); }
+.nc-marks i.held { border-color: rgba(211,201,174,0.5); background: rgba(211,201,174,0.08); }
+.nc-marks i.held span { color: var(--bone-dim); }
+.nc-marks i.held::after { content: ''; position: absolute; left: -3px; right: -3px; top: 50%; height: 2px; background: var(--bone-dim); transform: rotate(-52deg); }
+.nc-marks i.now { border-color: var(--amber); box-shadow: 0 0 14px rgba(224,165,66,0.35), inset 0 0 10px rgba(224,165,66,0.2); }
+.nc-marks i.now span { color: var(--amber); }
+.night-card.on .nc-marks i { animation: ncMark 0.4s var(--d) both; }
+.night-card.on .nc-marks i.now { animation: ncMark 0.4s var(--d) both, ncNow 1.6s calc(var(--d) + 0.4s) ease-in-out infinite; }
+@keyframes ncMark { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes ncNow { 50% { box-shadow: 0 0 24px rgba(224,165,66,0.6), inset 0 0 14px rgba(224,165,66,0.35); } }
+.nc-sub { font-size: 16px; letter-spacing: 0.4em; margin-right: -0.4em; color: var(--bone); opacity: 0; }
+.nc-tag { font-family: var(--mono); font-size: 13px; color: var(--bone-dim); max-width: min(680px, 86vw); opacity: 0; }
+.night-card.on .nc-sub { animation: ncFade 0.8s 1.5s both; }
+.night-card.on .nc-tag { animation: ncFade 0.8s 1.9s both; }
+@keyframes ncFade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .night-card.on .nc-title, .night-card.on .nc-marks i, .night-card.on .nc-sub, .night-card.on .nc-tag { animation-duration: 0.01s; } }
+/* the night is called: the shop's panels go first, the hangar follows into the dark */
+#s-shop.leaving { opacity: 0; transition: opacity 0.5s; pointer-events: none; }

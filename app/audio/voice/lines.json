@@ -43,9 +43,9 @@
   "dur": 8.652,
   "file": "command_517569d2df.ogg"
  },
- "COMMAND|Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.": {
-  "dur": 8.655,
-  "file": "command_69313163d7.ogg"
+ "COMMAND|Bastion-7, Command. You now have a one-oh-five battery on call. Call a fire mission wherever you need it.": {
+  "dur": 7.117,
+  "file": "command_f4433a7a5e.ogg"
  },
  "COMMAND|Bastion-7, airdrop of fuel and ammunition inbound at dawn. Mark your drop zone.": {
   "dur": 6.02,
@@ -95,9 +95,9 @@
   "dur": 4.06,
   "file": "cpl_voss_f8cacc4e65.ogg"
  },
- "HAMMER 1-1|Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it — that's T — and keep your heads down.": {
-  "dur": 6.68,
-  "file": "hammer_1_1_240d9b6329.ogg"
+ "HAMMER 1-1|Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it, and keep your heads down.": {
+  "dur": 6.256,
+  "file": "hammer_1_1_c9eefeb3b1.ogg"
  },
  "HAMMER 1-1|Bomb impact. Hammer one-one off target, re-arming.": {
   "dur": 3.24,
@@ -762,33 +762,9 @@
   "dur": 5.42,
   "file": "reaper_1_1_d8157475be.ogg"
  },
- "SGT. KOVAC|A new match-grade barrel on the fifty.": {
-  "dur": 2.96,
-  "file": "sgt_kovac_0941abf065.ogg"
- },
- "SGT. KOVAC|A stiffer buffer spring in the fifty.": {
-  "dur": 3.6,
-  "file": "sgt_kovac_8f52afd378.ogg"
- },
- "SGT. KOVAC|AP-T in the belt.": {
-  "dur": 2.878,
-  "file": "sgt_kovac_b943dda202.ogg"
- },
- "SGT. KOVAC|Another M240 up on the wall.": {
-  "dur": 3.2,
-  "file": "sgt_kovac_db5956261b.ogg"
- },
- "SGT. KOVAC|Another crate of grenades.": {
-  "dur": 2.062,
-  "file": "sgt_kovac_3007222137.ogg"
- },
  "SGT. KOVAC|Another crew for the wall. Put them on a gun and keep them fed.": {
   "dur": 4.56,
   "file": "sgt_kovac_d60fcd5357.ogg"
- },
- "SGT. KOVAC|Another gun section on the battery.": {
-  "dur": 2.914,
-  "file": "sgt_kovac_45c3c224a8.ogg"
  },
  "SGT. KOVAC|Another night. Another dawn.": {
   "dur": 3.4,
@@ -834,10 +810,6 @@
   "dur": 4.44,
   "file": "sgt_kovac_b33ed935dd.ogg"
  },
- "SGT. KOVAC|Claymores dug in out front.": {
-  "dur": 2.28,
-  "file": "sgt_kovac_56c3668dda.ogg"
- },
  "SGT. KOVAC|Command hasn't answered since 0300. I'm sure it's the antenna.": {
   "dur": 5.16,
   "file": "sgt_kovac_487efb2421.ogg"
@@ -858,9 +830,9 @@
   "dur": 2.821,
   "file": "sgt_kovac_87c9fb5671.ogg"
  },
- "SGT. KOVAC|Engineers found a crate of bottles and a jerrycan in the depot. E throws a Molotov — put it on the wall base and let them burn. And there's a crate of grenades at your feet. G, for anything climbing.": {
-  "dur": 13.964,
-  "file": "sgt_kovac_9a5d6b7ecf.ogg"
+ "SGT. KOVAC|Engineers found a crate of bottles and a jerrycan in the depot. Put a Molotov on the wall base and let them burn. And there's a crate of grenades at your feet, for anything climbing.": {
+  "dur": 12.6,
+  "file": "sgt_kovac_4443b5c9d8.ogg"
  },
  "SGT. KOVAC|Everybody in? Squad, back inside — shut the gate!": {
   "dur": 3.96,
@@ -873,10 +845,6 @@
  "SGT. KOVAC|Fog's lifting. Back to work.": {
   "dur": 3.128,
   "file": "sgt_kovac_d9e75c0ba8.ogg"
- },
- "SGT. KOVAC|Fresh water in the jacket.": {
-  "dur": 2.08,
-  "file": "sgt_kovac_00e2d4c9fd.ogg"
  },
  "SGT. KOVAC|Friendlies on the road! Kill what's chasing them — and watch your fire!": {
   "dur": 4.76,
@@ -898,14 +866,6 @@
   "dur": 1.72,
   "file": "sgt_kovac_8981f4493c.ogg"
  },
- "SGT. KOVAC|HE-I in the belt.": {
-  "dur": 2.197,
-  "file": "sgt_kovac_d2594678fe.ogg"
- },
- "SGT. KOVAC|Heavy charges for the one-oh-fives.": {
-  "dur": 2.72,
-  "file": "sgt_kovac_259e3e94d6.ogg"
- },
  "SGT. KOVAC|Here they come — dozens! Hundreds!": {
   "dur": 3.44,
   "file": "sgt_kovac_d28aaa65ba.ogg"
@@ -917,10 +877,6 @@
  "SGT. KOVAC|If anyone is listening: Bastion-7 is holding. Bastion-7 is holding.": {
   "dur": 6.2,
   "file": "sgt_kovac_9632e1a304.ogg"
- },
- "SGT. KOVAC|Incendiaries in the belt.": {
-  "dur": 2.28,
-  "file": "sgt_kovac_5455b5c49a.ogg"
  },
  "SGT. KOVAC|It's at the wall! It's tearing the wall apart — kill it!": {
   "dur": 4.4,
@@ -939,12 +895,12 @@
   "file": "sgt_kovac_fa4663dcfd.ogg"
  },
  "SGT. KOVAC|Keep it up!": {
-  "dur": 1.0,
+  "dur": 1,
   "file": "sgt_kovac_0f3cf8545b.ogg"
  },
- "SGT. KOVAC|Listen. If it all goes wrong, B brings the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.": {
-  "dur": 10.72,
-  "file": "sgt_kovac_718e1cba09.ogg"
+ "SGT. KOVAC|Listen. If it all goes wrong, we can bring the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.": {
+  "dur": 11.56,
+  "file": "sgt_kovac_1c164d6085.ogg"
  },
  "SGT. KOVAC|Look at them burn!": {
   "dur": 2.16,
@@ -955,16 +911,8 @@
   "file": "sgt_kovac_564e8c8fc1.ogg"
  },
  "SGT. KOVAC|Man down! They got in!": {
-  "dur": 3.0,
+  "dur": 3,
   "file": "sgt_kovac_e3b10737c3.ogg"
- },
- "SGT. KOVAC|More bottles.": {
-  "dur": 1.84,
-  "file": "sgt_kovac_5b7562f45e.ogg"
- },
- "SGT. KOVAC|More wire out in the approach.": {
-  "dur": 2.24,
-  "file": "sgt_kovac_30ee756f33.ogg"
  },
  "SGT. KOVAC|Movement on the ridge — it's a whole wave!": {
   "dur": 3.76,
@@ -973,10 +921,6 @@
  "SGT. KOVAC|Movement on the road. Here they come. Gunner — on the fifty.": {
   "dur": 4.629,
   "file": "sgt_kovac_1b268a8632.ogg"
- },
- "SGT. KOVAC|New on the line tonight.": {
-  "dur": 2.08,
-  "file": "sgt_kovac_538dee939d.ogg"
  },
  "SGT. KOVAC|No birds. No orders. Just the night, and the gun.": {
   "dur": 7.322,
@@ -1058,14 +1002,6 @@
   "dur": 5.04,
   "file": "sgt_kovac_c850028d55.ogg"
  },
- "SGT. KOVAC|The fire direction centre plotting faster.": {
-  "dur": 2.96,
-  "file": "sgt_kovac_280c2ef25c.ogg"
- },
- "SGT. KOVAC|The gun crews back from the range.": {
-  "dur": 2.385,
-  "file": "sgt_kovac_7af0c8f6e5.ogg"
- },
  "SGT. KOVAC|The tanker's gone up! Look at them burn!": {
   "dur": 3.12,
   "file": "sgt_kovac_ceafe0a492.ogg"
@@ -1126,10 +1062,6 @@
   "dur": 4.28,
   "file": "sgt_kovac_bcf07e797c.ogg"
  },
- "SGT. KOVAC|Thickened fuel in the bottles.": {
-  "dur": 2.201,
-  "file": "sgt_kovac_f1ec6fa93e.ogg"
- },
  "SGT. KOVAC|This is Bastion-7. Bastion-7 is holding.": {
   "dur": 3.76,
   "file": "sgt_kovac_a80ca14966.ogg"
@@ -1155,16 +1087,20 @@
   "file": "sgt_kovac_df087a12fc.ogg"
  },
  "SGT. KOVAC|You heard the man. Seventy-two hours. Keep that barrel cool and the wall clean.": {
-  "dur": 7.0,
+  "dur": 7,
   "file": "sgt_kovac_47d70ccabf.ogg"
  },
- "SPECTRE 2-1|Bastion-7, Spectre two-one on station overhead. We'll work the crowds in the field — you hold that wall.": {
-  "dur": 7.52,
-  "file": "spectre_2_1_74b7e4dfdb.ogg"
+ "SPECTRE 2-1|Bastion-7, Spectre two-one on station overhead. Lovely valley you've got down there. Shame about the neighbours. We'll work the field — you hold that wall.": {
+  "dur": 9.72,
+  "file": "spectre_2_1_aeff95c3b1.ogg"
  },
  "SPECTRE 2-1|Big group moving up the road — engaging.": {
   "dur": 2.88,
   "file": "spectre_2_1_aff73e4728.ogg"
+ },
+ "SPECTRE 2-1|Evening, Bastion. Spectre two-one on station. Bad news, we're the cavalry. Good news, the cavalry brought a one-oh-five.": {
+  "dur": 7.32,
+  "file": "spectre_2_1_cc2a62b9cd.ogg"
  },
  "SPECTRE 2-1|Good hits, good hits. Lot of movement down there, Bastion.": {
   "dur": 4.04,
@@ -1179,7 +1115,7 @@
   "file": "spectre_2_1_f9f36bfe32.ogg"
  },
  "SPECTRE 2-1|Sparkle on the treeline. Rounds away.": {
-  "dur": 3.0,
+  "dur": 3,
   "file": "spectre_2_1_a014aeaa58.ogg"
  },
  "SPECTRE 2-1|Spectre is blind in this soup. Holding fire until it clears.": {
@@ -1190,6 +1126,22 @@
   "dur": 3.12,
   "file": "spectre_2_1_c1d3b898ce.ogg"
  },
+ "SPECTRE 2-1|Spectre two-one on station. Good news, Bastion: we checked, and there's no rule against shooting people who are already dead. We'll take the field.": {
+  "dur": 9.2,
+  "file": "spectre_2_1_53ad28328c.ogg"
+ },
+ "SPECTRE 2-1|Spectre two-one overhead. Our navigator says we've killed more of them than live in his home town. He's from a big town. Rounds away.": {
+  "dur": 8.44,
+  "file": "spectre_2_1_330d13542a.ogg"
+ },
+ "SPECTRE 2-1|Spectre two-one, back on station. Same crowd as last night, Bastion. They don't learn, and they never tip.": {
+  "dur": 7.08,
+  "file": "spectre_2_1_5a43c18c82.ogg"
+ },
+ "SPECTRE 2-1|Spectre two-one, overhead again. Fuel's low, coffee's cold, valley's full. If we ever go down out there, Bastion, don't let them make us walk.": {
+  "dur": 11.4,
+  "file": "spectre_2_1_7560d364ce.ogg"
+ },
  "SPECTRE 2-1|We have you on thermals, Bastion. We'll be your eyes.": {
   "dur": 3.4,
   "file": "spectre_2_1_22ce2bbe06.ogg"
@@ -1198,9 +1150,9 @@
   "dur": 3.92,
   "file": "spectre_2_1_a417d4af11.ogg"
  },
- "SPECTRE 2-2|Bastion-7, Spectre two-two on station. Two-one were friends of ours. Let's make them pay for it.": {
-  "dur": 6.72,
-  "file": "spectre_2_2_964d465647.ogg"
+ "SPECTRE 2-2|Bastion-7, Spectre two-two on station. Two-one were friends of ours. Their pilot had a bad joke for every night over this valley. We'd give anything to hear one now. Let's make them pay for it.": {
+  "dur": 14.4,
+  "file": "spectre_2_2_c703242459.ogg"
  },
  "SPECTRE 2-2|Big group moving up the road — engaging.": {
   "dur": 2.96,
@@ -1225,6 +1177,22 @@
  "SPECTRE 2-2|Spectre still on station. We have you covered.": {
   "dur": 3.84,
   "file": "spectre_2_2_44814fadef.ogg"
+ },
+ "SPECTRE 2-2|Spectre two-two on station. Two-one used to say this valley was the only show where the crowd never leaves early. Still true, Bastion.": {
+  "dur": 9.8,
+  "file": "spectre_2_2_c04478a288.ogg"
+ },
+ "SPECTRE 2-2|Spectre two-two overhead. Two-one kept a tally on the cockpit wall. We kept painting over it. Tonight we start our own.": {
+  "dur": 11.48,
+  "file": "spectre_2_2_7f2a17e76b.ogg"
+ },
+ "SPECTRE 2-2|Spectre two-two, back over the valley. Somebody has to tell two-one's jokes now. Here's one: the dead outnumber us a thousand to one. That's it, that's the joke. Rounds away.": {
+  "dur": 12.28,
+  "file": "spectre_2_2_371a8c6b14.ogg"
+ },
+ "SPECTRE 2-2|Spectre two-two, on station for the last night. Two-one would have had a joke ready for this one. None of us can think of it. Let's finish it for them.": {
+  "dur": 9,
+  "file": "spectre_2_2_62ffccaa63.ogg"
  },
  "SPECTRE 2-2|We have you on thermals, Bastion. We'll be your eyes.": {
   "dur": 3.84,

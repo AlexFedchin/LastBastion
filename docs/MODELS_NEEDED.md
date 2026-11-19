@@ -237,3 +237,18 @@ It has to tile seamlessly along a wall.
 **Need:** a portable toilet cabin and an IBC tote or upright water tank.
 
 **Budget:** about 1–3k triangles each.
+
+## 16. Crow (animated)
+
+**Where:**
+- flocks on the killing field at dawn, picking at the dead, lifting off when the gun fires
+- a few on the wall's parapet and the dead trees during the night
+- birds circling over the field in the dawn chronicle and the ending shots
+
+The sound is already in: crows call over the valley at dawn and a flock's wings go up after first light, but there is nothing to see. The chronicle's lines talk about them ("The crows had learned where to find us").
+
+**Now:** nothing (sound only).
+
+**Need:** a carrion crow or raven, rigged, with these clips: idle (standing, head turns), peck at the ground, hop, take-off, flap (a flying loop), glide. One model is enough; I tint and scale copies for variety and instance them by the dozen.
+
+**Budget:** about 500–2,000 triangles (they are small and many), one 512–1024 px texture.

@@ -98,6 +98,8 @@ export function buildProps(env) {
     o.rotation.set((rng() - 0.5) * 0.25, rng() * 6.28, (rng() - 0.5) * 0.25);
     o.position.set(x, groundH(x, zz) - 0.05, zz);
     placeModel(env, 'hedgehog', o);
+    // solid: walkers go round it (2.1 m across, its legs reach nearly to the corners of a square)
+    addObstacle(x, zz, o.rotation.y, 0.85, 0.85);
   }
 
   // ── wire fence lines in the field (broken, sagging) ──────────────────────
@@ -280,6 +282,10 @@ export function buildProps(env) {
     boulderGeo.computeVertexNormals();
   }
   const bMs = [];
+  // every boulder is solid: the crowd at the wing ends and the ones coming down the rocks go round
+  // them. Tumbled at random, a boulder's footprint is about the circle of its long and short radii's
+  // mean; a square of 0.8 of that keeps feet out without leaving a gap you can see.
+  const rock = (x, zz, a, b) => { const r = (a + b) * 0.5 * 0.8; addObstacle(x, zz, 0, r, r); };
   for (const side of [-1, 1]) {
     for (let zz = -20; zz > -420; zz -= 4) {
       const x = side * (valleyEdge(zz) - 6 + rng() * 22);
@@ -287,6 +293,7 @@ export function buildProps(env) {
       _q.setFromEuler(new THREE.Euler(rng() * 3, rng() * 3, rng() * 3));
       _m.compose(_v.set(x, groundH(x, zz) + s * 0.1, zz), _q, _s.set(s * 1.3, s * 0.8, s));
       bMs.push(_m.clone());
+      rock(x, zz, s * 1.3, s);
     }
     for (let ax = 72; ax < 110; ax += 2.5) {
       const x = side * ax, zz = wallZ(x) - 1 + rng() * 6;
@@ -294,6 +301,7 @@ export function buildProps(env) {
       _q.setFromEuler(new THREE.Euler(rng() * 3, rng() * 3, rng() * 3));
       _m.compose(_v.set(x, groundH(x, zz) + s * 0.2, zz), _q, _s.set(s * 1.2, s, s));
       bMs.push(_m.clone());
+      rock(x, zz, s * 1.2, s);
     }
   }
   for (let i = 0; i < 30; i++) {
@@ -303,6 +311,7 @@ export function buildProps(env) {
     _q.setFromEuler(new THREE.Euler(rng() * 3, rng() * 3, rng() * 3));
     _m.compose(_v.set(x, groundH(x, zz) + s * 0.2, zz), _q, _s.set(s * 1.4, s * 0.8, s));
     bMs.push(_m.clone());
+    rock(x, zz, s * 1.4, s);
   }
   scene.add(instanced(boulderGeo, env.rockMat, bMs));
 

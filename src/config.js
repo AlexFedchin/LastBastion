@@ -38,6 +38,12 @@ export function wallDist(x, z) {
   return ax <= WORLD.GATE_HALF ? dz : dz * COS_WING;
 }
 
+/** z of the point at perpendicular distance d in front of the wall at x. */
+export function wallOffsetZ(x, d) {
+  const ax = x < 0 ? -x : x;
+  return wallZ(x) - (ax <= WORLD.GATE_HALF ? d : d / COS_WING);
+}
+
 /** Inward wall normal (direction a zombie faces when clawing at the wall). */
 export function wallFacing(x) {
   if (x > WORLD.GATE_HALF) return [WING_SIN, COS_WING];
@@ -194,19 +200,6 @@ export const UPGRADES = [
     apply: (s, r) => { s.molotovRadius *= 1 + 0.25 * r; s.molotovBurn += 3 * r; s.molotovDps *= 1 + 0.2 * r; } },
 ];
 
-// What came out of the hangar at dawn, as Kovac puts it at the start of the night
-// (main.js startNight), and the short names of the gun's own upgrades on the HUD.
-export const ISSUE_LINES = {
-  hmgDmg: 'a new match-grade barrel on the fifty', hmgRate: 'a stiffer buffer spring in the fifty', hmgCool: 'fresh water in the jacket',
-  hmgPen: 'AP-T in the belt', hmgInc: 'incendiaries in the belt', hmgHE: 'HE-I in the belt',
-  artyShells: 'another gun section on the battery', artyCd: 'the fire direction centre plotting faster', artyHeavy: 'heavy charges for the one-oh-fives',
-  gunners: 'another M240 up on the wall', crews: 'the gun crews back from the range', wire: 'more wire out in the approach',
-  grenades: 'another crate of grenades', molotov: 'more bottles', molotovFuel: 'thickened fuel in the bottles', claymores: 'claymores dug in out front',
-};
-// The same line spoken: it is assembled from what was bought, so Kovac's voice is recorded in
-// pieces, an opener and one short sentence per item, played back to back (audio.radioParts).
-export const ISSUE_OPEN = 'New on the line tonight.';
-export const issueSpoken = (phrase) => phrase[0].toUpperCase() + phrase.slice(1) + '.';
 // The hangar, as a requisition is set down in its bay: a word from whoever brought it in.
 export const DELIVERY_LINES = {
   hmgDmg: ['qm', "New barrel's on the bench, Sarge. Headspace and timing are set."],
@@ -240,8 +233,13 @@ export const ABILITY = {
   // E: light the rag, throw the bottle. What stands in the pool burns; what walks through it catches.
   molotov: { maxRange: 85, rearm: 0.75, light: 0.2, igniteSeconds: 5, igniteDps: 24, maxPools: 10 },
   dangerClose: { cost: 3, shells: 40, radius: 7.5, damage: 420 },
+  // Q: the 105 battery. It won't fire closer to the wall than minWallDist (that's danger close,
+  // and danger close costs men), and no shell of the pattern lands within its own blast of the
+  // face: the gun, the grenades and the bottles are what clear a pile.
+  artillery: { minWallDist: 26 },
   // T: throw a red marker flare anywhere on the field; a bomber puts a 2000 lb bomb on it
-  bomber: { cooldown: 75, firstDelay: 12, maxRange: 320, minWallDist: 16, radius: 24, damage: 1400,
+  // (minWallDist: Hammer won't drop closer than this to the wall: the blast reaches 24 m)
+  bomber: { cooldown: 45, firstDelay: 12, maxRange: 320, minWallDist: 32, radius: 24, damage: 1400,
     alt: 175, speed: 100, fall: 4.0, scale: 0.45 }, // B-36: 70 m span
 };
 
@@ -335,8 +333,26 @@ export const COMMS = {
     'Shack. Direct hit on your mark. Hammer one-one off target.',
   ],
   hammerOff: ['Bomb impact. Hammer one-one off target, re-arming.'],
-  spectreIntro: 'Bastion-7, Spectre two-one on station overhead. We\'ll work the crowds in the field — you hold that wall.',
-  spectreIntro2: 'Bastion-7, Spectre two-two on station. Two-one were friends of ours. Let\'s make them pay for it.',
+  // Spectre two-one checks in every night it flies (nights 3 to 8), never the same way twice:
+  // its crew get through the valley on dark jokes. Night 8 is the one they don't come back from.
+  spectreIntro: {
+    3: 'Bastion-7, Spectre two-one on station overhead. Lovely valley you\'ve got down there. Shame about the neighbours. We\'ll work the field — you hold that wall.',
+    4: 'Spectre two-one, back on station. Same crowd as last night, Bastion. They don\'t learn, and they never tip.',
+    5: 'Spectre two-one on station. Good news, Bastion: we checked, and there\'s no rule against shooting people who are already dead. We\'ll take the field.',
+    6: 'Spectre two-one overhead. Our navigator says we\'ve killed more of them than live in his home town. He\'s from a big town. Rounds away.',
+    7: 'Evening, Bastion. Spectre two-one on station. Bad news, we\'re the cavalry. Good news, the cavalry brought a one-oh-five.',
+    8: 'Spectre two-one, overhead again. Fuel\'s low, coffee\'s cold, valley\'s full. If we ever go down out there, Bastion, don\'t let them make us walk.',
+  },
+  // Spectre two-two takes over once two-one goes down (night 9 on, and the endless nights)
+  spectreIntro2: {
+    9: 'Bastion-7, Spectre two-two on station. Two-one were friends of ours. Their pilot had a bad joke for every night over this valley. We\'d give anything to hear one now. Let\'s make them pay for it.',
+    10: 'Spectre two-two, on station for the last night. Two-one would have had a joke ready for this one. None of us can think of it. Let\'s finish it for them.',
+    endless: [
+      'Spectre two-two, back over the valley. Somebody has to tell two-one\'s jokes now. Here\'s one: the dead outnumber us a thousand to one. That\'s it, that\'s the joke. Rounds away.',
+      'Spectre two-two on station. Two-one used to say this valley was the only show where the crowd never leaves early. Still true, Bastion.',
+      'Spectre two-two overhead. Two-one kept a tally on the cockpit wall. We kept painting over it. Tonight we start our own.',
+    ],
+  },
   spectre: [
     'Good hits, good hits. Lot of movement down there, Bastion.',
     'Shifting fire. Keep that fifty talking.',
@@ -370,10 +386,11 @@ export const UNLOCK_INFO = {
   bomber: 'BOMBER [T]', dangerClose: 'DANGER CLOSE [B]',
 };
 export const UNLOCK_LINES = {
-  2: [[CALL.kovac, 'Engineers found a crate of bottles and a jerrycan in the depot. E throws a Molotov — put it on the wall base and let them burn. And there\'s a crate of grenades at your feet. G, for anything climbing.']],
-  3: [[CALL.command, 'Bastion-7, Command. You now have a one-oh-five battery on call. Q puts a fire mission wherever you are looking.']],
-  4: [[CALL.hammer, 'Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it — that\'s T — and keep your heads down.']],
-  5: [[CALL.kovac, 'Listen. If it all goes wrong, B brings the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.']],
+  // (in the world's own words: which key and how is the HUD tip's job, src/ui/coach.js)
+  2: [[CALL.kovac, 'Engineers found a crate of bottles and a jerrycan in the depot. Put a Molotov on the wall base and let them burn. And there\'s a crate of grenades at your feet, for anything climbing.']],
+  3: [[CALL.command, 'Bastion-7, Command. You now have a one-oh-five battery on call. Call a fire mission wherever you need it.']],
+  4: [[CALL.hammer, 'Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it, and keep your heads down.']],
+  5: [[CALL.kovac, 'Listen. If it all goes wrong, we can bring the guns down on our own wall line. It will cost us men. Use it only if the wall is lost.']],
 };
 
 // ── Night events: one signature event per night, random ones in endless ─────
@@ -763,12 +780,11 @@ export function allRadioLines() {
   add(CALL.kovac, COMMS.markerOut);
   add(CALL.kovac, COMMS.dangerClose);
   for (const t of [...COMMS.hammerIn, ...COMMS.hammerGood, ...COMMS.hammerOff]) add(CALL.hammer, t);
-  for (const t of [COMMS.spectreIntro, ...COMMS.spectre]) add(CALL.spectre, t);
-  for (const t of [COMMS.spectreIntro2, ...COMMS.spectre]) add(CALL.spectre2, t);
+  for (const t of [...Object.values(COMMS.spectreIntro), ...COMMS.spectre]) add(CALL.spectre, t);
+  const i2 = COMMS.spectreIntro2;
+  for (const t of [i2[9], i2[10], ...i2.endless, ...COMMS.spectre]) add(CALL.spectre2, t);
   for (const lines of Object.values(UNLOCK_LINES)) for (const [w, t] of lines) add(w, t);
   for (const [w, t] of Object.values(DELIVERY_LINES)) add(CALL[w], t);
-  add(CALL.kovac, ISSUE_OPEN);
-  for (const t of Object.values(ISSUE_LINES)) add(CALL.kovac, issueSpoken(t));
   for (const ev of Object.values(EVENT_LINES)) {
     for (const lines of Object.values(ev)) {
       for (const [w, t] of lines) {

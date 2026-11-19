@@ -48,16 +48,6 @@ module.exports = {
     t.assert(fire.master - fire.amb > 8, `the beds sit well under the gun (${(fire.master - fire.amb).toFixed(1)} dB)`);
     t.assert(quiet.runners > 0 && quiet.beds.run > 0, 'runners sprinting in are heard');
 
-    // Kovac's night-start list, voiced in pieces: every piece recorded, played back to back
-    const parts = await t.get(`(() => { const A = __LB.audio, lines = __LB.test.radioLines().filter(([w, x]) => w === 'SGT. KOVAC');
-      const open = 'New on the line tonight.', a = 'AP-T in the belt.', b = 'Claymores dug in out front.';
-      const one = (x) => (A.voices_['SGT. KOVAC|' + x] || { duration: 0 }).duration;
-      const len = A.radioParts('SGT. KOVAC', [open, a, b]);
-      return { len: +len.toFixed(2), sum: +(one(open) + one(a) + one(b)).toFixed(2), listed: lines.some(([, x]) => x === b), gone: A.radioParts('SGT. KOVAC', [open, 'Not a recorded piece.']) };
-    })()`);
-    t.log(JSON.stringify(parts));
-    t.assert(parts.listed && parts.len > parts.sum && parts.len < parts.sum + 0.8 && parts.gone === 0, "Kovac reads the night's kit in recorded pieces");
-
     // the hangar: inside, the rain on the roof
     const inside = await t.get(`(() => { const A = __LB.audio; A.inside = true; A.updateBeds(0.1); A.updateBeds(0.1);
       const r = { rain: A.beds.hangar_rain.level, room: A.beds.hangar_room.level, outRain: A.beds.rain_far.level, flag: A.beds.flag.level };

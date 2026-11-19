@@ -1,7 +1,7 @@
 // Everything that kills besides your own gun: artillery, Molotovs,
 // grenades, danger-close, wall gunners, riflemen, claymores and wire.
 import * as THREE from 'three';
-import { WORLD, wallZ, wallDist, WING_COS, WING_SIN, ABILITY, CLAYMORE, sectionOf } from '../config.js';
+import { WORLD, wallZ, wallDist, wallOffsetZ, WING_COS, WING_SIN, ABILITY, CLAYMORE, sectionOf } from '../config.js';
 import { clamp, rand } from '../core/util.js';
 import { PF, DF } from '../world/textures.js';
 import { groundH, raycastGround } from '../world/terrain.js';
@@ -133,16 +133,24 @@ export class Arsenal {
   }
 
   // ── Artillery ────────────────────────────────────────────────────────────
+  /** A fire mission on target. false: still reloading; 'close': too near the wall (nothing fired). */
   callArtillery(target) {
     const s = this.stats;
     if (this.artyCd > 0) return false;
+    if (wallDist(target.x, target.z) < ABILITY.artillery.minWallDist) return 'close';
     this.artyCd = s.artyCooldown;
     const n = s.artyShells;
-    const spreadR = 8 + n * 1.1;
+    // a sheaf, not a stack: each gun section gets its own patch of the field, so every round
+    // added widens the pattern (rounds about a blast radius apart, a little jitter on each)
+    const step = s.artyRadius * 1.05, a0 = R() * Math.PI * 2;
     for (let k = 0; k < n; k++) {
-      const a = R() * Math.PI * 2, r = Math.sqrt(R()) * spreadR;
+      const a = a0 + k * 2.39996, r = step * 0.62 * Math.sqrt(k + 0.5) + R() * step * 0.25;
+      let x = target.x + Math.cos(a) * r, z = target.z + Math.sin(a) * r;
+      // the spread never carries a round in onto the wall line (heavy charges widen the blast)
+      const keep = s.artyRadius + 1.5;
+      if (wallDist(x, z) < keep) z = wallOffsetZ(x, keep);
       this.shells.push({
-        kind: 'arty', x: target.x + Math.cos(a) * r, z: target.z + Math.sin(a) * r,
+        kind: 'arty', x, z,
         t: 2.4 + k * 0.22 + R() * 0.25, r: s.artyRadius, dmg: s.artyDamage, scale: 2.2, whistled: false, streak: false,
       });
     }
@@ -157,12 +165,22 @@ export class Arsenal {
     if (this.dangerUsed) return false;
     this.dangerUsed = true;
     const D = ABILITY.dangerClose;
+    // half the rounds walk the wall face itself, evenly down both wings, so no stretch of it
+    // is missed: they take whatever is on it, the piles and the ones climbing over (wall: true
+    // makes the blast reach all the way up the face). The rest go into the crowd behind them.
+    const along = D.shells >> 1, wingLen = (WORLD.WING_END - WORLD.GATE_HALF) / WING_COS;
     for (let k = 0; k < D.shells; k++) {
-      let x;
-      do { x = rand(-70, 70); } while (Math.abs(x) < 10);
-      const d = rand(2.5, 26);
+      let x, d, wall = false;
+      if (k < along) {
+        const side = k % 2 ? 1 : -1, j = k >> 1, per = Math.ceil(along / 2);
+        const al = ((j + 0.5 + (R() - 0.5) * 0.5) / per) * (wingLen - 2) + 1;
+        x = side * (WORLD.GATE_HALF + al * WING_COS); d = rand(1.0, 2.6); wall = true;
+      } else {
+        do { x = rand(-70, 70); } while (Math.abs(x) < 10);
+        d = rand(4, 26);
+      }
       this.shells.push({
-        kind: 'danger', x, z: offsetZ(x, d), t: 1.8 + R() * 3.8, r: D.radius, dmg: D.damage, scale: 1.5, whistled: false, streak: false,
+        kind: 'danger', x, z: offsetZ(x, d), t: 1.8 + R() * 3.8, r: D.radius, dmg: D.damage, scale: 1.5, whistled: false, streak: false, wall,
       });
     }
     this.audio.klaxon();
@@ -765,7 +783,13 @@ export class Arsenal {
         fx.tracer(s.x - 25, 140, s.z + 60, s.x, groundH(s.x, s.z) + 0.5, s.z, 900, 1.2, 4, 2.5, 1.2);
       }
       if (s.t <= 0) {
-        this.detonate(s.x, groundH(s.x, s.z), s.z, s.scale, s.r, s.dmg, s.kind);
+        const gy = groundH(s.x, s.z);
+        this.detonate(s.x, gy, s.z, s.scale, s.r, s.dmg, s.kind);
+        // a round on the wall face: the blast goes up it too, through the pile to the top
+        if (s.wall) for (const up of [3.6, WORLD.WALL_H + 0.6]) {
+          const kills = this.horde.explode(s.x, gy + up, s.z, s.r, s.dmg, s.kind, { push: s.scale * 0.6 });
+          if (this.onExplosionKills) this.onExplosionKills(kills, s.x, s.z, s.kind);
+        }
         this.shells.splice(k, 1); k--;
       }
     }

@@ -136,7 +136,8 @@ export class Hangar {
     // a little of a room's light in every reflection: without it the steel reads black
     const pm = new THREE.PMREMGenerator(this.g.renderer);
     scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
-    scene.environmentIntensity = 0.45;
+    // the room's own soft light, bounced off every wall: it is what fills the shadows
+    scene.environmentIntensity = 1.15;
     pm.dispose();
 
     this.mats = {
@@ -273,7 +274,7 @@ export class Hangar {
 
   buildLights() {
     const scene = this.scene, q = this.g.quality;
-    scene.add(new THREE.HemisphereLight(0xc4bdb0, 0x4a4034, 1.45));
+    scene.add(new THREE.HemisphereLight(0xc4bdb0, 0x6a5e4e, 1.2));
     // the sun's patch on the floor throws warm light back up into the hall
     const bounce = new THREE.PointLight(0xffb880, 26, 22, 1.4);
     bounce.position.set(2, 1.2, -7.5);
@@ -295,7 +296,7 @@ export class Hangar {
     // a lamp over each bay and over the duty board
     this.bayLights = [];
     for (const b of BAYS) {
-      const l = new THREE.SpotLight(0xffd2a0, 120, 18, 0.85, 0.55, 1.4);
+      const l = new THREE.SpotLight(0xffd8b0, 70, 18, 0.9, 0.8, 1.4);
       l.position.set(b.x, 5.0, BAY_Z + 0.4);
       l.target.position.set(b.x, 0, BAY_Z + 0.4);
       scene.add(l, l.target);
@@ -307,14 +308,14 @@ export class Hangar {
     scene.add(bl, bl.target);
     // the strip lights down the middle
     for (const z of [0, 6.5]) {
-      const p = new THREE.PointLight(0xdfe8ff, 22, 22, 1.5);
+      const p = new THREE.PointLight(0xe8ecf4, 9, 22, 1.5);
       p.position.set(0, 6.4, z);
       scene.add(p);
     }
     // work lights on stands in front of each bay, low, throwing light into it: the bays read from across the hall
     this.workLights = [];
     for (const b of BAYS) {
-      const w = new THREE.SpotLight(0xffe6c2, 95, 16, 0.6, 0.75, 1.4);
+      const w = new THREE.SpotLight(0xffe6c2, 48, 16, 0.65, 0.85, 1.4);
       w.position.set(b.x + (b.x < 0 ? 1.6 : -1.6), 2.6, BAY_Z + 5.4);
       w.target.position.set(b.x, 0.6, BAY_Z - 0.6);
       scene.add(w, w.target);
@@ -330,7 +331,7 @@ export class Hangar {
     doorFill.position.set(0, 4.2, -10.5);
     scene.add(doorFill);
     // the front of the hall, where the overview looks down from
-    const front = new THREE.PointLight(0xffe2c4, 40, 26, 1.4);
+    const front = new THREE.PointLight(0xffe2c4, 22, 26, 1.4);
     front.position.set(0, 5.6, 7.5);
     scene.add(front);
     // the pick light: follows what the cursor is over
@@ -749,8 +750,9 @@ export class Hangar {
     const acc = r.shots ? Math.round((r.hits / r.shots) * 100) : 0;
     chalk(`DUTY BOARD — DAWN, DAY ${run.night - 1}`, 70, 110, 64, 'rgba(240,214,140,0.95)');
     x.strokeStyle = 'rgba(236,236,226,0.6)'; x.lineWidth = 4; x.beginPath(); x.moveTo(70, 140); x.lineTo(1150, 132); x.stroke();
-    const rows = [['Killed last night', r.kills || 0], ['Headshots', r.headshots || 0], ['Best streak', r.bestStreak || 0], ['Accuracy', acc + '%'],
-      ['Lost on the wall', r.lost || 0], ['Supplies scavenged', r.supplies || 0], ['Dawn bonus', '+' + (r.bonus || 0)]];
+    const n = (v) => Math.round(v || 0).toLocaleString('en-US');
+    const rows = [['Killed last night', n(r.kills)], ['Headshots', n(r.headshots)], ['Best streak', n(r.bestStreak)], ['Accuracy', acc + '%'],
+      ['Lost on the wall', n(r.lost)], ['Supplies scavenged', n(r.supplies)], ['Dawn bonus', '+' + n(r.bonus)]];
     rows.forEach(([k, v], i) => { chalk(k, 90, 230 + i * 82, 50); chalk(String(v), 1010, 230 + i * 82, 54, 'rgba(255,255,245,0.95)', 'right'); });
     chalk('ON THE WALL', 1110, 260, 44, 'rgba(240,214,140,0.95)');
     chalk(String(run.survivors), 1320, 400, 150, 'rgba(255,255,245,0.95)', 'center');
@@ -915,6 +917,7 @@ export class Hangar {
     this.active = true;
     for (const s of Object.values(this.slots)) s.rank = -1; // set without the drop
     this.sync(run, report);
+    this.camRate = 0;
     this.go('overview', true);
     this.tagLayer.classList.add('on');
     if (this.g.audio) this.g.audio.inside = true; // rain on the roof, the valley shut out
@@ -925,6 +928,20 @@ export class Hangar {
     if (this.g.audio) this.g.audio.inside = false;
     const hr = document.getElementById('hangar-radio'); if (hr) hr.classList.remove('show');
     if (this.tagLayer) this.tagLayer.classList.remove('on');
+    this.setHot(null);
+  }
+
+  /**
+   * The night is called: the camera walks out through the open door into the dusk, slower than
+   * a move between bays (the screen goes to the night's card meanwhile: main.leaveShop).
+   */
+  leave() {
+    this.view = 'leave';
+    this.wantPos = V(0.4, 1.75, -D + 3.2); this.wantLook = V(0.8, 2.3, -D - 30); this.wantFov = 58;
+    this.camRate = 1.15;
+    this.mouseIn = false;
+    if (this.tagLayer) this.tagLayer.classList.remove('on');
+    const hr = document.getElementById('hangar-radio'); if (hr) hr.classList.remove('show');
     this.setHot(null);
   }
 
@@ -962,12 +979,16 @@ export class Hangar {
     return false;
   }
 
-  /** The cursor, in client pixels (or null when it leaves the canvas). */
-  pointer(e) {
-    if (!e) { this.mouseIn = false; return; }
+  /**
+   * The cursor, in client pixels. `over3d`: it is over the 3D view itself, not a panel or button
+   * on top of it (only then does it pick things). The camera's drift follows it either way: a
+   * cursor on a button is still where it is, and dropping the drift there made the view jump.
+   */
+  pointer(e, over3d = true) {
     const r = this.g.canvas.getBoundingClientRect();
     this.mouse.set(((e.clientX - r.left) / r.width) * 2 - 1, -((e.clientY - r.top) / r.height) * 2 + 1);
-    this.mouseIn = true;
+    this.mouse.clampScalar(-1, 1);
+    this.mouseIn = over3d;
   }
 
   click() {
@@ -997,10 +1018,15 @@ export class Hangar {
     this.t += dt;
     const cam = this.camera, t = this.t;
     // the camera: eased to where it is going, a little hand-held, a little toward the cursor
-    this.camPos.x = damp(this.camPos.x, this.wantPos.x, 3.2, dt); this.camPos.y = damp(this.camPos.y, this.wantPos.y, 3.2, dt); this.camPos.z = damp(this.camPos.z, this.wantPos.z, 3.2, dt);
-    this.camLook.x = damp(this.camLook.x, this.wantLook.x, 3.8, dt); this.camLook.y = damp(this.camLook.y, this.wantLook.y, 3.8, dt); this.camLook.z = damp(this.camLook.z, this.wantLook.z, 3.8, dt);
+    const cr = this.camRate || 3.2, lr = this.camRate ? this.camRate * 1.4 : 3.8;
+    this.camPos.x = damp(this.camPos.x, this.wantPos.x, cr, dt); this.camPos.y = damp(this.camPos.y, this.wantPos.y, cr, dt); this.camPos.z = damp(this.camPos.z, this.wantPos.z, cr, dt);
+    this.camLook.x = damp(this.camLook.x, this.wantLook.x, lr, dt); this.camLook.y = damp(this.camLook.y, this.wantLook.y, lr, dt); this.camLook.z = damp(this.camLook.z, this.wantLook.z, lr, dt);
     this.fov = damp(this.fov, this.wantFov, 3, dt);
-    const mx = this.mouseIn ? this.mouse.x : 0, my = this.mouseIn ? this.mouse.y : 0;
+    // (eased, so even a cursor arriving from outside the window glides the view rather than snapping it)
+    this.drift = this.drift || new THREE.Vector2();
+    const lv = this.view === 'leave' ? 0 : 1; // walking out: the cursor lets go of the view
+    this.drift.x = damp(this.drift.x, this.mouse.x * lv, 4, dt); this.drift.y = damp(this.drift.y, this.mouse.y * lv, 4, dt);
+    const mx = this.drift.x, my = this.drift.y;
     cam.position.copy(this.camPos);
     cam.position.x += Math.sin(t * 0.31) * 0.05 + mx * 0.25; cam.position.y += Math.sin(t * 0.43) * 0.03 + my * 0.12;
     // a delivery landing jolts the camera, like a weight set down on the floor you stand on

@@ -6,7 +6,7 @@ import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
   nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, wallDist, ABILITY, CALL, COMMS,
   UNLOCKS, UNLOCK_INFO, UNLOCK_LINES, isUnlocked, allRadioLines, CHRONICLE, NIGHT_EVENTS, EXTRACTION,
-  ISSUE_LINES, ISSUE_OPEN, issueSpoken, GUN_MODS,
+  GUN_MODS,
 } from './config.js';
 import { clamp, lerp, damp, pick, rand, formatInt, fitFov } from './core/util.js';
 import { Input } from './core/input.js';
@@ -25,6 +25,7 @@ import { Post } from './render/post.js';
 import { AudioEngine } from './audio/audio.js';
 import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
+import { NightCard } from './ui/nightcard.js';
 import { Loader } from './ui/loader.js';
 import { loadModels, modelMesh } from './world/models.js';
 import { loadTextures } from './world/texlib.js';
@@ -130,6 +131,7 @@ class Game {
     this.post = new Post(renderer, this.scene, this.camera, this.quality);
     this.hud = new HUD();
     this.screens = new Screens(this);
+    this.nightCard = new NightCard();
     this.chronicle = new Chronicle(this);
     this.dev = new DevTools(this);
     this.hangar = new Hangar(this);
@@ -391,7 +393,7 @@ class Game {
       if (this.state === 'shop') this.hangar.click();
     });
     // the hangar: what the cursor is over (only over the 3D view, not the panels)
-    window.addEventListener('mousemove', (e) => { if (this.state === 'shop' && !this.freecam.on) this.hangar.pointer(e.target === this.canvas ? e : null); });
+    window.addEventListener('mousemove', (e) => { if (this.state === 'shop' && !this.freecam.on) this.hangar.pointer(e, e.target === this.canvas); });
     document.getElementById('s-click').addEventListener('click', () => { this.audio.init(); this.input.lock(); });
     document.addEventListener('keydown', (e) => {
       this.audio.init();
@@ -593,19 +595,29 @@ class Game {
     this.state = 'intro';
     this.stateT = 0;
     this.introFrom = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone() };
+    this.introLen = 2.8;
+    if (this.fromCard) {
+      // high over the base behind the tower, looking down the valley: it sinks into the nest
+      const c = new THREE.Object3D();
+      c.position.set(16, 34, 26);
+      c.lookAt(-8, 2, -110);
+      this.introFrom = { pos: c.position.clone(), quat: c.quaternion.clone() };
+      this.introLen = 7.5;
+    }
     this.letterboxTarget = 1;
     const hoursLeft = Math.max(0, 72 - (run.night - 1) * 8);
     const sub = run.endless || run.night > FINAL_NIGHT ? 'NOBODY IS COMING'
       : run.night === FINAL_NIGHT ? (this.extracting ? 'HOLD FOR THE EXTRACTION FLIGHT' : 'THE LAST NIGHT') : `${hoursLeft} HOURS UNTIL EXTRACTION`;
-    this.hud.announce(`NIGHT ${String(run.night).padStart(2, '0')}`, sub, 4.2);
+    // (after the night's card the title has been said: no second one over the field)
+    if (!this.fromCard) this.hud.announce(`NIGHT ${String(run.night).padStart(2, '0')}`, sub, 4.2);
     this.issueLoadout(run);
     this.coach.start();
     this.audio.init();
   }
 
   /**
-   * What came out of the hangar at the last dawn: a card under the night's title, Kovac
-   * reading it out on the radio, and the gun's fitted upgrades under its heat bar.
+   * What came out of the hangar at the last dawn: a card in the top-right corner, and the
+   * gun's fitted upgrades under its heat bar.
    * run.issued is the kit as it stood at the start of the last night (the save keeps it).
    */
   issueLoadout(run) {
@@ -618,12 +630,8 @@ class Game {
     const items = fresh.map((u) => ({ name: u.name, rank: run.upgrades[u.id], max: u.costs.length, what: u.total(run.upgrades[u.id]) }));
     const mines = run.minesOwned > (prev.claymores || 0);
     if (mines) items.push({ name: 'CLAYMORES', rank: 0, max: 0, what: `${run.minesOwned} in the approach` });
-    this.hud.loadout(items);
-    if (!items.length) return;
-    const said = [...fresh.map((u) => ISSUE_LINES[u.id]), ...(mines ? [ISSUE_LINES.claymores] : [])].filter(Boolean);
-    const list = said.length > 1 ? `${said.slice(0, -1).join(', ')} and ${said[said.length - 1]}` : said[0];
-    this.radioScript.push({ at: 6.5, who: CALL.kovac, text: `New on the line tonight: ${list}.`, parts: [ISSUE_OPEN, ...said.map(issueSpoken)], done: false });
-    this.radioScript.sort((a, b) => a.at - b.at);
+    // (the card in the corner is the whole of it: nobody reads the list out over the radio)
+    this.hud.loadout(items, this.fromCard ? 6.5 : 2.5);
   }
 
   pause() {
@@ -766,6 +774,8 @@ class Game {
     run.totals.shots += this.player.shots;
     run.totals.hits += this.player.hits;
     run.supplies = Math.round(run.supplies);
+    // (a kill's share is fractional: the night's sum is a float like 523.4800000000003)
+    this.ns.supplies = Math.round(this.ns.supplies);
     this.report = { ...this.ns };
     for (const r of this.radioScript) run.log.push([r.who, r.text]);
     run.log = run.log.slice(-8);
@@ -847,9 +857,49 @@ class Game {
   }
 
   beginNightFromShop() {
+    if (this.leavingShop) return;
     this.run.atShop = false;
     writeSave(this.run);
-    this.startNight();
+    // (the smoke tests step straight into the night; test.leaveShop() runs the walk-out)
+    if (TEST && !this.walkOut) { this.startNight(); return; }
+    this.leaveShop();
+  }
+
+  /**
+   * From the hangar to the night, as one move: the camera walks out through the hangar door
+   * while the screen goes black, the night's card comes up with the siren winding outside, and
+   * it opens on the valley from high over the base, settling down into the gun.
+   */
+  async leaveShop() {
+    this.leavingShop = true;
+    const run = this.run, n = run.night;
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    try {
+      this.audio.ui();
+      this.hangar.leave();
+      document.getElementById('s-shop')?.classList.add('leaving');
+      const diff = DIFFICULTY[run.difficulty] || DIFFICULTY.veteran;
+      const past = run.endless || n > FINAL_NIGHT;
+      const hours = Math.max(0, 72 - (n - 1) * 8);
+      const fresh = Object.keys(UNLOCKS).filter((k) => UNLOCKS[k] === n && !run.endless).map((k) => UNLOCK_INFO[k]);
+      const souls = run.survivors ?? 0;
+      const sub = past ? 'NOBODY IS COMING'
+        : n === FINAL_NIGHT ? (souls >= EXTRACTION.souls ? 'HOLD FOR THE EXTRACTION FLIGHT' : 'THE LAST NIGHT')
+          : `${hours} HOURS UNTIL EXTRACTION`;
+      const tag = fresh.length ? `New tonight: ${fresh.join(' · ')}` : n === FINAL_NIGHT && souls < EXTRACTION.souls ? 'Too few of us left for the flight. Hold anyway.' : '';
+      await this.nightCard.show({ night: n, past, sub, tag, kicker: `BASTION-7 · ${diff.label} · ${souls} ON THE WALL` });
+      // black: out there, the siren starts up, and the night is set going behind the card
+      this.audio.horn();
+      this.audio.thunder(1.6);
+      document.getElementById('s-shop')?.classList.remove('leaving');
+      this.fromCard = true;
+      this.startNight();
+      await wait(3200);
+      await this.nightCard.hide();
+    } finally {
+      this.fromCard = false;
+      this.leavingShop = false;
+    }
   }
 
   fall() {
@@ -961,9 +1011,14 @@ class Game {
     if (!inHangar && this.hangar.active) this.hangar.exit();
     this.post.scenePass.scene = inHangar ? this.hangar.scene : this.scene;
     this.post.scenePass.camera = inHangar ? this.hangar.camera : this.camera;
+    // the hangar is graded like daylight indoors, not like the night: a gentle curve, soft
+    // colour, no lens glare (the night's look crushed its shadows and blew out every lamp)
+    u.uCurve.value = inHangar ? 0.12 : 0.35; u.uTint.value = inHangar ? 0.35 : 1;
+    u.uFlare.value = inHangar ? 0.008 : 0.035; u.uStreak.value = inHangar ? 0.004 : 0.025; u.uDirt.value = inHangar ? 0.015 : 0.07;
+    this.post.bloom.strength = inHangar ? 0.2 : 0.42;
     if (inHangar) {
       u.uHeatN.value = 0; u.uShockN.value = 0;
-      u.uDesat.value = 0.16; u.uExposure.value = 1.12; u.uWarm.value = 0.16; u.uCA.value = 0.006;
+      u.uDesat.value = 0.28; u.uExposure.value = 1.0; u.uWarm.value = 0.1; u.uCA.value = 0.004;
     } else this.post.updateDistortion(this.env.fire.heatSources, this.fx.shocks);
     // pixel size for eye billboards
     const h = this.renderer.getDrawingBufferSize(this._sz || (this._sz = new THREE.Vector2())).y;
@@ -1026,7 +1081,7 @@ class Game {
   }
 
   updateIntro(dt, rdt) {
-    const T = 2.8;
+    const T = this.introLen || 2.8;
     const k = Math.min(1, this.stateT / T);
     const e = k * k * (3 - 2 * k);
     // target pose = gunner pose
@@ -1056,7 +1111,7 @@ class Game {
       if (isUnlocked('bomber', n)) keys.push('T BOMBER MARKER');
       if (isUnlocked('grenades', n)) keys.push('G GRENADES');
       this.hud.hint(keys.join(' · '));
-      for (const k of this.newUnlocks || []) this.hud.alert('', '', { key: 'new', item: UNLOCK_INFO[k], life: 7, priority: 1.5, format: (s) => `NEW — ${s.join(' · ')}` });
+      // (what's new tonight is taught by the coach's tips, src/ui/coach.js UNLOCK_TIPS)
       setTimeout(() => this.hud.hint(''), 9000);
     }
   }
@@ -1073,9 +1128,10 @@ class Game {
       if (input.hit('KeyQ') && can('artillery')) {
         const p = this.player.aimPoint(330);
         const ok = this.arsenal.callArtillery(p);
-        T.ability('artillery', ok);
-        this.medals.ability(run, 'artillery', ok);
-        if (ok) {
+        T.ability('artillery', ok === true);
+        this.medals.ability(run, 'artillery', ok === true);
+        if (ok === 'close') this.hud.alert("TOO CLOSE TO THE WALL — THE BATTERY WON'T FIRE THERE", '', { key: 'arty-close', plain: true });
+        else if (ok) {
           this.hud.alert(`FIRE MISSION — ${this.stats.artyShells} ROUNDS — SPLASH IN 3`);
           this.hud.radio(CALL.battery, COMMS.battery[this.stats.artyShells] || `Shot, over. ${this.stats.artyShells} rounds HE, splash in three.`, true, { valid: () => this.arsenal.shells.some((s) => s.kind === 'arty' && s.t > 1.2) });
         } else this.hud.alert(`BATTERY RELOADING — ${Math.ceil(this.arsenal.artyCd)}s`, '', { key: 'arty-cd', plain: true });
@@ -1088,8 +1144,9 @@ class Game {
       if (input.hit('KeyT') && can('bomber')) {
         const air = this.arsenal.air;
         const ok = air.throwMarker(this.player.aimPoint(ABILITY.bomber.maxRange));
-        T.ability('bomber', ok);
-        if (ok) {
+        T.ability('bomber', ok === true);
+        if (ok === 'close') this.hud.alert("TOO CLOSE TO THE WALL — HAMMER WON'T DROP THERE", '', { key: 'bomber-close', plain: true });
+        else if (ok) {
           this.hud.alert('MARKER OUT — BOMBER INBOUND');
           this.hud.radio(CALL.kovac, COMMS.markerOut, true, { ttl: 3 });
         } else this.hud.alert(air.bomberBusy ? 'BOMBER ALREADY ON ITS RUN' : `BOMBER RE-ARMING — ${Math.ceil(air.bomberCd)}s`, '', { key: 'bomber-cd', plain: true });
@@ -1121,7 +1178,7 @@ class Game {
 
     // radio script
     for (const r of this.radioScript) {
-      if (!r.done && this.director.t >= r.at) { r.done = true; this.hud.radio(r.who, r.text, false, { parts: r.parts }); }
+      if (!r.done && this.director.t >= r.at) { r.done = true; this.hud.radio(r.who, r.text); }
     }
 
     // carnage counter
@@ -1344,6 +1401,7 @@ class Game {
         this.startRun({ difficulty: diff, night, survivors: d.survivors, supplies: 0, kills: 0, upgrades, minesOwned: 12, endless: false, totals: { shots: 0, hits: 0, headshots: 0 }, log: [] });
       },
       skipIntro: () => { this.stateT = 99; },
+      leaveShop: () => { this.walkOut = true; this.beginNightFromShop(); this.walkOut = false; },
       aim: (yawDeg, pitchDeg) => { this.player.yaw = yawDeg * Math.PI / 180; this.player.pitch = pitchDeg * Math.PI / 180; },
       fire: (on) => { if (on) this.input.buttons |= 1; else this.input.buttons &= ~1; },
       press: (code) => this.input.pressed.add(code),

@@ -63,11 +63,6 @@ export function buildBomb() {
   return g;
 }
 
-/** Point at perpendicular distance d in front of the wall at x. */
-function offsetZ(x, d) {
-  return wallZ(x) - (Math.abs(x) <= WORLD.GATE_HALF ? d : d / WING_COS);
-}
-
 
 export class AirSupport {
   constructor(arsenal) {
@@ -114,7 +109,16 @@ export class AirSupport {
   }
 
   // ── lifecycle ──────────────────────────────────────────────────────────────
+  /** The gunship's check-in for tonight: a different one every night (COMMS.spectreIntro). */
+  introLine() {
+    const n = this.night || 3;
+    if (this.callsign === CALL.spectre2) { const L = COMMS.spectreIntro2; return L[n] || pickLine(L.endless); }
+    const L = COMMS.spectreIntro;
+    return L[n] || L[Math.min(8, Math.max(3, n))];
+  }
+
   startNight(menu = false, night = 1) {
+    this.night = night;
     this.clearBomber();
     this.callsign = night > 8 ? CALL.spectre2 : CALL.spectre;
     this.holdFire = false;
@@ -173,8 +177,8 @@ export class AirSupport {
     let dx = tx - cx, dz = tz - cz;
     const d = Math.hypot(dx, dz);
     if (d > B.maxRange) { tx = cx + dx * B.maxRange / d; tz = cz + dz * B.maxRange / d; }
-    // never on our own heads
-    if (wallDist(tx, tz) < B.minWallDist) tz = Math.min(tz, offsetZ(tx, B.minWallDist));
+    // never on our own heads: too close to the wall and Hammer won't take it (nothing is thrown)
+    if (wallDist(tx, tz) < B.minWallDist) return 'close';
     tx = clamp(tx, -230, 230);
     const dist = Math.hypot(tx - cx, tz - cz);
     this.marker = {
@@ -471,7 +475,7 @@ export class AirSupport {
     if (!g.introDone) {
       g.introDone = true;
       g.radioCd = 35;
-      this.radio(this.callsign === CALL.spectre2 ? COMMS.spectreIntro2 : COMMS.spectreIntro);
+      this.radio(this.introLine());
       this.audio.radioStatic(0.8);
     } else if (g.radioCd <= 0 && R() < 0.35) {
       g.radioCd = 40;

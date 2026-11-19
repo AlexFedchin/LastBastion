@@ -11,6 +11,7 @@
 import * as THREE from 'three';
 import { WORLD, wallZ, wallDist } from '../config.js';
 import { makeRng, clamp, smoothstep as S } from '../core/util.js';
+import { lampLit } from './lamplight.js';
 import { makeTurfTextures, makeRockTextures, makeAsphaltTextures, makeGrassBladeTexture } from './textures2.js';
 import { fileTex } from './texlib.js';
 
@@ -872,6 +873,7 @@ ${T_COMMON}
         diffuseColor.rgb *= 0.35 + 0.65 * vGrassAO;`);
     };
     mat.customProgramCacheKey = () => 'lb-grass';
+    lampLit(mat); // the blades under a wall lamp catch it like the ground they grow in
 
     // blades are bucketed into angular sectors around the gun, each its own instanced
     // mesh with a real bounding sphere, so the ones behind / beside the view are culled

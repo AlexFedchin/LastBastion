@@ -6,7 +6,21 @@
 //
 // Runs on night 1 while settings.tips is on (Settings ▸ First-night tips), then turns
 // the setting off so a second campaign isn't coached again. H hides it for the night.
-import { WORLD, wallZ, sectionCenterX } from '../config.js';
+//
+// On a night that brings something new (UNLOCKS), the same panel teaches each new tool
+// once, one after another: the radio says what arrived, the tip says which key and how.
+import { WORLD, wallZ, sectionCenterX, ABILITY } from '../config.js';
+
+/** How to use each new tool, shown on the night it arrives. */
+export const UNLOCK_TIPS = {
+  molotov: ['NEW · MOLOTOVS', 'Press E to throw a Molotov where you aim. Put it on the foot of the wall: it burns the pile, and anything that walks through the fire comes out alight.'],
+  grenades: ['NEW · GRENADES', 'Press G to throw a grenade where you aim. Save it for a pile: one blast takes out the bodies the others are climbing on.'],
+  claymores: ['NEW · CLAYMORES', 'Claymores are dug in along the approach. They go off on their own when the dead walk over them. More can be bought at the dawn resupply.'],
+  artillery: ['NEW · 105MM BATTERY', 'Press Q to call a fire mission where you aim. The shells land a few seconds later, so lead a moving crowd. The battery needs time to reload between missions.'],
+  gunship: ['NEW · SPECTRE', 'A Spectre gunship circles the valley tonight. It works the big crowds out in the field on its own. Keep your gun on the wall.'],
+  bomber: ['NEW · BOMBER', 'Press T to throw a red flare where you aim. The bomber puts one heavy bomb on it a few seconds later. Keep the flare well out from the wall.'],
+  dangerClose: ['NEW · DANGER CLOSE', `Press B only if the wall is lost: the battery fires on the whole wall line at once. Once a night, and it costs ${ABILITY.dangerClose.cost} of the men on the wall.`],
+};
 
 const LABELS = ['L5', 'L4', 'L3', 'L2', 'L1', 'R1', 'R2', 'R3', 'R4', 'R5'];
 const $ = (id) => document.getElementById(id);
@@ -21,6 +35,10 @@ export class Coach {
   start() {
     const g = this.g;
     this.active = !!(g.settings.tips && g.run && g.run.night === 1 && !g.run.endless && !g.run.dev);
+    // tonight's new tools, taught one at a time (any night, whatever the first-night setting)
+    this.newTips = (g.newUnlocks || []).filter((k) => UNLOCK_TIPS[k]);
+    this.tipI = 0; this.tipT = 0;
+    if (!this.active && this.newTips.length) { this.active = true; this.unlocks = true; } else this.unlocks = false;
     this.step = 0; this.t = 0; this.stepT = 0; this.shownAt = null; this.sec = -1; this.breached = false; this.looked = 0; this.pileSec = -1;
     this.shots0 = g.player.shots;
     this.hide();
@@ -66,11 +84,24 @@ export class Coach {
 
   next() { this.step++; this.stepT = 0; this.shownAt = null; this.hide(); this.mark(-1); }
 
+  /** The new tools' tips: after the intro, each up for a while, a short gap between. */
+  updateUnlocks(dt) {
+    this.tipT += dt;
+    const k = this.newTips[this.tipI];
+    if (!k) { this.stop(); return; }
+    const first = this.tipI === 0 ? 3.5 : 1.2, dur = 11;
+    if (this.tipT < first) { this.hide(); return; }
+    const [tag, text] = UNLOCK_TIPS[k];
+    this.show(tag, text);
+    if (this.tipT > first + dur) { this.tipI++; this.tipT = 0; this.hide(); }
+  }
+
   update(dt) {
     if (!this.active) return;
     const g = this.g;
     if (g.state === 'paused') return;
     if (g.state !== 'night') { if (g.state !== 'intro') this.stop(); return; }
+    if (this.unlocks) { this.updateUnlocks(dt); return; }
     this.t += dt; this.stepT += dt;
     const shots = g.player.shots - this.shots0;
     this.looked = Math.max(this.looked, Math.abs(g.player.yaw));

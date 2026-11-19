@@ -1015,35 +1015,6 @@ export class AudioEngine {
   }
 
   /**
-   * A line assembled from recorded pieces (Kovac's night-start list): each piece is a take of
-   * its own, played back to back with a short breath between. Only if every piece was recorded;
-   * returns the whole length in seconds (0 if any is missing, and the line stays text).
-   */
-  radioParts(who, parts, delay = 0.14, gap = 0.16) {
-    const bufs = parts.map((p) => this.voices_[who + '|' + p]);
-    if (!this.ready || !bufs.length || bufs.some((b) => !b)) return 0;
-    if (this._voice) { try { this._voice.stop(); } catch { /* done */ } }
-    const ctx = this.ctx, p = ctx.createStereoPanner(); p.pan.value = -0.18;
-    p.connect(this.voiceBus);
-    let at = ctx.currentTime + delay, last = null;
-    const srcs = bufs.map((buf) => {
-      const src = ctx.createBufferSource(); src.buffer = buf; src.connect(p); src.start(at);
-      at += buf.duration + gap; last = src; return src;
-    });
-    const end = at - gap;
-    // stopping the line (a newer call) stops every piece still to come
-    const handle = { stop: () => srcs.forEach((s) => { try { s.stop(); } catch { /* done */ } }) };
-    last.onended = () => { try { p.disconnect(); } catch { /* noop */ } if (this._voice === handle) this._voice = null; };
-    this._voice = handle;
-    this._voiceEnd = end;
-    const t = ctx.currentTime;
-    this.musicDuck.gain.cancelScheduledValues(t);
-    this.musicDuck.gain.setTargetAtTime(0.6, t, 0.08);
-    this.musicDuck.gain.setTargetAtTime(1, end, 0.6);
-    return end - t;
-  }
-
-  /**
    * The chronicle: a voice-over, not a transmission. Centred, no squelch, the
    * score and the world pulled well back under it. Returns the line's length in
    * seconds (0 if it was never recorded).

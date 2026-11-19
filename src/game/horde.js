@@ -258,12 +258,13 @@ export class Horde {
     this.type = new Uint8Array(N); this.dead = new Uint8Array(N);
     this.pileJit = F();
     this.fadeIn = F();
-    this.seek = F(); // countdown to looking for a mound to join (99 = already heading to one)
+    this.seek = F(); // countdown to looking for a mound to join, or to looking again at the one it joined
+    this.sought = new Int8Array(N); // the mound it is heading for, + 1 (0: none, it is going for the wall)
     this.inside = new Uint8Array(N); // over the wall and in the yard (only in the extraction: overWall)
     this.overWall = null; // the extraction sets (x, z) -> [tx, tz]: climbers drop into the yard and run there
     this._arrays = [this.seek, this.id, this.x, this.y, this.z, this.yaw, this.hp, this.maxHp, this.speed, this.rate, this.phase, this.lean,
       this.scale, this.radius, this.weight, this.tgtX, this.tgtZ, this.flash, this.burn, this.burnDps, this.atk, this.climb,
-      this.climbDur, this.slow, this.tr, this.tg, this.tb, this.type, this.dead, this.pileJit, this.fadeIn, this.inside];
+      this.climbDur, this.slow, this.tr, this.tg, this.tb, this.type, this.dead, this.pileJit, this.fadeIn, this.inside, this.sought];
 
     // mounds against the wall (see PILE): position along the wall (m from the tower corner) per side
     const P = PILE.MAX;
@@ -400,6 +401,7 @@ export class Horde {
     this.tgtX[i] = lx;
     this.tgtZ[i] = wallZ(lx) - 0.2;
     this.seek[i] = Math.random();
+    this.sought[i] = 0;
     this.yaw[i] = Math.atan2(lx - x, this.tgtZ[i] - z);
     this.flash[i] = 0; this.burn[i] = 0; this.burnDps[i] = 0; this.atk[i] = 0;
     this.climb[i] = 0; this.climbDur[i] = rand(PILE.CLIMB_TIME[0], PILE.CLIMB_TIME[1]);
@@ -422,6 +424,7 @@ export class Horde {
     this.tgtX[i] = lx;
     this.tgtZ[i] = wallZ(lx) - 0.2;
     this.seek[i] = Math.random();
+    this.sought[i] = 0;
   }
 
   // ── mounds ───────────────────────────────────────────────────────────────
@@ -477,14 +480,48 @@ export class Horde {
     if (best < 0) return;
     // the bigger it is, the harder it is to ignore
     if (Math.random() > Math.min(0.9, 0.25 + this.pH[best] / 4)) return;
-    // somewhere on the slope of what it will become, not all against the face: that's the wide base
-    const R = (PILE.R0 + Math.max(this.pH[best], 4) * PILE.SLOPE) * 0.8;
+    this.joinPile(i, best, 4);
+  }
+
+  /**
+   * Head for a spot on mound p's slope: somewhere on what it will become (a mound at least
+   * `grow` m high), not all against the face, which makes the wide base.
+   */
+  joinPile(i, p, grow) {
+    const side = this.pSide[p];
+    const R = (PILE.R0 + Math.max(this.pH[p], grow) * PILE.SLOPE) * 0.8;
     const du = (Math.random() * 2 - 1) * R, out = Math.random() * Math.random() * Math.sqrt(Math.max(0, R * R - du * du));
-    const al = Math.min(Math.max(this.pS[best] + du, PILE_S_MIN - 4), PILE_S_MAX);
+    const al = Math.min(Math.max(this.pS[p] + du, PILE_S_MIN - 4), PILE_S_MAX);
     const lx = side * (WORLD.GATE_HALF + al * WING_COS);
     this.tgtX[i] = lx;
     this.tgtZ[i] = wallZ(lx) - 0.2 - out / WING_COS;
-    this.seek[i] = 99;
+    this.sought[i] = p + 1;
+    this.seek[i] = rand(2.5, 4);
+  }
+
+  /**
+   * Every few seconds, one heading for (or waiting at) a mound looks at it again: a mound shot
+   * down to its last few bodies is no reason to stand off the wall where its slope used to be.
+   */
+  recheckPile(i) {
+    const p = this.sought[i] - 1;
+    if (!this.pAct[p] || this.pH[p] < 0.6) {
+      // gone: straight for the wall where it stands (it will start a mound of its own there)
+      const x = this.x[i], side = x < 0 ? -1 : 1;
+      const lx = side * Math.min(Math.max(Math.abs(x), PILE.MIN_X - 3), WORLD.WING_END - 3);
+      this.tgtX[i] = lx; this.tgtZ[i] = wallZ(lx) - 0.2;
+      this.sought[i] = 0; this.seek[i] = rand(0.8, 1.8);
+      return;
+    }
+    const al = (Math.abs(this.tgtX[i]) - WORLD.GATE_HALF) / WING_COS, du = al - this.pS[p];
+    const out = wallDist(this.tgtX[i], this.tgtZ[i]);
+    // an event has sent it somewhere else since (after a survivor, a crate): not ours to undo
+    const Rjoin = (PILE.R0 + Math.max(this.pH[p], 4) * PILE.SLOPE) * 0.8 + 4.5;
+    if ((this.tgtX[i] < 0 ? -1 : 1) !== this.pSide[p] || du * du + out * out > Rjoin * Rjoin) { this.sought[i] = 0; this.seek[i] = rand(0.8, 1.8); return; }
+    // still there: a spot on the slope it has now (floor 1.5 m: still a broad base to build on)
+    const R = (PILE.R0 + Math.max(this.pH[p], 1.5) * PILE.SLOPE) * 0.8;
+    if (du * du + out * out > R * R) this.joinPile(i, p, 1.5);
+    else this.seek[i] = rand(2.5, 4);
   }
 
   /** Index of a zombie by id, or -1 (indices move every frame as the dead are compacted). */
@@ -845,8 +882,8 @@ export class Horde {
       const inPile = pile >= 0;
       // the crowd drifts toward a mound that has started near its lane
       if (!inPile && !giant && dist < PILE.SEEK_D && (this.seek[i] -= dt) <= 0) {
-        this.seek[i] = rand(0.8, 1.8);
-        this.seekPile(i);
+        if (this.sought[i]) this.recheckPile(i);
+        else { this.seek[i] = rand(0.8, 1.8); this.seekPile(i); }
       }
       const pS0 = inPile ? this.pS[pile] : 0;
       const ri = this.radius[i] * (inPile ? 0.62 : 1);
