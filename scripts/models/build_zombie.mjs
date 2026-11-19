@@ -133,6 +133,12 @@ export async function makeZombie({ io, SRC, OUT, finish }) {
       const hp = new THREE.Vector3().setFromMatrixPosition(bones[srcName('Hips')].matrixWorld).applyMatrix4(C);
       poses.push(rig.fromWorld(Dw, hp));
     }
+    // another rig's legs: put the lowest the feet ever get on the ground (one shift for the whole
+    // clip, so a run's flight phase stays in the air)
+    const contact = [BI.LeftFoot, BI.RightFoot, BI.LeftToeBase, BI.RightToeBase];
+    let low = Infinity;
+    for (const p of poses) { const { P } = rig.solve(p); for (const i of contact) low = Math.min(low, P[i].y - rig.bind[i].y); }
+    for (const p of poses) p.hips.y -= low;
     return { name, loop, poses };
   };
   const src = {};

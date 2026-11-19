@@ -1,5 +1,5 @@
 // In-game HUD. Plain DOM, updated only when values change.
-import { WORLD, wallZ, sectionCenterX, ABILITY, isUnlocked } from '../config.js';
+import { WORLD, wallZ, sectionCenterX, ABILITY, isUnlocked, REACTIONS, CALL } from '../config.js';
 import { formatInt, formatTime } from '../core/util.js';
 import * as THREE from 'three';
 
@@ -14,7 +14,7 @@ export class HUD {
       night: $('h-night'), dawn: $('h-dawn'), dawnLbl: $('h-dawn-lbl'), dawnBar: $('h-dawn-bar'), contacts: $('h-alive'),
       kills: $('h-kills'), carnage: $('h-carnage'),
       surv: $('h-surv'), survIcons: $('h-surv-icons'), supplies: $('h-supplies'),
-      radio: $('h-radio'), radioWho: $('h-radio-who'), radioText: $('h-radio-text'),
+      radio: $('h-radio'), radioWho: $('h-radio-who'), radioText: $('h-radio-text'), radioRe: $('h-radio-re'),
       heat: $('h-heat'), gunState: $('h-gunstate'),
       abilities: $('h-abilities'),
       hit: $('hitmarker'), cross: $('crosshair'),
@@ -344,14 +344,25 @@ export class HUD {
         ? Math.min(full.length, Math.floor(full.length * Math.max(0, el2 - 0.12) / Math.max(0.5, this.radioVoice - 0.35)))
         : Math.min(full.length, Math.floor(el2 * 55));
       this.set('rtext', el.radioText, full.slice(0, shown));
-      if (this.radioT <= 0) el.radio.classList.remove('show');
-    } else if (this.radioQueue.length && (this._rm = this.nextRadio())) {
-      const { who, text } = this._rm;
+      if (this.radioT <= 0 && !this.reply) el.radio.classList.remove('show');
+    } else if (this.reply || (this.radioQueue.length && (this._rm = this.nextRadio()))) {
+      // Kovac's answer to the line just heard goes first, the moment it ends
+      const m = this.reply || this._rm;
+      this.reply = null;
+      const { who, text } = m;
       this.radioFull = text;
-      this.radioVoice = !g.audio ? 0 : g.audio.radioVoice(who, text);
+      this.radioVoice = !g.audio ? 0 : g.audio.radioVoice(who, text, m.quote ? 0.05 : 0.14);
       this.radioDur = this.radioT = Math.max(4.5, text.length * 0.065 + 2.5, this.radioVoice + 1.4);
+      const ans = !m.quote && REACTIONS[text];
+      if (ans) {
+        this.reply = { who: CALL.kovac, text: ans, quote: { who, text } };
+        // (no reading pause after the voice: he answers right away)
+        if (this.radioVoice > 0) this.radioDur = this.radioT = this.radioVoice + 0.45;
+      }
       el.radioWho.textContent = who;
       el.radioText.textContent = '';
+      el.radioRe.textContent = m.quote ? `RE: ${m.quote.who} — “${clip(m.quote.text, 64)}”` : '';
+      el.radio.classList.toggle('reply', !!m.quote);
       this.cache.rtext = '';
       el.radio.classList.add('show');
       if (g.audio) g.audio.radioStatic(this.radioVoice > 0 ? this.radioVoice + 0.1 : this.radioDur);
@@ -385,3 +396,5 @@ export class HUD {
 }
 
 function clamp01(x) { return x < 0 ? 0 : x > 1 ? 1 : x; }
+/** A line cut to n characters at a word, with an ellipsis. */
+function clip(s, n) { s = s.replace(/^[.…\s]+/, ''); if (s.length <= n) return s; const c = s.slice(0, n); return c.slice(0, Math.max(c.lastIndexOf(' '), n - 12)) + '…'; }

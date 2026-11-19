@@ -35,6 +35,10 @@
   "dur": 6.54,
   "file": "command_6223956d9e.ogg"
  },
+ "COMMAND|Bastion-7, Command. Be advised... your extraction is delayed. No new time. Command out.": {
+  "dur": 7.38,
+  "file": "command_b46ef6e66c.ogg"
+ },
  "COMMAND|Bastion-7, Command. Fog bank moving up the valley. Expect visibility near zero.": {
   "dur": 6.22,
   "file": "command_6bca788847.ogg"
@@ -762,6 +766,18 @@
   "dur": 5.42,
   "file": "reaper_1_1_d8157475be.ogg"
  },
+ "SGT. KOVAC|A bomber. About time they sent us something with teeth.": {
+  "dur": 3.76,
+  "file": "sgt_kovac_47a9a41e17.ogg"
+ },
+ "SGT. KOVAC|A gunship over our heads. Thank God.": {
+  "dur": 3.891,
+  "file": "sgt_kovac_4561f9d605.ogg"
+ },
+ "SGT. KOVAC|An airdrop! You hear that? Somebody back there still remembers we're here.": {
+  "dur": 5.96,
+  "file": "sgt_kovac_5d60231c0c.ogg"
+ },
  "SGT. KOVAC|Another crew for the wall. Put them on a gun and keep them fed.": {
   "dur": 4.56,
   "file": "sgt_kovac_d60fcd5357.ogg"
@@ -769,6 +785,10 @@
  "SGT. KOVAC|Another night. Another dawn.": {
   "dur": 3.4,
   "file": "sgt_kovac_1b26b08652.ogg"
+ },
+ "SGT. KOVAC|Artillery. Now we're talking.": {
+  "dur": 3.2,
+  "file": "sgt_kovac_2f43db93ea.ogg"
  },
  "SGT. KOVAC|Barrel's cooked!": {
   "dur": 1.462,
@@ -814,6 +834,10 @@
   "dur": 5.16,
   "file": "sgt_kovac_487efb2421.ogg"
  },
+ "SGT. KOVAC|Copy, two-two. They were good men. Let's make it count.": {
+  "dur": 6.84,
+  "file": "sgt_kovac_d83783860a.ogg"
+ },
  "SGT. KOVAC|Count the survivors. Then count the dead out there. Keep counting.": {
   "dur": 5.84,
   "file": "sgt_kovac_4b650e095b.ogg"
@@ -830,6 +854,18 @@
   "dur": 2.821,
   "file": "sgt_kovac_87c9fb5671.ogg"
  },
+ "SGT. KOVAC|Delayed? Delayed! Six nights on this wall, and they're delayed. Fine. Fine! We hold.": {
+  "dur": 9.64,
+  "file": "sgt_kovac_583940aeed.ogg"
+ },
+ "SGT. KOVAC|Don't look at it, kid. Look at the field.": {
+  "dur": 3.32,
+  "file": "sgt_kovac_6e8963e5f5.ogg"
+ },
+ "SGT. KOVAC|Down. The one road out of here, and it's down. Damn it.": {
+  "dur": 5.92,
+  "file": "sgt_kovac_48289758b7.ogg"
+ },
  "SGT. KOVAC|Engineers found a crate of bottles and a jerrycan in the depot. Put a Molotov on the wall base and let them burn. And there's a crate of grenades at your feet, for anything climbing.": {
   "dur": 12.6,
   "file": "sgt_kovac_4443b5c9d8.ogg"
@@ -838,6 +874,10 @@
   "dur": 3.96,
   "file": "sgt_kovac_cb6d717953.ogg"
  },
+ "SGT. KOVAC|Fifteen souls. They've got a quota now. Keep your people alive, he says. What does he think we've been doing?": {
+  "dur": 7.16,
+  "file": "sgt_kovac_177ab25c4a.ogg"
+ },
  "SGT. KOVAC|Fifteen. You heard him. Nobody else dies on this wall.": {
   "dur": 4.84,
   "file": "sgt_kovac_d8d33dd289.ogg"
@@ -845,6 +885,14 @@
  "SGT. KOVAC|Fog's lifting. Back to work.": {
   "dur": 3.128,
   "file": "sgt_kovac_d9e75c0ba8.ogg"
+ },
+ "SGT. KOVAC|Fog. Now. Perfect. Just perfect.": {
+  "dur": 5.04,
+  "file": "sgt_kovac_e01a094895.ogg"
+ },
+ "SGT. KOVAC|Forty seconds! You hear me? Forty seconds, hold on!": {
+  "dur": 4.8,
+  "file": "sgt_kovac_1c95b87e35.ogg"
  },
  "SGT. KOVAC|Friendlies on the road! Kill what's chasing them — and watch your fire!": {
   "dur": 4.76,
@@ -858,6 +906,10 @@
   "dur": 3.52,
   "file": "sgt_kovac_039c7bfb33.ogg"
  },
+ "SGT. KOVAC|Glad to have you, Lieutenant. Grab a rifle.": {
+  "dur": 3.08,
+  "file": "sgt_kovac_61d147eb55.ogg"
+ },
  "SGT. KOVAC|Got them. Every last one. Somebody find them some blankets.": {
   "dur": 6.64,
   "file": "sgt_kovac_ebf8d1728e.ogg"
@@ -866,6 +918,14 @@
   "dur": 1.72,
   "file": "sgt_kovac_8981f4493c.ogg"
  },
+ "SGT. KOVAC|Ha! Look at that! Hell of a shot, Hammer!": {
+  "dur": 3.32,
+  "file": "sgt_kovac_e4a078f4ca.ogg"
+ },
+ "SGT. KOVAC|Heh. Funny man. Keep it coming, Spectre.": {
+  "dur": 4.84,
+  "file": "sgt_kovac_4eacbf56a6.ogg"
+ },
  "SGT. KOVAC|Here they come — dozens! Hundreds!": {
   "dur": 3.44,
   "file": "sgt_kovac_d28aaa65ba.ogg"
@@ -873,6 +933,10 @@
  "SGT. KOVAC|Horde inbound! Get on them!": {
   "dur": 2.48,
   "file": "sgt_kovac_4c36c0c2f3.ogg"
+ },
+ "SGT. KOVAC|I'll hold you to that, Hollis. Get those people inside.": {
+  "dur": 5.08,
+  "file": "sgt_kovac_8fee8c52b8.ogg"
  },
  "SGT. KOVAC|If anyone is listening: Bastion-7 is holding. Bastion-7 is holding.": {
   "dur": 6.2,
@@ -926,6 +990,10 @@
   "dur": 7.322,
   "file": "sgt_kovac_15b471bedd.ogg"
  },
+ "SGT. KOVAC|Nobody's walking, Spectre. Not on my watch.": {
+  "dur": 3.72,
+  "file": "sgt_kovac_cf474a42e4.ogg"
+ },
  "SGT. KOVAC|None of them made it. Eyes front.": {
   "dur": 2.92,
   "file": "sgt_kovac_b16aaf963e.ogg"
@@ -953,6 +1021,10 @@
  "SGT. KOVAC|Red smoke out! Get your heads down!": {
   "dur": 3.16,
   "file": "sgt_kovac_5ec18c8275.ogg"
+ },
+ "SGT. KOVAC|Save it, Aran. Tell me at dawn.": {
+  "dur": 2.431,
+  "file": "sgt_kovac_2b480a84f9.ogg"
  },
  "SGT. KOVAC|Second squad, out the gate! Covering fire!": {
   "dur": 3.44,
@@ -982,6 +1054,10 @@
   "dur": 2.52,
   "file": "sgt_kovac_6a5e0e530d.ogg"
  },
+ "SGT. KOVAC|Tell your navigator the drinks are on us.": {
+  "dur": 3.134,
+  "file": "sgt_kovac_ec320284e3.ogg"
+ },
  "SGT. KOVAC|That's a whole column gone!": {
   "dur": 2.24,
   "file": "sgt_kovac_f15586a445.ogg"
@@ -997,6 +1073,10 @@
  "SGT. KOVAC|That's not like the other one. That's bigger. Everything we have — put it on that thing!": {
   "dur": 7.4,
   "file": "sgt_kovac_321e273ef5.ogg"
+ },
+ "SGT. KOVAC|That's our ride! They came. They actually came! Hold that wall!": {
+  "dur": 7.04,
+  "file": "sgt_kovac_91fe3cf547.ogg"
  },
  "SGT. KOVAC|The crews spent the morning on the range. They'll shoot straighter tonight.": {
   "dur": 5.04,
@@ -1021,6 +1101,10 @@
  "SGT. KOVAC|There's a fuel tanker stalled out on the road. Let them crowd around it, then put a burst through the tank.": {
   "dur": 6.76,
   "file": "sgt_kovac_8d74ca31f3.ogg"
+ },
+ "SGT. KOVAC|There's our resupply. Right on time, for once.": {
+  "dur": 3.04,
+  "file": "sgt_kovac_916c121738.ogg"
  },
  "SGT. KOVAC|They know. God help us, they know we are leaving. Everything is coming over that ridge — hold!": {
   "dur": 6.04,

@@ -255,9 +255,9 @@ export const GUNSHIP = {
 
 // ── Radio. The story is told in fragments. ───────────────────────────────────
 export const RADIO = {
+  // (Kovac's answer to a message is in REACTIONS: it follows the message itself)
   1: [
     ['COMMAND', 'Bastion-7, this is Command. Extraction is set for the seventy-second hour. Hold until then.'],
-    ['SGT. KOVAC', 'You heard the man. Seventy-two hours. Keep that barrel cool and the wall clean.'],
   ],
   2: [
     ['COMMAND', 'Bastion-7, Command. The bridge at Halden is down. Nobody leaves that valley by road now. Keep the gate shut.'],
@@ -265,7 +265,6 @@ export const RADIO = {
   ],
   3: [
     ['UNKNOWN', '...anyone on this frequency... we\'re at the overpass, we have children with us, please—'],
-    ['SGT. KOVAC', 'Overpass is forty klicks out. There\'s nothing we can do. Eyes front.'],
   ],
   4: [
     ['COMMAND', 'Bastion-7, airdrop of fuel and ammunition inbound at dawn. Mark your drop zone.'],
@@ -273,19 +272,18 @@ export const RADIO = {
   ],
   5: [
     ['COMMAND', '...all stations, Bastion-3 has fallen. Bastion-5 is not responding.'],
-    ['SGT. KOVAC', 'We\'re what\'s left on this line. Make it count.'],
   ],
   6: [
     ['COMMAND', 'Bastion-7... airframes are short... (static) ...the flight goes only for fifteen souls or more. Keep your people alive.'],
     ['SGT. KOVAC', 'Fifteen. You heard him. Nobody else dies on this wall.'],
   ],
   7: [
+    ['COMMAND', 'Bastion-7, Command. Be advised... your extraction is delayed. No new time. Command out.'],
     ['SGT. KOVAC', 'Command hasn\'t answered since 0300. I\'m sure it\'s the antenna.'],
     ['PVT. ARAN', 'Sarge... the city stopped burning.'],
   ],
   8: [
     ['AUTOMATED', 'This frequency is no longer monitored. This frequency is no longer monitored.'],
-    ['SGT. KOVAC', 'Then we monitor it. Bastion-7 is holding. Say it.'],
   ],
   9: [
     ['SGT. KOVAC', 'Biggest one yet coming down the valley. Everything we have, tonight.'],
@@ -360,6 +358,65 @@ export const COMMS = {
     'Big group moving up the road — engaging.',
     'Sparkle on the treeline. Rounds away.',
   ],
+};
+
+// ── Kovac answers the radio: [the line he hears] -> what he says back, straight after it ──
+// (hud.js plays the answer as soon as the line ends and quotes the line over it)
+export const REACTIONS = {
+  // the story
+  'Bastion-7, this is Command. Extraction is set for the seventy-second hour. Hold until then.':
+    'You heard the man. Seventy-two hours. Keep that barrel cool and the wall clean.',
+  'Bastion-7, Command. The bridge at Halden is down. Nobody leaves that valley by road now. Keep the gate shut.':
+    'Down. The one road out of here, and it\'s down. Damn it.',
+  '...anyone on this frequency... we\'re at the overpass, we have children with us, please—':
+    'Overpass is forty klicks out. There\'s nothing we can do. Eyes front.',
+  'Bastion-7, airdrop of fuel and ammunition inbound at dawn. Mark your drop zone.':
+    'An airdrop! You hear that? Somebody back there still remembers we\'re here.',
+  '...all stations, Bastion-3 has fallen. Bastion-5 is not responding.':
+    'We\'re what\'s left on this line. Make it count.',
+  'Bastion-7... airframes are short... (static) ...the flight goes only for fifteen souls or more. Keep your people alive.':
+    'Fifteen souls. They\'ve got a quota now. Keep your people alive, he says. What does he think we\'ve been doing?',
+  'Bastion-7, Command. Be advised... your extraction is delayed. No new time. Command out.':
+    'Delayed? Delayed! Six nights on this wall, and they\'re delayed. Fine. Fine! We hold.',
+  'Sarge... the city stopped burning.':
+    'Don\'t look at it, kid. Look at the field.',
+  'This frequency is no longer monitored. This frequency is no longer monitored.':
+    'Then we monitor it. Bastion-7 is holding. Say it.',
+  'Sarge, if this is it... it was an honour.':
+    'Save it, Aran. Tell me at dawn.',
+  // the flight comes
+  'Bastion-7, Nightingale. Extraction flight is airborne, three lifters and escort. Hold that wall until we are overhead.':
+    'That\'s our ride! They came. They actually came! Hold that wall!',
+  'Bastion-7, Reaper one-one, inbound with the lifters. Forty seconds. Just hold on.':
+    'Forty seconds! You hear me? Forty seconds, hold on!',
+  // help from the air
+  'Bastion-7, Command. You now have a one-oh-five battery on call. Call a fire mission wherever you need it.':
+    'Artillery. Now we\'re talking.',
+  'Bastion-7, Hammer one-one is on call tonight. Throw a red flare where you want it, and keep your heads down.':
+    'A bomber. About time they sent us something with teeth.',
+  'Good effect on target. That\'s a lot of them down. Hammer one-one off and climbing.':
+    'Ha! Look at that! Hell of a shot, Hammer!',
+  'Shack. Direct hit on your mark. Hammer one-one off target.':
+    'Ha! Look at that! Hell of a shot, Hammer!',
+  'Bastion-7, Spectre two-one on station overhead. Lovely valley you\'ve got down there. Shame about the neighbours. We\'ll work the field — you hold that wall.':
+    'A gunship over our heads. Thank God.',
+  'Spectre two-one, back on station. Same crowd as last night, Bastion. They don\'t learn, and they never tip.':
+    'Heh. Funny man. Keep it coming, Spectre.',
+  'Spectre two-one overhead. Our navigator says we\'ve killed more of them than live in his home town. He\'s from a big town. Rounds away.':
+    'Tell your navigator the drinks are on us.',
+  'Spectre two-one, overhead again. Fuel\'s low, coffee\'s cold, valley\'s full. If we ever go down out there, Bastion, don\'t let them make us walk.':
+    'Nobody\'s walking, Spectre. Not on my watch.',
+  'Bastion-7, Spectre two-two on station. Two-one were friends of ours. Their pilot had a bad joke for every night over this valley. We\'d give anything to hear one now. Let\'s make them pay for it.':
+    'Copy, two-two. They were good men. Let\'s make it count.',
+  // the nights' events
+  'Bastion-7, Command. Fog bank moving up the valley. Expect visibility near zero.':
+    'Fog. Now. Perfect. Just perfect.',
+  'Bastion-7, Reach three-one, thirty seconds out with your resupply. Look for the strobe.':
+    'There\'s our resupply. Right on time, for once.',
+  'We\'re through the gate. Thanks for the cover, Bastion. Recon Two will take a spot on the wall.':
+    'Glad to have you, Lieutenant. Grab a rifle.',
+  "We're in! We're in. Bastion-7, I owe every one of you a drink.":
+    'I\'ll hold you to that, Hollis. Get those people inside.',
 };
 
 export const BARKS = {
@@ -775,6 +832,7 @@ export function allRadioLines() {
   const out = [];
   const add = (who, text) => { if (!out.some((l) => l[0] === who && l[1] === text)) out.push([who, text]); };
   for (const lines of Object.values(RADIO)) for (const [w, t] of lines) add(w, t);
+  for (const t of Object.values(REACTIONS)) add(CALL.kovac, t);
   for (const lines of Object.values(BARKS)) for (const t of lines) add(CALL.kovac, t);
   for (const t of Object.values(COMMS.battery)) add(CALL.battery, t);
   add(CALL.kovac, COMMS.markerOut);

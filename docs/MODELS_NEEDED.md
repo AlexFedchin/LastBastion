@@ -1,6 +1,7 @@
 # Models needed
 
 The game already loads real models for:
+- the zombies (your rigged pack: three looks, its own animations and hand-keyed ones; see 1. for what Mixamo could add)
 - the M2HB
 - the AC-130 and the B-36
 - the CH-47 lifters and the Apache gunships in the extraction
@@ -44,27 +45,44 @@ Two of the files in the folder aren't used yet: `Searchlight.glb` (a Suez Canal 
 
 ---
 
-## 1. Zombie (infected civilian / soldier)
+## 1. Zombie — in (your pack); animations wanted from Mixamo
 
-**Where:** everywhere. The horde is what you look at for the entire game: hundreds to thousands on screen, close up at the wall, as corpses piled at its foot.
+The horde and the dead are the zombie pack you sent (`3D Models/Zombies`): one rigged zombie in its
+three looks, at three levels of detail (3,610 / 1,080 / 360 triangles), skinned in the shader from a
+baked animation texture so thousands still draw in a few calls (`scripts/models/build_zombie.mjs`,
+`src/game/zombieSkin.js`). The giants keep their own sculpted mesh.
 
-**Now:** a procedural mannequin with rounded limbs, a simple face, and gear (helmet, vest, pack, cap, hi-vis) switched per instance. It is animated in the vertex shader so thousands can draw in a few calls.
+**Its own clips, used as they are:** walk and run (re-cut with longer strides for the game's
+speeds), two idles and a roar for the ones standing, three attacks in the yard, the flinch when a
+heavy round hits, and both deaths for the shot dead.
 
-**Need:**
-- 2–4 rigged humanoid zombies on one shared skeleton: a mix of civilians, workers and soldiers, with torn clothing and gore.
-- Mixamo-compatible rigs, or meshes I can auto-rig on Mixamo.
-- Animations wanted: shamble walk, sprint, clawing at a wall, climbing, a couple of deaths and a burning flail. Mixamo clips work; I'll retarget them like the soldier's.
+**Hand-keyed on its rig for now** (`scripts/models/zombie_clips.mjs`). Each of these can be replaced
+by a Mixamo clip, and that would look better. In order of how much they're seen:
 
-**Budget:** about 3–6k triangles each, one material and one texture atlas per variant. They will be baked into an animation texture, so they stay instanced.
+| Name (file) | Where | What to look for on Mixamo |
+|---|---|---|
+| `claw` | every zombie at the foot of the wall | a zombie clawing or pounding on a wall or door above head height: "Zombie Scratch Idle", "Zombie Punching" against a wall |
+| `scramble` | on the mounds of bodies against the wall | climbing up a steep slope on hands and feet: "Climbing Up Wall", "Crawl" pitched up, "Freehang Climb" |
+| `climb` | the one at the top going over the parapet (1.6–2.8 s) | pulling up and over a ledge: "Climbing" / "Climb To Top" / "Braced Hang To Crouch" |
+| `sprint` | runners | a fast zombie run: "Zombie Running", "Fast Run" (the pack's run is a jog) |
+| `burn` | anyone on fire | staggering while beating at flames: "Zombie Scream", "Dying" variations, "On Fire" if found |
+| `perch` | crouched on the parapet before dropping into the yard (the extraction) | a crouch looking down: "Crouch Idle", "Zombie Crouch" |
+| `limp` | a few shamblers | "Zombie Walk" with a dragged leg: "Injured Walk", "Limping" |
+| `stomp` | brutes | a heavy, wide walk: "Mutant Walking", "Ogre Walk" |
+| `waddle` | bloaters | a heavy, swaying walk: "Drunk Walk", "Fat Walk" |
+| `thrown` | bodies thrown by a blast (a held pose) | not needed: a ragdoll pose |
 
-**Note:** this is the biggest visual upgrade, but also the biggest engineering job. The renderer has to move from shader-posed parts to baked skinned animation.
+**Not in the game yet, would add something:** a **crawl** (a legless zombie dragging itself after a
+blast took its legs), a **wall slam** for brutes, and a **feeding** idle for the dawn shots.
 
-**The pack you sent (`3D Models/Zombies`), looked at 2026-11-19:**
-- one rigged zombie: about 3,600 triangles (inside the budget), a 137-bone HumanIK rig (`Zombie_Hips`, `Zombie_Spine`, ..., with full fingers), in centimetres
-- three 4K texture sets on the same UVs (albedo, normal, metal/gloss, AO, height, emission): three looks from one mesh
-- twelve clips, in place: walk, run, idle ×2, attack ×4, roar, get-hit, death ×2
-- missing for this game: climbing, clawing at a wall, the burning flail, a crawl. The rig is a standard humanoid, so Mixamo clips for those can be retargeted onto it the way the soldier's are.
-- source and licence aren't in the archives: send the page it came from so it can go into the credits.
+**How to send them:** download from Mixamo on any character (the auto-rig's T-pose is enough: each
+file carries its own), **FBX, Without Skin, 30 fps, In Place** for anything that walks or climbs, and
+save it as `scripts/models/source/zombie/mixamo/<name>.fbx` with the names in the table above (e.g.
+`claw.fbx`). Then `node scripts/models/build_models.mjs zombie` retargets it onto the zombie's own
+skeleton (the same retargeter as the soldier's) and it replaces the hand-keyed clip of that name.
+A loop should start and end on the same pose.
+
+**Still missing:** the pack's source page, for its licence and the credits.
 
 ## 2. The central tower — done (your own model)
 

@@ -147,6 +147,49 @@ DIRECTION = {
         ("Quiet, hollow and numb, a confession, almost a whisper.", 0.15),
     "They'll come again tomorrow. So will we.":
         ("Tired, stoic, a grim half-smile, quiet resolve.", 0.3),
+    # ── Kovac answering the radio (REACTIONS in config.js: straight after the line he hears) ──
+    'Bastion-7, Command. Be advised... your extraction is delayed. No new time. Command out.':
+        ("Tired and uncomfortable, reading out bad news he has no answer for; flat, a little hurried, signing off before anyone can argue.", 0.25),
+    "Down. The one road out of here, and it's down. Damn it.":
+        ("Bitter and angry under his breath, a man taking a blow; the first word flat with disbelief, 'Damn it' muttered through his teeth.", 0.45),
+    "An airdrop! You hear that? Somebody back there still remembers we're here.":
+        ("Genuinely glad and surprised, a rough laugh breaking through the fatigue; warm, lifted, almost cheerful for once.", 0.6),
+    "Fifteen souls. They've got a quota now. Keep your people alive, he says. What does he think we've been doing?":
+        ("Irritated and sarcastic, contempt for the desk officers; biting on 'quota', mocking on 'he says', angry on the question.", 0.6),
+    "Delayed? Delayed! Six nights on this wall, and they're delayed. Fine. Fine! We hold.":
+        ("Furious, exasperated disbelief: a flat question, then an angry outburst on the second 'Delayed!', seething; then he reins it in, curt and hard on 'We hold.'", 0.8),
+    "Don't look at it, kid. Look at the field.":
+        ("Gentle but firm, a father's gruffness, quiet and close; protecting a frightened boy.", 0.25),
+    "Save it, Aran. Tell me at dawn.":
+        ("Gruff and warm at once, refusing to hear a goodbye; a small catch in the voice, then steady.", 0.3),
+    "That's our ride! They came. They actually came! Hold that wall!":
+        ("Overjoyed, relieved almost to tears, a laugh in the voice, shouting with real happiness; then a fierce order.", 0.9),
+    "Forty seconds! You hear me? Forty seconds, hold on!":
+        ("Shouting over the din, desperate hope and urgency, rallying exhausted men.", 0.9),
+    "Artillery. Now we're talking.":
+        ("Pleased, a satisfied grin you can hear, dry and approving.", 0.45),
+    "A bomber. About time they sent us something with teeth.":
+        ("Dry, a little sardonic but pleased, a grim smile.", 0.4),
+    "Ha! Look at that! Hell of a shot, Hammer!":
+        ("Delighted, a barking laugh, cheering a direct hit over the noise.", 0.85),
+    "A gunship over our heads. Thank God.":
+        ("Deep relief, quiet and heartfelt, an exhale of gratitude.", 0.3),
+    "Heh. Funny man. Keep it coming, Spectre.":
+        ("Amused despite himself, a short dry chuckle, easy camaraderie.", 0.4),
+    "Tell your navigator the drinks are on us.":
+        ("Wry and warm, a tired smile, soldierly humour.", 0.35),
+    "Nobody's walking, Spectre. Not on my watch.":
+        ("Serious, a quiet promise between soldiers, steady and sincere.", 0.4),
+    "Copy, two-two. They were good men. Let's make it count.":
+        ("Sombre and grieving, low and slow, then hardening into resolve.", 0.35),
+    "Fog. Now. Perfect. Just perfect.":
+        ("Irritated and sarcastic, a heavy sigh; deadpan exasperation, each word dropped flat.", 0.45),
+    "There's our resupply. Right on time, for once.":
+        ("Pleased and relieved, a little wry on 'for once'.", 0.45),
+    "Glad to have you, Lieutenant. Grab a rifle.":
+        ("Warm, relieved and matter-of-fact, welcoming a fellow soldier.", 0.4),
+    "I'll hold you to that, Hollis. Get those people inside.":
+        ("Happy, a tired laugh, warmth and relief; then businesslike.", 0.5),
     # ── Kovac's barks over the gun ───────────────────────────────────────
     'Big group coming down the valley!':
         ("Shouting a warning over machine-gun fire, urgent and loud.", 0.85),

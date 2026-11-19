@@ -58,6 +58,10 @@ b { color: var(--bone); font-weight: 600; }
 .radio-head { font-size: 11px; letter-spacing: 0.25em; color: var(--amber); margin-bottom: 4px; }
 .radio-head .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--red); margin-right: 4px; animation: blink 0.8s infinite; }
 #h-radio-text { font-family: var(--mono); font-size: 13px; line-height: 1.45; color: var(--bone); }
+/* an answer: the line it answers, quoted small over it */
+.radio-re { display: none; font-family: var(--mono); font-size: 11px; line-height: 1.35; color: var(--bone-dim); font-style: italic; opacity: 0.8; margin-bottom: 5px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.radio.reply .radio-re { display: block; }
+.radio.reply { border-left-color: var(--amber); }
 .wallmap svg { width: 300px; height: 110px; display: block; }
 .wm-sec { stroke: #5d6b4a; stroke-width: 3; stroke-linecap: butt; transition: stroke 0.3s; }
 .wm-sec.mid { stroke: #a99a52; }
