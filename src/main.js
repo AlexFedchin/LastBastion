@@ -27,7 +27,8 @@ import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { NightCard } from './ui/nightcard.js';
 import { Loader } from './ui/loader.js';
-import { loadModels, modelMesh } from './world/models.js';
+import { loadModels, modelMesh, zombieAnimData } from './world/models.js';
+import { zombieSkin } from './game/zombieSkin.js';
 import { loadTextures } from './world/texlib.js';
 import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
 import { Chronicle, composeChronicle } from './ui/chronicle.js';
@@ -124,6 +125,7 @@ class Game {
     this.audio.applySettings(this.settings);
     const soundLoaded = this.audio.preload();
     await modelsLoaded;
+    this.horde.useModel(zombieSkin(modelMesh, zombieAnimData()));
     setSoldierLamps(this.uniforms);
     this.env.dressWithModels(modelMesh);
     this.player = new Player(this.camera, this.scene, this.fx, this.audio, this.horde);

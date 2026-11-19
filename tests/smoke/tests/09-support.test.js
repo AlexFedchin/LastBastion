@@ -17,7 +17,7 @@ module.exports = {
       const C = G.horde.corpses;
       for (let k = 0; k < 90; k++) {
         step();
-        for (const L of [C.near, C.far]) for (const i of L.active) if (L.mode[i] === 2) flyMax = Math.max(flyMax, L.y[i]);
+        for (const L of C.pools) for (const i of L.active) if (L.mode[i] === 2) flyMax = Math.max(flyMax, L.y[i]);
       }
       return { n0, left: a.grenadesLeft, one, still, flyMax };
     })()`);
@@ -39,7 +39,7 @@ module.exports = {
       const C = G.horde.corpses;
       for (let k = 0; k < 150; k++) {
         G.test.advance(1 / 30, 1 / 30, false);
-        for (const L of [C.near, C.far]) for (const i of L.active) if (L.mode[i] === 2) flyMax = Math.max(flyMax, L.y[i]);
+        for (const L of C.pools) for (const i of L.active) if (L.mode[i] === 2) flyMax = Math.max(flyMax, L.y[i]);
       }
       return { before, after: G.horde.alive, flyMax };
     })()`);

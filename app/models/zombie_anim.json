@@ -1,0 +1,321 @@
+{
+ "bones": [
+  "Hips",
+  "Spine",
+  "Spine1",
+  "Spine2",
+  "Neck",
+  "Head",
+  "Jaw",
+  "LeftShoulder",
+  "LeftArm",
+  "LeftForeArm",
+  "LeftHand",
+  "RightShoulder",
+  "RightArm",
+  "RightForeArm",
+  "RightHand",
+  "LeftUpLeg",
+  "LeftLeg",
+  "LeftFoot",
+  "LeftToeBase",
+  "RightUpLeg",
+  "RightLeg",
+  "RightFoot",
+  "RightToeBase"
+ ],
+ "fps": 30,
+ "rows": 2728,
+ "width": 69,
+ "clips": {
+  "walk": {
+   "row": 0,
+   "frames": 75,
+   "loop": true,
+   "speed": 0.382,
+   "dur": 2.5
+  },
+  "run": {
+   "row": 76,
+   "frames": 75,
+   "loop": true,
+   "speed": 0.657,
+   "dur": 2.5
+  },
+  "idle1": {
+   "row": 152,
+   "frames": 250,
+   "loop": true,
+   "speed": 0,
+   "dur": 8.333
+  },
+  "idle2": {
+   "row": 403,
+   "frames": 300,
+   "loop": true,
+   "speed": 0,
+   "dur": 10
+  },
+  "attack1": {
+   "row": 704,
+   "frames": 75,
+   "loop": true,
+   "speed": 0,
+   "dur": 2.5
+  },
+  "attack2": {
+   "row": 780,
+   "frames": 150,
+   "loop": true,
+   "speed": 0,
+   "dur": 5
+  },
+  "attack3": {
+   "row": 931,
+   "frames": 150,
+   "loop": true,
+   "speed": 0.004,
+   "dur": 5
+  },
+  "roar": {
+   "row": 1082,
+   "frames": 250,
+   "loop": true,
+   "speed": 0,
+   "dur": 8.333
+  },
+  "gethit": {
+   "row": 1333,
+   "frames": 76,
+   "loop": false,
+   "speed": 0,
+   "dur": 2.533
+  },
+  "death1": {
+   "row": 1410,
+   "frames": 301,
+   "loop": false,
+   "speed": 0,
+   "dur": 10.033
+  },
+  "death2": {
+   "row": 1712,
+   "frames": 251,
+   "loop": false,
+   "speed": 0,
+   "dur": 8.367
+  },
+  "shuffle": {
+   "row": 1964,
+   "frames": 75,
+   "loop": true,
+   "speed": 0.511,
+   "dur": 2.5
+  },
+  "jog": {
+   "row": 2040,
+   "frames": 75,
+   "loop": true,
+   "speed": 0.658,
+   "dur": 2.5
+  },
+  "stomp": {
+   "row": 2116,
+   "frames": 75,
+   "loop": true,
+   "speed": 0.513,
+   "dur": 2.5
+  },
+  "waddle": {
+   "row": 2192,
+   "frames": 75,
+   "loop": true,
+   "speed": 0.42,
+   "dur": 2.5
+  },
+  "limp": {
+   "row": 2268,
+   "frames": 75,
+   "loop": true,
+   "speed": 0.4,
+   "dur": 2.5
+  },
+  "sprint": {
+   "row": 2344,
+   "frames": 20,
+   "loop": true,
+   "speed": 3.144,
+   "dur": 0.667
+  },
+  "claw": {
+   "row": 2365,
+   "frames": 78,
+   "loop": true,
+   "speed": 0,
+   "dur": 2.6
+  },
+  "scramble": {
+   "row": 2444,
+   "frames": 45,
+   "loop": true,
+   "speed": 0.028,
+   "dur": 1.5
+  },
+  "climb": {
+   "row": 2490,
+   "frames": 67,
+   "loop": false,
+   "speed": 0,
+   "dur": 2.233
+  },
+  "perch": {
+   "row": 2558,
+   "frames": 90,
+   "loop": true,
+   "speed": 0,
+   "dur": 3
+  },
+  "burn": {
+   "row": 2649,
+   "frames": 75,
+   "loop": true,
+   "speed": 0.436,
+   "dur": 2.5
+  },
+  "thrown": {
+   "row": 2725,
+   "frames": 2,
+   "loop": false,
+   "speed": 0,
+   "dur": 0.067
+  }
+ },
+ "eyes": [
+  0,
+  1.68,
+  0.104
+ ],
+ "stump": [
+  0,
+  1.623,
+  -0.028
+ ],
+ "headBone": 5,
+ "bind": [
+  [
+   0,
+   0.9866,
+   0
+  ],
+  [
+   0,
+   1.0557,
+   0
+  ],
+  [
+   0,
+   1.2248,
+   -0.0365
+  ],
+  [
+   0,
+   1.3938,
+   -0.0365
+  ],
+  [
+   0,
+   1.5629,
+   -0.0375
+  ],
+  [
+   0,
+   1.7603,
+   0.009
+  ],
+  [
+   -0.0004,
+   1.6223,
+   0.0108
+  ],
+  [
+   0.1093,
+   1.4677,
+   -0.0876
+  ],
+  [
+   0.2191,
+   1.4095,
+   -0.0799
+  ],
+  [
+   0.4238,
+   1.26,
+   -0.1056
+  ],
+  [
+   0.6022,
+   1.148,
+   0.0034
+  ],
+  [
+   -0.1093,
+   1.4677,
+   -0.0876
+  ],
+  [
+   -0.2191,
+   1.4095,
+   -0.0799
+  ],
+  [
+   -0.4238,
+   1.26,
+   -0.1056
+  ],
+  [
+   -0.6022,
+   1.148,
+   0.0034
+  ],
+  [
+   0.0879,
+   0.9248,
+   0
+  ],
+  [
+   0.1387,
+   0.5633,
+   0.0009
+  ],
+  [
+   0.1863,
+   0.0603,
+   -0.0988
+  ],
+  [
+   0.1436,
+   0.0241,
+   0.2314
+  ],
+  [
+   -0.0879,
+   0.9248,
+   0
+  ],
+  [
+   -0.1387,
+   0.5633,
+   0.0009
+  ],
+  [
+   -0.1863,
+   0.0603,
+   -0.0988
+  ],
+  [
+   -0.3893,
+   0.0372,
+   -0.3477
+  ]
+ ]
+}

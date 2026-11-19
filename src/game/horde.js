@@ -6,7 +6,8 @@ import {
   ZOMBIE_HEIGHT, WING_COS,
 } from '../config.js';
 import { nearObstacle, steer, pushOut } from '../world/obstacles.js';
-import { createZombieGeometry, createGiantGeometry, createZombieMaterial, createZombieDepthMaterial, createEyeMesh } from './zombieModel.js';
+import { createGiantGeometry, createZombieMaterial, createZombieDepthMaterial, createEyeMesh } from './zombieModel.js';
+import { createSkinnedZombieMaterial } from './zombieSkin.js';
 import { rand } from '../core/util.js';
 import { groundH } from '../world/terrain.js';
 import { fogUniforms } from '../render/atmosphere.js';
@@ -17,11 +18,6 @@ const GX0 = -230, GZ0 = -300;
 const GW = 230, GH = 156;
 const NCELLS = GW * GH;
 
-const SHIRTS = [
-  [0.15, 0.16, 0.11], [0.12, 0.12, 0.13], [0.17, 0.13, 0.09], [0.08, 0.09, 0.13],
-  [0.24, 0.23, 0.2], [0.19, 0.07, 0.06], [0.1, 0.11, 0.08], [0.05, 0.05, 0.05],
-  [0.2, 0.19, 0.12], [0.14, 0.1, 0.12],
-];
 
 const PILE_S_MIN = (PILE.MIN_X - WORLD.GATE_HALF) / WING_COS;     // nearest mound centre to the tower (m along the wall)
 const PILE_S_MAX = (WORLD.WING_END - WORLD.GATE_HALF) / WING_COS - 2;
@@ -42,20 +38,192 @@ function addInstanced(geo, name, cap, size) {
 
 class CorpseField {
   constructor(scene, cap, uniforms) {
-    this.near = new Corpses(scene, Math.round(cap * 0.45), uniforms, 1);
-    this.far = new Corpses(scene, Math.round(cap * 0.55), uniforms, 2);
-    this.near2 = 62 * 62;
+    this.scene = scene; this.cap = cap; this.uniforms = uniforms;
     this.giant = new Corpses(scene, 3, uniforms, 'giant');
+    this.pools = [];               // near, mid, far: the zombie model (useModel)
+    this.lim2 = [38 * 38, 95 * 95]; // the camera never moves: a body's detail is fixed where it falls
+    this._onLand = null;
   }
-  set onLand(fn) { this.near.onLand = fn; this.far.onLand = fn; }
-  get count() { return this.near.count + this.far.count + this.giant.count; }
+  /** The zombie model is in: bodies from now on are skinned (see SkinCorpses). */
+  useModel(skin) {
+    const share = [0.32, 0.4, 0.28];
+    this.pools = skin.geos.map((g, li) => new SkinCorpses(this.scene, Math.round(this.cap * share[li]), this.uniforms, skin, li));
+    for (const p of this.pools) p.onLand = this._onLand;
+  }
+  set onLand(fn) { this._onLand = fn; for (const p of this.pools) p.onLand = fn; this.giant.onLand = fn; }
+  get count() { return this.pools.reduce((a, p) => a + p.count, 0) + this.giant.count; }
   add(x, y, z, yaw, scale, type, ...rest) {
-    const dx = x - WORLD.CAM.x, dz = z - WORLD.CAM.z;
-    const C = type === ZT.GIANT ? this.giant : (dx * dx + dz * dz < this.near2 ? this.near : this.far);
-    C.add(x, y, z, yaw, scale, type, ...rest);
+    if (type === ZT.GIANT) { this.giant.add(x, y, z, yaw, scale, type, ...rest); return; }
+    if (!this.pools.length) return;
+    const dx = x - WORLD.CAM.x, dz = z - WORLD.CAM.z, d2 = dx * dx + dz * dz;
+    this.pools[d2 < this.lim2[0] ? 0 : d2 < this.lim2[1] ? 1 : 2].add(x, y, z, yaw, scale, type, ...rest);
   }
-  update(dt) { this.near.update(dt); this.far.update(dt); this.giant.update(dt); }
-  clear() { this.near.clear(); this.far.clear(); this.giant.clear(); }
+  update(dt) { for (const p of this.pools) p.update(dt); this.giant.update(dt); }
+  clear() { for (const p of this.pools) p.clear(); this.giant.clear(); }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// The dead, on the zombie model: shot ones play a death (falling back mostly, or folding
+// forward onto their knees), thrown ones tumble in a limp pose and land flat; then they lie
+// as they fell.
+const DEATHS = [['death2', 1.75, 0.78], ['death1', 2.5, 1]]; // [clip, playback rate, cumulative chance]
+class SkinCorpses {
+  constructor(scene, cap, uniforms, skin, lod) {
+    this.cap = cap; this.head = 0; this.count = 0;
+    this.anim = skin.anim;
+    const geo = skin.geos[lod].clone();
+    this.aAnim = addInstanced(geo, 'aAnim', cap, 4);
+    this.aState = addInstanced(geo, 'aState', cap, 4);
+    this.aTint = addInstanced(geo, 'aTint', cap, 3);
+    this.mesh = new THREE.InstancedMesh(geo, createSkinnedZombieMaterial(skin.anim, skin.maps, uniforms, { corpse: true }), cap);
+    this.mesh.count = 0;
+    this.mesh.frustumCulled = false;
+    this.mesh.receiveShadow = true;
+    this.mesh.castShadow = false;
+    this.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    scene.add(this.mesh);
+    const F = () => new Float32Array(cap);
+    this.x = F(); this.y = F(); this.z = F(); this.vx = F(); this.vy = F(); this.vz = F();
+    this.yaw = F(); this.pitch = F(); this.pv = F(); this.roll = F(); this.rv = F(); this.scale = F();
+    this.t = F(); this.rate = F(); this.target = F();
+    this.clip = new Int16Array(cap);
+    this.mode = new Uint8Array(cap); // 0 lying · 2 flying · 3 settling · 4 dying (playing its death)
+    this.active = [];
+    this.dirty = false;
+    this.onLand = null;
+    this.ids = DEATHS.map(([c]) => this.anim.id[c]);
+    this.thrown = this.anim.id.thrown;
+  }
+  clear() { this.head = 0; this.count = 0; this.mesh.count = 0; this.active.length = 0; this.mode.fill(0); }
+  add(x, y, z, yaw, scale, type, tint, vx, vy, vz, headless, charred, flying, look = 0) {
+    const i = this.head;
+    this.head = (this.head + 1) % this.cap;
+    if (this.count < this.cap) this.count++;
+    const wasActive = this.mode[i] !== 0;
+    this.x[i] = x; this.y[i] = y; this.z[i] = z;
+    this.vx[i] = vx; this.vy[i] = vy; this.vz[i] = vz;
+    this.yaw[i] = yaw; this.scale[i] = scale;
+    this.t[i] = 0;
+    let row;
+    if (flying) {
+      this.mode[i] = 2;
+      this.y[i] = y + 0.9 * scale;
+      this.roll[i] = (Math.random() - 0.5) * 0.5;
+      this.pitch[i] = (Math.random() - 0.5) * 0.6;
+      const spin = Math.min(1.6, 0.5 + Math.hypot(vx, vy, vz) / 22) / Math.sqrt(scale);
+      this.pv[i] = (Math.random() < 0.5 ? -1 : 1) * (5 + Math.random() * 9) * spin;
+      this.rv[i] = (Math.random() - 0.5) * 9 * spin;
+      row = this.anim.row(this.thrown, Math.random() < 0.5 ? 0 : 1 / this.anim.fps);
+    } else {
+      this.mode[i] = 4;
+      this.pitch[i] = 0; this.roll[i] = 0; this.pv[i] = 0; this.rv[i] = 0;
+      const r = Math.random();
+      const k = DEATHS.findIndex((d) => r < d[2]);
+      this.clip[i] = this.ids[k];
+      this.rate[i] = DEATHS[k][1] * (0.85 + Math.random() * 0.3) / Math.sqrt(scale);
+      row = this.anim.row(this.clip[i], 0);
+    }
+    const A = this.aAnim.array, S = this.aState.array, T = this.aTint.array;
+    A[i * 4] = row; A[i * 4 + 1] = 0; A[i * 4 + 2] = 0; A[i * 4 + 3] = look;
+    S[i * 4] = 0; S[i * 4 + 1] = charred ? 1 : 0; S[i * 4 + 2] = type; S[i * 4 + 3] = headless ? 1 : 0;
+    T[i * 3] = tint[0]; T[i * 3 + 1] = tint[1]; T[i * 3 + 2] = tint[2];
+    this.aAnim.needsUpdate = this.aState.needsUpdate = this.aTint.needsUpdate = true;
+    if (!wasActive) this.active.push(i);
+    this.write(i);
+  }
+  write(i) {
+    const s = this.scale[i];
+    if (this.mode[i] === 4 || (this.mode[i] === 0 && this.pitch[i] === 0)) {
+      // standing where it was shot, the death clip does the falling
+      _e.set(0, this.yaw[i], 0, 'YXZ');
+      _q.setFromEuler(_e);
+      _p.set(this.x[i], this.y[i] + groundH(this.x[i], this.z[i]), this.z[i]);
+      _s.set(s, s, s);
+      _m.compose(_p, _q, _s);
+    } else {
+      // thrown: tumbling about its middle
+      _e.set(this.pitch[i], this.yaw[i], this.roll[i], 'YXZ');
+      _q.setFromEuler(_e);
+      _p.set(this.x[i], this.y[i] + groundH(this.x[i], this.z[i]), this.z[i]);
+      _s.set(s, s, s);
+      _m.compose(_p, _q, _s);
+      const e = _m.elements;
+      e[12] -= 0.9 * e[4]; e[13] -= 0.9 * e[5]; e[14] -= 0.9 * e[6];
+    }
+    _m.toArray(this.mesh.instanceMatrix.array, i * 16);
+    this.dirty = true;
+  }
+  update(dt) {
+    const act = this.active, A = this.aAnim.array;
+    let animDirty = false;
+    for (let k = 0; k < act.length; k++) {
+      const i = act[k];
+      const s = this.scale[i], mode = this.mode[i];
+      if (mode === 4) {
+        // dying: the clip plays out; a body shot on the mound drops to the ground as it goes
+        this.t[i] += dt * this.rate[i];
+        if (this.y[i] > 0) { this.vy[i] -= 20 * dt; this.y[i] = Math.max(0, this.y[i] + this.vy[i] * dt); }
+        const damp = Math.exp(-4 * dt);
+        this.x[i] += this.vx[i] * dt; this.z[i] += this.vz[i] * dt; this.vx[i] *= damp; this.vz[i] *= damp;
+        A[i * 4] = this.anim.row(this.clip[i], this.t[i]);
+        animDirty = true;
+        if (this.t[i] >= this.anim.dur(this.clip[i]) && this.y[i] <= 0) {
+          this.mode[i] = 0;
+          if (this.onLand) this.onLand(this.x[i], this.z[i], 0.6);
+          this.write(i);
+          act[k] = act[act.length - 1]; act.pop(); k--;
+          continue;
+        }
+      } else if (mode === 2) {
+        this.vy[i] -= 22 * dt;
+        const drag = Math.exp(-0.25 * dt);
+        this.vx[i] *= drag; this.vz[i] *= drag;
+        this.x[i] += this.vx[i] * dt; this.y[i] += this.vy[i] * dt; this.z[i] += this.vz[i] * dt;
+        if (wallDist(this.x[i], this.z[i]) < 0.5 && Math.abs(this.x[i]) < WORLD.WING_END) {
+          const ax = Math.abs(this.x[i]);
+          this.z[i] = wallZ(this.x[i]) - (ax <= WORLD.GATE_HALF ? 0.5 : 0.5 / WING_COS);
+          this.vx[i] *= 0.2; this.vz[i] = Math.min(0, this.vz[i]) * 0.2 - 1; this.pv[i] *= 0.3;
+        }
+        this.pitch[i] += this.pv[i] * dt;
+        this.roll[i] += this.rv[i] * dt;
+        const floor = 0.14 * s;
+        if (this.y[i] <= floor && this.vy[i] < 0) {
+          this.y[i] = floor;
+          const impact = -this.vy[i];
+          if (this.onLand) this.onLand(this.x[i], this.z[i], Math.min(1.6, 0.5 + impact * 0.05));
+          if (impact > 9) {
+            this.vy[i] = impact * 0.25; this.vx[i] *= 0.4; this.vz[i] *= 0.4; this.pv[i] *= 0.5; this.rv[i] *= 0.5;
+          } else {
+            this.mode[i] = 3;
+            this.t[i] = 0;
+            const sp = Math.sin(this.pitch[i]);
+            this.target[i] = sp >= 0 ? Math.PI / 2 : -Math.PI / 2;
+            this.pitch[i] = Math.atan2(Math.sin(this.pitch[i]), Math.cos(this.pitch[i]));
+          }
+        }
+      } else if (mode === 3) {
+        this.t[i] += dt;
+        const k2 = Math.min(1, this.t[i] / 0.16);
+        this.pitch[i] += (this.target[i] - this.pitch[i]) * k2;
+        this.roll[i] *= 1 - k2 * 0.8;
+        this.x[i] += this.vx[i] * dt * (1 - k2); this.z[i] += this.vz[i] * dt * (1 - k2);
+        if (k2 >= 1) {
+          this.mode[i] = 0;
+          if (this.pitch[i] === 0) this.pitch[i] = 1e-4; // (stays drawn lying flat, not standing)
+          this.write(i);
+          act[k] = act[act.length - 1]; act.pop(); k--;
+          continue;
+        }
+      }
+      this.write(i);
+    }
+    if (animDirty) this.aAnim.needsUpdate = true;
+    if (this.dirty) {
+      this.mesh.count = this.count;
+      this.mesh.instanceMatrix.needsUpdate = true;
+      this.dirty = false;
+    }
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -261,10 +429,16 @@ export class Horde {
     this.seek = F(); // countdown to looking for a mound to join, or to looking again at the one it joined
     this.sought = new Int8Array(N); // the mound it is heading for, + 1 (0: none, it is going for the wall)
     this.inside = new Uint8Array(N); // over the wall and in the yard (only in the extraction: overWall)
+    // the model's animation (animStep): the clip playing and the one fading out under it
+    this.look = F();                          // which of the three looks, + a seed in the fraction
+    this.aClip = F(); this.aT = F(); this.pClip = F(); this.pT = F(); this.xf = F();
+    this.px = F(); this.pz = F(); this.mv = F(); // last position, smoothed ground speed
+    this.hitT = F(); this.hitCd = F();          // a flinch playing, and the time before the next can
     this.overWall = null; // the extraction sets (x, z) -> [tx, tz]: climbers drop into the yard and run there
     this._arrays = [this.seek, this.id, this.x, this.y, this.z, this.yaw, this.hp, this.maxHp, this.speed, this.rate, this.phase, this.lean,
       this.scale, this.radius, this.weight, this.tgtX, this.tgtZ, this.flash, this.burn, this.burnDps, this.atk, this.climb,
-      this.climbDur, this.slow, this.tr, this.tg, this.tb, this.type, this.dead, this.pileJit, this.fadeIn, this.inside, this.sought];
+      this.climbDur, this.slow, this.tr, this.tg, this.tb, this.type, this.dead, this.pileJit, this.fadeIn, this.inside, this.sought,
+      this.look, this.aClip, this.aT, this.pClip, this.pT, this.xf, this.px, this.pz, this.mv, this.hitT, this.hitCd];
 
     // mounds against the wall (see PILE): position along the wall (m from the tower corner) per side
     const P = PILE.MAX;
@@ -294,33 +468,31 @@ export class Horde {
     this.pending = []; // delayed explosions (bloater chains)
     this._gibChance = -1; // set by explode() for the kill it is about to cause
 
-    // rendering: living — detailed mesh close to the wall, boxes far away
-    const mat = createZombieMaterial(uniforms);
-    const depth = createZombieDepthMaterial(uniforms);
-    // (and the giants, few and huge, on a sculpted mesh of their own)
-    this.lods = [createZombieGeometry(0), createZombieGeometry(2), createGiantGeometry()].map((geo, li) => {
-      const L = {
-        aAnim: addInstanced(geo, 'aAnim', li === 2 ? 4 : N, 4),
-        aState: addInstanced(geo, 'aState', li === 2 ? 4 : N, 4),
-        aTint: addInstanced(geo, 'aTint', li === 2 ? 4 : N, 3),
-      };
-      L.mesh = new THREE.InstancedMesh(geo, mat, li === 2 ? 4 : N);
-      L.mesh.customDepthMaterial = depth;
-      L.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-      L.mesh.count = 0;
-      L.mesh.frustumCulled = false;
-      L.mesh.castShadow = shadows;
-      L.mesh.receiveShadow = true;
-      scene.add(L.mesh);
-      return L;
-    });
-    this.mesh = this.lods[0].mesh;
-    this.lodNear2 = 72 * 72;
-    // full per-zombie buffers (eyes see every zombie)
+    // rendering: living — the zombie model at three levels of detail (useModel, once it has
+    // loaded), and the giants, few and huge, on a sculpted mesh of their own
+    this.shadows = shadows;
+    const geo = createGiantGeometry();
+    const big = {
+      aAnim: addInstanced(geo, 'aAnim', 4, 4), aState: addInstanced(geo, 'aState', 4, 4), aTint: addInstanced(geo, 'aTint', 4, 3),
+    };
+    big.mesh = new THREE.InstancedMesh(geo, createZombieMaterial(uniforms), 4);
+    big.mesh.customDepthMaterial = createZombieDepthMaterial(uniforms);
+    big.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    big.mesh.count = 0;
+    big.mesh.frustumCulled = false;
+    big.mesh.castShadow = shadows;
+    big.mesh.receiveShadow = true;
+    scene.add(big.mesh);
+    this.big = big;
+    this.lods = [];
+    this.lodLim2 = [44 * 44, 120 * 120];
+    this.anim = null;
+    // full per-zombie buffers (eyes see every zombie): the giant's old pose inputs, and where the eyes are
     this.aAnim = new THREE.InstancedBufferAttribute(new Float32Array(N * 4), 4).setUsage(THREE.DynamicDrawUsage);
     this.aState = new THREE.InstancedBufferAttribute(new Float32Array(N * 4), 4).setUsage(THREE.DynamicDrawUsage);
+    this.aEye = new THREE.InstancedBufferAttribute(new Float32Array(N * 3), 3).setUsage(THREE.DynamicDrawUsage);
     this.tintBuf = new Float32Array(N * 3);
-    this.eyes = createEyeMesh(N, uniforms, fogUniforms, this.aAnim, this.aState);
+    this.eyes = createEyeMesh(N, uniforms, fogUniforms, this.aAnim, this.aState, this.aEye);
     this.eyes.count = 0;
     scene.add(this.eyes);
     // soft contact shadows that ground every walker
@@ -354,6 +526,39 @@ export class Horde {
     this.ctx = { fireAt: null, wireAt: null };
   }
 
+  /**
+   * The zombie model has loaded: { anim: ZombieAnim, geos: [lod0, lod1, lod2], maps: { looks, normal } }.
+   * The living draw on it from now on, and so do the dead.
+   */
+  useModel(skin) {
+    this.anim = skin.anim;
+    const mat = createSkinnedZombieMaterial(skin.anim, skin.maps, this.uniforms);
+    const depth = createSkinnedZombieMaterial(skin.anim, skin.maps, this.uniforms, { depth: true });
+    const N = this.cap;
+    this.lods = skin.geos.map((g, li) => {
+      const geo = g.clone();
+      const L = { aAnim: addInstanced(geo, 'aAnim', N, 4), aState: addInstanced(geo, 'aState', N, 4), aTint: addInstanced(geo, 'aTint', N, 3) };
+      L.mesh = new THREE.InstancedMesh(geo, mat, N);
+      L.mesh.customDepthMaterial = depth;
+      L.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+      L.mesh.count = 0;
+      L.mesh.frustumCulled = false;
+      L.mesh.castShadow = this.shadows && li < 2;
+      L.mesh.receiveShadow = true;
+      this.scene.add(L.mesh);
+      return L;
+    });
+    this.mesh = this.lods[0].mesh;
+    const id = skin.anim.id;
+    this.CLIP = {
+      walk: id.shuffle, jog: id.jog, limp: id.limp, stomp: id.stomp, waddle: id.waddle, sprint: id.sprint,
+      claw: id.claw, scramble: id.scramble, climb: id.climb, perch: id.perch, burn: id.burn, gethit: id.gethit,
+      idle: [id.idle1, id.idle2, id.roar], attack: [id.attack1, id.attack2, id.attack3],
+    };
+    this.LOCO = new Set([id.shuffle, id.jog, id.limp, id.stomp, id.waddle, id.sprint, id.burn]);
+    this.corpses.useModel(skin);
+  }
+
   clear() {
     this.n = 0; this.alive = 0;
     this.pending.length = 0;
@@ -361,6 +566,7 @@ export class Horde {
     this.pAct.fill(0); this.pH.fill(0); this.pW.fill(0); this.pWn.fill(0); this.pAcid.fill(0); this.pTop.fill(0); this.pTopN.fill(0);
     this.corpses.clear();
     for (const L of this.lods) L.mesh.count = 0;
+    this.big.mesh.count = 0;
     this.eyes.count = 0;
     this.blobs.count = 0;
     this.cellStart.fill(0);
@@ -407,12 +613,19 @@ export class Horde {
     this.climb[i] = 0; this.climbDur[i] = rand(PILE.CLIMB_TIME[0], PILE.CLIMB_TIME[1]);
     this.slow[i] = 0;
     this.pileJit[i] = Math.random();
-    let c = SHIRTS[(Math.random() * SHIRTS.length) | 0];
-    if (type === ZT.BRUTE) c = [0.09, 0.1, 0.07];
-    if (type === ZT.BLOATER) c = [0.2, 0.22, 0.15];
-    if (type === ZT.GIANT) c = [0.06, 0.05, 0.045];
-    const v = rand(0.7, 1.25);
-    this.tr[i] = c[0] * v; this.tg[i] = c[1] * v; this.tb[i] = c[2] * v;
+    if (type === ZT.GIANT) {
+      // (the giant's own mesh: its hide colour)
+      this.tr[i] = 0.06; this.tg[i] = 0.05; this.tb[i] = 0.045;
+    } else {
+      // the model's textures, a little dirtier or paler one to the next
+      const v = rand(0.72, 1.08), w = rand(-0.06, 0.06);
+      let c = [v * (1 + w), v, v * (1 - w)];
+      if (type === ZT.BRUTE) c = [v * 0.78, v * 0.76, v * 0.72];
+      this.tr[i] = c[0]; this.tg[i] = c[1]; this.tb[i] = c[2];
+    }
+    this.look[i] = ((Math.random() * 3) | 0) + Math.random() * 0.98;
+    this.aClip[i] = -1; this.pClip[i] = -1; this.xf[i] = 0; this.aT[i] = 0; this.pT[i] = 0;
+    this.px[i] = x; this.pz[i] = z; this.mv[i] = sp; this.hitT[i] = 0; this.hitCd[i] = 0;
     return i;
   }
 
@@ -537,6 +750,8 @@ export class Horde {
     if (this.type[i] === ZT.GIANT && cause === 'gunship') amount *= 0.5; // thick hide: the gunship can't do it alone
     this.hp[i] -= amount;
     this.flash[i] = 1;
+    // a heavy hit staggers it (not every round: a man-sized thing under a fifty would never move)
+    if (this.hitCd[i] <= 0 && this.hp[i] > 0 && amount > this.maxHp[i] * 0.12 && Math.random() < 0.45) { this.hitT[i] = 0.62; this.hitCd[i] = rand(1.6, 3); }
     if (this.hp[i] <= 0) {
       this.kill(i, cause, dx, dy, dz, headshot, -this.hp[i]);
       return true;
@@ -586,7 +801,7 @@ export class Horde {
     let vx = 0, vy = 0, vz = 0;
     if (explosive) { vx = dx; vy = dy; vz = dz; }
     else { vx = dx * 1.5; vz = dz * 1.5; }
-    this.corpses.add(x, y, z, this.yaw[i], s, type, tint, vx, vy, vz, headshot, this.burn[i] > 0, flying);
+    this.corpses.add(x, y, z, this.yaw[i], s, type, tint, vx, vy, vz, headshot, this.burn[i] > 0, flying, this.look[i]);
     if (!flying) this.fx.blood(x, z, 0.8 * s);
   }
 
@@ -982,7 +1197,66 @@ export class Horde {
 
     this.compact();
     this.buildGrid();
+    this.animStep(dt);
     this.corpses.update(dt);
+  }
+
+  /**
+   * Which clip each one plays, and how fast: what it is doing (burning, going over, on the
+   * mound, at the wall, running, standing) and what it is. Changes crossfade; the gait's
+   * rate follows how fast it is really moving over the ground, so the feet don't slide.
+   */
+  animStep(dt) {
+    if (!this.anim) return;
+    const A = this.anim, C = this.CLIP, n = this.n;
+    const k = 1 - Math.exp(-6 * dt);
+    for (let i = 0; i < n; i++) {
+      const type = this.type[i];
+      if (type === ZT.GIANT) continue;
+      // ground speed, smoothed
+      const dx = this.x[i] - this.px[i], dz = this.z[i] - this.pz[i];
+      this.px[i] = this.x[i]; this.pz[i] = this.z[i];
+      const v = dt > 0 ? Math.min(12, Math.sqrt(dx * dx + dz * dz) / dt) : 0;
+      this.mv[i] += (v - this.mv[i]) * k;
+      if (this.hitCd[i] > 0) this.hitCd[i] -= dt;
+      const seed = this.look[i] % 1;
+      const y = this.y[i];
+      let want, t = -1, rate = 1;
+      if (this.hitT[i] > 0) this.hitT[i] -= dt;
+      if (this.burn[i] > 0.2) { want = C.burn; }
+      else if (this.inside[i]) {
+        if (this.seek[i] > 0 || y > 2.5) want = C.perch;
+        else if (this.mv[i] < 0.6 && this.atk[i] > 0.5) { want = C.attack[(seed * 3) | 0]; rate = 1.3; }
+        else want = type === ZT.RUNNER || this.speed[i] > 2.1 ? C.sprint : C.jog;
+      } else if (this.climb[i] > 0) {
+        // going over the top: the climb plays over exactly the time it takes
+        want = C.climb; t = Math.min(1, this.climb[i] / this.climbDur[i]) * A.dur(C.climb);
+      } else if (y > 0.35) { want = C.scramble; rate = 0.85 + seed * 0.35; }
+      else if (this.hitT[i] > 0) { want = C.gethit; t = 0.62 - this.hitT[i]; }
+      else if (this.atk[i] > 0.5) { want = C.claw; rate = 0.85 + seed * 0.4; }
+      else if (this.mv[i] > 0.3) {
+        if (type === ZT.RUNNER) want = C.sprint;
+        else if (type === ZT.BRUTE) want = C.stomp;
+        else if (type === ZT.BLOATER) want = C.waddle;
+        else want = seed > 0.86 ? C.limp : (this.speed[i] > 2.2 || seed < 0.3 ? C.jog : C.walk);
+      } else { want = C.idle[seed < 0.45 ? 0 : seed < 0.85 ? 1 : 2]; rate = 0.8 + seed * 0.4; }
+      if (this.LOCO.has(want)) {
+        const sp = A.byId[want].speed;
+        rate = sp > 0.05 ? this.mv[i] / (sp * this.scale[i]) : 1;
+        if (want === C.burn) rate = Math.max(0.9, rate);
+        rate = Math.min(3.2, Math.max(0.35, rate));
+      }
+      const cur = this.aClip[i];
+      if (want !== cur) {
+        if (cur >= 0) { this.pClip[i] = cur; this.pT[i] = this.aT[i]; this.xf[i] = 1; }
+        // gaits hand over at the same point of the stride; anything else starts somewhere of its own
+        if (cur >= 0 && this.LOCO.has(cur) && this.LOCO.has(want)) this.aT[i] = (this.aT[i] / A.dur(cur)) * A.dur(want);
+        else this.aT[i] = A.byId[want].loop ? (this.phase[i] % A.dur(want)) : 0;
+        this.aClip[i] = want;
+      }
+      if (t >= 0) this.aT[i] = t; else this.aT[i] += dt * rate;
+      if (this.xf[i] > 0) { this.xf[i] = Math.max(0, this.xf[i] - dt / 0.28); this.pT[i] += dt; }
+    }
   }
 
   /** In the yard: drop off the wall, then a straight run at the target, clawing when there. */
@@ -1040,14 +1314,17 @@ export class Horde {
   // ── rendering ────────────────────────────────────────────────────────────
   syncRender() {
     const n = this.n;
+    if (!this.anim) return;
     const M = this.eyes.instanceMatrix.array;
-    const A = this.aAnim.array, S = this.aState.array, T = this.tintBuf;
-    const near = this.lods[0], far = this.lods[1], big = this.lods[2];
-    const MN = near.mesh.instanceMatrix.array, MF = far.mesh.instanceMatrix.array, MG = big.mesh.instanceMatrix.array;
-    const AN = near.aAnim.array, AF = far.aAnim.array, SN = near.aState.array, SF = far.aState.array, TN = near.aTint.array, TF = far.aTint.array;
-    const cx = WORLD.CAM.x, cz = WORLD.CAM.z, lim = this.lodNear2;
+    const A = this.aAnim.array, S = this.aState.array, T = this.tintBuf, E = this.aEye.array;
+    const big = this.big, L = this.lods, AN = this.anim;
+    const MG = big.mesh.instanceMatrix.array;
+    const cx = WORLD.CAM.x, cz = WORLD.CAM.z, lim0 = this.lodLim2[0], lim1 = this.lodLim2[1];
     const fire = this.fire;
-    let a = 0, b = 0, gi = 0;
+    const cnt = [0, 0, 0];
+    const eye = this._eye || (this._eye = [0, 0, 0]);
+    const EY = AN.eyes;
+    let gi = 0;
     for (let i = 0; i < n; i++) {
       const c = Math.cos(this.yaw[i]), s = Math.sin(this.yaw[i]);
       const sc = this.scale[i];
@@ -1062,23 +1339,38 @@ export class Horde {
       M[o + 12] = x; M[o + 13] = y; M[o + 14] = z; M[o + 15] = 1;
       const q4 = i * 4, t3 = i * 3;
       const burn = this.burn[i] > 0 ? Math.min(1, this.burn[i] * 2) : 0;
+      // (the eyes' own inputs: type, and the giant's old lean)
       A[q4] = this.phase[i]; A[q4 + 1] = this.rate[i]; A[q4 + 2] = this.type[i]; A[q4 + 3] = this.lean[i];
       S[q4] = this.flash[i]; S[q4 + 1] = burn; S[q4 + 2] = this.atk[i]; S[q4 + 3] = -this.fadeIn[i];
       T[t3] = this.tr[i]; T[t3 + 1] = this.tg[i]; T[t3 + 2] = this.tb[i];
-      // copy into the LOD that draws it
       const dx = x - cx, dz = z - cz;
-      let k, LM, LA, LS, LT;
-      if (ty === ZT.GIANT && gi < 4) { k = gi++; LM = MG; LA = big.aAnim.array; LS = big.aState.array; LT = big.aTint.array; }
-      else if (dx * dx + dz * dz < lim) { k = a++; LM = MN; LA = AN; LS = SN; LT = TN; } else { k = b++; LM = MF; LA = AF; LS = SF; LT = TF; }
-      const ko = k * 16, k4 = k * 4, k3 = k * 3;
-      for (let j = 0; j < 16; j++) LM[ko + j] = M[o + j];
-      LA[k4] = A[q4]; LA[k4 + 1] = A[q4 + 1]; LA[k4 + 2] = A[q4 + 2]; LA[k4 + 3] = A[q4 + 3];
-      LS[k4] = S[q4]; LS[k4 + 1] = S[q4 + 1]; LS[k4 + 2] = S[q4 + 2]; LS[k4 + 3] = S[q4 + 3];
-      LT[k3] = T[t3]; LT[k3 + 1] = T[t3 + 1]; LT[k3 + 2] = T[t3 + 2];
+      const e3 = i * 3;
+      if (ty === ZT.GIANT && gi < 4) {
+        const k = gi++, ko = k * 16, k4 = k * 4, k3 = k * 3;
+        for (let j = 0; j < 16; j++) MG[ko + j] = M[o + j];
+        const BA = big.aAnim.array, BS = big.aState.array, BT = big.aTint.array;
+        BA[k4] = A[q4]; BA[k4 + 1] = A[q4 + 1]; BA[k4 + 2] = A[q4 + 2]; BA[k4 + 3] = A[q4 + 3];
+        BS[k4] = S[q4]; BS[k4 + 1] = S[q4 + 1]; BS[k4 + 2] = S[q4 + 2]; BS[k4 + 3] = S[q4 + 3];
+        BT[k3] = T[t3]; BT[k3 + 1] = T[t3 + 1]; BT[k3 + 2] = T[t3 + 2];
+        const lean = this.lean[i] + this.atk[i] * 0.2;
+        E[e3] = 0; E[e3 + 1] = 0.95 + 0.785 * Math.cos(lean); E[e3 + 2] = 0.12 + 0.785 * Math.sin(lean);
+      } else {
+        const li = dx * dx + dz * dz < lim0 ? 0 : dx * dx + dz * dz < lim1 ? 1 : 2;
+        const D = L[li], k = cnt[li]++, ko = k * 16, k4 = k * 4, k3 = k * 3;
+        const LM = D.mesh.instanceMatrix.array, LA = D.aAnim.array, LS = D.aState.array, LT = D.aTint.array;
+        for (let j = 0; j < 16; j++) LM[ko + j] = M[o + j];
+        const cA = this.aClip[i] < 0 ? 0 : this.aClip[i];
+        const rowA = AN.row(cA, this.aT[i]);
+        const xf = this.xf[i] > 0 && this.pClip[i] >= 0 ? this.xf[i] * this.xf[i] * (3 - 2 * this.xf[i]) : 0;
+        LA[k4] = rowA; LA[k4 + 1] = xf > 0 ? AN.row(this.pClip[i], this.pT[i]) : rowA; LA[k4 + 2] = xf; LA[k4 + 3] = this.look[i];
+        LS[k4] = this.flash[i]; LS[k4 + 1] = burn; LS[k4 + 2] = ty; LS[k4 + 3] = this.fadeIn[i] > 0 ? -this.fadeIn[i] : 0;
+        LT[k3] = T[t3]; LT[k3 + 1] = T[t3 + 1]; LT[k3 + 2] = T[t3 + 2];
+        AN.onHead(rowA, EY[0], EY[1], EY[2], eye);
+        E[e3] = eye[0]; E[e3 + 1] = eye[1]; E[e3 + 2] = eye[2];
+      }
       if (burn > 0 && fire) fire.transient(x, y + 0.15 * sc, z, 0.85 * sc * wide, 2.1 * sc, 0.9 + burn * 0.8, (this.phase[i] * 0.37) % 1);
     }
-    near.mesh.count = a;
-    far.mesh.count = b;
+    for (let li = 0; li < L.length; li++) L[li].mesh.count = cnt[li];
     big.mesh.count = gi;
     this.eyes.count = n;
     this.blobs.count = n;
@@ -1088,9 +1380,8 @@ export class Horde {
       attr.addUpdateRange(0, cnt * attr.itemSize);
       attr.needsUpdate = true;
     };
-    upd(this.eyes.instanceMatrix, n); upd(this.aAnim, n); upd(this.aState, n);
-    upd(near.mesh.instanceMatrix, a); upd(near.aAnim, a); upd(near.aState, a); upd(near.aTint, a);
-    upd(far.mesh.instanceMatrix, b); upd(far.aAnim, b); upd(far.aState, b); upd(far.aTint, b);
+    upd(this.eyes.instanceMatrix, n); upd(this.aAnim, n); upd(this.aState, n); upd(this.aEye, n);
+    for (let li = 0; li < L.length; li++) { const D = L[li], c = cnt[li]; upd(D.mesh.instanceMatrix, c); upd(D.aAnim, c); upd(D.aState, c); upd(D.aTint, c); }
     upd(big.mesh.instanceMatrix, gi); upd(big.aAnim, gi); upd(big.aState, gi); upd(big.aTint, gi);
   }
 

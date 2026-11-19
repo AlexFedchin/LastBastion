@@ -28,15 +28,15 @@ const P = 'mixamorig';
 const world = (m) => { const p = new THREE.Vector3(), q = new THREE.Quaternion(), s = new THREE.Vector3(); m.decompose(p, q, s); return { p, q }; };
 
 /**
- * gameBones: the game rig's bones by short name (first skeleton of the source FBX, scene pose
+ * gameBones: the game rig (names without gamePrefix)'s bones by short name (first skeleton of the source FBX, scene pose
  * as the glb stores it); bind: their bind world matrices. Returns a function that turns a
  * clip FBX into { name, times, rot: {bone: Float32Array xyzw...}, hips: Float32Array xyz (cm, game world) }.
  */
-export function makeRetargeter(gameBones, bind) {
+export function makeRetargeter(gameBones, bind, { gamePrefix = P } = {}) {
   // game T-pose, built from the bind pose
   const names = Object.keys(gameBones);
   const parent = {};
-  for (const n of names) { const pb = gameBones[n].parent; parent[n] = pb && pb.isBone ? pb.name.replace(P, '') : null; }
+  for (const n of names) { const pb = gameBones[n].parent; parent[n] = pb && pb.isBone ? pb.name.replace(gamePrefix, '') : null; }
   const order = []; const visit = (n) => { if (order.includes(n)) return; if (parent[n]) visit(parent[n]); order.push(n); };
   names.forEach(visit);
   const kids = {}; for (const n of names) if (parent[n]) (kids[parent[n]] ||= []).push(n);

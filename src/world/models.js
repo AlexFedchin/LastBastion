@@ -15,6 +15,8 @@ const FILES = {
   // the field, the hills and the crews (scripts/models/build_field.mjs)
   trees: 'models/trees.glb', deadtrees: 'models/deadtrees.glb', mg4: 'models/mg4.glb', crow: 'models/crow.glb',
   hangar: 'models/hangar.glb', // the dawn resupply's hall (src/world/hangar.js)
+  // the horde's zombie (scripts/models/build_zombie.mjs; its baked clips load beside it)
+  zombie: 'models/zombie.glb',
 };
 /** The wrecked cars on the roads, each its own model (long axis +x, base at 0). */
 export const CARS = ['car_sedan', 'car_police', 'car_police_flip', 'car_hatch', 'car_saloon'];
@@ -34,18 +36,23 @@ export const KIT = [
 for (const k of KIT) FILES['kit/' + k] = `models/kit/${k}.glb`;
 const scenes = {}, clips = {};
 let loading = null;
+let zombieAnim = null;
 
 /** Start loading every model; resolves when all are in. */
 export function loadModels() {
   if (loading) return loading;
   const loader = new GLTFLoader().setMeshoptDecoder(MeshoptDecoder);
-  loading = Promise.all(Object.entries(FILES).map(async ([name, url]) => {
+  loading = Promise.all([...Object.entries(FILES).map(async ([name, url]) => {
     const r = await fetch(url);
     if (!r.ok) throw new Error(`model ${url}: ${r.status}`);
     const gltf = await loader.parseAsync(await r.arrayBuffer(), '');
     scenes[name] = gltf.scene;
     clips[name] = gltf.animations || [];
-  }));
+  }), (async () => {
+    const [m, d] = await Promise.all([fetch('models/zombie_anim.json'), fetch('models/zombie_anim.bin')]);
+    if (!m.ok || !d.ok) throw new Error('models/zombie_anim: ' + m.status + ' ' + d.status);
+    zombieAnim = { meta: await m.json(), data: new Float32Array(await d.arrayBuffer()) };
+  })()]);
   return loading;
 }
 
@@ -58,6 +65,9 @@ export function modelScene(name) {
   if (!scenes[name]) throw new Error(`model ${name} not loaded`);
   return scenes[name];
 }
+
+/** The zombie's baked clips: { meta (zombie_anim.json), data (every frame's bone matrices) }. */
+export function zombieAnimData() { return zombieAnim; }
 
 /** A loaded model's animation clips (the soldier's, retargeted from Mixamo). */
 export function modelClips(name) { return clips[name] || []; }

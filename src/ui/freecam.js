@@ -252,7 +252,7 @@ export class FreeCam {
   /** Everything that draws the dead: the walkers (every level of detail), their eyes and contact shadows, the bodies. */
   hordeMeshes() {
     const h = this.g.horde, c = h.corpses;
-    return [...h.lods.map((l) => l.mesh), h.eyes, h.blobs, c.near.mesh, c.far.mesh, c.giant.mesh].filter(Boolean);
+    return [...h.lods.map((l) => l.mesh), h.big.mesh, h.eyes, h.blobs, ...c.pools.map((p) => p.mesh), c.giant.mesh].filter(Boolean);
   }
 
   showDead(on) {

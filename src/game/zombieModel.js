@@ -635,14 +635,14 @@ export function createZombieDepthMaterial(uniforms, { corpse = false } = {}) {
 const EYE_VERT = /* glsl */`
 attribute vec4 aAnim;
 attribute vec4 aState;
+attribute vec3 aEye;     // where the eyes are on this body now, in instance space (the horde works it out from the head)
 uniform float uPixel;
 uniform float uEyeGlow;
 varying vec2 vUv;
 varying float vA;
 ${FOG_CUSTOM_GLSL}
 void main() {
-  float lean = aAnim.w + aState.z * 0.2;
-  vec3 local = vec3(0.0, 0.95 + 0.785 * cos(lean), 0.12 + 0.785 * sin(lean));
+  vec3 local = aEye;
   vec4 world = modelMatrix * instanceMatrix * vec4(local, 1.0);
   vec3 fwd = normalize((instanceMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
   vec4 mv = viewMatrix * world;
@@ -678,12 +678,13 @@ void main() {
 }`;
 
 /** Eye billboards for every living zombie (own instance buffers, all LODs). */
-export function createEyeMesh(cap, uniforms, fogU, aAnim, aState) {
+export function createEyeMesh(cap, uniforms, fogU, aAnim, aState, aEye) {
   const geo = new THREE.BufferGeometry();
   geo.setIndex([0, 1, 2, 0, 2, 3]);
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]), 3));
   geo.setAttribute('aAnim', aAnim);
   geo.setAttribute('aState', aState);
+  geo.setAttribute('aEye', aEye);
   const mat = new THREE.ShaderMaterial({
     uniforms: {
       uPixel: uniforms.uPixel,
