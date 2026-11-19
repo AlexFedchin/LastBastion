@@ -12,6 +12,9 @@ const FILES = {
   heliwreck: 'models/heliwreck.glb', container: 'models/container.glb', bale: 'models/bale.glb', bomb: 'models/bomb.glb',
   house: 'models/house.glb', mcrate: 'models/mcrate.glb', church: 'models/church.glb', hedgehog: 'models/hedgehog.glb',
   tower: 'models/tower.glb', // the central tower (the user's own model)
+  // the field, the hills and the crews (scripts/models/build_field.mjs)
+  trees: 'models/trees.glb', deadtrees: 'models/deadtrees.glb', mg4: 'models/mg4.glb', crow: 'models/crow.glb',
+  hangar: 'models/hangar.glb', // the dawn resupply's hall (src/world/hangar.js)
 };
 /** The wrecked cars on the roads, each its own model (long axis +x, base at 0). */
 export const CARS = ['car_sedan', 'car_police', 'car_police_flip', 'car_hatch', 'car_saloon'];

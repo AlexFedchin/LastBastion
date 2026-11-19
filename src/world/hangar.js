@@ -6,8 +6,11 @@
 // dropped into its slot with a thud.
 //
 // Its own scene and camera, drawn through the game's post chain while the shop is open
-// (main.js render). Surfaces are ambientCG CC0 scans (hg* sets, texlib.js); the props are
-// the game's models and Poly Haven kit (app/models/kit).
+// (main.js render). The building is an old factory hall (app/models/hangar.glb, built by
+// scripts/models/build_field.mjs): open at the yard end (-z), the four bays in a row down its
+// right wall between the pilasters, the duty board across from the third, the hall's old tanks
+// and pipework still standing at the far end. The bays' surfaces are ambientCG CC0 scans (hg* sets,
+// texlib.js); the props are the game's models and Poly Haven kit (app/models/kit).
 import * as THREE from 'three';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
@@ -19,15 +22,23 @@ import { Soldier } from '../game/soldier.js';
 import { fitFov } from '../core/util.js';
 
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
-const W = 16, D = 13, WALL_H = 7, RIDGE = 10.4, DOOR = 6, DOOR_H = 6.4; // half-width, half-depth, door half-width
-const BAY_Z = -4.6;
+// the hall (the model's frame): inner half-width, the open end, the far wall, under the trusses
+// (measured by casting at the model: the wall faces at x -5.48 / +5.39, pilasters at z -7.75,
+// -1, 5.75 and 19.25, side doorways at 3..5 (left), 11..14 and 24..27, the trusses at 4.69 m)
+const HW = 5.45, XR = 5.39, XL = -5.48, OPEN_Z = -10.48, FAR_Z = 29.9, CEIL = 4.65;
+// each bay stands with its back to the right wall between the pilasters, facing across the
+// hall: x, z of its centre, ry its turn (its own +z is its front). From the open end: the gun,
+// the battery, the wall, support.
 export const BAYS = [
-  { id: 'hmg', x: -10.6, key: 'Digit1' },
-  { id: 'arty', x: -3.55, key: 'Digit2' },
-  { id: 'wall', x: 3.55, key: 'Digit3' },
-  { id: 'support', x: 10.6, key: 'Digit4' },
+  { id: 'hmg', z: -4.25, key: 'Digit1' },
+  { id: 'arty', z: 2.25, key: 'Digit2' },
+  { id: 'wall', z: 8.4, key: 'Digit3' },
+  { id: 'support', z: 16.4, key: 'Digit4' },
 ];
-const BOARD = { x: -W + 0.12, y: 2.35, z: 2.45 }; // between two of the frames
+for (const b of BAYS) { b.x = XR - 3.2; b.ry = -Math.PI / 2; b.n = new THREE.Vector3(Math.sin(b.ry), 0, Math.cos(b.ry)); } // its front, into the hall
+const BOARD = { x: XL + 0.06, y: 2.35, z: 8.5, n: new THREE.Vector3(1, 0, 0) }; // on the left wall, across from the third bay
+/** Screen-right for a camera looking back along n at a thing facing n. */
+const rightOf = (n) => new THREE.Vector3(-n.z, 0, n.x).negate();
 const damp = (a, b, k, dt) => a + (b - a) * (1 - Math.exp(-k * dt));
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 
@@ -171,69 +182,27 @@ export class Hangar {
   }
 
   // ── the building ───────────────────────────────────────────────────────────
+  /** The building: the factory hall model, and the hazard paint on its floor. */
   buildShell() {
-    const M = this.mats, geos = { floor: [], wall: [], roof: [], steel: [], hazard: [] };
-    // floor, and the slab carried out through the door onto the apron
-    geos.floor.push(wuv(new THREE.PlaneGeometry(2 * W, 2 * D).rotateX(-Math.PI / 2), 3));
-    // walls: sides, front, and the back round the door
-    geos.wall.push(wuv(box(-W - 0.12, 0, -D, -W, WALL_H, D), 2), wuv(box(W, 0, -D, W + 0.12, WALL_H, D), 2));
-    geos.wall.push(wuv(box(-W, 0, D, W, WALL_H, D + 0.12), 2));
-    geos.wall.push(wuv(box(-W, 0, -D - 0.12, -DOOR, WALL_H, -D), 2), wuv(box(DOOR, 0, -D - 0.12, W, WALL_H, -D), 2));
-    geos.wall.push(wuv(box(-DOOR, DOOR_H, -D - 0.12, DOOR, WALL_H, -D), 2));
-    // the gables
-    for (const z of [-D - 0.06, D + 0.06]) {
-      const s = new THREE.Shape([new THREE.Vector2(-W, WALL_H), new THREE.Vector2(W, WALL_H), new THREE.Vector2(0, RIDGE)]);
-      geos.wall.push(wuv(new THREE.ShapeGeometry(s).translate(0, 0, z), 2));
+    const hall = prop('hangar');
+    // its strip lights glow, but not so they blow out the trusses round them
+    hall.traverse((o) => { if (o.isMesh && o.material.emissive && o.material.emissive.getHex() !== 0) o.material.emissiveIntensity = 0.35; });
+    this.scene.add(hall);
+    const M = this.mats, geos = { hazard: [] };
+    // the walkway painted down the middle of the hall, and the line in front of each bay
+    for (const s of [-1, 1]) geos.hazard.push(wuv(box(s * 1.05 - 0.09, 0, OPEN_Z + 1.2, s * 1.05 + 0.09, 0.006, FAR_Z - 12), 1));
+    for (const b of BAYS) {
+      const g = wuv(box(-2.9, 0, 3.45, 2.9, 0.006, 3.62), 1).rotateY(b.ry).translate(b.x, 0, b.z);
+      geos.hazard.push(g);
     }
-    // the roof, two slopes
-    const slope = Math.atan2(RIDGE - WALL_H, W), half = Math.hypot(W, RIDGE - WALL_H) + 0.4;
-    for (const s of [-1, 1]) {
-      const g = new THREE.BoxGeometry(half, 0.08, 2 * D + 0.6).translate(s * half / 2, 0, 0).rotateZ(-s * slope).translate(0, RIDGE + 0.05, 0);
-      geos.roof.push(wuv(g, 2));
-    }
-    // the portal frames: columns, rafters, a tie, and purlins along the length
-    for (let z = -D + 0.4; z <= D; z += 4.3) {
-      for (const s of [-1, 1]) {
-        geos.steel.push(wuv(box(s * (W - 0.35) - 0.18, 0, z - 0.14, s * (W - 0.35) + 0.18, WALL_H, z + 0.14), 2));
-        geos.steel.push(wuv(beam(V(s * (W - 0.35), WALL_H - 0.2, z), V(0, RIDGE - 0.25, z), 0.22, 0.42), 2));
-        // a knee brace
-        geos.steel.push(wuv(beam(V(s * (W - 0.35), WALL_H - 1.4, z), V(s * (W - 2.2), WALL_H - 0.02, z), 0.1, 0.12), 2));
-      }
-      geos.steel.push(wuv(beam(V(-W + 2.4, WALL_H + 0.1, z), V(W - 2.4, WALL_H + 0.1, z), 0.08, 0.1), 2));
-    }
-    for (const x of [-12, -6, 0, 6, 12]) {
-      const y = WALL_H + (RIDGE - WALL_H) * (1 - Math.abs(x) / W) - 0.35;
-      geos.steel.push(wuv(box(x - 0.07, y - 0.16, -D, x + 0.07, y, D), 2));
-    }
-    // the door: steel posts and lintel, hazard-striped
-    geos.hazard.push(wuv(box(-DOOR - 0.35, 0, -D - 0.2, -DOOR, DOOR_H, -D + 0.12), 1), wuv(box(DOOR, 0, -D - 0.2, DOOR + 0.35, DOOR_H, -D + 0.12), 1));
-    geos.steel.push(wuv(box(-DOOR - 0.35, DOOR_H, -D - 0.2, DOOR + 0.35, DOOR_H + 0.45, -D + 0.12), 2));
-    // the door leaves, slid open behind the wall
-    for (const s of [-1, 1]) geos.wall.push(wuv(box(s * DOOR + (s > 0 ? 0.1 : -6.5), 0.04, -D + 0.16, s * DOOR + (s > 0 ? 6.5 : -0.1), DOOR_H + 0.2, -D + 0.32), 2));
-    // the runs painted on the floor: a walkway from the door, a stripe across the front of the bays
-    for (const s of [-1, 1]) geos.hazard.push(wuv(box(s * DOOR - 0.12, 0, -D, s * DOOR + 0.12, 0.006, BAY_Z - 3.4), 1));
-    geos.hazard.push(wuv(box(-W + 1.2, 0, BAY_Z + 3.6, W - 1.2, 0.006, BAY_Z + 3.82), 1));
-    for (const [k, list] of Object.entries(geos)) {
-      if (!list.length) continue;
-      const mesh = new THREE.Mesh(mergeGeometries(list.map((g) => (g.index ? g : g))), M[k]);
-      mesh.receiveShadow = true; mesh.castShadow = k !== 'floor' && k !== 'hazard';
-      this.scene.add(mesh);
-    }
-    // skylights along both slopes: the dawn through dirty polycarbonate
-    const sky = new THREE.MeshBasicMaterial({ color: new THREE.Color(0.9, 0.78, 0.68), fog: false });
-    for (const s of [-1, 1]) {
-      for (let z = -D + 2.2; z < D - 1; z += 4.3) {
-        const m = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 2.4), sky);
-        const x = s * W * 0.45, y = RIDGE - (RIDGE - WALL_H) * 0.45 - 0.02;
-        m.position.set(x, y, z); m.rotation.set(Math.PI / 2, 0, s * (Math.atan2(RIDGE - WALL_H, W)));
-        this.scene.add(m);
-      }
-    }
+    const mesh = new THREE.Mesh(mergeGeometries(geos.hazard), M.hazard);
+    mesh.receiveShadow = true;
+    this.scene.add(mesh);
   }
 
-  /** Beyond the door: the apron, the yard, sandbags and barriers, and a sky coming up pink over the wall. */
+  /** Beyond the open end: the apron, the yard, sandbags and barriers, and a sky coming up pink over the wall. */
   buildOutside() {
-    const M = this.mats;
+    const M = this.mats, D = -OPEN_Z;
     const apron = new THREE.Mesh(wuv(new THREE.PlaneGeometry(80, 60).rotateX(-Math.PI / 2).translate(0, -0.01, -D - 30), 3), M.apron);
     apron.receiveShadow = true;
     this.scene.add(apron);
@@ -266,10 +235,11 @@ export class Hangar {
     const wall = new THREE.Mesh(box(-60, 0, -45, 60, 7.5, -44), new THREE.MeshStandardMaterial({ color: 0x1a1a1c, roughness: 1 }));
     this.scene.add(wall);
     // the yard: barriers, sandbags, a light tower, drums
+    const dz = OPEN_Z + 13; // (laid out for a door at z = -13)
     const yard = [['barrier', -9, -19, 0.2], ['barrier', 8.5, -22, -0.3], ['barrierTall', 14, -18, 1.4], ['drumBlue', -7, -16.5, 0], ['drumRed', -6.3, -17.1, 1],
       ['floodlight', 12, -27, 2.4], ['generator', -12.5, -18, 0.6]];
-    for (const [k, x, z, ry] of yard) this.scene.add(place(prop('kit/' + k), x, 0, z, ry));
-    for (let i = 0; i < 5; i++) this.scene.add(place(prop('sandbags'), -16 + i * 1.5, 0, -24 - (i % 2) * 0.2, (i % 2) * 0.1));
+    for (const [k, x, z, ry] of yard) this.scene.add(place(prop('kit/' + k), x, 0, z + dz, ry));
+    for (let i = 0; i < 5; i++) this.scene.add(place(prop('sandbags'), -16 + i * 1.5, 0, -24 + dz - (i % 2) * 0.2, (i % 2) * 0.1));
   }
 
   buildLights() {
@@ -277,10 +247,10 @@ export class Hangar {
     scene.add(new THREE.HemisphereLight(0xc4bdb0, 0x6a5e4e, 1.2));
     // the sun's patch on the floor throws warm light back up into the hall
     const bounce = new THREE.PointLight(0xffb880, 26, 22, 1.4);
-    bounce.position.set(2, 1.2, -7.5);
+    bounce.position.set(1, 1.2, OPEN_Z + 4.5);
     scene.add(bounce);
     // the low sun through the open door: warm, raking, the one shadow-casting light
-    const sun = this.sun = new THREE.DirectionalLight(0xffc49a, 4.2);
+    const sun = this.sun = new THREE.DirectionalLight(0xffc49a, 2.5);
     const dir = V(0.32, -0.36, 1).normalize();
     sun.target.position.set(1, 0, -2);
     sun.position.copy(sun.target.position).addScaledVector(dir, -70);
@@ -296,86 +266,86 @@ export class Hangar {
     // a lamp over each bay and over the duty board
     this.bayLights = [];
     for (const b of BAYS) {
-      const l = new THREE.SpotLight(0xffd8b0, 70, 18, 0.9, 0.8, 1.4);
-      l.position.set(b.x, 5.0, BAY_Z + 0.4);
-      l.target.position.set(b.x, 0, BAY_Z + 0.4);
+      const l = new THREE.SpotLight(0xffd8b0, 60, 14, 0.95, 0.8, 1.4);
+      l.position.set(b.x + b.n.x * 0.4, CEIL - 0.6, b.z);
+      l.target.position.set(b.x + b.n.x * 0.4, 0, b.z);
       scene.add(l, l.target);
       this.bayLights.push(l);
     }
-    const bl = new THREE.SpotLight(0xffe0b8, 45, 12, 0.75, 0.6, 1.4);
+    const bl = new THREE.SpotLight(0xffe0b8, 30, 12, 0.75, 0.6, 1.4);
     bl.position.set(BOARD.x + 2.6, 4.4, BOARD.z);
     bl.target.position.set(BOARD.x, BOARD.y, BOARD.z);
     scene.add(bl, bl.target);
-    // the strip lights down the middle
-    for (const z of [0, 6.5]) {
-      const p = new THREE.PointLight(0xe8ecf4, 9, 22, 1.5);
-      p.position.set(0, 6.4, z);
+    // the hall's own ceiling lights, down the middle
+    for (const z of [-4, 4, 12, 20]) {
+      const p = new THREE.PointLight(0xe8ecf4, 8, 16, 1.5);
+      p.position.set(-1.2, CEIL - 0.3, z);
       scene.add(p);
     }
     // work lights on stands in front of each bay, low, throwing light into it: the bays read from across the hall
     this.workLights = [];
     for (const b of BAYS) {
-      const w = new THREE.SpotLight(0xffe6c2, 48, 16, 0.65, 0.85, 1.4);
-      w.position.set(b.x + (b.x < 0 ? 1.6 : -1.6), 2.6, BAY_Z + 5.4);
-      w.target.position.set(b.x, 0.6, BAY_Z - 0.6);
+      const r = rightOf(b.n);
+      const w = new THREE.SpotLight(0xffe6c2, 44, 14, 0.65, 0.85, 1.4);
+      w.position.set(b.x + b.n.x * 4.6 - r.x * 1.6, 2.6, b.z + b.n.z * 4.6 - r.z * 1.6);
+      w.target.position.set(b.x - b.n.x * 0.6, 0.6, b.z - b.n.z * 0.6);
       scene.add(w, w.target);
       this.workLights.push(w);
     }
-    // warm washes along the side walls (the cladding and the shelving), a cool fill by the open door
-    for (const x of [-W + 1.2, W - 1.2]) for (const z of [-6, 6]) {
-      const p = new THREE.PointLight(0xffc890, 8, 9, 1.6);
-      p.position.set(x * 0.9, 4.6, z);
+    // warm washes along the side walls, a cool fill by the open end
+    for (const x of [XL + 0.8, XR - 0.8]) for (const z of [-3, 9, 21]) {
+      const p = new THREE.PointLight(0xffc890, 6, 8, 1.6);
+      p.position.set(x, 4.2, z);
       scene.add(p);
     }
-    const doorFill = new THREE.PointLight(0xd0d4dc, 18, 18, 1.4);
-    doorFill.position.set(0, 4.2, -10.5);
+    const doorFill = new THREE.PointLight(0xd0d4dc, 16, 16, 1.4);
+    doorFill.position.set(0, 4.2, OPEN_Z + 0.5);
     scene.add(doorFill);
-    // the front of the hall, where the overview looks down from
-    const front = new THREE.PointLight(0xffe2c4, 22, 26, 1.4);
-    front.position.set(0, 5.6, 7.5);
+    // the entrance, where the overview looks down the hall from
+    const front = new THREE.PointLight(0xffe2c4, 18, 22, 1.4);
+    front.position.set(0, CEIL - 0.5, OPEN_Z + 3);
     scene.add(front);
     // the pick light: follows what the cursor is over
     const pick = this.pick = new THREE.SpotLight(0xfff0d0, 0, 7, 0.38, 0.5, 1.4);
     scene.add(pick, pick.target);
   }
 
-  /** The working hangar round the bays: shelving, carts, the crane, a jeep under a sheet, lamps. */
+  /**
+   * The working hangar round the bays: shelving, carts, drums and tools along the walls where
+   * no bay or camera stands (by the open end, between the bays, and toward the far end), and a
+   * lamp hung over each bay from the trusses.
+   */
   buildDressing() {
     const S = this.scene;
     const add = (k, x, z, ry = 0, y = 0, tint = null) => { const o = place(prop(k, tint), x, y, z, ry); S.add(o); return o; };
-    // shelving down the right wall, loaded
-    for (let i = 0; i < 4; i++) {
-      add('kit/shelves', W - 0.6, 2.2 + i * 1.12, -Math.PI / 2);
+    const R = XR - 0.5, L = XL + 0.5; // against the right (+x) and left (-x) walls
+    // by the open end: shelving, the compressor, a ladder
+    for (let i = 0; i < 2; i++) {
+      const z = OPEN_Z + 1.6 + i * 1.12;
+      add('kit/shelves', L + 0.05, z, Math.PI / 2);
       const loads = [['kit/ammo', 0.5], ['kit/toolbox', 1.0], ['kit/cardboard', 1.5], ['kit/foodCans', 0.5], ['kit/medbox', 1.0]];
-      loads.forEach(([k, y], j) => { if ((i + j) % 2) add(k, W - 0.6, 2.2 + i * 1.12 + ((j % 3) - 1) * 0.25, -Math.PI / 2, y * 0.98 + 0.02); });
+      loads.forEach(([k, y], j) => { if ((i + j) % 2) add(k, L + 0.05, z + ((j % 3) - 1) * 0.25, Math.PI / 2, y * 0.98 + 0.02); });
     }
-    add('kit/shelves2', -W + 0.45, 9.6, Math.PI / 2); add('kit/shelves2', -W + 0.45, 10.4, Math.PI / 2);
-    // the gantry crane over the back, by the door
-    add('kit/crane', 0, -10.4, 0);
-    // the work floor: carts, the welder, the compressor, drums
-    add('kit/toolcart', -6.4, 3.6, 0.4); add('kit/welder', -7.6, 2.4, -0.3); add('kit/compressor', 7.2, 3.2, -0.5);
-    add('kit/drumRed', 13.6, 7.6, 0); add('kit/drumBlue', 14.3, 8.2, 1); add('kit/drumPlastic', 13.7, 8.9, 2);
-    add('kit/handtruck', 12.2, 6.4, -0.8); add('kit/tyre', -13.6, -10.4, 0.3); add('kit/tyre', -13.3, -10.4, 0.1, 0.22);
-    add('kit/toolchest', -14.9, 7.2, Math.PI / 2); add('kit/drillpress', -14.4, 7.2, Math.PI / 2, 0.65);
-    add('kit/storecart', 6.2, 9.4, 0.25); add('kit/crateLong', -2.4, 10.6, 0.1); add('kit/crateWood', -2.2, 10.6, 0.05, 0.58);
-    add('kit/car', 3.4, 8.8, -0.35);
-    add('kit/chalkboard', -11.2, 9.2, 0.6); add('kit/ladder', W - 0.25, -10.8, -Math.PI / 2);
-    for (const [x, z] of [[-W + 0.5, -2], [W - 0.5, -2], [-W + 0.5, 11.5], [W - 0.5, 11.5]]) add('kit/extinguisher', x, z, x < 0 ? Math.PI / 2 : -Math.PI / 2);
-    // wall lamps on the columns, lamps over the bays, strip fittings down the middle
-    for (let z = -D + 0.4; z <= D; z += 8.6) for (const s of [-1, 1]) add('kit/wallLamp', s * (W - 0.55), z + 0.18, s > 0 ? -Math.PI / 2 : Math.PI / 2, 3.6);
+    add('kit/compressor', R - 0.5, OPEN_Z + 1.4, -0.5); add('kit/ladder', R + 0.3, OPEN_Z + 2.6, -Math.PI / 2);
+    // along the left wall, under the cameras: the welder and its cart, drums, tyres
+    add('kit/toolcart', L + 0.6, -6.0, 0.4); add('kit/welder', L + 0.4, -5.0, -0.3);
+    add('kit/drumRed', L + 0.1, 0.4, 0); add('kit/drumBlue', L + 0.15, 1.1, 1); add('kit/drumPlastic', L + 0.6, 0.75, 2);
+    add('kit/handtruck', L + 0.9, 1.9, -0.8);
+    add('kit/tyre', L + 0.4, 5.3, 0.3); add('kit/tyre', L + 0.45, 5.3, 0.1, 0.22);
+    // past the board: the tool chest, the drill press, shelving
+    add('kit/toolchest', L + 0.25, 15.2, Math.PI / 2); add('kit/drillpress', L + 0.3, 16.4, Math.PI / 2);
+    add('kit/shelves2', L + 0.05, 17.6, Math.PI / 2); add('kit/shelves2', L + 0.05, 18.4, Math.PI / 2);
+    // the far end, among the old tanks: stores waiting to be sorted
+    add('kit/storecart', 0.4, 20.4, 0.25); add('kit/crateLong', -2.0, 20.6, 0.1); add('kit/crateWood', -1.8, 20.6, 0.05, 0.58);
+    add('kit/chalkboard', 1.8, 20.1, -0.4);
+    for (const [x, z] of [[XL, -2.6], [XR, -0.5], [XL, 10.6], [XR, OPEN_Z + 0.6], [XR, 19.8]]) add('kit/extinguisher', x + (x < 0 ? 0.5 : -0.5), z, x < 0 ? Math.PI / 2 : -Math.PI / 2);
+    // a lamp over each bay, hung from the trusses
     const cable = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
     for (const b of BAYS) {
-      add('kit/lampHang', b.x, BAY_Z + 0.4, 0, 5.1);
-      const top = WALL_H + (RIDGE - WALL_H) * (1 - Math.abs(b.x) / W) - 0.3;
-      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, top - 6.4, 4), cable);
-      c.position.set(b.x, (top + 6.4) / 2, BAY_Z + 0.4); S.add(c);
-    }
-    const tube = new THREE.MeshBasicMaterial({ color: new THREE.Color(2.2, 2.3, 2.4) });
-    for (const z of [-2, 2.3, 6.6]) {
-      const f = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 2.2), tube);
-      f.position.set(0, 6.5, z); S.add(f);
-      const h = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.06, 2.3), this.mats.steel);
-      h.position.set(0, 6.56, z); S.add(h);
+      const x = b.x + b.n.x * 0.4;
+      add('kit/lampHang', x, b.z, 0, CEIL - 0.62);
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.3, 4), cable);
+      c.position.set(x, CEIL - 0.15, b.z); S.add(c);
     }
   }
 
@@ -388,7 +358,7 @@ export class Hangar {
     this.soldiers = [];
     for (const b of BAYS) {
       const root = new THREE.Group();
-      root.position.set(b.x, 0, BAY_Z);
+      root.position.set(b.x, 0, b.z); root.rotation.y = b.ry;
       S.add(root);
       this.bayRoots[b.id] = root;
       // the mat and its striped border
@@ -398,12 +368,12 @@ export class Hangar {
       const grp = UPGRADE_GROUPS.find((x) => x.id === b.id);
       const sign = stencil([{ t: grp.title, font: '700 130px "Bahnschrift Condensed", "Arial Narrow", sans-serif' }, { t: grp.sub.toUpperCase(), font: '500 64px "Bahnschrift Condensed", "Arial Narrow", sans-serif' }],
         2.6, 0.62, { bg: '#2b3020', color: '#e4dcc0', wear: 0.5 });
-      sign.position.set(0, 4.15, 3.0); root.add(sign);
+      sign.position.set(0, 4.05, 3.0); root.add(sign);
       const back = new THREE.Mesh(new THREE.BoxGeometry(2.7, 0.7, 0.04), M.steel);
-      back.position.set(0, 4.15, 2.97); root.add(back);
+      back.position.set(0, 4.05, 2.97); root.add(back);
       for (const s of [-1, 1]) {
-        const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, 2.4, 3), M.black);
-        ch.position.set(s * 1.2, 5.7, 3.0); root.add(ch);
+        const ch = new THREE.Mesh(new THREE.CylinderGeometry(0.006, 0.006, CEIL - 4.38, 3), M.black);
+        ch.position.set(s * 1.2, (CEIL + 4.38) / 2, 3.0); root.add(ch);
       }
       const hit = new THREE.Mesh(new THREE.BoxGeometry(6, 3, 6.6), new THREE.MeshBasicMaterial({ visible: false }));
       hit.position.y = 1.5; hit.userData.bay = b.id; root.add(hit);
@@ -632,7 +602,11 @@ export class Hangar {
     const R = this.bayRoots.wall, M = this.mats;
     for (const [x, z, ry] of [[-0.9, 1.9, 0.05], [0.75, 1.95, -0.05], [0, 2.35, 0]]) R.add(place(prop('sandbags', 0x8f8676), x, 0, z, ry));
     R.add(place(prop('sandbags', 0x8f8676), -0.1, 0.48, 1.95, 0.1));
-    const m240 = prop('kit/rifle'); m240.position.set(-0.1, 0.98, 1.9); m240.rotation.set(0, Math.PI / 2 + 0.08, 0); R.add(m240);
+    // the crews' gun (the MG4 standing in for the M240) on its bipod over the bags, muzzle out
+    const mg = prop('mg4');
+    mg.rotation.set(0, 1.2, 0);
+    const mb = new THREE.Box3().setFromObject(mg);
+    mg.position.set(-0.1, 0.99 - mb.min.y, 2.0); R.add(mg);
     R.add(place(prop('kit/ammo'), 0.55, 0.98, 1.95, 0.3));
     // the men already on the wall, at ease behind their guns
     const men = (n) => (i) => {
@@ -728,7 +702,7 @@ export class Hangar {
     const frame = new THREE.Mesh(wuv(new THREE.BoxGeometry(3.48, 2.1, 0.06), 2), this.mats.wood);
     frame.castShadow = true; g.add(frame);
     const tray = new THREE.Mesh(wuv(box(-1.7, -1.06, 0, 1.7, -1.02, 0.12), 2), this.mats.wood); g.add(tray);
-    g.position.set(BOARD.x + 0.05, BOARD.y, BOARD.z); g.rotation.y = Math.PI / 2;
+    g.position.set(BOARD.x + 0.05, BOARD.y, BOARD.z); g.rotation.y = Math.PI / 2; // (facing +x, across the hall)
     this.scene.add(g);
     this.boardHit = new THREE.Mesh(new THREE.BoxGeometry(0.3, 2.1, 3.5), new THREE.MeshBasicMaterial({ visible: false }));
     this.boardHit.position.set(BOARD.x + 0.2, BOARD.y, BOARD.z); this.boardHit.userData.bay = 'report';
@@ -774,7 +748,7 @@ export class Hangar {
     const dir = this.sunDir;
     // the shaft: the door's rectangle swept along the light, glowing faintly, fading inward
     const L = 30;
-    const basis = new THREE.Matrix4().makeBasis(V(2 * DOOR, 0, 0), V(0, DOOR_H, 0), dir.clone().multiplyScalar(L));
+    const basis = new THREE.Matrix4().makeBasis(V(2 * HW, 0, 0), V(0, CEIL, 0), dir.clone().multiplyScalar(L));
     const geo = new THREE.BoxGeometry(1, 1, 1).translate(0.5, 0.5, 0.5);
     const shaft = new THREE.Mesh(geo, new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide, fog: false,
@@ -785,17 +759,17 @@ export class Hangar {
           float edge = smoothstep(0.0, 0.18, vL.x) * smoothstep(1.0, 0.82, vL.x) * smoothstep(0.0, 0.25, vL.y) * smoothstep(1.0, 0.85, vL.y);
           float along = pow(1.0 - vL.z, 1.6) * smoothstep(0.0, 0.04, vL.z);
           float flick = 0.92 + 0.08 * sin(uT * 0.7 + vL.x * 9.0 + vL.z * 4.0);
-          gl_FragColor = vec4(vec3(1.0, 0.72, 0.48) * edge * along * flick * 0.032, 1.0);
+          gl_FragColor = vec4(vec3(1.0, 0.72, 0.48) * edge * along * flick * 0.018, 1.0);
         }`,
     }));
     shaft.applyMatrix4(basis);
-    shaft.position.set(-DOOR, 0, -D - 4);
+    shaft.position.set(-HW, 0, OPEN_Z - 4);
     shaft.renderOrder = 5;
     this.shaft = shaft;
     this.scene.add(shaft);
     // motes
     const N = 700, pos = new Float32Array(N * 3), seed = new Float32Array(N);
-    for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 22; pos[i * 3 + 1] = Math.random() * 6.5; pos[i * 3 + 2] = -D + Math.random() * 20; seed[i] = Math.random() * 100; }
+    for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 2 * HW; pos[i * 3 + 1] = Math.random() * CEIL; pos[i * 3 + 2] = OPEN_Z + Math.random() * 26; seed[i] = Math.random() * 100; }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
     g.setAttribute('seed', new THREE.BufferAttribute(seed, 1));
@@ -937,7 +911,7 @@ export class Hangar {
    */
   leave() {
     this.view = 'leave';
-    this.wantPos = V(0.4, 1.75, -D + 3.2); this.wantLook = V(0.8, 2.3, -D - 30); this.wantFov = 58;
+    this.wantPos = V(0.4, 1.75, OPEN_Z + 3.2); this.wantLook = V(0.8, 2.3, OPEN_Z - 30); this.wantFov = 58;
     this.camRate = 1.15;
     this.mouseIn = false;
     if (this.tagLayer) this.tagLayer.classList.remove('on');
@@ -950,7 +924,13 @@ export class Hangar {
     this.view = view;
     const b = BAYS.find((x) => x.id === view);
     // (the bay and the board are framed in the left of the screen: the panel is on the right)
-    if (b) { this.wantPos = V(b.x * 0.9 + 1.35, 3.15, BAY_Z + 6.6); this.wantLook = V(b.x + 1.4, 0.8, BAY_Z - 0.4); this.wantFov = 48; } else if (view === 'report') { this.wantPos = V(BOARD.x + 4.4, 2.45, BOARD.z - 1.45); this.wantLook = V(BOARD.x, BOARD.y - 0.1, BOARD.z - 1.5); this.wantFov = 46; } else { this.wantPos = V(0, 5.9, 11.6); this.wantLook = V(0, 1.1, -5.2); this.wantFov = 64; }
+    // (across the hall from it, framed in the left of the screen: the panel is on the right)
+    const frame = (c, n, dist, h, lookH, side) => {
+      const r = rightOf(n);
+      this.wantPos = V(c.x + n.x * dist + r.x * side, h, c.z + n.z * dist + r.z * side);
+      this.wantLook = V(c.x + r.x * (side + 0.05) - n.x * 0.4, lookH, c.z + r.z * (side + 0.05) - n.z * 0.4);
+    };
+    if (b) { frame(b, b.n, 6.6, 3.15, 0.8, 1.35); this.wantFov = 50; } else if (view === 'report') { frame(BOARD, BOARD.n, 4.4, 2.45, BOARD.y - 0.1, 1.45); this.wantFov = 46; } else { this.wantPos = V(-1.4, 3.5, OPEN_Z + 0.9); this.wantLook = V(0.9, 0.7, 11); this.wantFov = 64; }
     if (snap) { this.camPos.copy(this.wantPos); this.camLook.copy(this.wantLook); this.fov = this.wantFov; }
     const el = document.getElementById('s-shop');
     if (el) el.dataset.bay = view;
@@ -1108,7 +1088,7 @@ export class Hangar {
       tag.style.transform = `translate(${((_v.x + 1) / 2 * w).toFixed(1)}px, ${((1 - _v.y) / 2 * h).toFixed(1)}px)`;
     };
     for (const s of Object.values(this.slots)) show(this.tags[s.id], s.anchor, this.view === s.bay);
-    for (const b of BAYS) show(this.bayTags[b.id], _w.set(b.x, 0.05, BAY_Z + 3.7), this.view === 'overview');
+    for (const b of BAYS) show(this.bayTags[b.id], _w.set(b.x + b.n.x * 2.2, 0.9, b.z + b.n.z * 2.2), this.view === 'overview');
     show(this.bayTags.report, _w.set(BOARD.x + 0.3, BOARD.y - 1.2, BOARD.z), this.view === 'overview');
     for (const [id, el2] of Object.entries(this.bayTags)) el2.classList.toggle('hot', this.overBay === id && this.view === 'overview');
   }

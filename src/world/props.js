@@ -8,6 +8,7 @@ import { groundH, groundNormal, roadX, trenchZ, valleyEdge, NAPALM_OFFSET, crate
 import { box, cylY, merge, sandbagGeo, concertinaGeo, sagWire, makeTank, makeRuin } from './kit.js';
 import { CAR_SIZE, TRUCK_SIZE, placeModel } from './vehicles.js';
 import { addObstacle } from './obstacles.js';
+import { placeRock, placeBush, placeDeadTree } from './flora.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -156,7 +157,9 @@ export function buildProps(env) {
     _m.compose(_v.set(x, groundH(x, zz), zz), _q, _s.set(s, s * (0.9 + rng() * 0.3), s));
     treeMs[i % 3].push(_m.clone());
   }
-  treeGeos.forEach((g, k) => scene.add(instanced(g, mats.charred, treeMs[k])));
+  // (laid out as the old branching trees were; each is one of the dead-tree pack's seven)
+  void treeGeos;
+  treeMs.flat().forEach((m) => placeDeadTree(env, m, 'field'));
 
   // ── telephone poles along the road, wires sagging between them ───────────
   const poleGeo = merge([
@@ -313,7 +316,30 @@ export function buildProps(env) {
     bMs.push(_m.clone());
     rock(x, zz, s * 1.4, s);
   }
-  scene.add(instanced(boulderGeo, env.rockMat, bMs));
+  for (const m of bMs) placeRock(env, m, { group: 'field' });
+  void boulderGeo;
+
+  // the killing field's undergrowth: bushes and loose rocks between the craters (none on the
+  // road, none at the foot of the wall); walked through, not round. Its own RNG, so nothing
+  // laid out after this moves.
+  {
+    const r = makeRng(4242);
+    for (let i = 0; i < 260; i++) {
+      const x = (r() - 0.5) * 2 * 150, zz = -34 - r() * 300;
+      const ry = r() * 6.28, s0 = r(), kind = r();
+      if (wallDist(x, zz) < 22 || Math.abs(x - roadX(zz)) < 8 || Math.abs(x) > valleyEdge(zz) - 4) continue;
+      _q.setFromEuler(new THREE.Euler(0, ry, 0));
+      if (kind < 0.62) {
+        const s = 0.7 + s0 * 1.1;
+        _m.compose(_v.set(x, groundH(x, zz) + s * 0.35, zz), _q, _s.set(s * 1.2, s * 0.7, s * 1.1));
+        placeBush(env, _m.clone(), 'field');
+      } else {
+        const s = 0.18 + s0 * 0.45;
+        _m.compose(_v.set(x, groundH(x, zz) + s * 0.1, zz), _q, _s.set(s * 1.3, s * 0.6, s));
+        placeRock(env, _m.clone(), { group: 'fieldSmall', cast: false });
+      }
+    }
+  }
 
   // ── farm ruins past the spawn line ──────────────────────────────────────
   for (const [x, zz, ry, seed, w, d] of [[-152, -292, 0.3, 7, 9, 7], [168, -318, -0.5, 9, 8, 6], [-188, -330, 1.2, 11, 6, 6], [118, -380, 0.15, 13, 10, 8]]) {

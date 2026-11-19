@@ -9,7 +9,7 @@ import { clamp, lerp, rand, fitFov } from '../core/util.js';
 import { groundH } from '../world/terrain.js';
 import { Survivor, ADULTS, WALKS } from './survivor.js';
 import { Soldier } from './soldier.js';
-import { walkStep } from '../world/obstacles.js';
+import { walkStep, obstacles } from '../world/obstacles.js';
 
 const $ = (id) => document.getElementById(id);
 const ease = (k) => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
@@ -20,6 +20,31 @@ const ROAD_FROM = -104, ROAD_TO = GATE_Z + 0.4; // the column walks this stretch
 const TRACK = { z0: -66, speed: 1.15 };          // the tracking shot keeps pace with the column
 // the truck keeps the right of the road, the people the left (their lanes end short of it)
 const TRUCK_LANE = 2.6, TRUCK_HL = 3.7, TRUCK_HW = 1.3, LANE_MAX = 0.4;
+
+/**
+ * The truck's line up the road, x as a function of z: its lane, swung out past every wreck that
+ * stands in it (to clear it by most of a metre) and eased back after, with room for its length.
+ */
+function truckLine() {
+  const bumps = [];
+  for (const b of obstacles()) {
+    if (Math.abs(b.x) > 12 || b.z < -150 || b.z > GATE_Z) continue;
+    const ex = Math.abs(b.ax) * b.hl + Math.abs(b.az) * b.hw, ez = Math.abs(b.az) * b.hl + Math.abs(b.ax) * b.hw;
+    const x0 = b.x - ex, x1 = b.x + ex;
+    if (x1 < TRUCK_LANE - TRUCK_HW - 0.5 || x0 > TRUCK_LANE + TRUCK_HW + 0.5) continue; // not in its lane
+    bumps.push({ z0: b.z - ez - TRUCK_HL, z1: b.z + ez + TRUCK_HL, x: x1 + TRUCK_HW + 0.8 });
+  }
+  const ramp = 9;
+  const s = (k) => { k = Math.min(1, Math.max(0, k)); return k * k * (3 - 2 * k); };
+  return (z) => {
+    let x = TRUCK_LANE;
+    for (const b of bumps) {
+      const w = z < b.z0 ? s(1 - (b.z0 - z) / ramp) : z > b.z1 ? s(1 - (z - b.z1) / ramp) : 1;
+      x = Math.max(x, TRUCK_LANE + (b.x - TRUCK_LANE) * w);
+    }
+    return x;
+  };
+}
 const GAP = 0.8;                                  // default silence between cues
 const TAIL = 5.5;                                 // after the last word, before the fade
 const FADE_OUT = 3;
@@ -173,7 +198,7 @@ export class Ending {
     }
     for (const w of this.walkers) w.f.root.visible = false;
     // the quarry's tractor-trailer stand-in: the survivors' truck, crawling up behind them
-    this.truck = { x: TRUCK_LANE, z: -135, sp: 3.2, on: false, bias: 1, yaw: -Math.PI / 2 };
+    this.truck = { x: TRUCK_LANE, z: -135, sp: 3.2, on: false, bias: 1, yaw: -Math.PI / 2, line: truckLine() };
     // the gate squad, out on the road to bring them in
     this.guards = this.g.events.soldiers.slice(8, 12).map((s, i) => {
       const side = i % 2 ? 1 : -1, x = side * (i < 2 ? 4.2 : 6.6), z = GATE_Z - 2.5 - (i < 2 ? 0 : 1.2);
@@ -220,12 +245,16 @@ export class Ending {
     for (const s of this.guards) if (s.root.visible) s.idle();
     const M = this.g.events.truck;
     if (T.on) {
-      // up its own lane on the right, steering round the wrecks on the road like the walkers do
+      // up its own lane on the right, out onto the shoulder past each wreck in it (the line is
+      // planned once from the wrecks, so it never noses into one), heading where it is going
       if (T.sp > 0) {
-        const v = walkStep(T, (TRUCK_LANE - T.x) * 0.5, T.sp, dt, TRUCK_HW + 0.2);
-        const want = Math.atan2(-v[1], v[0]); // the model's nose is +x
+        const z0 = T.z;
+        T.z += T.sp * dt;
+        const x0 = T.x;
+        T.x = T.line(T.z + 2.5);
+        const want = Math.atan2(-(T.z - z0), T.x - x0 + 1e-6); // the model's nose is +x
         let d = want - T.yaw; d = Math.atan2(Math.sin(d), Math.cos(d));
-        T.yaw += d * Math.min(1, dt * 2.5);
+        T.yaw += d * Math.min(1, dt * 3);
       }
       if (T.z > GATE_Z - 3) { T.z = GATE_Z - 3; T.sp = 0; }
       const x = T.x;

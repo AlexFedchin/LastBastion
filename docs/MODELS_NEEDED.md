@@ -14,8 +14,12 @@ The game already loads real models for:
 - the grenade and the molotov
 - the central tower (your own model)
 - the sandbags
+- the wall crews' machine guns (the HK MG4 you sent, standing in for the M240; also in bay 3 of the hangar)
+- the woods on the hills (spruce, pine and birch from the tree pack), the bushes and rocks in the field and on the farmland, and the dead trees standing in the killing field
+- the crows: on the dead trees and the wall at night, in a flock among the dead at dawn, across the sun in the prologue (the model has no rig: the wings are folded, spread and flapped in the game's shader)
+- the dawn resupply's hall (the old factory you sent; its front half cleared for the four bays)
 - 48 Poly Haven props in the yard and on the walkway
-- 17 more Poly Haven props for the dawn resupply hangar: the overhead crane, steel shelving, hanging and wall lamps, the tool chest, drill press, office desk, storage cart, extinguishers, a flood light and crates
+- 17 more Poly Haven props for the dawn resupply hangar: steel shelving, hanging and wall lamps, the tool chest, drill press, office desk, storage cart, extinguishers, a flood light and crates
 
 See [app/models/CREDITS.md](../app/models/CREDITS.md) for those.
 
@@ -25,6 +29,8 @@ and are downloaded and built directly. The same goes for any CC0 prop Poly Haven
 (`scripts/models/build_kit.mjs` downloads missing sources itself). The list below is what neither library has.
 
 Everything below is still built from boxes, cylinders and cones in code. The list is in order of importance: how much screen time a thing gets, multiplied by how far its current look falls short.
+
+Two of the files in the folder aren't used yet: `Searchlight.glb` (a Suez Canal searchlight, CC BY, Fishboe) and `House-2.glb` (a second house by Mateusz Woliński, CC BY). `House-3.glb` is the same house as `House-1`. Say if they should go in (the wing towers' lamps; the villages, see below).
 
 ## What to send for any model
 
@@ -52,6 +58,13 @@ Everything below is still built from boxes, cylinders and cones in code. The lis
 **Budget:** about 3–6k triangles each, one material and one texture atlas per variant. They will be baked into an animation texture, so they stay instanced.
 
 **Note:** this is the biggest visual upgrade, but also the biggest engineering job. The renderer has to move from shader-posed parts to baked skinned animation.
+
+**The pack you sent (`3D Models/Zombies`), looked at 2026-11-19:**
+- one rigged zombie: about 3,600 triangles (inside the budget), a 137-bone HumanIK rig (`Zombie_Hips`, `Zombie_Spine`, ..., with full fingers), in centimetres
+- three 4K texture sets on the same UVs (albedo, normal, metal/gloss, AO, height, emission): three looks from one mesh
+- twelve clips, in place: walk, run, idle ×2, attack ×4, roar, get-hit, death ×2
+- missing for this game: climbing, clawing at a wall, the burning flail, a crawl. The rig is a standard humanoid, so Mixamo clips for those can be retargeted onto it the way the soldier's are.
+- source and licence aren't in the archives: send the page it came from so it can go into the credits.
 
 ## 2. The central tower — done (your own model)
 
@@ -82,28 +95,7 @@ that export arrives:
   flag and the blinking beacon
 - re-shoot the roof and gun views before/after
 
-## 3. Trees and vegetation set
-
-**Where:**
-- forests on every hill around the valley
-- dead trees in the killing field
-- the new woods, hedgerows and copses behind the base
-
-These show in the gun view and in every cutscene.
-
-**Now:** stacked cones (conifers), bare procedural branch trees, poles with stubs for burnt pines, and lumpy blobs for bushes.
-
-**Need:**
-- 2–3 conifers (spruce/pine)
-- 1–2 burnt or dead pines
-- 2–3 bare, dead deciduous trees for the field
-- 1–2 shrubs or bushes
-
-They will be instanced by the thousand, so they must be low-poly: impostor-friendly, or with LODs.
-
-**Budget:** about 500–2,000 triangles per tree, alpha-cut foliage cards are fine. Bushes about 200–800.
-
-## 4. Fuel tanker truck
+## 3. Fuel tanker truck
 
 **Where:** the tanker event: a fuel truck stalled on the road in front of the wall, which you shoot to blow up the crowd around it. It sits close to the gun, in plain view.
 
@@ -113,7 +105,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 10-25k triangles.
 
-## 5. Burnt-out truck wreck
+## 4. Burnt-out truck wreck
 
 **Where:** the burning truck everybody remembers at the foot of the field, a second burnt truck further out, and the one in the ditch on the rear road.
 
@@ -123,19 +115,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 10-25k triangles.
 
-## 6. M240 machine gun
-
-**Where:**
-- the crewed M240s on the wall (two to four, firing all night beside you)
-- bay 3 of the dawn resupply hangar, on its sandbags, where you buy wall gunners
-
-**Now:** the soldier's rifle stands in for it on the wall, and the bolt-action rifle prop lies on the sandbags in the hangar.
-
-**Need:** an M240B/G (or a PKM, if that fits the setting better) with its bipod, ideally with the feed cover and an ammo belt as separate meshes.
-
-**Budget:** about 3-8k triangles.
-
-## 7. Wrecked main battle tank
+## 5. Wrecked main battle tank
 
 **Where:** a burnt tank out on the killing field, in plain view from the gun.
 
@@ -145,7 +125,7 @@ They will be instanced by the thousand, so they must be low-poly: impostor-frien
 
 **Budget:** about 20–40k triangles.
 
-## 8. HESCO / defensive barrier unit
+## 6. HESCO / defensive barrier unit
 
 **Where:** the wall itself, the thing you defend all game.
 
@@ -159,7 +139,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 1–4k triangles per unit.
 
-## 9. Rural buildings set
+## 7. Rural buildings set
 
 **Where:**
 - the dead village and church on the far hills
@@ -176,7 +156,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 5–20k triangles each. They're seen from 100–600 m away, so silhouette and texture matter more than detail.
 
-## 10. Supply-drop parachute and pallet
+## 8. Supply-drop parachute and pallet
 
 **Where:** the night's supply drop: a crate comes down under a parachute in front of the wall, and the canopy collapses when it lands.
 
@@ -186,7 +166,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 3-8k triangles.
 
-## 11. Van or minibus wreck
+## 9. Van or minibus wreck
 
 **Where:** the abandoned column on the road out, and the rear road. The cars cover the sedans and hatchbacks, but nothing taller breaks up the line.
 
@@ -196,7 +176,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 5-15k triangles.
 
-## 12. Military tents
+## 10. Military tents
 
 **Where:** five tents in the yard, with lit doorways. Seen in the yard, landing-zone and run shots.
 
@@ -206,7 +186,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 3–8k triangles.
 
-## 13. Guard / searchlight tower
+## 11. Guard / searchlight tower
 
 **Where:** the two searchlight towers at the wing ends, which carry the sweeping beams.
 
@@ -216,7 +196,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** about 5–15k triangles.
 
-## 14. Utility poles and power pylon
+## 12. Utility poles and power pylon
 
 **Where:**
 - telephone poles along the field road and the new rear track
@@ -228,7 +208,7 @@ It has to tile seamlessly along a wall.
 
 **Budget:** pole about 300–1,000 triangles, pylon about 2–6k.
 
-## 15. Portable toilets and water tank
+## 13. Portable toilets and water tank
 
 **Where:** the yard's latrine row and the water tanks.
 
@@ -237,18 +217,3 @@ It has to tile seamlessly along a wall.
 **Need:** a portable toilet cabin and an IBC tote or upright water tank.
 
 **Budget:** about 1–3k triangles each.
-
-## 16. Crow (animated)
-
-**Where:**
-- flocks on the killing field at dawn, picking at the dead, lifting off when the gun fires
-- a few on the wall's parapet and the dead trees during the night
-- birds circling over the field in the dawn chronicle and the ending shots
-
-The sound is already in: crows call over the valley at dawn and a flock's wings go up after first light, but there is nothing to see. The chronicle's lines talk about them ("The crows had learned where to find us").
-
-**Now:** nothing (sound only).
-
-**Need:** a carrion crow or raven, rigged, with these clips: idle (standing, head turns), peck at the ground, hop, take-off, flap (a flying loop), glide. One model is enough; I tint and scale copies for variety and instance them by the dozen.
-
-**Budget:** about 500–2,000 triangles (they are small and many), one 512–1024 px texture.

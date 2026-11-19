@@ -765,7 +765,8 @@ async function survivors() {
   }
 }
 
-const { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog, tower } = await import('./build_vehicles.mjs').then((m) => m.make({ io, SRC, finish, splitByTriangles, bakeNodes }));
+const { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog, tower, helpers } = await import('./build_vehicles.mjs').then((m) => m.make({ io, SRC, finish, splitByTriangles, bakeNodes }));
+const { mg4, trees, deadtrees, crow, hangar } = await import('./build_field.mjs').then((m) => m.make({ io, SRC, finish, bakeNodes, helpers }));
 const want = process.argv.slice(2);
-const all = { m2hb, ac130, b36, grenade, molotov, crate, sandbags, soldier, survivors, cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog, tower };
+const all = { m2hb, ac130, b36, grenade, molotov, crate, sandbags, soldier, survivors, cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog, tower, mg4, trees, deadtrees, crow, hangar };
 for (const [k, f] of Object.entries(all)) if (!want.length || want.includes(k)) await f();

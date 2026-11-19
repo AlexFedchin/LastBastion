@@ -417,8 +417,9 @@ export class Arsenal {
     this.gunners = [];
     for (const px of GUNNER_POSTS) {
       const g = new THREE.Group();
-      // a soldier at the parapet, his M240 over it (the model's rifle stands in for it)
+      // a soldier at the parapet, his machine gun over it (the MG4 model stands in for the M240)
       const sol = new Soldier();
+      sol.carry('mg4');
       sol.root.visible = true;
       sol.root.rotation.y = Math.PI; // the model faces +z; the group's forward is -z
       g.add(sol.root);

@@ -7,7 +7,7 @@
 // Mixamo bone happens to be oriented.
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
-import { modelScene, modelClips } from '../world/models.js';
+import { modelScene, modelClips, cloneModel } from '../world/models.js';
 
 const REST_ELEV = 25 * Math.PI / 180;     // the rifle's elevation in the model's own pose
 const MUZZLE = new THREE.Vector3(0.053, 1.59, 0.96); // printed by build_models.mjs soldier
@@ -174,6 +174,40 @@ export class Soldier {
     _q.setFromAxisAngle(axis, angle);
     _q2.copy(r.model).invert().multiply(_q).multiply(r.model);
     b.quaternion.copy(r.local).multiply(_q2);
+  }
+
+  /**
+   * Swap the rifle for another weapon model (the wall crews' MG4: app/models/mg4.glb, its
+   * origin at the pistol grip, barrel along +z, a 'muzzle' anchor). The rifle's joint is
+   * collapsed so its mesh vanishes; the gun rides the right hand on the rifle's own axis,
+   * so aim() points it exactly as it pointed the rifle. Call before any pose is played.
+   */
+  carry(name) {
+    if (this.carried || !this.bones.Rifle) return null;
+    for (const [k, r] of Object.entries(this.rest)) this.bones[k].quaternion.copy(r.local);
+    this.body.updateMatrixWorld(true);
+    const gun = cloneModel(name);
+    gun.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    let anchors = null;
+    gun.traverse((o) => { if (!anchors && o.userData.anchors) anchors = o.userData.anchors; });
+    // in the model's frame at rest: the grip in the hand, the barrel along the rifle's axis
+    const hand = this.bones.RightHand, toModel = new THREE.Matrix4().copy(this.model.matrixWorld).invert();
+    const at = new THREE.Vector3().setFromMatrixPosition(hand.matrixWorld).applyMatrix4(toModel);
+    const axis = new THREE.Vector3(0, Math.sin(REST_ELEV), Math.cos(REST_ELEV));
+    at.addScaledVector(axis, 0.07).add(new THREE.Vector3(0, -0.035, 0));
+    gun.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis);
+    gun.position.copy(at);
+    this.model.add(gun);
+    gun.updateMatrixWorld(true);
+    hand.attach(gun);
+    // the muzzle point (tracers, flashes) moves to the new gun's muzzle
+    gun.attach(this.muzzle);
+    if (anchors && anchors.muzzle) this.muzzle.position.fromArray(anchors.muzzle); else this.muzzle.position.set(0, 0.03, 0.8);
+    this.muzzle.quaternion.identity();
+    this.bones.Rifle.scale.setScalar(1e-4);
+    this.slingLocal = null; // (nothing to sling: the gun stays in his hands)
+    this.carried = gun;
+    return gun;
   }
 
   /** Rifle on his back (true) or in his hands. */

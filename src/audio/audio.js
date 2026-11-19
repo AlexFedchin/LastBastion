@@ -361,7 +361,7 @@ export class AudioEngine {
     this.master.gain.setTargetAtTime(this.settings.master * OUTPUT_TRIM, t, 0.05);
     this.music.gain.setTargetAtTime(this.settings.music * MUSIC_TRIM, t, 0.05);
     this.sfx.gain.setTargetAtTime(this.settings.sfx, t, 0.05);
-    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM * (this._cine ? 1.35 : 1), t, 0.05);
+    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM * (this._cine ? 2.4 : 1), t, 0.05);
   }
 
   /** Outdoor impulse response: the wall and bunker up close, the valley sides
@@ -844,21 +844,21 @@ export class AudioEngine {
     this._cine = !!on;
     if (!this.ready) return;
     const t = this.ctx.currentTime;
-    this.snap.gain.setTargetAtTime(on ? 1.35 : (SNAP[this.musicMode] ?? 1), t, 0.6);
-    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM * (on ? 1.6 : 1), t, 0.3);
+    this.snap.gain.setTargetAtTime(on ? 1.15 : (SNAP[this.musicMode] ?? 1), t, 0.6);
+    this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM * (on ? 2.4 : 1), t, 0.3);
     if (!on) { this.cineDuck.gain.cancelScheduledValues(t); this.cineDuck.gain.setTargetAtTime(1, t, 0.3); }
   }
 
   /**
-   * A cutscene line: the world (bombs, rotors, rockets, the horde) steps back about 8 dB
-   * for its length, so every word carries; it comes back up after. Outside the cutscenes
-   * the radio sits on the guns as it always has.
+   * A cutscene line: the world (bombs, rotors, rockets, the horde) steps back about 16 dB
+   * for its length, so every word carries over a carpet of bombs; it comes back up after.
+   * Outside the cutscenes the radio sits on the guns as it always has.
    */
   speakDuck(start, end) {
     if (!this._cine) return;
     const g = this.cineDuck.gain, t = this.ctx.currentTime;
     g.cancelScheduledValues(t);
-    g.setTargetAtTime(0.4, Math.max(t, start - 0.15), 0.12);
+    g.setTargetAtTime(0.16, Math.max(t, start - 0.15), 0.12);
     g.setTargetAtTime(1, end + 0.25, 0.9);
   }
 
@@ -1127,7 +1127,7 @@ export class AudioEngine {
     if (!this.ready || (prev === mode && !force)) return;
     const T = this.tracks;
     const only = (keep) => { for (const [k, tr] of Object.entries(T)) if (!keep.includes(k)) tr.set(0, 1.4); };
-    this.snap.gain.setTargetAtTime(this._cine ? 1.35 : (SNAP[mode] ?? 1), this.ctx.currentTime, 1.2);
+    this.snap.gain.setTargetAtTime(this._cine ? 1.15 : (SNAP[mode] ?? 1), this.ctx.currentTime, 1.2);
     if (mode === 'menu') { only(['menu']); T.menu.set(1.2, 2.5); }
     else if (mode === 'night') {
       this.tide = false; this._tideOn = false; this._mi = 0;

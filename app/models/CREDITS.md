@@ -33,6 +33,11 @@ meshopt-compressed.
 | `mcrate.glb` | Weapons crate: what each man of the recovery team carries home, the supply drop's load, the stacks on the nest roof | [Sketchfab: Weapons Crate](https://sketchfab.com/3d-models/weapons-crate-6597d3858df94da698ece8e0038f50b7) | Sousinho | CC BY 4.0 |
 | `church.glb` | The village church and its bell tower, on the far hills | [Sketchfab: Church](https://sketchfab.com/3d-models/church-867a847b67364484bf44912e1af190af) | Tiago Lopes | CC BY 4.0 |
 | `hedgehog.glb` | Czech hedgehogs in the killing field | [Sketchfab: Rusted Czech Hedgehog](https://sketchfab.com/3d-models/rusted-czech-hedgehog-cfa712e8851a4881989ea890bfc6910e) | GrostyBoi | CC BY 4.0 |
+| `mg4.glb` | HK MG4 machine gun, standing in for the M240: the wall crews' guns, bay 3 of the hangar | [Sketchfab: HK MG4 machine gun](https://sketchfab.com/3d-models/hk-mg4-machine-gun-ee1c36acc61749f787be7e4a694e3b1f) | Ivan008 | CC BY 4.0 |
+| `trees.glb` | Spruce, pine and birch for the hills; bushes and rocks for the field and the farmland | [Sketchfab: Low Poly Forest Tree Pack](https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b) | 99.Miles | CC BY 4.0 |
+| `deadtrees.glb` | The dead trees standing in the killing field | [Sketchfab: Trees](https://sketchfab.com/3d-models/trees-eed7470843504aa592514554a6100fbc) | DJMaesen | CC BY 4.0 |
+| `crow.glb` | The crows (animated in the game's shader: the model has no rig) | [Sketchfab: Low-Poly Crow](https://sketchfab.com/3d-models/low-poly-crow-ddaccf0bff5d4bb3a5b619845e31aaa8) | Demon | CC BY 4.0 |
+| `hangar.glb` | The dawn resupply's hall (an old factory, its front half cleared for the bays) | [Sketchfab: old factory FREE](https://sketchfab.com/3d-models/old-factory-free-9d0acdbe78944c098689c0d34853e57b) | dasy444 | Sketchfab Standard |
 | `tower.glb` | The central tower: your gun position (concrete painted in game with ambientCG Concrete044C) | Hand-made for the game | the project | — |
 
 ## What was changed

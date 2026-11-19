@@ -12,6 +12,7 @@
 // from sunset to full dark across the whole of it. The sound is scored here too:
 // the beds (audio.scape, updateScape) and the one-shots placed on the shots (score()).
 import * as THREE from 'three';
+import { Crows } from '../world/crows.js';
 import { WORLD, PROLOGUE, ZT, wallZ } from '../config.js';
 import { clamp, lerp, rand, fitFov } from '../core/util.js';
 import { groundH } from '../world/terrain.js';
@@ -82,39 +83,32 @@ const SHOTS = {
 };
 
 // ── crows ────────────────────────────────────────────────────────────────────
-// A loose flock crossing the sun: flat silhouettes, each wing hinged at the body and
-// flapped (with glides), drawn as one instanced mesh, two instances (mirrored) a bird.
+// A loose flock crossing the sun: the crow model (src/world/crows.js), each bird flapping
+// with glides, drawn as one instanced mesh per part of the model.
 const BIRDS = 34;
 class Flock {
   constructor(scene) {
-    const geo = new THREE.BufferGeometry();
-    // one wing and half the body (the other half is its mirror), forward = +z
-    geo.setAttribute('position', new THREE.Float32BufferAttribute([
-      0, 0, 0.16, 0, 0, -0.1, 0.62, 0, -0.06,       // inner wing
-      0.62, 0, -0.06, 0, 0, -0.1, 0.5, 0, -0.16,    // trailing primaries
-      0, 0, 0.3, 0.06, 0, -0.05, 0, 0, -0.32,       // body
-    ], 3));
-    this.mesh = new THREE.InstancedMesh(geo, new THREE.MeshBasicMaterial({ color: 0x050403, side: THREE.DoubleSide, fog: false }), BIRDS * 2);
-    this.mesh.frustumCulled = false;
-    this.mesh.visible = false;
-    scene.add(this.mesh);
+    this.draw = new Crows(scene, BIRDS, { fog: false }); // (far off in the long lens: silhouettes against the sun)
+    this.on = false;
     this.b = [];
     for (let i = 0; i < BIRDS; i++) {
-      this.b.push({ u: rand(-10, 10) - (i % 5) * 2, v: rand(-2.5, 2.5), w: rand(-12, 12), sp: rand(0.92, 1.1), f: rand(3.4, 4.6), ph: rand(0, 6), glide: rand(0, 10), size: rand(1.3, 1.8) });
+      this.b.push({ u: rand(-10, 10) - (i % 5) * 2, v: rand(-2.5, 2.5), w: rand(-12, 12), sp: rand(0.92, 1.1), f: rand(3.4, 4.6), ph: rand(0, 6), glide: rand(0, 10), size: rand(1.5, 2.0) });
     }
-    this._m = new THREE.Matrix4(); this._q = new THREE.Quaternion(); this._r = new THREE.Quaternion(); this._s = new THREE.Vector3(); this._p = new THREE.Vector3();
-    this._z = V(0, 0, 1); this._up = V(0, 1, 0);
+    this._p = new THREE.Vector3(); this._up = V(0, 1, 0);
   }
 
+  /** (the first part's mesh: what the smoke test looks at to see the flock is up) */
+  get mesh() { return { visible: this.on }; }
+
   /** Lay the flight out: from `origin` across the view along `right`; `fwd` is depth. */
-  start(origin, right, fwd) { this.o = origin.clone(); this.right = right.clone(); this.fwd = fwd.clone(); this.t = 0; this.mesh.visible = true; }
+  start(origin, right, fwd) { this.o = origin.clone(); this.right = right.clone(); this.fwd = fwd.clone(); this.t = 0; this.on = true; }
 
   update(dt) {
-    if (!this.mesh.visible) return;
+    if (!this.on) return;
     this.t += dt;
     const T = this.t, up = this._up;
     const dir = this.right.clone().multiplyScalar(0.95).addScaledVector(up, 0.12).normalize();
-    this._q.setFromUnitVectors(this._z, dir);
+    const yaw = Math.atan2(dir.x, dir.z), pitch = -Math.asin(dir.y);
     for (let i = 0; i < BIRDS; i++) {
       const b = this.b[i];
       // the flock drifts across, each bird wandering in it
@@ -123,19 +117,13 @@ class Flock {
         .addScaledVector(up, b.v + T * 1.0 + Math.sin(T * 1.1 + b.ph * 2) * 0.8);
       // flapping; now and then a glide on set wings
       const gliding = Math.sin(T * 0.6 + b.glide) > 0.55;
-      const flap = gliding ? 0.12 : Math.sin(T * b.f * Math.PI * 2 + b.ph) * 0.75 + 0.1;
-      for (let s = 0; s < 2; s++) {
-        this._r.setFromAxisAngle(this._z, s ? -flap : flap);
-        const q = this._q.clone().multiply(this._r);
-        this._s.set((s ? -1 : 1) * b.size, b.size, b.size);
-        this._m.compose(p, q, this._s);
-        this.mesh.setMatrixAt(i * 2 + s, this._m);
-      }
+      const flap = gliding ? 0.15 : Math.sin(T * b.f * Math.PI * 2 + b.ph) * 0.8 + 0.12;
+      this.draw.pose(i, p, yaw + Math.sin(T * 0.9 + b.ph) * 0.12, pitch, Math.sin(T * 0.8 + b.ph) * 0.2, b.size, 1, flap);
     }
-    this.mesh.instanceMatrix.needsUpdate = true;
+    this.draw.commit(BIRDS);
   }
 
-  stop() { this.mesh.visible = false; }
+  stop() { this.on = false; this.draw.hide(); }
 }
 
 export class Prologue {

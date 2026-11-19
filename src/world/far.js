@@ -7,6 +7,7 @@ import { makeRng, lerp } from '../core/util.js';
 import { groundH, groundNormal, heightFn, roadX, valleyEdge, vnoise } from './terrain.js';
 import { box, cylY, merge, xf, worldUV, makePylonGeo, sagWire, weather } from './kit.js';
 import { placeModel } from './vehicles.js';
+import { placeTree } from './flora.js';
 import { FOG_CUSTOM_GLSL, fogUniforms } from '../render/atmosphere.js';
 
 const _m = new THREE.Matrix4();
@@ -69,15 +70,6 @@ void main(){
   gl_FragColor = vec4(col, a * (1.0 - vFog * 0.5));
 }`;
 
-/** A layered conifer (pivot at the root). */
-export function makeConiferGeo() {
-  return merge([
-    cylY(0.25, 4, 5, 0, 2, 0),
-    xf(new THREE.ConeGeometry(2.6, 5.5, 7), 0, 4.6, 0),
-    xf(new THREE.ConeGeometry(2.0, 4.8, 7), 0, 7.2, 0, 0, 0.5),
-    xf(new THREE.ConeGeometry(1.3, 4.0, 7), 0, 9.8, 0, 0, 1.0),
-  ]);
-}
 /** A burnt pine: a bare pole and a few snapped limbs. */
 export function makeDeadPineGeo() {
   return merge([
@@ -86,10 +78,6 @@ export function makeDeadPineGeo() {
     box(1.4, 0.1, 0.1, 0.3, 10, 0, 0, 3.6, 0.3), box(2.4, 0.12, 0.12, -0.5, 5.6, 0, 0, 4.4, -0.15),
   ]);
 }
-let _pineMat = null;
-export function makePineMat() {
-  return _pineMat || (_pineMat = weather(new THREE.MeshStandardMaterial({ color: 0x1b2318, roughness: 0.95, flatShading: true }), { soot: 0.6, key: 'pine' }));
-}
 
 export function buildFar(env) {
   const { scene, mats, fire } = env;
@@ -97,9 +85,7 @@ export function buildFar(env) {
   const rng = makeRng(9090);
 
   // ── forests on the hills ────────────────────────────────────────────────
-  const conifer = makeConiferGeo();
   const deadPine = makeDeadPineGeo();
-  const pineMat = makePineMat();
   const NT = q.texSize >= 1024 ? 5200 : 2600;
   const cMs = [], dMs = [];
   let tries = 0;
@@ -124,9 +110,8 @@ export function buildFar(env) {
     _m.compose(_v.set(x, y - 0.4, z), _q, _s.set(s, s * (0.85 + rng() * 0.4), s));
     (dead ? dMs : cMs).push(_m.clone());
   }
-  const forest = new THREE.InstancedMesh(conifer, pineMat, cMs.length);
-  cMs.forEach((m, i) => forest.setMatrixAt(i, m));
-  scene.add(forest);
+  // the living woods: the tree pack's spruce, pine and birch (low-poly cards: hills only)
+  for (const m of cMs) placeTree(env, m, 'far');
   const dead = new THREE.InstancedMesh(deadPine, mats.charred, dMs.length);
   dMs.forEach((m, i) => dead.setMatrixAt(i, m));
   scene.add(dead);

@@ -22,6 +22,8 @@ import { makeMaterials, weather } from './kit.js';
 import { lampLit, setLamps, setLampPower } from './lamplight.js';
 import { buildFortification, buildTowers, buildBase, buildLightPools, updateWallBlood, wingMatrix } from './structures.js';
 import { buildProps } from './props.js';
+import { CrowField, crowPerches } from './crows.js';
+import { patchFoliage } from './flora.js';
 import { buildDressing } from './dressing.js';
 import { buildFar } from './far.js';
 import { buildRear } from './rear.js';
@@ -128,6 +130,11 @@ export class Environment {
    */
   dressWithModels(modelMesh) {
     const rnd = makeRngLocal(77);
+    // the packs' foliage keeps its crowns at a distance (flora.js)
+    for (const k of ['trees', 'deadtrees']) modelScene(k).traverse((o) => { if (o.isMesh) patchFoliage(o.material); });
+    // the valley's crows: on the dead trees and the wall at night, among the dead at dawn
+    this.crows = new CrowField(this.scene, crowPerches(this.deadTreeSpots || []));
+    this.crows.reset();
     // sandbag piles: as many 1.6 m piles as fit each run, alternating the two scans
     const piles = [modelMesh('sandbags', 'pile_0'), modelMesh('sandbags', 'pile_1')];
     const ms = [[], []];
@@ -194,19 +201,20 @@ export class Environment {
       });
     }
     // whole models: one instanced mesh per mesh of the model (vehicles keep their part nodes)
-    for (const { name, skip, tint, swap, list } of this.placed.values()) {
+    for (const { name, skip, tint, swap, node, cast, list } of this.placed.values()) {
       const src = modelScene(name);
       src.updateMatrixWorld(true);
       src.traverse((o) => {
         if (!o.isMesh) return;
         for (let p = o; p; p = p.parent) if (skip && p.name === skip) return;
+        if (node) { let p = o; while (p && p.name !== node) p = p.parent; if (!p) return; }
         let mat = (swap && swap[o.material.name]) || o.material;
         if (tint != null) { mat = mat.clone(); mat.color.multiply(new THREE.Color(tint)); }
         const im = new THREE.InstancedMesh(o.geometry, mat, list.length);
         list.forEach((mm, j) => im.setMatrixAt(j, m.multiplyMatrices(mm, o.matrixWorld)));
-        im.castShadow = true; im.receiveShadow = true;
+        im.castShadow = cast; im.receiveShadow = true;
         im.computeBoundingSphere();
-        im.name = name;
+        im.name = node ? name + '/' + node : name;
         this.scene.add(im);
       });
     }
@@ -218,9 +226,11 @@ export class Environment {
    * tint: a colour the materials are multiplied by; swap: material name -> a material of the
    * game's to use instead (the tower's 'concrete' gets the wall's).
    */
-  addModel(name, matrix, { skip = null, tint = null, swap = null } = {}) {
-    const key = `${name}|${skip || ''}|${tint ?? ''}`;
-    if (!this.placed.has(key)) this.placed.set(key, { name, skip, tint, swap, list: [] });
+  addModel(name, matrix, { skip = null, tint = null, swap = null, node = null, cast = true, group = '' } = {}) {
+    // node: only that node's meshes (one variant of a pack: 'trees' / 'tree_3');
+    // group: instances kept in a mesh of their own (so each part of the world culls apart)
+    const key = `${name}|${skip || ''}|${tint ?? ''}|${node || ''}|${group}|${cast}`;
+    if (!this.placed.has(key)) this.placed.set(key, { name, skip, tint, swap, node, cast, list: [] });
     this.placed.get(key).list.push(matrix.clone());
   }
 
@@ -318,6 +328,7 @@ export class Environment {
 
   // ── Per-frame ─────────────────────────────────────────────────────────────
   update(dt, time, horde, fx, audio) {
+    if (this.crows) this.crows.update(dt, this.dawn);
     this.time = time;
     const d = this.dawn;
     const su = this.skyUniforms;

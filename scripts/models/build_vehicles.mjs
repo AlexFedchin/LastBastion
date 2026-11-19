@@ -78,12 +78,15 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
   }
   /** Rewrite one texture's pixels: fn(r, g, b, x, y) -> [r, g, b] on 0..255 values. */
   async function repaint(tex, fn) {
-    const { data, info } = await sharp(Buffer.from(tex.getImage())).removeAlpha().raw().toBuffer({ resolveWithObject: true });
-    for (let y = 0, i = 0; y < info.height; y++) for (let x = 0; x < info.width; x++, i += 3) {
+    // (a cut-out's alpha is kept: foliage cards carry their shape in it)
+    const img = sharp(Buffer.from(tex.getImage())), meta = await img.metadata();
+    const ch = meta.hasAlpha ? 4 : 3;
+    const { data, info } = await (meta.hasAlpha ? img.ensureAlpha() : img.removeAlpha()).raw().toBuffer({ resolveWithObject: true });
+    for (let y = 0, i = 0; y < info.height; y++) for (let x = 0; x < info.width; x++, i += ch) {
       const o = fn(data[i], data[i + 1], data[i + 2], x / info.width, y / info.height);
       data[i] = o[0]; data[i + 1] = o[1]; data[i + 2] = o[2];
     }
-    tex.setImage(await sharp(data, { raw: { width: info.width, height: info.height, channels: 3 } }).png().toBuffer()).setMimeType('image/png');
+    tex.setImage(await sharp(data, { raw: { width: info.width, height: info.height, channels: ch } }).png().toBuffer()).setMimeType('image/png');
   }
   // ambientCG CC0 rust (Rust009 colour; Metal041B's rust spots as the mask), for weathering
   const ACG = (a, m) => path.join(SRC, 'ambientcg', a, `${a}_1K-JPG_${m}.jpg`);
@@ -574,5 +577,5 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     await finish(doc, 'tower.glb');
   }
 
-  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog, tower };
+  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog, tower, helpers: { grade, texWebp, anchors, triCount, repaint } };
 }

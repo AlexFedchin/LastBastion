@@ -10,7 +10,8 @@ import {
 } from './terrain.js';
 import { box, cylY, merge, makeHouseGeo, makeRuin, sagWire, weather } from './kit.js';
 import { placeModel } from './vehicles.js';
-import { makeConiferGeo, makeDeadPineGeo, makePineMat } from './far.js';
+import { makeDeadPineGeo } from './far.js';
+import { placeTree, placeBush, placeRock } from './flora.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -174,16 +175,19 @@ export function buildRear(env) {
   }
 
   const leafMat = weather(new THREE.MeshStandardMaterial({ color: 0x232b1b, roughness: 1, flatShading: true }), { soot: 0.4, key: 'hedge' });
-  const coniferGeo = makeConiferGeo(), deadGeo = makeDeadPineGeo();
-  instanced(scene, coniferGeo, makePineMat(), rearC);
+  // the woods: the tree pack's trees (hills and copses); the burnt pines stay as they were
+  const deadGeo = makeDeadPineGeo();
+  for (const m of rearC) placeTree(env, m, 'rear');
   instanced(scene, deadGeo, mats.charred, rearD);
   for (const sd of [-1, 1]) {
     // and the crest trees per side, so each side culls on its own
-    instanced(scene, coniferGeo, makePineMat(), crestC.filter((m) => Math.sign(m.elements[12]) === sd));
+    for (const m of crestC) if (Math.sign(m.elements[12]) === sd) placeTree(env, m, 'crest' + sd);
     instanced(scene, deadGeo, mats.charred, crestD.filter((m) => Math.sign(m.elements[12]) === sd));
   }
-  instanced(scene, lumpGeo(1, 41, 0.75, 1.2), leafMat, bushes);
-  instanced(scene, lumpGeo(1, 77, 0.78, 1.22), env.rockMat, rocks);
+  // the hedgerows' bushes and the hills' rocks, from the same pack
+  for (const m of bushes) placeBush(env, m, 'rear');
+  for (const m of rocks) placeRock(env, m, { group: 'rear', cast: false });
+  void leafMat; void lumpGeo;
 
   // ── farmsteads along the track ────────────────────────────────────────────
   const houses = [], roofs = [], barns = [];

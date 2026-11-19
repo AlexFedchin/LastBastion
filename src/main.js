@@ -100,6 +100,11 @@ class Game {
     const textures = { particles: makeParticleAtlas(128), decals: makeDecalAtlas(128) };
     this.fx = new Effects(this.scene, textures, this.env.fogUniforms, this.quality);
     this.fx.fire = this.env.fire;
+    // anything that goes off near the crows puts them up
+    for (const k of ['explosion', 'bigExplosion']) {
+      const f = this.fx[k].bind(this.fx);
+      this.fx[k] = (x, y, z, ...rest) => { if (this.env.crows) this.env.crows.scare(x, z, k === 'bigExplosion' ? 70 : 40); return f(x, y, z, ...rest); };
+    }
     this.uniforms = {
       uTime: { value: 0 },
       uEyeGlow: { value: 9 },
@@ -566,6 +571,7 @@ class Game {
     this.director.start(this.plan);
     this.player.reset();
     this.env.setStory(run.night, run.endless);
+    if (this.env.crows) this.env.crows.reset();
     this.env.dawn = 0;
     this.ns = { kills: 0, headshots: 0, lost: 0, shots: 0, hits: 0, bestStreak: 0, supplies: 0, bonus: 0, fireKills: 0 };
     this.medals.startNight(run);
@@ -1136,6 +1142,12 @@ class Game {
     const input = this.input;
     const active = input.locked || TEST;
     const run = this.run;
+    // the crows near where the fifty's rounds are landing go up
+    if (this.player.firing && this.env.crows && (this.crowT = (this.crowT || 0) - dt) <= 0) {
+      this.crowT = 0.3;
+      const at = this.player.aimPoint(320);
+      this.env.crows.scare(at.x, at.z, 24);
+    }
 
     // abilities (each arrives on its own night: see UNLOCKS)
     const can = (k) => isUnlocked(k, run.night);
