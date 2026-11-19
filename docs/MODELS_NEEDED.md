@@ -67,6 +67,21 @@ Its concrete is painted in the game with the wall's own (`slab`: ambientCG Concr
 model was made with), so materials named `…Concrete…` can keep any texture in Blender. Every other
 material ships as exported, graded darker for the night.
 
+### Planned: the taller remake, with the roof dressed in Blender
+
+The tower will be remade at the original height: roof and nest platform at 11.6 m (the gun camera at
+13.2 m), same footprint and front face. The roof's decorations will be placed in the model too. When
+that export arrives:
+- set the build's expected roof/platform height to the new one, and `WORLD.TOWER_TOP` / `WORLD.CAM.y`
+  to match (the cutscenes and the audio listener read them)
+- delete the static props from `dressRoof` (`src/world/dressing.js`) that the model now has: the hatch,
+  vents, dish, scope, drains, tar patches, cable runs, tarp, kit, generator, jerrycans, stretcher and the
+  parapet and blast-wall sandbags
+- keep in code what moves or lights up, unless the model marks a spot for it with an empty: the gun and
+  its nest sandbags, the two roof soldiers (`env.roofSoldiers`, animated), the work lamp's light, the
+  flag and the blinking beacon
+- re-shoot the roof and gun views before/after
+
 ## 3. Trees and vegetation set
 
 **Where:**
