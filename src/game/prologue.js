@@ -37,12 +37,15 @@ const SHOTS = {
   // a long lens on the sun going down behind the city; crows cross it
   sunTele: (k, t, P) => ({ pos: TELE.clone(), look: sunAt(P, TELE, 1000).add(V(-8 + 10 * k, -9, 0)), fov: lerp(9, 10, k), shake: 0.0008 }),
   // the lens pulls out and back: the flag, the nest and the riflemen against the sun
+  // (one long, even move: the zoom eased in and out over the whole shot, in equal steps of
+  // magnification rather than of angle, so it never lurches at the start or snaps at the end)
   sun: (k, t, P) => {
-    const e = easeOut(k / 0.55), s = ease(k);
+    const e = k * k * k * (k * (k * 6 - 15) + 10);
+    const fov = 10 * Math.pow(26 / 10, e);
     return {
-      pos: TELE.clone().lerp(V(8, 16.8, 37), s),
+      pos: TELE.clone().lerp(V(8, 16.8, 37), e),
       look: sunAt(P, TELE, 1000).add(V(2, -9, 0)).lerp(V(-55, 12, -260), e),
-      fov: lerp(10, 26, e), shake: 0.0012,
+      fov, shake: 0.0012,
     };
   },
   // out on the road: a low dolly across it that cranes up on the wall, lit orange from the front
@@ -74,7 +77,13 @@ const SHOTS = {
   // high over the back of the bastion as the sun goes and the lights sweep the field
   lights: (k) => ({ pos: V(22, 31, 45).lerp(V(13, 26, 33), ease(k)), look: V(-8, 2, -95).lerp(V(-6, 3, -110), ease(k)), fov: 50 }),
   // low in the field, a long lens up the road: the first of them over the rise, lightning behind
-  dead: (k) => ({ pos: V(8, 0, -166).lerp(V(5, 0, -176), ease(k)), ground: 0.9, look: V(-6, 0, -262), lookGround: 3.2, fov: lerp(26, 21, ease(k)), shake: 0.0025 }),
+  // (on a level track: the camera holds one height above the ground's high points along the
+  // move, rather than dipping into the craters it passes over)
+  dead: (k, t, P) => {
+    if (P.deadY === undefined) { let y = -Infinity; for (let i = 0; i <= 24; i++) { const u = i / 24; y = Math.max(y, groundH(lerp(8, 5, u), lerp(-166, -176, u))); } P.deadY = y + 0.9; }
+    const pos = V(8, 0, -166).lerp(V(5, 0, -176), ease(k)); pos.y = P.deadY;
+    return { pos, look: V(-6, 0, -262), lookGround: 3.2, fov: lerp(26, 21, ease(k)), shake: 0.0025 };
+  },
   // into the nest, behind the gun, as the dark comes down (night 1's move into the gun follows)
   nest: (k, t, P) => {
     const G = P.g.ending.gunAt, e = ease(k);
@@ -133,6 +142,7 @@ export class Prologue {
   }
 
   start() {
+    this.deadY = undefined;
     const g = this.g;
     if (!this.flock) this.flock = new Flock(g.scene);
     this.active = true;
@@ -376,6 +386,8 @@ export class Prologue {
     cam.position.copy(p.pos);
     cam.up.set(0, 1, 0);
     cam.lookAt(p.look);
+    // the lens: focused where the shot looks (or on what it names), the blur growing with the focal length
+    g.post.focus(p.focus ?? p.pos.distanceTo(p.look), p.aperture ?? Math.min(3, 0.55 * 42 / p.fov));
     const fov = fitFov(p.fov, cam.aspect);
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
     cam.updateMatrixWorld(true);

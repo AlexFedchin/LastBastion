@@ -457,7 +457,8 @@ export class Arsenal {
         }
         if (g.target >= 0) g.targetId = h.id[g.target];
       }
-      if (g.target < 0) continue;
+      // nothing in range: at the ready over the parapet, muzzle a little down the field
+      if (g.target < 0) { g.elev += (-0.12 - g.elev) * Math.min(1, dt * 2); g.soldier.aim(g.elev, 0, 0); continue; }
       const i = g.target;
       // aim model
       const tx = h.x[i], tz = h.z[i];

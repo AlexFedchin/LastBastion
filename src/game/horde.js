@@ -597,9 +597,10 @@ export class Horde {
   }
 
   /** One of them is in the yard (the extraction): off the wall top and running for (tx, tz). */
-  goInside(i, tx, tz) {
+  goInside(i, tx, tz, perch = 0) {
     const x = this.x[i];
     this.inside[i] = 1;
+    this.seek[i] = perch; // (inside, seek is the time it crouches on the parapet before it drops)
     this.z[i] = wallZ(x) + (Math.abs(x) <= WORLD.GATE_HALF ? 1.2 : 1.2 / WING_COS);
     this.y[i] = WORLD.WALL_H + 0.6;
     this.tgtX[i] = tx; this.tgtZ[i] = tz;
@@ -986,6 +987,8 @@ export class Horde {
 
   /** In the yard: drop off the wall, then a straight run at the target, clawing when there. */
   updateInside(i, dt, time, gs) {
+    // on the parapet a moment, looking down into the yard, before it drops
+    if (this.seek[i] > 0) { this.seek[i] -= dt; this.atk[i] += (1 - this.atk[i]) * (1 - Math.exp(-5 * dt)); return; }
     let x = this.x[i], z = this.z[i];
     const dx = this.tgtX[i] - x, dz = this.tgtZ[i] - z, dd = Math.sqrt(dx * dx + dz * dz);
     const Y = this.y[i];

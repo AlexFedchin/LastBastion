@@ -171,14 +171,13 @@ export function buildFortification(env) {
       }
     }
   }
-  // firing steps for the wall gunners
+  // firing steps for the wall gunners: a platform of bags three high, three deep, that the
+  // gunner stands on (his feet at WALL_H - 0.55, deckY + 0.45), reaching back from the parapet
   for (const px of GUNNER_POSTS) {
     const w = px < 0 ? wings[0] : wings[1];
     const u = (px - w.A[0]) / w.tx;
-    for (let r = 0; r < 6; r++) for (let c = 0; c < 4; c++) {
-      wingMatrix(w, u - 0.95 + c * 0.63 + (r % 2) * 0.3, deckY + 0.12 + r * 0.155, 1.0 + (rng() - 0.5) * 0.05, _m, 1, 1, 1.0, Math.PI / 2 + (rng() - 0.5) * 0.15);
-      bagMs.push(_m.clone());
-      wingMatrix(w, u - 0.95 + c * 0.63 + (r % 2) * 0.3, deckY + 0.12 + r * 0.155, 1.65, _m, 1, 1, 1.0, Math.PI / 2 + (rng() - 0.5) * 0.15);
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 4; c++) for (const d of [0.95, 1.35, 1.75]) {
+      wingMatrix(w, u - 0.95 + c * 0.63 + (r % 2) * 0.3, deckY + 0.1 + r * 0.155, d + (rng() - 0.5) * 0.04, _m, 1, 1, 1.0, Math.PI / 2 + (rng() - 0.5) * 0.15);
       bagMs.push(_m.clone());
     }
   }

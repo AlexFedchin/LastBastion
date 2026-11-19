@@ -293,11 +293,8 @@ export class Environment {
       beam.frustumCulled = false;
       beam.renderOrder = 5;
       this.scene.add(beam);
-      const glare = this.makeGlowSprite(0xdfe8ff, 4, 1.6);
-      glare.position.copy(spot.position);
-      this.scene.add(glare);
       this.searchlights.push({
-        spot, beam, glare, side,
+        spot, beam, side,
         aim: new THREE.Vector3(side * 30, 0, -90),
         goal: new THREE.Vector3(side * 30, 0, -90),
         t: Math.random() * 10, hunt: 0, phase: k * 2.1,

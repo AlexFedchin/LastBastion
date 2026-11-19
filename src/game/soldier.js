@@ -184,22 +184,38 @@ export class Soldier {
    */
   carry(name) {
     if (this.carried || !this.bones.Rifle) return null;
-    for (const [k, r] of Object.entries(this.rest)) this.bones[k].quaternion.copy(r.local);
-    this.body.updateMatrixWorld(true);
     const gun = cloneModel(name);
     gun.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
     let anchors = null;
     gun.traverse((o) => { if (!anchors && o.userData.anchors) anchors = o.userData.anchors; });
-    // in the model's frame at rest: the grip in the hand, the barrel along the rifle's axis
-    const hand = this.bones.RightHand, toModel = new THREE.Matrix4().copy(this.model.matrixWorld).invert();
-    const at = new THREE.Vector3().setFromMatrixPosition(hand.matrixWorld).applyMatrix4(toModel);
-    const axis = new THREE.Vector3(0, Math.sin(REST_ELEV), Math.cos(REST_ELEV));
-    at.addScaledVector(axis, 0.07).add(new THREE.Vector3(0, -0.035, 0));
-    gun.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), axis);
-    gun.position.copy(at);
+    // fitted to both hands as they are in the aiming pose: the pistol grip in the right palm,
+    // the handguard (under the barrel, ahead of the feed cover) in the left
+    for (const [k, r] of Object.entries(this.rest)) this.bones[k].quaternion.copy(r.local);
+    this.play('rifle_aiming_idle', 0);
+    this.body.updateMatrixWorld(true);
+    const toModel = new THREE.Matrix4().copy(this.model.matrixWorld).invert();
+    const P = (n) => new THREE.Vector3().setFromMatrixPosition(this.bones[n].matrixWorld).applyMatrix4(toModel);
+    const palm = (side) => { const w = P(side + 'Hand'), m = this.bones[side + 'HandMiddle1'] ? P(side + 'HandMiddle1') : w; return w.lerp(m, 0.55); };
+    const R = palm('Right'), L = palm('Left');
+    const GUARD = new THREE.Vector3(0, 0.035, 0.34); // the handguard, in the gun's frame (grip at the origin)
+    // barrel direction: the grip-to-guard line through both hands, the gun's top kept up
+    const want = L.clone().sub(R).normalize();
+    const q = new THREE.Quaternion().setFromUnitVectors(GUARD.clone().normalize(), want);
+    const upNow = new THREE.Vector3(0, 1, 0).applyQuaternion(q), fwd = want;
+    const flat = (v) => v.clone().sub(fwd.clone().multiplyScalar(v.dot(fwd))).normalize();
+    const a1 = flat(upNow), b1 = flat(new THREE.Vector3(0, 1, 0));
+    const roll = Math.atan2(fwd.dot(new THREE.Vector3().crossVectors(a1, b1)), a1.dot(b1));
+    q.premultiply(new THREE.Quaternion().setFromAxisAngle(fwd, roll));
+    gun.quaternion.copy(q);
+    // grip in the right palm, slid along the line so the guard meets the left palm halfway
+    const reach = L.distanceTo(R), slack = (reach - GUARD.length()) / 2;
+    gun.position.copy(R).addScaledVector(want, slack);
     this.model.add(gun);
     gun.updateMatrixWorld(true);
-    hand.attach(gun);
+    this.bones.RightHand.attach(gun);
+    // aim() now points this gun's barrel: its axis in the right hand's frame
+    const barrel = new THREE.Vector3(0, 0, 1).applyQuaternion(q);
+    this.rifleInHand = barrel.applyQuaternion(this.modelQ('RightHand', new THREE.Quaternion()).invert()).normalize();
     // the muzzle point (tracers, flashes) moves to the new gun's muzzle
     gun.attach(this.muzzle);
     if (anchors && anchors.muzzle) this.muzzle.position.fromArray(anchors.muzzle); else this.muzzle.position.set(0, 0.03, 0.8);
@@ -207,6 +223,7 @@ export class Soldier {
     this.bones.Rifle.scale.setScalar(1e-4);
     this.slingLocal = null; // (nothing to sling: the gun stays in his hands)
     this.carried = gun;
+    for (const [k, r] of Object.entries(this.rest)) this.bones[k].quaternion.copy(r.local);
     return gun;
   }
 

@@ -24,6 +24,9 @@ class ScenePass extends Pass {
     this.camera = camera;
     this.needsSwap = false;
     this.rt = new THREE.WebGLRenderTarget(w, h, { type: THREE.HalfFloatType, samples });
+    // the depth, kept for the cutscenes' depth of field (DofPass)
+    this.rt.depthTexture = new THREE.DepthTexture(w, h);
+    this.rt.depthTexture.type = THREE.FloatType;
     // clamp extreme HDR before bloom: stacked fires must glow, not white out the frame.
     // Also scrub NaN/Inf — bloom would blur a single bad pixel into a black screen.
     this.mat = new THREE.ShaderMaterial({
@@ -213,6 +216,56 @@ const FinalShader = {
     }`,
 };
 
+/**
+ * Depth of field for the cutscenes: a lens's blur, by how far each pixel is from the focus.
+ * The circle of confusion comes from the scene's own depth (thin lens: |1/f - 1/z|, scaled
+ * by the aperture); a disc of 32 taps on the golden angle gathers it, each tap weighted by
+ * its own blur so a sharp subject doesn't smear onto the background behind it. Off in play
+ * (the pass is skipped), on whenever a cutscene sets a focus.
+ */
+class DofPass extends Pass {
+  constructor(depth, camera) {
+    super();
+    this.camera = camera;
+    this.enabled = false;
+    this.mat = new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null }, tDepth: { value: depth }, uNear: { value: 0.1 }, uFar: { value: 1000 }, uFocus: { value: 20 }, uAperture: { value: 1 }, uMaxPx: { value: 11 }, uRes: { value: new THREE.Vector2(1, 1) } },
+      vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+      fragmentShader: /* glsl */`
+        uniform sampler2D tDiffuse, tDepth; uniform float uNear, uFar, uFocus, uAperture, uMaxPx; uniform vec2 uRes; varying vec2 vUv;
+        float lin(float d) { return uNear * uFar / (uFar - d * (uFar - uNear)); }
+        float coc(vec2 uv) { float z = lin(texture2D(tDepth, uv).x); return clamp(abs(1.0 / uFocus - 1.0 / z) * uFocus * uAperture, 0.0, 1.0); }
+        void main() {
+          float c0 = coc(vUv);
+          vec3 acc = texture2D(tDiffuse, vUv).rgb; float wsum = 1.0;
+          float r0 = c0 * uMaxPx;
+          if (r0 > 0.6) {
+            for (int i = 1; i < 33; i++) {
+              float fi = float(i), r = sqrt(fi / 32.0) * r0, a = fi * 2.39996;
+              vec2 uv = vUv + vec2(cos(a), sin(a)) * r / uRes;
+              float ci = coc(uv);
+              // a tap only counts if it is itself at least as blurred as how far out it is
+              float w = smoothstep(r - 1.0, r + 0.5, ci * uMaxPx + 0.5);
+              acc += texture2D(tDiffuse, uv).rgb * w; wsum += w;
+            }
+          }
+          gl_FragColor = vec4(acc / wsum, 1.0);
+        }`,
+      depthTest: false, depthWrite: false,
+    });
+    this.quad = new FullScreenQuad(this.mat);
+  }
+
+  render(renderer, writeBuffer, readBuffer) {
+    const u = this.mat.uniforms;
+    u.tDiffuse.value = readBuffer.texture;
+    u.uNear.value = this.camera.near; u.uFar.value = this.camera.far;
+    u.uRes.value.set(readBuffer.width, readBuffer.height);
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    this.quad.render(renderer);
+  }
+}
+
 const _v = new THREE.Vector3();
 
 export class Post {
@@ -226,6 +279,9 @@ export class Post {
     this.composer = new EffectComposer(renderer, rt);
     this.scenePass = new ScenePass(scene, camera, size.x, size.y, quality.msaa);
     this.composer.addPass(this.scenePass);
+    this.dof = new DofPass(this.scenePass.rt.depthTexture, camera);
+    this.composer.addPass(this.dof);
+    this.dofAt = -1;
     // subtle and tight: a soft glow round hot things, not a haze over the frame
     this.bloom = new UnrealBloomPass(new THREE.Vector2(size.x * quality.bloomScale, size.y * quality.bloomScale), 0.42, 0.22, 1.0);
     this.composer.addPass(this.bloom);
@@ -285,7 +341,20 @@ export class Post {
     this.u.uShockN.value = m;
   }
 
+  /**
+   * A cutscene's lens this frame: focus distance (m) and aperture (how fast the blur grows away
+   * from it; 1 is a cinema lens wide open at a normal focal length). Lasts until it stops being set.
+   */
+  focus(dist, aperture = 1) {
+    const u = this.dof.mat.uniforms;
+    u.uFocus.value = Math.max(0.5, dist);
+    u.uAperture.value = aperture;
+    u.uMaxPx.value = 11 * (this.u.uRes.value.y || 900) / 900; // (uRes is the drawing buffer)
+    this.dofAt = performance.now();
+  }
+
   render(dt, time) {
+    this.dof.enabled = performance.now() - this.dofAt < 250;
     this.u.uTime.value = time;
     this.composer.render(dt);
   }

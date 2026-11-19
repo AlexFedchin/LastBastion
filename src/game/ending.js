@@ -305,6 +305,8 @@ export class Ending {
     cam.position.copy(p.pos);
     cam.up.set(0, 1, 0);
     cam.lookAt(p.look);
+    // the lens: focused where the shot looks (or on what it names), the blur growing with the focal length
+    g.post.focus(p.focus ?? p.pos.distanceTo(p.look), p.aperture ?? Math.min(3, 0.55 * 42 / p.fov));
     const fov = fitFov(p.fov, cam.aspect);
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
     cam.updateMatrixWorld(true);

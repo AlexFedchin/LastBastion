@@ -32,7 +32,8 @@ module.exports = {
       o.down = +(L.group.position.y - L.base).toFixed(2); o.open = +(1 - L.shut).toFixed(2);
       // nobody over the wall while the ramps are down: they only start coming as the ramps go up
       const inYard = () => { let n = 0; for (let i = 0; i < h.n; i++) if (!h.dead[i] && h.inside[i]) n++; return n; };
-      at(T.doorClose - 1); o.early = inYard();
+      // (a few on the parapet already, none down in the yard near the lifter)
+      at(T.doorClose - 1); { let n = 0; for (let i = 0; i < h.n; i++) if (!h.dead[i] && h.inside[i] && Math.hypot(h.x[i] - E.lifters[0].lz.x, h.z[i] - E.lifters[0].lz.z) < 22) n++; o.early = n; o.onParapet = inYard(); }
       at(T.liftoff); o.shut = +L.shut.toFixed(2);
       o.inside = inYard();
       at(T.liftoff + 5);
@@ -40,10 +41,11 @@ module.exports = {
       at(T.liftoff + 8); o.climbed = +(L.group.position.y - L.base).toFixed(1);
       // the gunships stay until the lifters are gone, then turn round and follow
       at(T.helosLeave + 1); o.helosStill = E.helos.every((x) => x.group.visible);
-      at(T.helosLeave + 12); o.heloGoneZ = Math.round(E.helos[0].att.pos.z);
+      at(T.away + 1); o.litAway = G.env.power;
+      at(T.helosLeave + 14); o.heloGoneZ = Math.round(E.helos[0].att.pos.z);
       // and the dead run after the lifters as they go, not piling where they stood
       { let n = 0, sz = 0; for (let i = 0; i < h.n; i++) if (!h.dead[i] && h.inside[i]) { n++; sz += h.z[i]; } o.chaseZ = n ? Math.round(sz / n - L.lz.z) : 0; o.chasing = n; }
-      o.dark = G.env.power;
+      at((T.away + E.end) / 2 + 3); o.dark = G.env.power;
       o.voiceUp = G.audio._cine === true;
       return o; })()`);
     t.log(JSON.stringify(r));
@@ -53,10 +55,10 @@ module.exports = {
     t.assert(r.rockets >= 1, 'rockets in the air on the gun run');
     t.assert(Math.abs(r.down) < 0.2 && r.open > 0.9, 'the lead lifter is on its wheels with the ramp down');
     t.assert(r.shut > 0.99, 'the ramp is shut before it lifts');
-    t.assert(r.early === 0, `nobody comes over the wall while the ramps are down (${r.early})`);
+    t.assert(r.early === 0 && r.onParapet > 0, `the first come over the wall while the ramps are down, none reach the lifter (${r.onParapet} over, ${r.early} near)`);
     t.assert(r.inside >= 20 && r.nearLifter >= 8, `the dead come over the wall at the lifters as they shut (${r.inside} inside, ${r.nearLifter} near)`);
     t.assert(r.chasing >= 40 && r.chaseZ > 12, `they run after the lifters as they leave (${r.chasing}, ${r.chaseZ} m past the pad)`);
-    t.assert(r.dark < 0.1, `the wall goes dark on the wide shot (power ${r.dark})`);
+    t.assert(r.litAway > 0.9 && r.dark < 0.1, `the wall is lit as the last wide opens, dark half-way through it (${r.litAway} -> ${r.dark})`);
     t.assert(r.climbed > 4, `it climbs away (${r.climbed} m up)`);
     t.assert(r.helosStill, 'the gunships are still over the field when the lifters have gone');
     t.assert(r.heloGoneZ > 60, 'then they turn round and follow');
