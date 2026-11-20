@@ -431,6 +431,67 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     await finish(doc, 'bale.glb', { ratio: 700 / triCount(doc), error: 0.01 });
   }
 
+  // ── B-2 Spirit: the extraction's bombers. Metres (52.4 m span), nose +z, port +x, centred
+  // on its bounds. The landing gear and its open doors are dropped (it is only ever seen in
+  // flight); the four bomb-bay doors (two bays, a pair of doors each) are nodes of their own,
+  // 'door_0'..'door_3', pivoted on their hinge lines (the outer and the centre keel edges) so
+  // the game can swing them down. Anchors: the four engine exhausts, the lamps, the bays.
+  async function b2() {
+    const GEAR = new Set(['Object_8', 'Object_11', 'Object_14', 'Object_17', 'Object_20']);
+    const DOORS = ['Object_32', 'Object_35', 'Object_38', 'Object_41'];
+    const doc = await readRigid(V('B-2-Spirit.glb'), (n) => !GEAR.has(n));
+    // source: nose -z, port -x, span 110.2 units
+    xformAll(doc, new THREE.Matrix4().makeRotationY(Math.PI));
+    let b = getBounds(scene(doc));
+    const s = 52.4 / (b.max[0] - b.min[0]);
+    xformAll(doc, new THREE.Matrix4().makeScale(s, s, s));
+    b = getBounds(scene(doc));
+    xformAll(doc, new THREE.Matrix4().makeTranslation(-(b.min[0] + b.max[0]) / 2, -(b.min[1] + b.max[1]) / 2, -(b.min[2] + b.max[2]) / 2));
+    b = getBounds(scene(doc));
+    const root = rootNode(doc, 'b2');
+    const box = (n) => { const vs = verts(doc, (x) => x === n.getName()); const bb = new THREE.Box3(); for (const v of vs) bb.expandByPoint(v); return bb; };
+    // the bay doors: each hinged on its outboard edge if it is the outer door of its bay, else on the keel
+    const doorOpen = [];
+    DOORS.map((name) => meshNodes(doc).find((n) => n.getName() === name)).sort((a, c) => box(a).getCenter(new THREE.Vector3()).x - box(c).getCenter(new THREE.Vector3()).x)
+      .forEach((n, k) => {
+        const bb = box(n), cx = (bb.min.x + bb.max.x) / 2, outer = Math.abs(cx) > 1.25;
+        const outerEdge = cx > 0 ? bb.max.x : bb.min.x, innerEdge = cx > 0 ? bb.min.x : bb.max.x;
+        const hx = outer ? outerEdge : innerEdge;
+        const pivot = [hx, bb.max.y, (bb.min.z + bb.max.z) / 2];
+        transformMesh(n.getMesh(), new THREE.Matrix4().makeTranslation(-pivot[0], -pivot[1], -pivot[2]).elements);
+        n.setName('door_' + k).setTranslation(pivot);
+        // swinging down: the free edge lies toward the bay's other door
+        const free = (outer ? innerEdge : outerEdge) - hx;
+        doorOpen.push(+(-Math.sign(free) * 1.45).toFixed(3));
+        console.log('b2 door', k, 'x', bb.min.x.toFixed(2), bb.max.x.toFixed(2), 'y', bb.max.y.toFixed(2), 'z', bb.min.z.toFixed(2), bb.max.z.toFixed(2), outer ? 'outer' : 'keel');
+      });
+    // measured off the airframe: the wingtips, the top and belly of the centre body, the engines
+    const all = verts(doc, (x) => !x.startsWith('door'));
+    const near = (test) => { const vs = all.filter(test); return centroid(vs); };
+    const port = near((v) => v.x > b.max[0] - 0.25), stbd = port.clone().setX(-port.x);
+    const top = all.filter((v) => Math.abs(v.x) < 0.3).reduce((a, v) => (v.y > a.y ? v : a));
+    const belly = all.filter((v) => Math.abs(v.x) < 0.3 && v.z < 0 && v.z > -4).reduce((a, v) => (v.y < a.y ? v : a));
+    // the exhausts: the slots at the back of each nacelle hump (two engines a side)
+    const exh = [];
+    for (const name of ['Object_29', 'Object_80']) {
+      const vs = verts(doc, (x) => x === name), zmin = Math.min(...vs.map((v) => v.z));
+      const bb = new THREE.Box3(); for (const v of vs) if (v.z < zmin + 0.35) bb.expandByPoint(v);
+      console.log('b2 exhaust', name, bb.min.toArray().map((v) => v.toFixed(2)).join(','), '..', bb.max.toArray().map((v) => v.toFixed(2)).join(','));
+      for (const u of [0.3, 0.7]) exh.push(new THREE.Vector3(THREE.MathUtils.lerp(bb.min.x, bb.max.x, u), THREE.MathUtils.lerp(bb.min.y, bb.max.y, 0.4), zmin));
+    }
+    exh.sort((p, q) => p.x - q.x);
+    console.log('b2 bounds', b.min.map((v) => v.toFixed(2)).join(','), '..', b.max.map((v) => v.toFixed(2)).join(','), 'lamps', port.toArray().map((v) => v.toFixed(2)), top.toArray().map((v) => v.toFixed(2)), belly.toArray().map((v) => v.toFixed(2)));
+    anchors(doc, {
+      doorOpen, port: port.add(new THREE.Vector3(0.05, 0, 0)), stbd: stbd.add(new THREE.Vector3(-0.05, 0, 0)), top: top.add(new THREE.Vector3(0, 0.08, 0)), belly: belly.add(new THREE.Vector3(0, -0.08, 0)),
+      exhaust: exh.flatMap((p) => p.toArray()),
+      bays: [-1.23, 1.23].flatMap((x) => [x, -1.5, 1.0]), // the middle of each bay, under the doors
+    });
+    await grade(doc, { dark: 0.85, sat: 0.55 });
+    await texWebp(doc, 2048, { normalSize: 2048 });
+    console.log('b2 scale', s.toFixed(4), 'tris', triCount(doc));
+    await finish(doc, 'b2.glb');
+  }
+
   // ── general-purpose bomb: 2.2 m, laid along z with the nose at +z, centred.
   async function bomb() {
     const doc = await readRigid(V('Aircraft-Bomb.glb'));
@@ -577,5 +638,5 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     await finish(doc, 'tower.glb');
   }
 
-  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, house, mcrate, church, hedgehog, tower, helpers: { grade, texWebp, anchors, triCount, repaint } };
+  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, b2, house, mcrate, church, hedgehog, tower, helpers: { grade, texWebp, anchors, triCount, repaint } };
 }

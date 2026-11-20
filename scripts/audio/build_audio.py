@@ -543,6 +543,13 @@ loop('amb/wire_wind', 147599, 19.5, 34)
 loop('amb/wire_creak', 217769, 28.5, 34)
 # the bombers: a formation of multi-engine bombers, from where the pass settles (the first 1.5 s swell is cut)
 loop('sfx/bomber', 437892, 1.5, 19, X=1.5, ch=1, target=-12, hp=30)
+# the extraction's B-2s (2026-11-20): a heavy jet's steady roar from high overhead, from where the
+# pass has settled (the propeller formation above stays on the B-36 on call)
+loop('sfx/b2_jet', 847113, 62.0, 28, X=1.5, ch=1, target=-12, hp=30)
+# their bomb-bay doors swinging open: a heavy hydraulic door, its start and run spliced onto the
+# clunk of the doors locking open (cut to the ~2.4 s the doors take), pitched down for the size
+oneshot('sfx/bay_doors', [dict(src=841192, ss=0.0, t=2.25, fo=0.3, rate=0.85, hp=40),
+                          dict(src=841192, ss=6.95, t=2.0, fi=0.04, fo=0.9, rate=0.85, hp=40, delay=1.95)], sr=44100, ch=1, target=-12)
 # the convoy's truck: a diesel truck idling, pitched down to an army truck's heavy, slow beat
 loop('sfx/truck', 128160, 1.5, 20, X=1.5, ch=1, target=-14, rate=0.78, hp=30)
 # the riflemen: M16 single shots recorded outdoors, each with its own echo

@@ -33,6 +33,8 @@ const SFX = {
   searchlight_on: [0, 44100], sl_motor: [0, 32000], gen_start: [0, 44100], gen_stop: [0, 44100], power_down_bass: [0, 44100],
   siren_far: [0, 32000], flock: [0, 32000], m240_load: [3, 44100], bomber: [0, 32000], truck: [0, 32000],
   rifle: [5, 44100], wire: [3, 44100], arty: [3, 32000], crate: [3, 44100],
+  // the extraction's B-2s: their jets, and the bomb-bay doors opening
+  b2_jet: [0, 32000], bay_doors: [0, 44100],
 };
 const BEDS = {
   rain_far: 32000, rain_near: 32000, wind: 32000, wind_howl: 32000, fire_roar: 32000, fire_crackle: 32000, fire_pool: 32000,
@@ -920,6 +922,14 @@ export class AudioEngine {
 
   /** A searchlight's traversing motor, as a moving source (environment.js drives its level from the beam's slew). */
   slMotor() { return this.B.sl_motor[0] ? this.loop(this.B.sl_motor[0], { ref: 18, reverb: 0.2, rate: rand(0.94, 1.06) }) : null; }
+
+  /** The extraction's B-2s: a heavy jet's roar (the propeller formation if it is missing). */
+  b2Buf() { return this.B.b2_jet[0] || this.bomberBuf(); }
+  /** A B-2's bomb-bay doors swinging open at (x, y, z): the hydraulics running, the clunk as they lock. */
+  bayDoors(x, y, z, gain = 1) {
+    const b = this.B.bay_doors[0];
+    if (b) this.play(b, { x, y, z, gain, rate: rand(0.96, 1.04), ref: 90, reverb: 0.45, force: true });
+  }
 
   /** The bombers' engines (the recording, or the synthesized roar until it loads). */
   bomberBuf() { return this.B.bomber[0] || (this.B.jet && this.B.jet[0]) || null; }

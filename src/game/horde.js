@@ -402,10 +402,11 @@ class Corpses {
 
 // ─────────────────────────────────────────────────────────────────────────────
 export class Horde {
-  constructor(scene, fx, { cap = 1500, corpseCap = 2500, shadows = true, uniforms }) {
+  constructor(scene, fx, { cap = 1500, limit = cap, corpseCap = 2500, shadows = true, uniforms }) {
     this.scene = scene;
     this.fx = fx;
-    this.cap = cap;
+    this.cap = cap;     // room allocated
+    this.limit = limit; // how many spawn: the quality's number, raised only for the extraction's last stand
     this.n = 0;
     this.alive = 0;
     this.nextId = 1;
@@ -581,7 +582,7 @@ export class Horde {
 
   // ── spawning ─────────────────────────────────────────────────────────────
   spawn(type, x, z, hpMul = 1, speedMul = 1, laneSide = 0) {
-    if (this.n >= this.cap) return -1;
+    if (this.n >= Math.min(this.cap, this.limit)) return -1;
     const T = ZOMBIE_TYPES[type];
     const i = this.n++;
     this.alive++;

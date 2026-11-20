@@ -2,8 +2,9 @@
 // of the last night, night 10 is a hold (ExtractionHold, run like a night event): the
 // flight is inbound, the radio counts it down, and for the last minute and a half
 // everything in the valley comes over the ridge at once. If the wall still stands when
-// the flight is overhead, ExtractionScene plays, still at night: the bombers come in
-// head-on and carpet the field (a wide shot, then riding with the lead bomber), two gunship
+// the flight is overhead, ExtractionScene plays, still at night: the B-2s come in head-on
+// and carpet the field (a wide shot, riding above the lead bomber, then under it as the bay
+// doors open in the searchlights and the bombs fall away), two gunship
 // helicopters come in low over the wall, seen from out on the field, and
 // make running passes with rockets and the chain gun, the lifters come round over the
 // field and land behind the wall in their own dust, the garrison runs for the ramps,
@@ -17,8 +18,9 @@ import { clamp, lerp, rand, fitFov } from '../core/util.js';
 import { groundH } from '../world/terrain.js';
 import { Survivor, ADULTS } from './survivor.js';
 import { Soldier } from './soldier.js';
-import { buildBomber, buildBomb } from './air.js';
+import { buildStealthBomber, buildBomb } from './air.js';
 import { NavLights } from '../fx/navlights.js';
+import { Exhaust } from '../fx/exhaust.js';
 import { makeAttackHeli, makeLifter, spinRotors, makeBeam, aimBeam } from './helis.js';
 import { FlightPath, Attitude, racetrack } from './flight.js';
 
@@ -26,6 +28,7 @@ const $ = (id) => document.getElementById(id);
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const R = Math.random;
 const GAP = 0.8, TAIL = 5, FADE_OUT = 3;
+const B2_SCALE = 0.62; // the B-2s, a little under their real size (52 m span): they fly at 120 m over a toy-sized valley
 const _v = new THREE.Vector3(), _w = new THREE.Vector3();
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -110,6 +113,7 @@ const LZ = [
   { x: 27, z: 66, yaw: -0.35 },
 ];
 const NEST = () => V(0, WORLD.TOWER_TOP + 1.9, 2);
+const H_FAR = -160; // where the gunships break off a run and turn: short of the far end of the crowds they work
 const smoother = (k) => { k = clamp(k, 0, 1); return k * k * k * (k * (k * 6 - 15) + 10); };
 const _f = new THREE.Vector3(), _s = new THREE.Vector3();
 const offRun = (u) => u.state !== 'run'; // (only those out and running are in the crowd)
@@ -138,15 +142,26 @@ const SHOTS = {
     const tgt = S.bomberRuns[1].b.group.visible ? lead.clone() : V(0, 120, 700);
     return { pos, look: follow(S, '_lk', clampLook(pos, tgt, 1.05), 2.2, dt), fov: 56, shake: 0.12 };
   },
-  // riding with the lead bomber: bolted on just off its port wingtip, looking ahead past the
-  // engines and down at the bastion and the field coming up under the nose; the first bombs
-  // leave the bay at the end of it. Rigid (no follow lag): it flies dead straight and level.
+  // riding with the lead bomber, high on its starboard quarter and looking down along it: the
+  // black wing filling the frame, the four jets burning blue over the deck toward us, and past
+  // the nose, far below, the bastion and the burning field. Rigid (no follow lag): it flies
+  // dead straight and level; the camera only creeps in on it.
   bombersClose: (k, st, S) => {
     const g = S.bomberRuns[1].b.group;
     g.updateMatrixWorld();
-    const pos = _v.set(lerp(46, 41, k), lerp(9, 7, k), lerp(-10, -17, k)).applyMatrix4(g.matrixWorld).clone();
-    const look = _w.set(-4, -26, 70).applyMatrix4(g.matrixWorld).clone();
-    return { pos, look, fov: 54, shake: 0.06 };
+    const pos = _v.set(lerp(-15, -11.5, k), lerp(9.5, 8, k), lerp(-29, -23, k)).applyMatrix4(g.matrixWorld).clone();
+    const look = _w.set(lerp(3, 2, k), -13, 34).applyMatrix4(g.matrixWorld).clone();
+    return { pos, look, fov: 50, shake: 0.05 };
+  },
+  // under the lead bomber, behind its port side, looking up at the belly: the searchlights off
+  // the wall find it, the bay doors swing down (heard: the hydraulics, the clunk as they lock),
+  // and the first of the bombs drop out of the bays past the camera
+  bayOpen: (k, st, S) => {
+    const g = S.bomberRuns[1].b.group;
+    g.updateMatrixWorld();
+    const pos = _v.set(lerp(11, 8.5, k), lerp(-10.5, -9, k), lerp(-23, -18, k)).applyMatrix4(g.matrixWorld).clone();
+    const look = _w.set(lerp(0.5, -0.5, k), -2.5, lerp(5, 2, k)).applyMatrix4(g.matrixWorld).clone();
+    return { pos, look, fov: 50, shake: 0.06 };
   },
   // high behind the left wing: the sticks walking up the field, wide enough to see all three
   bombing: (k) => ({ pos: V(-58, 31, 16).lerp(V(-54, 29, 10), k), look: V(2, 0, -100).lerp(V(-6, 0, -110), k), fov: 52, shake: 0.2 }),
@@ -231,8 +246,14 @@ export class ExtractionScene {
     this.built = true;
     const scene = this.g.scene;
     const pool = this.g.fx.lights;
-    this.bombers = [0, 1, 2].map((k) => { const b = buildBomber(); b.group.scale.setScalar(0.42); b.group.visible = false; scene.add(b.group); b.nav = new NavLights(b, { lens: 0.12, pool, phase: k * 0.31 }); return b; });
-    this.bombPool = Array.from({ length: 20 }, () => { const m = buildBomb(); m.visible = false; m.scale.setScalar(0.8); scene.add(m); return m; });
+    this.bombers = [0, 1, 2].map((k) => {
+      const b = buildStealthBomber();
+      b.group.scale.setScalar(B2_SCALE); b.group.visible = false; scene.add(b.group);
+      b.nav = new NavLights(b, { lens: 0.1, pool, phase: k * 0.31 });
+      b.exhaust = new Exhaust(b.group, b.engines, { len: 7, r: 0.5, flat: 0.68, wide: 1.15 });
+      return b;
+    });
+    this.bombPool = Array.from({ length: 72 }, () => { const m = buildBomb(); m.visible = false; m.scale.setScalar(0.5); scene.add(m); return m; });
     this.helos = [0, 1].map((k) => {
       const h = makeAttackHeli(); h.group.visible = false; scene.add(h.group);
       h.beam = makeBeam(); h.beam.visible = false; scene.add(h.beam);
@@ -299,11 +320,20 @@ export class ExtractionScene {
     A.scape = { horde_near: 0.32, horde_surge: 0.3, shuffle: 0.22 };
     this.pileMul0 = g.horde.pileMul;
     g.horde.pileMul = Math.max(g.horde.pileMul, 1.6);
-    for (let i = 0; i < 260 && g.horde.n < g.horde.cap - 200; i++) g.horde.spawn(R() < 0.45 ? ZT.RUNNER : ZT.SHAMBLER, rand(-130, 130), rand(-150, -40), 1, 1.1);
-    // and the crowds coming down the field, far out, along the lines the gunships will run
-    for (const [x, z] of [[-16, -190], [16, -215], [-22, -260], [20, -280], [-60, -230], [70, -250]]) this.crowd(x, z, 90, 200);
+    // the whole valley: the horde may fill all the room it has (half as many again as in a night)
+    this.limit0 = g.horde.limit;
+    g.horde.limit = g.horde.cap;
+    for (let i = 0; i < 520 && g.horde.n < g.horde.limit - 300; i++) g.horde.spawn(R() < 0.45 ? ZT.RUNNER : ZT.SHAMBLER, rand(-140, 140), rand(-160, -35), 1, 1.1);
+    // and the crowds coming down the field along the lines the gunships will run (inside their
+    // turns, so every pass has something under it)
+    for (const [x, z] of [[-16, -105], [16, -122], [-22, -140], [20, -155], [-14, -170], [18, -185], [-60, -130], [70, -145], [-95, -115], [100, -125]]) this.crowd(x, z, 130, 300);
     this.planBombs();
     this.stageHelos();
+    // the crowds the gunships' first runs are lined up on (behind the field camera as they come in),
+    // running on past where they break off: they turn short of the last of them
+    this.later(this.T.helosIn, () => {
+      for (const x of [-13, 15]) for (const z of [-140, -160, -180, -200]) this.crowd(x + rand(-4, 4), z, 75, 120);
+    });
     this.stageLifters();
     this.stagePeople();
     for (const r of this.rockets) { r.on = false; r.m.visible = false; }
@@ -314,23 +344,30 @@ export class ExtractionScene {
     g.screens.show('cine');
   }
 
-  // ── the bombers: three B-36s line abreast out of the south, each walking a stick of bombs up the field ──
+  // ── the bombers: three B-2s line abreast out of the south, each laying a carpet up the field ──
   planBombs() {
     const v = 70, alt = 120, fall = 2.6;
-    const tImpact = this.T.bombing + 0.6; // the first bombs land just after the cut
+    // the doors start down early in the bay shot (the radio is done: they are heard), the first
+    // bombs leave as they lock open; the wingmen a beat behind the lead
+    const tDoors = this.T.bayOpen + 0.5, tRel = tDoors + 2.4;
     this.drops = [];
     this.bomberRuns = this.bombers.map((b, k) => {
-      const x = [-40, 0, 40][k] + rand(-3, 3), lag = [0.5, 0, 0.9][k];
+      const x = [-55, 0, 55][k] + rand(-3, 3), lag = [0.45, 0, 0.8][k];
       const zFirst = wallZ(x) - 16;
       const zr0 = zFirst + v * fall * 0.75;       // where the first bomb leaves the bay
-      const trel0 = tImpact + lag - fall;          // and when
-      const run = { b, x, v, alt, zr0, trel0, loop: null };
+      const trel0 = tRel + lag;                    // and when
+      const run = { b, x, v, alt, zr0, trel0, tDoors: tDoors + lag, heard: false, loop: null };
       b.group.visible = false;
-      for (let i = 0; i < 15; i++) {
-        const zi = zFirst - i * 14 + rand(-2, 2), xi = x + rand(-7, 7);
+      b.setDoors(0);
+      // a ripple out of both bays in turn, fanning wide as they fall: a carpet 50 m across, not a line
+      const N = 24;
+      for (let i = 0; i < N; i++) {
+        const bay = i % 2, side = bay ? 1 : -1;
+        const zi = zFirst - i * 9.5 + rand(-3, 3), xi = x + side * (R() < 0.3 ? rand(2, 9) : rand(9, 27));
         const zr = zi + v * fall * 0.75, trel = trel0 + (zr0 - zr) / v;
-        this.drops.push({ run, xi, zi, xr: x, zr, trel, timp: trel + fall, fall, mesh: null, done: false, big: i % 7 === 3 });
+        this.drops.push({ run, bay, xi, zi, zr, trel, timp: trel + fall, fall, mesh: null, p0: null, done: false, big: i % 7 === 3 });
       }
+      run.tShut = trel0 + (N * 9.5) / v + 1.2;
       return run;
     });
   }
@@ -338,11 +375,12 @@ export class ExtractionScene {
   bomberZ(r, t) { return r.zr0 + r.v * (r.trel0 - t); }
 
   updateBombers(dt) {
-    const g = this.g, fx = g.fx, t = this.t;
+    const g = this.g, fx = g.fx, t = this.t, T = this.T;
+    const lead = this.bomberRuns[1];
     for (const r of this.bomberRuns) {
       const z = this.bomberZ(r, t), x = r.x, y = r.alt;
-      const grp = r.b.group;
-      if (t < this.T.bombersIn - 0.5 || z < -700) {
+      const B = r.b, grp = B.group;
+      if (t < T.bombersIn - 0.5 || z < -700) {
         if (grp.visible) { grp.visible = false; if (r.loop) { r.loop.stop(3); r.loop = null; } }
         continue;
       }
@@ -350,26 +388,62 @@ export class ExtractionScene {
       grp.position.set(x, y, z);
       grp.lookAt(x, y, z - 1);
       grp.updateMatrixWorld();
-      for (const p of r.b.props) p.rotation.z += dt * 30;
-      for (const e of r.b.engines) { _v.copy(e).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1.1, 3.4, 1.5, 0.5, 0.05); }
+      // the jets: cold blue flames over the deck, a hot point at each nozzle. The B-2 hides its
+      // exhaust from below (the deck shields it): seen from under the wing it is all but gone
+      const camY = grp.worldToLocal(_w.copy(g.camera.position)).y;
+      B.exhaust.update(t, clamp(1 + camY / 3, 0.06, 1));
+      for (const e of B.engines) { _v.copy(e).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 0.65, 0.4, 1.0, 3.0, 0.05); }
+      if (r === lead) {
+        const near = t > T.bombersClose - 0.5 && t < T.bombing;
+        if (near && !this.jetLight) { this.jetLight = fx.lights.acquire(); if (this.jetLight) { this.jetLight.color.setRGB(0.3, 0.5, 1); this.jetLight.distance = 16; this.jetLight.decay = 1.4; } }
+        if (this.jetLight) {
+          if (!near) { fx.lights.release(this.jetLight); this.jetLight = null; }
+          else { this.jetLight.position.copy(_v.set(0, 3.6, -7.5).applyMatrix4(grp.matrixWorld)); this.jetLight.intensity = 70 * (0.92 + 0.08 * Math.sin(t * 37)); }
+        }
+      }
+      // the bomb bays: the doors swing down ahead of the first release and shut after the last
+      const open = smoother((t - r.tDoors) / 2.3) * (1 - smoother((t - r.tShut) / 2.6));
+      if (Math.abs(open - B.open) > 1e-4) B.setDoors(open);
+      if (!r.heard && t >= r.tDoors) { r.heard = true; g.audio.bayDoors(x, y - 2, z, r === lead ? 2.2 : 0.8); }
       // position lights and the beacon: how you see them coming in the dark
-      r.b.nav.update(t, g.camera);
-      // landing lights in the wing roots, burning straight ahead: blinding head-on, nothing from behind
+      B.nav.update(t, g.camera);
+      // landing lights in the leading edge either side of the nose, burning straight ahead:
+      // blinding head-on, nothing from behind
       const cam = g.camera.position, dz = cam.z - z, dd = Math.hypot(cam.x - x, cam.y - y, dz);
       const face = Math.pow(clamp(-dz / dd, 0, 1), 3);
-      if (face > 0.02) for (const sx of [-9, 9]) { _v.set(sx, -2.4, 6).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3.2 + face * 3, 9 * face, 8.6 * face, 7.5 * face, 0.05); }
-      if (!r.loop && g.audio.ready) r.loop = g.audio.loop(g.audio.bomberBuf(), { ref: 170, reverb: 0.4, rate: 0.96 + (r.x % 7) * 0.01 });
+      if (face > 0.02) for (const sx of [-3.2, 3.2]) { _v.set(sx, -1.0, 8.6).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3.2 + face * 3, 9 * face, 8.6 * face, 7.5 * face, 0.05); }
+      if (!r.loop && g.audio.ready) r.loop = g.audio.loop(g.audio.b2Buf(), { ref: 170, reverb: 0.4, rate: 0.96 + (r.x % 7) * 0.01 });
       if (r.loop) r.loop.update(x, y, z, 0, 0, -r.v, 3.4 * g.audio.bomberGain);
     }
+    // the searchlights on the wing towers swing up and hold the lead bomber for the bay shot
+    // (crossing on its belly as the doors open), then go back to the field
+    const SL = g.env.searchlights || [];
+    const lit = t > T.bayOpen - 1.6 && t < T.bombing + 0.3 && lead.b.group.visible;
+    SL.forEach((sl, k) => {
+      if (!lit) { sl.track = null; sl.boost = 1; sl.spotK = 1; return; }
+      const p = lead.b.group.position;
+      sl.track = (sl.track || new THREE.Vector3()).set(p.x + (k ? 2 : -2), p.y - 1, p.z - lead.v * 0.12);
+      sl.boost = 2.6; sl.spotK = 0.3; // (a shaft of light up the sky; the lamp itself dimmed so the black airframe shows grey, not chrome)
+    });
     for (const d of this.drops) {
       if (d.done || t < d.trel) continue;
+      // out of the bay it left from, with the bomber's speed, dropping behind as it falls
+      if (!d.p0) {
+        const grp = d.run.b.group;
+        grp.updateMatrixWorld();
+        const bay = d.run.b.bays[d.bay];
+        d.p0 = _v.set(bay.x, bay.y - 0.35, bay.z + rand(-2.2, 2.2)).applyMatrix4(grp.matrixWorld).clone();
+      }
       if (!d.mesh) { d.mesh = this.bombPool.find((m) => !m.visible) || null; if (d.mesh) d.mesh.visible = true; }
-      const u = clamp((t - d.trel) / d.fall, 0, 1);
-      const gy = groundH(d.xi, d.zi);
+      const s = Math.min(t - d.trel, d.fall), u = s / d.fall;
+      const gy = groundH(d.xi, d.zi), p0 = d.p0, v = d.run.v;
       if (d.mesh) {
-        const x = lerp(d.xr, d.xi, u), z = lerp(d.zr, d.zi, u), y = lerp(d.run.alt - 3, gy, u * u);
+        // z: leaving at the bomber's speed and slowing (lands where planned); x: fanning out; y: falling
+        const acc = 2 * (d.zi - p0.z + v * d.fall) / (d.fall * d.fall);
+        const z = p0.z - v * s + 0.5 * acc * s * s, x = lerp(p0.x, d.xi, u * u * (3 - 2 * u)), y = lerp(p0.y, gy, u * u);
         d.mesh.position.set(x, y, z);
-        d.mesh.lookAt(x + (d.xi - d.xr) * 0.1, y - 2 * u * (d.run.alt - gy) * 0.05 - 0.4, z + (d.zi - d.zr) * 0.1);
+        const vx = (d.xi - p0.x) * 6 * u * (1 - u) / d.fall, vz = -v + acc * s, vy = -2 * u * (p0.y - gy) / d.fall;
+        d.mesh.lookAt(x + vx, y + vy, z + vz);
       }
       if (t >= d.timp) {
         d.done = true;
@@ -391,15 +465,17 @@ export class ExtractionScene {
 
   // ── the gunship helicopters: in low over the nest, then running passes up the field ──
   stageHelos() {
-    const T = this.T, tA = T.helosIn;
+    const T = this.T, tA = T.helosIn, IN = 1.5;
     this.helos.forEach((h) => {
       const k = h.k, s = k ? 1 : -1;
       const P = h.path = new FlightPath();
       // in from behind the base, low and fast, under the camera on the nest roof
-      P.add(tA - 6, s * 15, 48, 230).add(tA - 2, s * 12, 19, 85).add(tA + 0.6, s * 11, 10.8, 10);
+      // (IN: they come in a beat after the shot opens, so the run the camera rides is the start of
+      // their first pass, not its end)
+      P.add(tA - 6 + IN, s * 15, 48, 230).add(tA - 2 + IN, s * 12, 19, 85).add(tA + 0.6 + IN, s * 11, 10.8, 10);
       // then running passes up the field until the lifters are gone
       const tl = T.helosLeave;
-      racetrack(P, { t0: tA + 1.6, t1: tl, side: s, inner: 13 + k * 2, outer: 72, zNear: -14, zFar: -205, alt: [16, 13, 26], speed: 23, turnSpeed: 16.5 });
+      racetrack(P, { t0: tA + 1.6 + IN, t1: tl, side: s, inner: 13 + k * 2, outer: 72, zNear: -14, zFar: H_FAR, alt: [16, 13, 26], speed: 23, turnSpeed: 16.5 });
       // break off: on down the field, a wide climbing turn outward (banked over at speed, as a
       // helicopter turns), round and back over the wall after the lifters. One unbroken move.
       const i0 = 13 + k * 2;
@@ -410,7 +486,7 @@ export class ExtractionScene {
       h.group.visible = false; h.beam.visible = false;
       h.burst = 0; h.nextBurst = tA + 2 + k * 0.9; h.round = 0; h.rounds = 0;
       // the first salvos on the run the camera rides along with, then every few seconds on a pass
-      h.salvos = k === 0 ? [T.helosFire + 0.9, T.helosFire + 3.6] : [T.helosFire + 2.2];
+      h.salvos = k === 0 ? [T.helosFire + 0.7, T.helosFire + 2.2] : [T.helosFire + 1.6];
       h.nextRocket = T.helosFire + 6 + k * 1.7;
       h.loop = null; h.light = null; h.tgt = new THREE.Vector3(); h.aim = null;
     });
@@ -419,10 +495,18 @@ export class ExtractionScene {
   /** A crowd of n, packed round (x, z), as long as the horde has room past `keep`. */
   crowd(x, z, n, keep = 90) {
     const h = this.g.horde;
-    for (let i = 0; i < n && h.n < h.cap - keep; i++) {
+    for (let i = 0; i < n && h.n < h.limit - keep; i++) {
       const a = R() * 6.28, d = Math.sqrt(R()) * 14, r = R();
       h.spawn(r < 0.5 ? ZT.RUNNER : r < 0.92 ? ZT.SHAMBLER : ZT.BRUTE, x + Math.cos(a) * d, z + Math.sin(a) * d * 1.6, 1, 1.1);
     }
+  }
+
+  /** How many of the dead lie down the heading (fx, fz) from p, 50-150 m out: worth a rocket? */
+  crowdAhead(p, f) {
+    const h = this.g.horde, fl = Math.hypot(f.x, f.z) || 1;
+    let c = 0;
+    for (let d = 50; d <= 150; d += 20) c += h.queryRadius(p.x + f.x / fl * d, p.z + f.z / fl * d, 9, h._q);
+    return c;
   }
 
   /** A zombie worth shooting near (x, z): the one with the most others around it, of a few looked at. */
@@ -458,7 +542,7 @@ export class ExtractionScene {
       if (!h.loop && g.audio.ready) { const b = g.audio.rotorBuf(0); if (b) h.loop = g.audio.loop(b, { ref: 150, reverb: 0.35, rate: 0.97 + h.k * 0.06 }); }
       if (h.loop) h.loop.update(p.x, p.y, p.z, a.vel.x, a.vel.y, a.vel.z, 3.2);
       // on a run (nose up the field, over it): the searchlight ahead, the gun, the rockets
-      const onRun = _f.z < -0.75 && p.z < -8 && t > this.T.helosIn + 1.4 && t < this.T.helosLeave + 1;
+      const onRun = _f.z < -0.75 && p.z < -8 && p.z > H_FAR + 30 && t > this.T.helosIn + 1.4 && t < this.T.helosLeave + 1;
       const lamp = _v.copy(h.lamp).applyMatrix4(grp.matrixWorld).clone();
       const ahead = V(p.x + _f.x * 50, 0, p.z + _f.z * 50);
       ahead.y = groundH(ahead.x, ahead.z);
@@ -473,7 +557,7 @@ export class ExtractionScene {
         fx.glowDot(lamp.x, lamp.y, lamp.z, 1.4, 8, 8, 9, 0.05);
       }
       // the 30 mm: bursts of ten-odd rounds walked into the crowd ahead, each round its own thud
-      if (onRun && t >= h.nextBurst && h.burst <= 0) {
+      if (onRun && t >= h.nextBurst && h.burst <= 0 && this.crowdAhead(p, _f) >= 4) {
         h.burst = rand(0.9, 1.6); h.nextBurst = t + h.burst + rand(1.0, 2.2); h.round = 0; h.rounds = 0;
         h.aim = this.pickNear(ahead.x, ahead.z, 30) || { x: ahead.x, z: ahead.z };
       }
@@ -498,7 +582,7 @@ export class ExtractionScene {
       }
       // rockets: a pair off the pods, scripted for the camera's run, then now and then on a pass
       const due = h.salvos.length && t >= h.salvos[0];
-      if (due || (onRun && t >= h.nextRocket)) {
+      if (due || (onRun && t >= h.nextRocket && this.crowdAhead(p, _f) >= 10)) {
         if (due) h.salvos.shift(); else h.nextRocket = t + rand(3.5, 6);
         h.pods.forEach((pod, n) => this.later(n * 0.14, () => this.fireRocket(h, pod)));
       }
@@ -797,7 +881,7 @@ export class ExtractionScene {
       h.pileMul = 5;
       // the horde is at its cap by now: the far field (off camera from here on) makes room for the ones coming over
       h.cull((x, z) => z < -85 && R() < 0.75);
-      for (let i = 0; i < 200; i++) h.spawn(R() < 0.55 ? ZT.RUNNER : ZT.SHAMBLER, rand(-70, 70), rand(-55, -12), 1, 1.25);
+      for (let i = 0; i < 320; i++) h.spawn(R() < 0.55 ? ZT.RUNNER : ZT.SHAMBLER, rand(-75, 75), rand(-60, -12), 1, 1.25);
     }
     // the first heads over the parapet as the last of the garrison boards (seen past the ramp):
     // the mounds outside have reached the top under the wall's lamps, and the dead climb them
@@ -940,9 +1024,9 @@ export class ExtractionScene {
     // the valley keeps coming, all the way through: whole crowds at a time, far out up the
     // field and down the gunships' lines (room kept for the ones coming over the wall)
     this.fieldAcc = (this.fieldAcc || 0) + dt;
-    if (this.fieldAcc > 1.6) {
+    if (this.fieldAcc > 1.2) {
       this.fieldAcc = 0;
-      this.crowd(R() < 0.6 ? (R() < 0.5 ? -1 : 1) * rand(8, 28) : rand(-120, 120), rand(-300, -170), 70, t > T.doorClose - 2 ? 260 : 90);
+      this.crowd(R() < 0.6 ? (R() < 0.5 ? -1 : 1) * rand(8, 28) : rand(-130, 130), rand(-190, -100), 110, t > T.doorClose - 2 ? 320 : 120);
     }
     this.updateLights(dt);
 
@@ -999,7 +1083,7 @@ export class ExtractionScene {
     g.audio.stopVoice();
     g.audio.setCine(false);
     this.timers = [];
-    for (const r of this.bomberRuns || []) { r.b.group.visible = false; if (r.loop) r.loop.stop(1); r.loop = null; }
+    for (const r of this.bomberRuns || []) { r.b.group.visible = false; r.b.setDoors(0); if (r.loop) r.loop.stop(1); r.loop = null; }
     for (const m of this.bombPool || []) m.visible = false;
     for (const r of this.rockets || []) { r.on = false; r.m.visible = false; }
     for (const h of this.helos || []) { h.group.visible = false; h.beam.visible = false; if (h.loop) h.loop.stop(1); h.loop = null; if (h.light) g.fx.lights.release(h.light); h.light = null; }
@@ -1010,6 +1094,9 @@ export class ExtractionScene {
     g.arsenal.endNight();
     g.horde.overWall = null;
     g.horde.pileMul = this.pileMul0 ?? g.horde.pileMul;
+    g.horde.limit = this.limit0 ?? g.horde.limit;
+    for (const sl of g.env.searchlights || []) { sl.track = null; sl.boost = 1; sl.spotK = 1; }
+    if (this.jetLight) { g.fx.lights.release(this.jetLight); this.jetLight = null; }
     this.mounds = false;
     g.horde.maxClimbers = 0;
     g.audio.scape = null;

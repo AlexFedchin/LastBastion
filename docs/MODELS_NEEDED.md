@@ -45,15 +45,11 @@ Two of the files in the folder aren't used yet: `Searchlight.glb` (a Suez Canal 
 
 ---
 
-## Coming: B-2 bombers for the extraction (you're sending the model)
+## Done: B-2 bombers for the extraction
 
-**Where:** the extraction's carpet bombing: three bombers in line abreast, head-on over the base, then the shot riding off the lead bomber's wingtip. They should read as newer and better than anything the bastion had.
+**In since 2026-11-20:** `3D Models/B-2-Spirit.glb` (Kevin Love, CC BY 4.0), built by `b2()` in `scripts/models/build_vehicles.mjs` into `app/models/b2.glb`, used through `buildStealthBomber()` in `src/game/air.js` by the extraction only (the bomber on call keeps the B-36). Its bomb-bay doors open (`setDoors`), its jets burn with cold blue flames (`src/fx/exhaust.js`), the strobe sits on top of the centre body and the beacon under it.
 
-**Now:** the same B-36 as the bomber on call during a night (`buildBomber()` in `src/game/air.js`), scaled to 0.42 in `ExtractionScene.build()` (`src/game/extraction.js`). The bomber on call keeps the B-36.
-
-**To wire in:** a `buildStealthBomber()` beside `buildBomber()`, used only by the extraction. It returns the same shape: `group`, `props` (empty, no propellers), `engines` (the exhaust glow points) and `lights` (`port`, `stbd`, `tail`) for the nav lamps (`src/fx/navlights.js`). The wingtip close-up's offsets (`bombersClose` in `extraction.js`) need re-measuring for the flying wing's span. A B-2 has no tail fin, so the strobe goes on the top of the centre body.
-
-**Budget:** about 20-40k triangles; a dark grey finish.
+---
 
 ## 1. Zombie — in (your pack); animations wanted from Mixamo
 

@@ -53,6 +53,48 @@ export function buildBomber() {
 }
 
 /**
+ * B-2 Spirit (app/models/b2.glb): the extraction's bombers. Metres (52.4 m span), nose +z,
+ * port +x. No propellers: four jets exhausting over the top deck behind the engine humps (cold
+ * blue flames, src/fx/exhaust.js). Two bomb bays under the centre body, each shut by a pair of
+ * doors ('door_0'..'door_3', hinged on their long edges) that swing down: setDoors(0..1).
+ * The strobe is on the top of the centre body (there is no fin), the beacon under it.
+ */
+export function buildStealthBomber() {
+  const g = cloneModel('b2');
+  tint(g, 0x07080a);
+  // the radar-absorbent skin is a dull coating, not bare metal: a searchlight on it shows grey, not chrome
+  g.traverse((o) => { if (o.isMesh && o.material.metalness !== undefined) { o.material.metalness = 0.22; o.material.roughness = 1; } });
+  let A = null;
+  g.traverse((o) => { if (!A && o.userData.anchors) A = o.userData.anchors; });
+  const P = (a) => V(a[0], a[1], a[2]);
+  const ex = A.exhaust, engines = [];
+  for (let i = 0; i < ex.length; i += 3) engines.push(V(ex[i], ex[i + 1] + 0.12, ex[i + 2] + 0.15));
+  const doors = [0, 1, 2, 3].map((k) => g.getObjectByName('door_' + k));
+  const bays = [P(A.bays.slice(0, 3)), P(A.bays.slice(3, 6))];
+  // inside the bays: dark, ribbed by the racks (only seen when the doors are open)
+  const bayMat = new THREE.MeshStandardMaterial({ color: 0x1b1d20, roughness: 0.8, metalness: 0.4, side: THREE.BackSide });
+  for (const b of bays) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.15, 7.3), bayMat);
+    m.position.set(b.x, b.y + 0.56, b.z);
+    m.visible = false;
+    g.add(m);
+    b.box = m;
+  }
+  const bomber = {
+    group: g, props: [], engines, doors, bays,
+    lights: { port: P(A.port), stbd: P(A.stbd), tail: P(A.top), belly: P(A.belly) },
+    open: 0,
+    /** The bomb-bay doors: 0 shut, 1 open (down, hanging off their hinges). */
+    setDoors(k) {
+      this.open = k;
+      doors.forEach((d, i) => { if (d) d.rotation.z = A.doorOpen[i] * k; });
+      for (const b of bays) b.box.visible = k > 0.001;
+    },
+  };
+  return bomber;
+}
+
+/**
  * A general-purpose bomb (app/models/bomb.glb: 2.2 m, nose +z), drawn at 2x so a
  * stick of them reads from the ground. Point it with lookAt.
  */

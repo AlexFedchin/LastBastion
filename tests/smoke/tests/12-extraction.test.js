@@ -14,7 +14,7 @@ module.exports = {
     t.log(JSON.stringify(info));
     t.eq(info.state, 'extraction', 'the extraction starts');
     t.eq(info.missing, [], 'every line of the extraction is recorded');
-    t.eq(info.shots, ['bombersIn', 'bombersClose', 'bombing', 'helosIn', 'helosFire', 'liftersIn', 'landing', 'run', 'ramp', 'doorClose', 'liftoff', 'helosLeave', 'away'], 'the shots in order');
+    t.eq(info.shots, ['bombersIn', 'bombersClose', 'bayOpen', 'bombing', 'helosIn', 'helosFire', 'liftersIn', 'landing', 'run', 'ramp', 'doorClose', 'liftoff', 'helosLeave', 'away'], 'the shots in order');
     t.assert(info.end > 90 && info.end < 160, `a cutscene of sensible length (${Math.round(info.end)} s)`);
 
     // step through it, watching what happens when
@@ -25,7 +25,7 @@ module.exports = {
       at(T.bombersIn + 3); o.bomberZ = Math.round(E.bomberRuns[1].b.group.position.z); o.bombersSeen = E.bomberRuns.every((r) => r.b.group.visible);
       at(T.bombing + 3); o.blasts = E.drops.filter((d) => d.done).length;
       // the gunships come in under the nest and fire rockets on the run the camera rides
-      at(T.helosIn + 1); o.heloY = +E.helos[0].att.pos.y.toFixed(1); o.heloZ = Math.round(E.helos[0].att.pos.z);
+      at(T.helosIn + 2.5); o.heloY = +E.helos[0].att.pos.y.toFixed(1); o.heloZ = Math.round(E.helos[0].att.pos.z);
       for (let k = 0; k < 400 && E.t < T.helosFire + 5; k++) { G.test.advance(0.05, 1/20, false); o.rockets = Math.max(o.rockets, fired()); }
       // the lead lifter is down, ramp open, then shut before it lifts
       at(E.lifters[0].touch + 4); const L = E.lifters[0];

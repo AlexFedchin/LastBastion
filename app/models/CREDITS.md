@@ -28,7 +28,8 @@ meshopt-compressed.
 | `heliwreck.glb` | Crashed helicopter in the field | [Sketchfab](https://sketchfab.com/jigar6102021) | J1G4R | CC BY 4.0 |
 | `container.glb` | Rusty 20 ft shipping container | [Sketchfab](https://sketchfab.com/sousinho) | Sousinho | CC BY 4.0 |
 | `bale.glb` | Round hay bale | [Sketchfab](https://sketchfab.com/FrodoUndead) | FrodoUndead | CC BY 4.0 |
-| `bomb.glb` | General-purpose aircraft bomb: the B-36s' sticks and the air strike | [Sketchfab](https://sketchfab.com/Youssef.Loukili) | Youssef.Loukili | CC BY 4.0 |
+| `b2.glb` | B-2 Spirit: the extraction's bombers | [Sketchfab: b-2 spirit](https://sketchfab.com/3d-models/b-2-spirit-06464acbeca94381893c037b6dfa3d12) | Kevin Love (Tyler_Kevin) | CC BY 4.0 |
+| `bomb.glb` | General-purpose aircraft bomb: the extraction's carpet and the air strike | [Sketchfab](https://sketchfab.com/Youssef.Loukili) | Youssef.Loukili | CC BY 4.0 |
 | `house.glb` | Single-storey house: the farmhouses and the village houses | [Sketchfab: House](https://sketchfab.com/3d-models/house-cfaf9a6c3a304dd9948044f8a63e391f) | Mateusz Woliński | CC BY 4.0 |
 | `mcrate.glb` | Weapons crate: what each man of the recovery team carries home, the supply drop's load, the stacks on the nest roof | [Sketchfab: Weapons Crate](https://sketchfab.com/3d-models/weapons-crate-6597d3858df94da698ece8e0038f50b7) | Sousinho | CC BY 4.0 |
 | `church.glb` | The village church and its bell tower, on the far hills | [Sketchfab: Church](https://sketchfab.com/3d-models/church-867a847b67364484bf44912e1af190af) | Tiago Lopes | CC BY 4.0 |
@@ -48,6 +49,10 @@ meshopt-compressed.
   receiver and 1024 px for everything else.
 - **AC-130**: re-centred, geometry thinned to ~85k triangles, textures reduced to 512 px.
   The four propellers are cut out of the airframe into separate nodes so they can spin.
+- **B-2 Spirit**: turned nose +z and scaled to its real 52.4 m span; the landing gear and its open
+  doors are removed; the four bomb-bay doors are separate nodes hinged on their long edges so they
+  can open; textures at 2048 px WebP, lightly darkened; ~6.7k triangles. Engine exhausts, lamps and
+  bays are measured off the airframe into anchors.
 - **B-36**: scaled to its real 70.1 m wingspan. The cockpit interior, seats, landing gear,
   open bomb-bay doors, landing flaps and jet turbine fans are removed. Simplified to ~43k
   triangles; paint texture at 1024 px. The six pusher propellers are separate nodes.

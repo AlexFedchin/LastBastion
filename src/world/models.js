@@ -9,7 +9,7 @@ const FILES = {
   survivor_man2: 'models/survivor_man2.glb', survivor_child: 'models/survivor_child.glb', grenade: 'models/grenade.glb', molotov: 'models/molotov.glb', sandbags: 'models/sandbags.glb',
   // vehicles and field props (scripts/models/build_vehicles.mjs)
   ch47: 'models/ch47.glb', apache: 'models/apache.glb', ural: 'models/ural.glb', ural_burnt: 'models/ural_burnt.glb',
-  heliwreck: 'models/heliwreck.glb', container: 'models/container.glb', bale: 'models/bale.glb', bomb: 'models/bomb.glb',
+  heliwreck: 'models/heliwreck.glb', b2: 'models/b2.glb', container: 'models/container.glb', bale: 'models/bale.glb', bomb: 'models/bomb.glb',
   house: 'models/house.glb', mcrate: 'models/mcrate.glb', church: 'models/church.glb', hedgehog: 'models/hedgehog.glb',
   tower: 'models/tower.glb', // the central tower (the user's own model)
   // the field, the hills and the crews (scripts/models/build_field.mjs)

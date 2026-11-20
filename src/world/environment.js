@@ -411,7 +411,8 @@ export class Environment {
       const sl = this.searchlights[k];
       sl.t += dt;
       sl.hunt -= dt;
-      if (sl.hunt <= 0 && horde && Math.random() < dt * 0.25) {
+      if (sl.track) { sl.goal.copy(sl.track); sl.hunt = 0.5; }
+      else if (sl.hunt <= 0 && horde && Math.random() < dt * 0.25) {
         const c = horde.densest(20, 200, 24, 7);
         if (c && c.count > 6) { sl.goal.set(c.x, groundH(c.x, c.z), c.z); sl.hunt = 4 + Math.random() * 3; }
       }
@@ -421,7 +422,7 @@ export class Environment {
         sl.goal.set(gx, groundH(gx, gz), gz);
       }
       _prev.subVectors(sl.aim, sl.spot.position).normalize();
-      sl.aim.lerp(sl.goal, 1 - Math.exp(-dt * (sl.hunt > 0 ? 1.6 : 0.9)));
+      sl.aim.lerp(sl.goal, 1 - Math.exp(-dt * (sl.track ? 4.5 : sl.hunt > 0 ? 1.6 : 0.9)));
       // the mount's motor: heard when the beam slews (jumping to a crowd, swinging out), not on the slow sweep
       if (audio && audio.ready && dt > 0) {
         const slew = _prev.angleTo(_dir.subVectors(sl.aim, sl.spot.position).normalize()) / dt;
@@ -438,8 +439,8 @@ export class Environment {
       sl.beam.material.uniforms.uTime.value = time;
       // (sl.pw: one light on its own, the extraction's blackout takes them one at a time)
       const pw = this.power * (sl.pw ?? 1);
-      sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d) * pw * this.beamBoost;
-      sl.spot.intensity = 650 * (1 - d * 0.85) * pw;
+      sl.beam.material.uniforms.uIntensity.value = 0.05 * (1 - d) * pw * this.beamBoost * (sl.boost ?? 1);
+      sl.spot.intensity = 650 * (1 - d * 0.85) * pw * (sl.spotK ?? 1);
       if (sl.spot.castShadow && shadowNow) sl.spot.shadow.needsUpdate = true;
       const hs = this.towerHousings[k];
       if (hs) hs.lookAt(sl.aim);

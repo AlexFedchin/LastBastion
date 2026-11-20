@@ -167,6 +167,8 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Factory Warning Buzzer](https://freesound.org/people/qubodup/sounds/832414/) | qubodup | klaxon |
 | [Bullet casings falling](https://freesound.org/people/barryshamir/sounds/834236/) | barryshamir | casing |
 | [Closeup Thunder Strike 01](https://freesound.org/people/loganzsound/sounds/840628/) | loganzsound | thunder_close |
+| [Hydraulic Door](https://freesound.org/people/Autobot8299/sounds/841192/) | Autobot8299 | bay_doors |
+| [Heavy Aircraft Pass‑By – High‑Resolution Rural Snippet - 260303_001](https://freesound.org/people/TSP-Talk/sounds/847113/) | TSP-Talk | b2_jet |
 | [Autocannon Three Shot Burst](https://freesound.org/people/qubodup/sounds/854186/) | qubodup | chain |
 | [M142 HIMARS Rocket Launch 8](https://freesound.org/people/qubodup/sounds/854476/) | qubodup | rocket |
 | [Distant Machine Gun Firing](https://freesound.org/people/qubodup/sounds/854635/) | qubodup | distant_mg |

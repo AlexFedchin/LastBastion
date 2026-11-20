@@ -95,7 +95,7 @@ export class Director {
     // drain the queue into the world as room allows
     if (this.queue.length) {
       const h = this.horde;
-      let budget = Math.max(0, h.cap - h.n);
+      let budget = Math.max(0, h.limit - h.n);
       let spawnedThisFrame = 0;
       for (let k = 0; k < this.queue.length && budget > 0 && spawnedThisFrame < 60; k++) {
         const q = this.queue[k];

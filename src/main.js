@@ -118,7 +118,8 @@ class Game {
     };
     await step('waking the dead…');
     this.horde = new Horde(this.scene, this.fx, {
-      cap: this.quality.maxZombies, corpseCap: this.quality.corpses, shadows: this.quality.zombieShadows, uniforms: this.uniforms,
+      // (room for half as many again: the extraction raises the limit for the valley's last rush)
+      cap: Math.round(this.quality.maxZombies * 1.5), limit: this.quality.maxZombies, corpseCap: this.quality.corpses, shadows: this.quality.zombieShadows, uniforms: this.uniforms,
     });
     this.horde.fire = this.env.fire;
     this.audio = new AudioEngine();
@@ -1415,7 +1416,7 @@ class Game {
 
   updateFallen(dt, rdt) {
     // they keep coming; the camera drifts up and away
-    if (this.horde.n < this.horde.cap - 10 && Math.random() < dt * 30) this.spawnMenuZombie(rand(-120, -60));
+    if (this.horde.n < this.horde.limit - 10 && Math.random() < dt * 30) this.spawnMenuZombie(rand(-120, -60));
     this.director.update(dt);
     this.horde.update(dt, this.time);
     this.arsenal.update(dt, this.time);
