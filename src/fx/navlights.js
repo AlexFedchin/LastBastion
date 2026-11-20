@@ -87,7 +87,7 @@ export class NavLights {
     // the halo: light scattered in the air and the housing round the lamp, sized in metres, so
     // close up the lamp glows and far off it shrinks inside the glint
     const hm = new THREE.SpriteMaterial({ map: glow(), color: 0x000000, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
-    hm.defines = { LB_FOG_ADD: '' };
+    fogMaterial(hm, { add: true });
     const halo = new THREE.Sprite(hm);
     halo.position.copy(at);
     halo.renderOrder = 7;
