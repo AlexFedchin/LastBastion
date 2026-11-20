@@ -758,7 +758,14 @@ export class ExtractionScene {
       // lights: nav, strobe, and the red glow of the open ramp
       L.nav.update(t, g.camera);
       const open = 1 - shut;
-      if (open > 0.2) { _v.set(0, -0.6, -5.2).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.6, 5 * open, 0.5, 0.25, 0.05); }
+      // the hold's red night lighting, deep in the cabin: it lights the inside and the people in
+      // it, and (through the open ramp) the ground behind; the hull's outside faces away from it
+      if (open > 0.03 && !L.holdLight) { L.holdLight = fx.lights.acquire(); if (L.holdLight) { L.holdLight.color.setRGB(1, 0.09, 0.04); L.holdLight.distance = 11; L.holdLight.decay = 1.1; } }
+      if (L.holdLight) {
+        L.holdLight.position.copy(_v.set(0, -0.7, 0.6).applyMatrix4(grp.matrixWorld));
+        L.holdLight.intensity = 45 * Math.min(1, open * 1.5);
+        if (open <= 0.01 && t > close) { fx.lights.release(L.holdLight); L.holdLight = null; }
+      }
       // the lead lifter's hold spills red light down the ramp onto the yard
       if (L.k === 0) {
         if (open > 0.05 && !L.light) { L.light = fx.lights.acquire(); if (L.light) { L.light.color.setRGB(1, 0.16, 0.08); L.light.distance = 16; L.light.decay = 1.3; } }
@@ -786,9 +793,11 @@ export class ExtractionScene {
     for (let i = 0; i < nC; i++) order.splice(2 + ((i * 3.7) | 0) % (order.length - 1), 0, [this.civs[i], false]);
     // they have to be up the ramps before it shuts: the gap between them shrinks with their number
     const gap = Math.min(0.55, 8.5 / order.length);
+    for (const L of this.lifters) L.aboard = 0;
     this.runners = order.map(([f, soldier], k) => {
-      const L = k % 5 === 4 ? 1 + (k % 2) : 0; // most to the lead lifter (on camera), some to the others
+      const L = k % 3; // a third to each lifter (the lead's on camera, the others out to the sides)
       f.reset();
+      if (f.root.parent !== this.g.scene) this.g.scene.add(f.root); // (out of last time's lifter)
       f.root.visible = false;
       // where each starts: behind the camera as it is when he sets off (the run shot tracks in
       // behind them), so he runs into the frame past it
@@ -798,6 +807,23 @@ export class ExtractionScene {
       const sp = soldier ? rand(4.6, 5.4) : rand(3.7, 4.3) * (f.child ? 0.85 : 1);
       return { f, soldier, L, x: rand(-6.5, 5.5), z: cz - rand(3, 8), ph: R() * 6, sp, go, state: 'wait', yaw: 0, wp: 0, bias: k % 2 ? 1 : -1 };
     });
+  }
+
+  /**
+   * Into the hold: they stay there, standing packed in two files from the front of the cabin
+   * back toward the ramp (carried on the lifter, so they fly out with it).
+   */
+  board(u) {
+    const L = this.lifters[u.L], k = L.aboard++, f = u.f;
+    const row = k >> 1, side = k % 2 ? 1 : -1;
+    // (cabin floor at y -2.04 in the lifter's frame, the ramp's hinge near z -3.6)
+    const z = Math.max(-3.1, 1.3 - row * 0.72) + rand(-0.08, 0.08), x = row * 0.72 > 4.4 ? rand(-0.15, 0.15) : side * rand(0.42, 0.55);
+    L.group.add(f.root);
+    f.root.position.set(x, -2.04, z);
+    f.root.rotation.set(0, Math.PI + side * rand(0.3, 0.7), 0); // turned in, half facing the ramp
+    f.root.visible = true;
+    u.state = 'aboard';
+    f.idle();
   }
 
   /** The run shot's camera z at scene time t (before the shot: where it will start). */
@@ -811,11 +837,12 @@ export class ExtractionScene {
   updatePeople(dt) {
     const t = this.t;
     for (const u of this.runners) {
+      if (u.state === 'aboard') { u.f.idle(); continue; }
       if (u.state === 'gone') continue;
       if (t < u.go) continue;
       const f = u.f, L = this.lifters[u.L];
-      // anyone still out when the ramp starts up is already on it, out of sight
-      if (t > this.T.doorClose + 0.6) { u.state = 'gone'; f.root.visible = false; continue; }
+      // anyone still out when the ramp starts up is already on it, out of sight: in with the rest
+      if (t > this.T.doorClose + 0.6) { this.board(u); continue; }
       if (u.state === 'wait') { u.state = 'run'; f.root.visible = true; }
       // the track out of the yard, then the ramp foot, then inside
       L.group.updateMatrixWorld();
@@ -827,7 +854,7 @@ export class ExtractionScene {
       // (the turn out of the yard is a loose one; the ramp's foot and the hold are closer marks)
       if (d < [1.8, 1.0, 0.6][Math.min(u.wp, 2)]) {
         u.wp++;
-        if (u.wp > 2) { u.state = 'gone'; f.root.visible = false; continue; }
+        if (u.wp > 2) { this.board(u); continue; }
       }
       // round the others (in single file up the ramp), never through them
       const sp = Math.min(u.sp, d / Math.max(dt, 1e-3));
@@ -1011,10 +1038,12 @@ export class ExtractionScene {
       g.arsenal.setGunners(0);
       for (const r of g.arsenal.riflemen || []) r.group.visible = false;
       for (const s of g.env.roofMen || []) s.root.visible = false;
+      g.arsenal.air.endNight(); // the gunship on station heads home
     }
     if (t >= T.run + 1 && !this.scoreTurned) { this.scoreTurned = true; g.audio.setMusicMode('victory'); }
     this.updateScape(t);
     if (onWall) g.arsenal.update(dt, g.time);
+    else g.arsenal.air.update(dt); // (the AC-130 flying home, not frozen where it was)
     g.horde.update(dt, g.time);
     this.updateBombers(dt);
     this.updateHelos(dt);
@@ -1088,9 +1117,10 @@ export class ExtractionScene {
     for (const m of this.bombPool || []) m.visible = false;
     for (const r of this.rockets || []) { r.on = false; r.m.visible = false; }
     for (const h of this.helos || []) { h.group.visible = false; h.beam.visible = false; if (h.loop) h.loop.stop(1); h.loop = null; if (h.light) g.fx.lights.release(h.light); h.light = null; }
-    for (const L of this.lifters || []) { L.group.visible = false; if (L.loop) L.loop.stop(1); L.loop = null; if (L.light) g.fx.lights.release(L.light); L.light = null; }
+    for (const L of this.lifters || []) { L.group.visible = false; if (L.loop) L.loop.stop(1); L.loop = null; if (L.light) g.fx.lights.release(L.light); L.light = null; if (L.holdLight) g.fx.lights.release(L.holdLight); L.holdLight = null; }
+    g.arsenal.air.hide();
     g.ending.restoreGun();
-    for (const u of this.runners || []) u.f.root.visible = false;
+    for (const u of this.runners || []) { u.f.root.visible = false; if (u.f.root.parent !== g.scene) g.scene.add(u.f.root); }
     for (const r of g.arsenal.riflemen || []) r.group.visible = true;
     g.arsenal.endNight();
     g.horde.overWall = null;

@@ -9,32 +9,7 @@ import { cloneModel } from '../world/models.js';
 let M = null;
 function materials() {
   const disc = new THREE.MeshBasicMaterial({ color: 0x3a3f46, transparent: true, opacity: 0.03, depthWrite: false, side: THREE.DoubleSide });
-  const hold = new THREE.MeshBasicMaterial({ map: holdTexture(), side: THREE.DoubleSide }); // the cabin seen through the ramp
-  return { disc, hold };
-}
-
-/** The hold of a lifter at night, as seen up the ramp: red-lit, ribbed, seats down both sides. */
-function holdTexture() {
-  const c = document.createElement('canvas'); c.width = 256; c.height = 256;
-  const x = c.getContext('2d');
-  const g = x.createRadialGradient(128, 70, 10, 128, 120, 190);
-  g.addColorStop(0, '#d0301c'); g.addColorStop(0.35, '#6a1209'); g.addColorStop(1, '#120201');
-  x.fillStyle = g; x.fillRect(0, 0, 256, 256);
-  // the far bulkhead (a darker rectangle in perspective), ribs converging on it
-  x.fillStyle = 'rgba(20,3,2,0.75)'; x.fillRect(92, 70, 72, 92);
-  x.strokeStyle = 'rgba(15,2,1,0.6)'; x.lineWidth = 5;
-  for (let k = 0; k <= 6; k++) { const u = k / 6; x.beginPath(); x.moveTo(u * 256, 0); x.lineTo(92 + u * 72, 70); x.stroke(); x.beginPath(); x.moveTo(u * 256, 256); x.lineTo(92 + u * 72, 162); x.stroke(); }
-  // seat rows down both sides
-  x.fillStyle = 'rgba(30,6,3,0.9)';
-  for (let k = 0; k < 6; k++) { const u = k / 6; x.fillRect(8 + u * 70, 150 - u * 20, 20 - u * 8, 40 - u * 16); x.fillRect(228 - u * 70, 150 - u * 20, 20 - u * 8, 40 - u * 16); }
-  // the floor, lighter where the lamp falls
-  const f = x.createLinearGradient(0, 162, 0, 256); f.addColorStop(0, 'rgba(120,20,10,0.5)'); f.addColorStop(1, 'rgba(40,6,3,0.9)');
-  x.fillStyle = f; x.beginPath(); x.moveTo(92, 162); x.lineTo(164, 162); x.lineTo(256, 256); x.lineTo(0, 256); x.fill();
-  // the lamp
-  x.fillStyle = '#ffb090'; x.fillRect(118, 60, 20, 5);
-  const t = new THREE.CanvasTexture(c);
-  t.colorSpace = THREE.SRGBColorSpace;
-  return t;
+  return { disc };
 }
 
 /** A point the model carries in its root's extras (its own frame): where a light, gun or path goes. */
@@ -88,11 +63,8 @@ export function makeLifter() {
   const g = cloneModel('ch47');
   shadows(g);
   const fore = hub(g, 'rotor_fore', 7.9), aft = hub(g, 'rotor_aft', 7.9);
-  // the red-lit hold, seen up the ramp: a backdrop at the forward end of the cabin
-  const hold = new THREE.Mesh(new THREE.PlaneGeometry(2.3, 2.1), M.hold);
-  hold.position.set(0, -1.05, 1.5);
-  hold.rotation.y = Math.PI;
-  g.add(hold);
+  // (the red-lit hold is a light deep in the cabin, extraction.js; no backdrop card any more:
+  // it stood below the belly and showed under the airframe in flight)
   // the ramp (node 'ramp', hinged at the cabin floor's end): rotation 0 is down on the ground
   // as modelled, angles.x shuts it along the tail's lines; its treadway boards are a child that
   // retracts into it (boardsSlide); the upper door (node 'door') folds up under the aft pylon
