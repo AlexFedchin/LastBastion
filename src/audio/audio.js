@@ -30,7 +30,7 @@ const SFX = {
   tinnitus: [0, 32000], crow: [5, 32000], bell: [0, 32000], dog: [3, 22050], distant_mg: [4, 22050],
   heli_a: [0, 32000], heli_b: [0, 32000], chain: [3, 44100], rocket: [2, 44100],
   // the shortlist (docs/SOUNDS_NEEDED.md): recordings in place of the stand-ins
-  searchlight_on: [0, 44100], sl_motor: [0, 32000], gen_start: [0, 44100], gen_stop: [0, 44100],
+  searchlight_on: [0, 44100], sl_motor: [0, 32000], gen_start: [0, 44100], gen_stop: [0, 44100], power_down_bass: [0, 44100],
   siren_far: [0, 32000], flock: [0, 32000], m240_load: [3, 44100], bomber: [0, 32000], truck: [0, 32000],
   rifle: [5, 44100], wire: [3, 44100], arty: [3, 32000], crate: [3, 44100],
 };
@@ -899,6 +899,12 @@ export class AudioEngine {
   powerDown() {
     const b = this.B.gen_stop[0] || (this.B.power_down && this.B.power_down[0]);
     this.play(b, { gain: 0.7, x: -9, z: 16, ref: 30, reverb: 0.4, force: true });
+  }
+  /** The whole base losing its power (the extraction's blackout): a sub-bass sweep falling away as the lights die, heard wherever the camera is. */
+  blackout() {
+    if (!this.ready) return;
+    const b = this.B.power_down_bass && this.B.power_down_bass[0];
+    if (b) this.play(b, { gain: 1.0, reverb: 0.35, force: true });
   }
   powerUp() {
     const b = this.B.gen_start[0] || (this.B.power_up && this.B.power_up[0]);

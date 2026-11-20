@@ -46,6 +46,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [Mk 46 30mm gun - single shot](https://freesound.org/people/qubodup/sounds/162258/) | qubodup | hmg |
 | [ZombiesMoaning.wav](https://freesound.org/people/voiceofgup/sounds/165872/) | voiceofgup | horde_near |
 | [Grunts of pain by military soldiers.flac](https://freesound.org/people/qubodup/sounds/166944/) | qubodup | death |
+| [Power Down](https://freesound.org/people/peepholecircus/sounds/169994/) | peepholecircus | power_down_bass |
 | [Angry Beast.wav](https://freesound.org/people/husky70/sounds/170454/) | husky70 | brute |
 | [Torture screams and moans](https://freesound.org/people/stomachache/sounds/171819/) | stomachache | burn |
 | [Zombie](https://freesound.org/people/Taodan/sounds/173128/) | Taodan | groan |
@@ -92,6 +93,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [ROAD FLARE.wav](https://freesound.org/people/frankelmedico/sounds/348766/) | frankelmedico | flare_ignite |
 | [splat.ogg](https://freesound.org/people/gprosser/sounds/360942/) | gprosser | gib |
 | [Ear Ringing (After explosion)](https://freesound.org/people/dbdarby/sounds/365956/) | dbdarby | tinnitus |
+| [Bass Power Down](https://freesound.org/people/Kinoton/sounds/369520/) | Kinoton | power_down_bass |
 | [Distant Explosion](https://freesound.org/people/Mr_KeybOred/sounds/372086/) | Mr_KeybOred | boom_far |
 | [Machine_Gun_Reload.wav](https://freesound.org/people/ken788/sounds/386777/) | ken788 | latch |
 | [Fire -massive no cracking.wav](https://freesound.org/people/Aegersum/sounds/387924/) | Aegersum | fire_roar |

@@ -151,8 +151,6 @@ export function handClips({ rig, src, FPS, Pose }) {
   const clips = [];
   // the shambler's lurch: the pack's walk, half again the stride
   clips.push(exaggerate(src.walk, 'shuffle', { ...LEGS(1.6, 1.35), LeftArm: 1.25, RightArm: 1.25, Spine: 1.3, Spine1: 1.2 }));
-  // a jog: the pack's run with a longer stride (shamblers that hurry)
-  clips.push(exaggerate(src.run, 'jog', { ...LEGS(1.35, 1.15), Spine: 1.15 }));
   // the brute: a heavy stride, more lean, arms hanging wide
   clips.push(exaggerate(src.walk, 'stomp', { ...LEGS(1.4, 1.3), Spine: 1.4, Hips: 1.5 }, (p, ph) => {
     p.turn('Spine', rot(9, 0, 0)); p.turn('Neck', rot(-8, 0, 0));
@@ -188,28 +186,118 @@ export function handClips({ rig, src, FPS, Pose }) {
     clips.push({ name: 'limp', loop: true, poses, speed: 0.4 });
   }
 
+  // ── runs, by the feet: each foot's path is laid down (on the ground for its stance, sweeping
+  // back at exactly the run's speed; then an arc up behind, through under the hip and out ahead)
+  // and the leg is solved onto it. So the stance never slides and the swing never scuffs, and the
+  // clip's speed is known: a long stride at a human cadence instead of a whirl of short ones. ──
+  const L1 = B[BI.LeftUpLeg].distanceTo(B[BI.LeftLeg]);
+  const L2 = B[BI.LeftLeg].distanceTo(B[BI.LeftFoot]);
+  const SHIN0 = Math.atan2(B[BI.LeftFoot].z - B[BI.LeftLeg].z, B[BI.LeftLeg].y - B[BI.LeftFoot].y); // the shin's lean at bind
+  const HIPJ = B[BI.LeftUpLeg].y - B[BI.Hips].y;                       // hip joint below the hips bone
+  const ANK = B[BI.LeftFoot].y, BALL = B[BI.LeftToeBase], BX = BALL.z - B[BI.LeftFoot].z, BY = B[BI.LeftFoot].y - BALL.y;
+  /** Thigh, knee and foot (degrees, leg() conventions) putting the ankle at (z ahead of the hip,
+   *  y above the ground) for a hip joint at height hip, the foot pitched toe-down by toe (deg). */
+  function legTo(z, y, hip, toe) {
+    const ty = y - hip, d = Math.min(L1 + L2 - 1e-4, Math.hypot(z, ty));
+    const kg = Math.PI - Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + L2 * L2 - d * d) / (2 * L1 * L2))));
+    const th = Math.atan2(z, -ty) + Math.acos(Math.max(-1, Math.min(1, (L1 * L1 + d * d - L2 * L2) / (2 * L1 * d))));
+    const thigh = th / D2R, knee = (kg + SHIN0) / D2R;
+    return { thigh, knee, foot: thigh - knee + toe };
+  }
+  /** The ankle on the ground with the foot rolled toe-down by toe (deg) about the ball at bz. */
+  const onBall = (bz, toe) => {
+    const r = toe * D2R;
+    return [bz - BX * Math.cos(r) - BY * Math.sin(r), BALL.y + BY * Math.cos(r) + BX * Math.sin(r)];
+  };
+  /**
+   * A run cycle's legs. o: T (s), ST (stance share), v (m/s), land (ball z ahead of the hip at
+   * the strike), hip (keys over the half-stride: [h, height of the hip joint]), swing ([phase, z,
+   * y, toe] keys from toe-off to the next strike), roll (toe-down at toe-off).
+   * Returns (phase) -> { Left, Right, hip } for leg() and the hips.
+   */
+  function runLegs(o) {
+    const sweep = o.v * o.T * o.ST, b0 = o.land, b1 = o.land - sweep;
+    const [z1, y1] = onBall(b1, o.roll), [z0, y0] = onBall(b0, 0);
+    const keys = [[o.ST, z1, y1, o.roll], ...o.swing, [1, z0, y0, 0]];
+    const sz = seg(keys.map((k) => [k[0], k[1]])), sy = seg(keys.map((k) => [k[0], k[2]])), st = seg(keys.map((k) => [k[0], k[3]]));
+    const hipH = cyc(o.hip);
+    return (ph) => {
+      const hip = hipH((ph * 2) % 1);
+      const one = (q) => {
+        q = ((q % 1) + 1) % 1;
+        if (q < o.ST) {
+          const u = q / o.ST, toe = o.roll * Math.pow(Math.max(0, (u - 0.45) / 0.55), 1.6);
+          const [z, y] = onBall(b0 + (b1 - b0) * u, toe);
+          return legTo(z, y, hip, toe);
+        }
+        return legTo(sz(q), sy(q), hip, st(q));
+      };
+      return { Left: one(ph), Right: one(ph + 0.5), hip };
+    };
+  }
+  const setHip = (p, hip) => { p.hips.y = hip - HIPJ; };
+  /** Lower (or raise) a whole clip by one amount so its lowest contact over the cycle is on the ground. */
+  const settle = (clip) => {
+    let low = Infinity;
+    for (const p of clip.poses) { const { P } = rig.solve(p); for (const i of contact) low = Math.min(low, P[i].y - B[i].y); }
+    for (const p of clip.poses) p.hips.y -= low;
+    return clip;
+  };
+
   // ── sprint: the runner. Thrown forward, knees driving, arms clawing ahead ──
+  // A short, hard stance (a fifth of the stride) and a flight off both feet: about three steps a
+  // second at the runner's pace.
   {
-    // one leg's phase: 0 strike (foot ahead), 0..0.32 stance, 0.32 toe-off, swing to 1
-    const thigh = cyc([[0, 56], [0.16, 12], [0.32, -40], [0.48, 4], [0.66, 80], [0.84, 70]]);
-    const knee = cyc([[0, 16], [0.12, 36], [0.3, 20], [0.45, 98], [0.62, 124], [0.82, 56], [0.94, 12]]);
-    const foot = cyc([[0, -4], [0.16, 6], [0.32, 34], [0.5, 22], [0.75, -6], [0.94, -12]]);
-    const lift = cyc([[0, 0], [0.16, -0.01], [0.3, 0.02], [0.4, 0.06], [0.5, 0.0], [0.66, -0.01], [0.8, 0.02], [0.9, 0.06]]);
+    const T = 0.76;
+    const legs = runLegs({
+      T, ST: 0.22, v: 5.4, land: 0.62, roll: 40,
+      hip: [[0, 0.85], [0.22, 0.815], [0.44, 0.87], [0.72, 0.925]],
+      swing: [[0.34, -0.5, 0.5, 30], [0.48, -0.15, 0.6, 22], [0.62, 0.3, 0.46, 8], [0.78, 0.55, 0.22, -6], [0.92, 0.38, 0.09, -4]],
+    });
     const nz = loopNoise(7);
-    clips.push(loop('sprint', 0.66, (ph) => {
+    clips.push(settle(loop('sprint', T, (ph) => {
       const p = base();
-      const L = ph, R = ph + 0.5;
-      hips(p, { pitch: 0, yaw: Math.sin(TAU * ph) * 7, roll: Math.sin(TAU * (ph + 0.25)) * 3 });
-      leg(p, 'Left', { thigh: thigh(L), knee: knee(L), foot: foot(L), out: 2 });
-      leg(p, 'Right', { thigh: thigh(R), knee: knee(R), foot: foot(R), out: 2 });
-      spine(p, { pitch: 46 + Math.cos(TAU * ph * 2) * 5, yaw: -Math.sin(TAU * ph) * 16, roll: nz(ph) * 4 });
-      head(p, { pitch: -50 + Math.cos(TAU * ph * 2 + 0.6) * 5, yaw: Math.sin(TAU * ph) * 9 + nz(ph + 0.3) * 6, roll: nz(ph + 0.5) * 8, jaw: 18 + 8 * Math.sin(TAU * ph * 2) });
+      const h = (ph * 2) % 1, Lg = legs(ph);
+      hips(p, { pitch: 0, yaw: Math.sin(TAU * ph) * 8, roll: Math.sin(TAU * (ph + 0.25)) * 3 });
+      setHip(p, Lg.hip);
+      leg(p, 'Left', { ...Lg.Left, out: 2 });
+      leg(p, 'Right', { ...Lg.Right, out: 2 });
+      // the trunk dips into each landing and drives up out of it
+      spine(p, { pitch: 44 + Math.cos(TAU * h) * 4, yaw: -Math.sin(TAU * ph) * 18, roll: nz(ph) * 4 });
+      head(p, { pitch: -48 + Math.cos(TAU * h + 0.6) * 5, yaw: Math.sin(TAU * ph) * 9 + nz(ph + 0.3) * 6, roll: nz(ph + 0.5) * 8, jaw: 20 + 8 * Math.sin(TAU * h) });
       // arms: swinging hard against the legs, reaching forward on the up-stroke, hands clawed
-      const aL = Math.sin(TAU * (R + 0.08)), aR = Math.sin(TAU * (L + 0.08));
-      arm(p, 'Left', { fwd: 38 + aL * 50, out: 18 + aL * 6, elbow: 72 - aL * 28, twist: 15, wrist: -10, shrug: 8 + aL * 6, reach: aL * 8 });
-      arm(p, 'Right', { fwd: 40 + aR * 52, out: 16 + aR * 6, elbow: 68 - aR * 30, twist: 15, wrist: -10, shrug: 8 + aR * 6, reach: aR * 8 });
-      return groundLock(p, Math.max(0, lift(ph * 2 % 1)));
-    }));
+      const aL = Math.sin(TAU * (ph + 0.5 + 0.06)), aR = Math.sin(TAU * (ph + 0.06));
+      arm(p, 'Left', { fwd: 40 + aL * 54, out: 18 + aL * 6, elbow: 74 - aL * 28, twist: 15, wrist: -10, shrug: 8 + aL * 6, reach: aL * 9 });
+      arm(p, 'Right', { fwd: 42 + aR * 56, out: 16 + aR * 6, elbow: 70 - aR * 30, twist: 15, wrist: -10, shrug: 8 + aR * 6, reach: aR * 9 });
+      return p;
+    }, { speed: 5.4 })));
+  }
+
+  // ── jog: a shambler that hurries. A lurching, uneven run with hardly any flight, the head
+  // hanging, one arm reaching ahead and the other dangling ──
+  {
+    const T = 0.92;
+    const legs = runLegs({
+      T, ST: 0.36, v: 2.2, land: 0.5, roll: 28,
+      hip: [[0, 0.86], [0.36, 0.83], [0.72, 0.865], [0.86, 0.885]],
+      swing: [[0.48, -0.42, 0.3, 22], [0.62, -0.1, 0.38, 14], [0.76, 0.3, 0.24, 2], [0.9, 0.3, 0.1, -4]],
+    });
+    const nz = loopNoise(13), nz2 = loopNoise(31);
+    clips.push(settle(loop('jog', T, (ph) => {
+      const p = base();
+      const h = (ph * 2) % 1, Lg = legs(ph);
+      hips(p, { pitch: 0, yaw: Math.sin(TAU * ph) * 9, roll: Math.sin(TAU * (ph + 0.25)) * 5 + 3 });
+      setHip(p, Lg.hip);
+      leg(p, 'Left', { ...Lg.Left, out: 4, twist: -4 });
+      leg(p, 'Right', { ...Lg.Right, out: 3 });
+      spine(p, { pitch: 26 + Math.cos(TAU * h) * 5, yaw: -Math.sin(TAU * ph) * 16, roll: -6 + nz(ph) * 6 });
+      head(p, { pitch: -26 + Math.cos(TAU * h + 0.8) * 7 + nz2(ph) * 5, yaw: Math.sin(TAU * ph) * 10 + nz(ph + 0.4) * 10, roll: 10 + nz2(ph + 0.3) * 8, jaw: 16 + 10 * Math.sin(TAU * h) });
+      const aL = Math.sin(TAU * (ph + 0.6)), aR = Math.sin(TAU * (ph + 0.1));
+      // the left arm reaching out ahead, the right flopping with the run
+      arm(p, 'Left', { fwd: 62 + aL * 22, out: 20 + aL * 5, elbow: 34 - aL * 14, twist: 20, wrist: -18, shrug: 10 + aL * 4, reach: 6 + aL * 5 });
+      arm(p, 'Right', { fwd: 18 + aR * 38, out: 14, elbow: 40 - aR * 22, twist: 8, wrist: 12 + aR * 10, shrug: 2, reach: aR * 4 });
+      return p;
+    }, { speed: 2.2 })));
   }
 
   // ── claw: at the foot of the wall, tearing at the concrete, head up at the men above ──

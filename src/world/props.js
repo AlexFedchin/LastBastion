@@ -112,6 +112,7 @@ export function buildProps(env) {
       if (rng() < 0.22) { x += 3 + rng() * 9; continue; }
       const zz = lineZ + Math.sin(x * 0.05) * 6 + (lineZ < -100 ? Math.sin(x * 0.013) * 10 : 0);
       if (wallDist(x, zz) < 22) continue;
+      if (Math.abs(x + 1.5) < 10) continue; // cut through where the road crosses (the column and its truck use it)
       const y = groundH(x + 1.5, zz);
       _q.setFromEuler(new THREE.Euler(0, (rng() - 0.5) * 0.3, (rng() - 0.5) * 0.15));
       _m.compose(_v.set(x + 1.5, y - 0.15 - rng() * 0.2, zz), _q, _s.set(1, 0.8 + rng() * 0.4, 1));

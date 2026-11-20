@@ -10,6 +10,7 @@
 // the ramps shut, and the lifters climb away with the dead coming over the wall under
 // them; the gunships turn round and follow. Voiced and cut to the script like the
 // other ending (EXTRACT_ENDING in config.js).
+import { crowdSteer, crowdResolve } from './crowd.js';
 import * as THREE from 'three';
 import { WORLD, EXTRACTION, EXTRACT_ENDING, ZT, wallZ, WING_COS } from '../config.js';
 import { clamp, lerp, rand, fitFov } from '../core/util.js';
@@ -21,7 +22,6 @@ import { makeAttackHeli, makeLifter, spinRotors, makeBeam, aimBeam } from './hel
 import { FlightPath, Attitude, racetrack } from './flight.js';
 
 const $ = (id) => document.getElementById(id);
-const ease = (k) => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const R = Math.random;
 const GAP = 0.8, TAIL = 5, FADE_OUT = 3;
@@ -111,6 +111,7 @@ const LZ = [
 const NEST = () => V(0, WORLD.TOWER_TOP + 1.9, 2);
 const smoother = (k) => { k = clamp(k, 0, 1); return k * k * k * (k * (k * 6 - 15) + 10); };
 const _f = new THREE.Vector3(), _s = new THREE.Vector3();
+const offRun = (u) => u.state !== 'run'; // (only those out and running are in the crowd)
 
 /** Ease a stored vector toward a target (the camera's follow), at rate per second; returns a copy. */
 function follow(S, key, target, rate, dt) {
@@ -142,16 +143,16 @@ const SHOTS = {
   bombersClose: (k, st, S) => {
     const g = S.bomberRuns[1].b.group;
     g.updateMatrixWorld();
-    const pos = _v.set(lerp(46, 41, ease(k)), lerp(9, 7, ease(k)), lerp(-10, -17, ease(k))).applyMatrix4(g.matrixWorld).clone();
+    const pos = _v.set(lerp(46, 41, k), lerp(9, 7, k), lerp(-10, -17, k)).applyMatrix4(g.matrixWorld).clone();
     const look = _w.set(-4, -26, 70).applyMatrix4(g.matrixWorld).clone();
     return { pos, look, fov: 54, shake: 0.06 };
   },
   // high behind the left wing: the sticks walking up the field, wide enough to see all three
-  bombing: (k) => ({ pos: V(-58, 31, 16).lerp(V(-54, 29, 10), ease(k)), look: V(2, 0, -100).lerp(V(-6, 0, -110), ease(k)), fov: 52, shake: 0.2 }),
+  bombing: (k) => ({ pos: V(-58, 31, 16).lerp(V(-54, 29, 10), k), look: V(2, 0, -100).lerp(V(-6, 0, -110), k), fov: 52, shake: 0.2 }),
   // out on the field, on the city side, low among the dead and the fires: looking back at the
   // bastion as the gunships come in over the wall at us, past us, and on up the field
   helosIn: (k, st, S, dt) => {
-    const pos = V(-30, 0, -72).lerp(V(-31, 0, -76), ease(k));
+    const pos = V(-30, 0, -72).lerp(V(-31, 0, -76), k);
     pos.y = groundH(pos.x, pos.z) + 5.5;
     const a = S.helos[0].att.pos, b = S.helos[1].att.pos, mid = a.clone().add(b).multiplyScalar(0.5);
     // the tower to start with, then the pair as they come close
@@ -169,13 +170,13 @@ const SHOTS = {
   },
   // on the right wing, high: the lifters come round over the field in trail and in over the wall
   liftersIn: (k, st, S, dt) => {
-    const pos = V(40, 24, 18).lerp(V(34, 22, 22), ease(k));
+    const pos = V(40, 24, 18).lerp(V(34, 22, 22), k);
     const L = S.lifters[0].att.pos;
     return { pos, look: follow(S, '_lk2', clampLook(pos, L.clone(), 0.9), 2.4, dt), fov: 50, shake: 0.08 };
   },
   // in the yard: the lead lifter comes over us, flares and settles in its own dust
   landing: (k, st, S, dt) => {
-    const pos = V(15, 0, 25).lerp(V(12.5, 0, 28.5), ease(k));
+    const pos = V(15, 0, 25).lerp(V(12.5, 0, 28.5), k);
     pos.y = groundH(pos.x, pos.z) + 1.7;
     const L = S.lifters[0].att.pos, lz = V(LZ[0].x, groundH(LZ[0].x, LZ[0].z) + 4.5, LZ[0].z);
     const tgt = S.lifters[0].group.visible ? L.clone().lerp(lz, 0.35) : lz;
@@ -183,7 +184,7 @@ const SHOTS = {
   },
   // low behind the garrison running for the ramp
   run: (k) => {
-    const z = lerp(14, 33, ease(k));
+    const z = lerp(14, 33, k);
     return { pos: V(-4.5, 0, z - 6), ground: 1.5, look: V(0.5, 1.6, LZ[0].z - 9), fov: 50, shake: 0.18 };
   },
   // at the foot of the ramp, looking back on a longer lens: the last of them running past soft
@@ -192,7 +193,7 @@ const SHOTS = {
     const L = S.lifters[0];
     L.group.updateMatrixWorld();
     const pos = _v.set(2.4, -0.9, -11.5).applyMatrix4(L.group.matrixWorld).clone();
-    const look = V(lerp(-4, 4, ease(k)), WORLD.WALL_H + 0.4, -6);
+    const look = V(lerp(-4, 4, k), WORLD.WALL_H + 0.4, -6);
     return { pos, look, fov: 30, shake: 0.1 };
   },
   // behind the lifter: the ramp comes up and shuts, the dead already over the wall behind
@@ -205,7 +206,7 @@ const SHOTS = {
   },
   // low in the yard: the lifter climbs away slowly over the dead running in under it
   liftoff: (k, st, S, dt) => {
-    const pos = V(-15, 0, 31).lerp(V(-17, 0, 29), ease(k));
+    const pos = V(-15, 0, 31).lerp(V(-17, 0, 29), k);
     pos.y = groundH(pos.x, pos.z) + 1.6;
     const L = S.lifters[0].att.pos;
     return { pos, look: follow(S, '_lk4', clampLook(pos, V(L.x, L.y + 1, L.z), 0.95), 2, dt), fov: 54, shake: 0.12 };
@@ -218,7 +219,7 @@ const SHOTS = {
     return { pos, look: follow(S, '_lk5', clampLook(pos, mid, 1.0), 1.8, dt), fov: 58, shake: 0.08 };
   },
   // high and far: the flight going away over the hills, the bastion small and burning
-  away: (k) => ({ pos: V(46, 52, 118).lerp(V(30, 78, 196), ease(k)), look: V(0, 4, -22).lerp(V(0, 0, -60), ease(k)), fov: 44 }),
+  away: (k) => ({ pos: V(46, 52, 118).lerp(V(30, 78, 196), k), look: V(0, 4, -22).lerp(V(0, 0, -60), k), fov: 44 }),
 };
 
 export class ExtractionScene {
@@ -302,7 +303,7 @@ export class ExtractionScene {
     this.stageLifters();
     this.stagePeople();
     for (const r of this.rockets) { r.on = false; r.m.visible = false; }
-    this.intrudeAcc = 0; this.chaseAcc = 0; this.fieldAcc = 0; this.darkDone = false;
+    this.intrudeAcc = 0; this.chaseAcc = 0; this.fieldAcc = 0; this.darkDone = false; this.bassDone = false;
     $('cine-sub').classList.remove('on');
     $('cine-title').classList.remove('on');
     $('cine-skip').classList.remove('on');
@@ -740,18 +741,31 @@ export class ExtractionScene {
       const wps = [[u.L ? Math.sign(L.lz.x) * 4 : u.bias * 1.6, 26], [foot.x, foot.z], [ins.x, ins.z]];
       const [tx, tz] = wps[Math.min(u.wp, 2)];
       const dx = tx - u.x, dz = tz - u.z, d = Math.hypot(dx, dz);
-      if (d < 0.6) {
+      // (the turn out of the yard is a loose one; the ramp's foot and the hold are closer marks)
+      if (d < [1.8, 1.0, 0.6][Math.min(u.wp, 2)]) {
         u.wp++;
         if (u.wp > 2) { u.state = 'gone'; f.root.visible = false; continue; }
-      } else {
-        const st = Math.min(d, u.sp * dt);
-        u.x += dx / d * st; u.z += dz / d * st;
-        u.yaw = Math.atan2(dx, dz);
       }
-      u.ph += dt * u.sp;
+      // round the others (in single file up the ramp), never through them
+      const sp = Math.min(u.sp, d / Math.max(dt, 1e-3));
+      const v = crowdSteer(this.runners, u, dx / d * sp, dz / d * sp, { side: u.wp >= 2 ? 0.15 : 1, look: 2.8 }, offRun);
+      const x0 = u.x, z0 = u.z;
+      u.x += v[0] * dt; u.z += v[1] * dt;
+      u.moved = Math.hypot(u.x - x0, u.z - z0);
+      u.d = d; u.ins = ins.y;
+      if (u.moved > 1e-4) {
+        let dy = Math.atan2(v[0], v[1]) - u.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        u.yaw += dy * Math.min(1, dt * 9);
+      }
+    }
+    crowdResolve(this.runners, 0.34, offRun);
+    for (const u of this.runners) {
+      if (u.state !== 'run') continue;
+      const f = u.f;
+      u.ph += u.moved || 0; // the stride follows the ground actually covered
       // up the ramp: climbing with it
       let y = groundH(u.x, u.z);
-      if (u.wp >= 2) y = lerp(groundH(u.x, u.z), ins.y, clamp(1 - d / 3.6, 0, 1));
+      if (u.wp >= 2) y = lerp(groundH(u.x, u.z), u.ins, clamp(1 - u.d / 3.6, 0, 1));
       f.root.position.set(u.x, y, u.z);
       f.root.rotation.y = u.yaw;
       f.run(u.ph);
@@ -850,6 +864,8 @@ export class ExtractionScene {
     const g = this.g, t = this.t, at = this.T.away + 2.2; // early in the last wide, the whole wall in frame
     if (t < at) return;
     const u = t - at, env = g.env;
+    // the power going out of the whole base: a sub sweep falling away under the lights as they die
+    if (!this.bassDone) { this.bassDone = true; g.audio.blackout(); }
     // first the searchlights, one after another: each sags off its target and dies
     const SL = env.searchlights || [];
     SL.forEach((sl, k) => {

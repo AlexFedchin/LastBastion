@@ -3,6 +3,7 @@
 // the gate; then the light goes, the dead come down the valley again, and the
 // narrator gives the place its name. The script (ENDING in config.js) is voiced:
 // every cue lasts as long as its recording, and the shots are cut to the cues.
+import { crowdSteer, crowdResolve } from './crowd.js';
 import * as THREE from 'three';
 import { WORLD, ENDING } from '../config.js';
 import { clamp, lerp, rand, fitFov } from '../core/util.js';
@@ -53,25 +54,25 @@ const FADE_OUT = 3;
 const SHOTS = {
   // over the shoulder of the fifty, out across the valley it held
   gun: (k, t, E) => {
-    const c = E.gunAt, e = ease(k);
+    const c = E.gunAt, e = k;
     return {
       pos: V(c.x + 0.75, c.y + 0.3, c.z + 2.2).lerp(V(c.x + 0.2, c.y + 0.75, c.z + 1.0), e),
       look: V(c.x - 0.1, c.y + 0.15, c.z - 6).lerp(V(0, 2, -115), e), fov: 42,
     };
   },
   // the set in the nest, where Kovac sat with the handset
-  radio: (k) => ({ pos: V(-1.2, TOP + 0.78, -2.2).lerp(V(-1.55, TOP + 0.62, -1.9), ease(k)), look: V(-2.2, TOP + 0.24, -1.25), fov: 38 }),
+  radio: (k) => ({ pos: V(-1.2, TOP + 0.78, -2.2).lerp(V(-1.55, TOP + 0.62, -1.9), k), look: V(-2.2, TOP + 0.24, -1.25), fov: 38 }),
   // from out on the road: the wall, small, still standing
-  field: (k) => ({ pos: V(7, 0, -80).lerp(V(5, 0, -62), ease(k)), ground: 2.0, look: V(0, 7.5, -2), fov: 40 }),
+  field: (k) => ({ pos: V(7, 0, -80).lerp(V(5, 0, -62), k), ground: 2.0, look: V(0, 7.5, -2), fov: 40 }),
   // alongside the column as it walks
   road: (k, t) => {
     const z = TRACK.z0 + t * TRACK.speed;
     return { pos: V(-12, 0, z + 8), ground: 4.2, look: V(0.5, 0, z - 7), lookGround: 1.0, fov: 40 };
   },
   // from the wall top: the column coming in through the gate
-  gate: (k) => ({ pos: V(11.5, 9.6, -4.2).lerp(V(8.5, 10.6, -6.5), ease(k)), look: V(-1, 0.4, -40), fov: 46 }),
+  gate: (k) => ({ pos: V(11.5, 9.6, -4.2).lerp(V(8.5, 10.6, -6.5), k), look: V(-1, 0.4, -40), fov: 46 }),
   // up and away over the bastion as the light goes
-  crane: (k) => ({ pos: V(7, 16, 12).lerp(V(-30, 66, 56), ease(k)), look: V(0, 7, -40).lerp(V(0, 0, -175), ease(k)), fov: 50 }),
+  crane: (k) => ({ pos: V(7, 16, 12).lerp(V(-30, 66, 56), k), look: V(0, 7, -40).lerp(V(0, 0, -175), k), fov: 50 }),
 };
 
 export class Ending {
@@ -229,18 +230,26 @@ export class Ending {
         const dz = w.z - T.z, clear = T.x - TRUCK_HW - 0.9; // the truck's left side, and a step more
         if (dz > -TRUCK_HL - 2 && dz < TRUCK_HL + 7 && w.x > clear) vx -= (w.x - clear + 0.4) * 2.2;
       }
-      const wv = walkStep(w, vx, w.sp, dt, 0.35);
+      // round the others walking (easing off behind the slower ones), never through them
+      const cv = crowdSteer(this.walkers, w, vx, w.sp, { look: 2.2 });
+      const x0 = w.x, z0 = w.z;
+      const wv = walkStep(w, cv[0], cv[1], dt, 0.35);
       // never inside it
       if (T.on && Math.abs(w.z - T.z) < TRUCK_HL + 0.3 && w.x > T.x - TRUCK_HW - 0.35) w.x = T.x - TRUCK_HW - 0.35;
       w.yaw = Math.atan2(wv[0], wv[1]);
       if (Math.random() < dt * 0.05) w.lane = w.soldier ? rand(-2.8, -1.4) : rand(-2.2, LANE_MAX);
       // through the gate: walk on from the far end of the column
       if (w.z > ROAD_TO) { w.z -= ROAD_TO - ROAD_FROM; w.x = w.lane; }
+      w.moved = w.z - z0 < -50 ? 0 : Math.hypot(w.x - x0, w.z - z0);
+    }
+    crowdResolve(this.walkers, 0.34);
+    for (const w of this.walkers) {
       const f = w.f;
-      w.ph += dt * w.sp * 3.1;
-      f.walk(w.ph / 3.1); // 3.1 rad per metre
+      w.ph += w.moved; // the stride follows the ground actually covered
+      f.walk(w.ph);
       f.root.position.set(w.x, groundH(w.x, w.z), w.z);
-      f.root.rotation.y += (w.yaw - f.root.rotation.y) * Math.min(1, dt * 5);
+      let dy = w.yaw - f.root.rotation.y; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      f.root.rotation.y += dy * Math.min(1, dt * 5);
     }
     for (const s of this.guards) if (s.root.visible) s.idle();
     const M = this.g.events.truck;

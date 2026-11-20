@@ -22,6 +22,7 @@ const ease = (k) => { k = clamp(k, 0, 1); return k * k * (3 - 2 * k); };
 const easeOut = (k) => { k = clamp(k, 0, 1); return 1 - (1 - k) ** 3; };
 const V = (x, y, z) => new THREE.Vector3(x, y, z);
 const GAP = 0.8, TAIL = 2.2;
+const NEST_F = 0.8; // how far along its path into the gun the last shot gets before night 1 takes over
 // the sun: low over the city at the end of the valley, a little left of the road
 const SUN_AZ = -0.3, SUN_FROM = 0.085, SUN_TO = -0.11;
 const TELE = V(5, 15.5, 24); // the long lens on the sun, behind the bastion
@@ -37,10 +38,10 @@ const SHOTS = {
   // a long lens on the sun going down behind the city; crows cross it
   sunTele: (k, t, P) => ({ pos: TELE.clone(), look: sunAt(P, TELE, 1000).add(V(-8 + 10 * k, -9, 0)), fov: lerp(9, 10, k), shake: 0.0008 }),
   // the lens pulls out and back: the flag, the nest and the riflemen against the sun
-  // (one long, even move: the zoom eased in and out over the whole shot, in equal steps of
-  // magnification rather than of angle, so it never lurches at the start or snaps at the end)
+  // (one long, even move, in equal steps of magnification rather than of angle: it picks up
+  // from the long lens's drift over its first stretch, then runs on at one speed into the cut)
   sun: (k, t, P) => {
-    const e = k * k * k * (k * (k * 6 - 15) + 10);
+    const a = 0.3, e = k < a ? (k * k) / (2 * a) / (1 - a / 2) : (k - a / 2) / (1 - a / 2);
     const fov = 10 * Math.pow(26 / 10, e);
     return {
       pos: TELE.clone().lerp(V(8, 16.8, 37), e),
@@ -49,15 +50,15 @@ const SHOTS = {
     };
   },
   // out on the road: a low dolly across it that cranes up on the wall, lit orange from the front
-  valley: (k) => { const e = ease(k); return { pos: V(lerp(-28, -5, e), 0, lerp(-86, -80, e)), ground: lerp(1.3, 4.6, e), look: V(lerp(-6, 1, e), 6.5, -2), fov: 33, shake: 0.002 }; },
+  valley: (k) => { const e = k; return { pos: V(lerp(-28, -5, e), 0, lerp(-86, -80, e)), ground: lerp(1.3, 4.6, e), look: V(lerp(-6, 1, e), 6.5, -2), fov: 33, shake: 0.002 }; },
   // along the left wing's walkway, past the riflemen and the M240, toward the light
   wall: (k) => {
-    const x = lerp(-9, -23, ease(k));
+    const x = lerp(-9, -23, k);
     return { pos: onWing(x, 2.4, WORLD.WALL_H + 1.25), look: onWing(x - 22, -9, WORLD.WALL_H + 0.4), fov: 42, shake: 0.004 };
   },
   // round the M240 gunner at the end of the walk, ending over his shoulder with the sun past it
   sentry: (k, t, P) => {
-    const G = P.sentryAt, a = lerp(1.05, -0.35, ease(k)), r = lerp(2.6, 2.0, ease(k));
+    const G = P.sentryAt, a = lerp(1.05, -0.35, k), r = lerp(2.6, 2.0, k);
     const dx = IN[0] * Math.cos(a) + ALONG[0] * Math.sin(a), dz = IN[1] * Math.cos(a) + ALONG[1] * Math.sin(a);
     const pos = V(G.x + dx * r, G.y + 1.85, G.z + dz * r);
     const look = V(G.x - IN[0] * 6 + ALONG[0] * 3, G.y + 1.25, G.z - IN[1] * 6 + ALONG[1] * 3).lerp(V(G.x, G.y + 1.5, G.z), 0.35 * (1 - k));
@@ -65,7 +66,7 @@ const SHOTS = {
   },
   // up on the tower at the end of the left wing: the searchlight clunks on and swings out
   searchlight: (k, t, P) => {
-    const T = P.lamp.spot.position, e = ease(k);
+    const T = P.lamp.spot.position, e = k;
     // behind the lamp, looking down its beam: the housing in the corner of the frame, the beam out over the field
     const dir = P.lamp.aim.clone().sub(T).normalize();
     return {
@@ -75,19 +76,22 @@ const SHOTS = {
     };
   },
   // high over the back of the bastion as the sun goes and the lights sweep the field
-  lights: (k) => ({ pos: V(22, 31, 45).lerp(V(13, 26, 33), ease(k)), look: V(-8, 2, -95).lerp(V(-6, 3, -110), ease(k)), fov: 50 }),
+  lights: (k) => ({ pos: V(22, 31, 45).lerp(V(13, 26, 33), k), look: V(-8, 2, -95).lerp(V(-6, 3, -110), k), fov: 50 }),
   // low in the field, a long lens up the road: the first of them over the rise, lightning behind
   // (on a level track: the camera holds one height above the ground's high points along the
   // move, rather than dipping into the craters it passes over)
   dead: (k, t, P) => {
     if (P.deadY === undefined) { let y = -Infinity; for (let i = 0; i <= 24; i++) { const u = i / 24; y = Math.max(y, groundH(lerp(8, 5, u), lerp(-166, -176, u))); } P.deadY = y + 0.9; }
-    const pos = V(8, 0, -166).lerp(V(5, 0, -176), ease(k)); pos.y = P.deadY;
-    return { pos, look: V(-6, 0, -262), lookGround: 3.2, fov: lerp(26, 21, ease(k)), shake: 0.0025 };
+    const pos = V(8, 0, -166).lerp(V(5, 0, -176), k); pos.y = P.deadY;
+    return { pos, look: V(-6, 0, -262), lookGround: 3.2, fov: lerp(26, 21, k), shake: 0.0025 };
   },
-  // into the nest, behind the gun, as the dark comes down (night 1's move into the gun follows)
+  // into the nest as the dark comes down: one even dolly from behind the mount toward the
+  // gunner's seat, NEST_F of the way there by the end; night 1's move carries straight on at
+  // the same speed and settles behind the gun as it is taken up (main.js updateIntro)
   nest: (k, t, P) => {
-    const G = P.g.ending.gunAt, e = ease(k);
-    return { pos: V(G.x + 1.6, G.y + 1.1, G.z + 4.0).lerp(V(G.x + 0.3, G.y + 0.42, G.z + 1.9), e), look: V(G.x - 0.2, G.y - 0.3, G.z - 6).lerp(V(0, 8, -90), e), fov: 42 };
+    const N = P.nestPath();
+    const u = NEST_F * k;
+    return { pos: N.from.pos.clone().lerp(N.to.pos, u), quat: N.from.quat.clone().slerp(N.to.quat, u), fov: lerp(N.from.fov, N.to.fov, u) };
   },
 };
 
@@ -143,6 +147,7 @@ export class Prologue {
 
   start() {
     this.deadY = undefined;
+    this._nest = null;
     const g = this.g;
     if (!this.flock) this.flock = new Flock(g.scene);
     this.active = true;
@@ -218,6 +223,22 @@ export class Prologue {
     g.screens.show('cine');
   }
 
+  /** The last shot's path: from behind the mount to the gunner's seat (where night 1 puts the camera). */
+  nestPath() {
+    if (this._nest) return this._nest;
+    const g = this.g, G = g.ending.gunAt;
+    const a = new THREE.PerspectiveCamera(); // (a camera's lookAt: its -z on the target, as the view's)
+    a.position.set(G.x + 1.6, G.y + 1.1, G.z + 4.0);
+    a.lookAt(G.x - 0.2, G.y - 0.3, G.z - 6);
+    const b = new THREE.Object3D();
+    b.position.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z);
+    b.rotation.order = 'YXZ';
+    b.rotation.set(g.player.pitch, g.player.yaw, 0);
+    b.updateMatrixWorld();
+    this._nest = { from: { pos: a.position.clone(), quat: a.quaternion.clone(), fov: 42 }, to: { pos: b.position.clone(), quat: b.quaternion.clone(), fov: g.settings.fov } };
+    return this._nest;
+  }
+
   shotAt(name) { return (this.shots.find((s) => s.name === name) || { from: Infinity }).from; }
 
   /**
@@ -274,10 +295,9 @@ export class Prologue {
     add(dead + 0.3, () => B.heartbeat && A.play(B.heartbeat[0], { gain: 0.3, force: true }));
     add(dead + 2.4, () => { g.env.nextLightning = 0; });
     add(dead + 3.0, () => B.heartbeat && A.play(B.heartbeat[0], { gain: 0.22, rate: 0.96, force: true }));
-    // in the nest: the fifty's charging handle, twice
-    const nest = this.shotAt('nest');
-    add(nest + 2.0, () => B.charge && A.play(B.charge[0], { gain: 0.5, reverb: 0.25, pan: 0.1, force: true }));
-    add(nest + 2.9, () => B.charge && A.play(B.charge[0], { gain: 0.42, rate: 0.94, reverb: 0.25, pan: 0.1, force: true }));
+    // the nest stands empty for the last shot: the gun is taken up from below as night 1 begins
+    // (and its charging handle is worked then, main.js updateIntro)
+    add(this.shotAt('nest'), () => { g.ending.restoreGun(); g.player.gun.visible = false; });
     this.events = ev.sort((a, b) => a.t - b.t);
     this.groanT = 0;
   }
@@ -383,9 +403,10 @@ export class Prologue {
       p.look.y += (Math.sin(t * 0.61 + 2) + 0.4 * Math.sin(t * 1.7)) * d * 0.7;
     }
     const cam = g.camera;
+    this.shot = s;
     cam.position.copy(p.pos);
     cam.up.set(0, 1, 0);
-    cam.lookAt(p.look);
+    if (p.quat) cam.quaternion.copy(p.quat); else cam.lookAt(p.look);
     // the lens: focused where the shot looks (or on what it names), the blur growing with the focal length
     const fov = fitFov(p.fov, cam.aspect);
     if (Math.abs(cam.fov - fov) > 0.01) { cam.fov = fov; cam.updateProjectionMatrix(); }
@@ -419,6 +440,13 @@ export class Prologue {
   /** Over (or skipped): night 1 begins from wherever the camera is. */
   finish() {
     if (!this.active) return;
+    // ended (or skipped) in the last shot: night 1's move into the gun carries on from it at its speed
+    const s = this.shot;
+    if (s && s.name === 'nest') {
+      const dur = Math.max(0.5, s.to - s.from), u = NEST_F * clamp((this.t - s.from) / dur, 0, 1), N = this.nestPath();
+      const len = 2.8;
+      this.g.introCarry = { len, fov: lerp(N.from.fov, N.to.fov, u), slope: Math.min(2.5, (NEST_F / dur) * len / Math.max(0.05, 1 - u)) };
+    }
     this.stop();
     this.g.onPrologueDone();
   }

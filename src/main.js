@@ -608,7 +608,14 @@ class Game {
     this.stateT = 0;
     this.introFrom = { pos: this.camera.position.clone(), quat: this.camera.quaternion.clone() };
     this.introLen = 2.8;
+    this.introSlope = 0;
     this.introRaised = false;
+    if (this.introCarry) {
+      // straight on from the prologue's last shot, at the speed it was moving (src/game/prologue.js)
+      const c = this.introCarry;
+      this.introCarry = null;
+      this.introLen = c.len; this.introSlope = c.slope; this.introFrom.fov = c.fov;
+    }
     this.player.gun.visible = false;
     if (this.fromCard) {
       // high over the base behind the tower, looking down the valley: it sinks into the nest
@@ -1098,8 +1105,11 @@ class Game {
     const T = this.introLen || 2.8;
     const k = Math.min(1, this.stateT / T);
     // smootherstep: it comes to rest with no speed and no deceleration left, so the hand-off to
-    // the gun's own camera is seamless
-    const e = k * k * k * (k * (k * 6 - 15) + 10);
+    // the gun's own camera is seamless. Carried on from a moving shot, it starts at that shot's
+    // speed (slope s, in path per unit k) and still comes to rest the same way (a quartic).
+    const sl = this.introSlope || 0;
+    const e = sl > 0 ? k * (sl + k * ((6 - 3 * sl) + k * ((3 * sl - 8) + k * (3 - sl))))
+      : k * k * k * (k * (k * 6 - 15) + 10);
     // target pose = gunner pose
     const target = new THREE.Object3D();
     target.position.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z);
@@ -1119,7 +1129,7 @@ class Game {
     }
     if (!this.introRaised) this.player.gun.visible = false;
     this.player.poseGun(dt, rdt);
-    const fov = fitFov(lerp(55, this.settings.fov, e), this.camera.aspect);
+    const fov = fitFov(lerp(this.introFrom.fov ?? 55, this.settings.fov, e), this.camera.aspect);
     if (Math.abs(this.camera.fov - fov) > 0.01) { this.camera.fov = fov; this.camera.updateProjectionMatrix(); }
     this.director.update(dt);
     this.horde.update(dt, this.time);

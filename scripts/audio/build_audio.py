@@ -525,6 +525,10 @@ loop('sfx/sl_motor', 327900, 1.0, 5.5, X=0.8, ch=1, target=-20, hp=120)
 GEN = 406892
 clip('sfx/gen_start', GEN, 26.8, 7.2, fi=0.02, fo=1.6, hp=50, target=-16)
 clip('sfx/gen_stop', GEN, 52.6, 4.2, fi=0.5, fo=1.0, hp=50, target=-16)
+# the whole base losing power (the extraction's blackout): a sub sweep falling away, with a
+# second, higher power-down under it a beat late
+oneshot('sfx/power_down_bass', [dict(src=369520, ss=0.0, t=4.0, fo=1.2),
+                                dict(src=169994, ss=0.55, t=3.6, vol=-6, delay=0.12, fo=1.0)], sr=44100, ch=1, target=-11)
 # the prologue: an air-raid siren winding down far off in the dead city, a pigeon flock going up
 # (the crows' wings), and the evening grassland the sun goes down over
 clip('sfx/siren_far', 52040, 0.0, 40.0, ch=2, sr=32000, fi=2.0, fo=6.0, lp=5000, target=-16, q=4)

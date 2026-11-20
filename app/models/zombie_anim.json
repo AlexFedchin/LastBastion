@@ -25,7 +25,7 @@
   "RightToeBase"
  ],
  "fps": 30,
- "rows": 2728,
+ "rows": 2684,
  "width": 69,
  "clips": {
   "walk": {
@@ -112,78 +112,78 @@
    "speed": 0.511,
    "dur": 2.5
   },
-  "jog": {
-   "row": 2040,
-   "frames": 75,
-   "loop": true,
-   "speed": 0.658,
-   "dur": 2.5
-  },
   "stomp": {
-   "row": 2116,
+   "row": 2040,
    "frames": 75,
    "loop": true,
    "speed": 0.513,
    "dur": 2.5
   },
   "waddle": {
-   "row": 2192,
+   "row": 2116,
    "frames": 75,
    "loop": true,
    "speed": 0.42,
    "dur": 2.5
   },
   "limp": {
-   "row": 2268,
+   "row": 2192,
    "frames": 75,
    "loop": true,
    "speed": 0.4,
    "dur": 2.5
   },
   "sprint": {
-   "row": 2344,
-   "frames": 20,
+   "row": 2268,
+   "frames": 23,
    "loop": true,
-   "speed": 3.144,
-   "dur": 0.667
+   "speed": 5.4,
+   "dur": 0.767
+  },
+  "jog": {
+   "row": 2292,
+   "frames": 28,
+   "loop": true,
+   "speed": 2.2,
+   "dur": 0.933
   },
   "claw": {
-   "row": 2365,
+   "row": 2321,
    "frames": 78,
    "loop": true,
    "speed": 0,
    "dur": 2.6
   },
   "scramble": {
-   "row": 2444,
+   "row": 2400,
    "frames": 45,
    "loop": true,
    "speed": 0.028,
    "dur": 1.5
   },
   "climb": {
-   "row": 2490,
+   "row": 2446,
    "frames": 67,
    "loop": false,
    "speed": 0,
    "dur": 2.233
   },
   "perch": {
-   "row": 2558,
+   "row": 2514,
    "frames": 90,
    "loop": true,
    "speed": 0,
    "dur": 3
   },
   "burn": {
-   "row": 2649,
+   "row": 2605,
    "frames": 75,
    "loop": true,
    "speed": 0.436,
    "dur": 2.5
   },
   "thrown": {
-   "row": 2725,
+   "row": 2681,
    "frames": 2,
    "loop": false,
    "speed": 0,
