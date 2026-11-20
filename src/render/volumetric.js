@@ -55,7 +55,7 @@ const NEAR = 40;
  * Build the volumetric pass for `scene` seen by `camera`, using `scenePass`'s depth.
  * Returns { sample(uv), update(time) } or null on presets without it.
  */
-export function volumetricPass(scene, camera, scenePass, quality) {
+export function volumetricPass(scene, camera, scenePass, quality, renderer = null) {
   const tier = TIERS[quality.label] || TIERS.HIGH;
   if (!tier) return null;
   const nTex = noise3D();
@@ -101,6 +101,13 @@ export function volumetricPass(scene, camera, scenePass, quality) {
     sample: (uv) => tex.sample(uv),
     update(time) {
       VOL.time.value = time;
+      // the air is soft: no finer than ~1100 px across, whatever the screen (a 4K buffer at half
+      // resolution would march four times the rays for nothing the blur keeps)
+      if (renderer) {
+        const w = renderer.domElement.width || 1920;
+        const k = Math.min(tier.res, 1100 / w);
+        if (Math.abs(k - volPass.getResolutionScale()) > 1e-3) volPass.setResolutionScale(k);
+      }
       volPass.scene = scenePass.scene;
       volPass.camera = scenePass.camera;
     },

@@ -449,7 +449,7 @@ export class Environment {
     // the air the searchlights light: thinner towards dawn, thicker in a fog bank, a cutscene's boost
     if (this.searchlights[0]) VOL.src0.value.copy(this.searchlights[0].spot.position);
     if (this.searchlights[1]) VOL.src1.value.copy(this.searchlights[1].spot.position);
-    VOL.density.value = 0.55 * (1 - d * 0.9) * (this.beamBoost > 1 ? 1.5 : 1) * (1 + (d < 0.01 ? this.fogBank : 0) * 1.5);
+    VOL.density.value = 0.55 * (1 - d * 0.9) * (this.beamBoost > 1 ? 1.2 : 1) * (1 + (d < 0.01 ? this.fogBank : 0) * 1.5);
 
     updateWallBlood(this, horde, dt);
 

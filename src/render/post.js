@@ -75,14 +75,14 @@ export class Post {
       return select(m.greaterThan(3), v.mul(float(3).div(m)), v);
     };
     // the volumetric searchlights (volumetric.js) are added to the scene before anything else
-    this.vol = volumetricPass(scene, camera, this.scenePass, quality);
+    this.vol = volumetricPass(scene, camera, this.scenePass, quality, renderer);
     const hdr = Fn(([uvS]) => {
       const c = clampHDR(sceneTex.sample(uvS));
       if (!this.vol) return c;
       // the lit air, compressed at the top (a beam swinging across the lens glows, it doesn't
       // white out the frame): dim beams stay linear, the core rolls off
       const v = this.vol.sample(uvS).rgb;
-      return c.add(v.div(dot(v, vec3(0.3, 0.5, 0.2)).mul(0.8).add(1)));
+      return c.add(v.div(dot(v, vec3(0.3, 0.5, 0.2)).mul(2.2).add(1)));
     });
     const bloomIn = Fn(() => vec4(hdr(screenUV), 1))();
     this.bloom = bloom(bloomIn, 0.42, 0.22, 1.0);

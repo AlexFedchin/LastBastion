@@ -149,7 +149,8 @@ export class Hangar {
     const pm = new THREE.PMREMGenerator(this.g.renderer);
     scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
     // the room's own soft light, bounced off every wall: it is what fills the shadows
-    scene.environmentIntensity = 1.15;
+    // (1.15 under WebGL; the WebGPU PMREM of the room comes out brighter, so less of it)
+    scene.environmentIntensity = 0.45;
     pm.dispose();
 
     this.mats = {

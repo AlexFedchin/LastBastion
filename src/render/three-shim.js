@@ -54,7 +54,32 @@ export const LineBasicMaterial = W.LineBasicNodeMaterial;
   };
 }
 
+// Skip lights that contribute nothing. The night is lit by ~25 point and spot lights (the wall
+// lamps, the searchlights, the fixed pool for blasts and flares, most of it dark) and three
+// evaluates every one of them, BRDF and shadow lookups included, on every lit pixel. Each point
+// or spot light's contribution is wrapped in a branch: a dark light (colour 0, a uniform) is
+// skipped outright, and a pixel past the light's cutoff distance skips it too. The WebGL build
+// patched three's GLSL light loop the same way.
+{
+  const setupDirectLight = W.LightsNode.prototype.setupDirectLight;
+  W.LightsNode.prototype.setupDirectLight = function (builder, lightNode, lightData) {
+    const light = lightNode.light;
+    if (!light || !(light.isPointLight || light.isSpotLight) || typeof lightNode.getLightVector !== 'function' || (builder.material && builder.material.isVolumeNodeMaterial)) {
+      return setupDirectLight.call(this, builder, lightNode, lightData);
+    }
+    const lit = T.dot(lightNode.colorNode, T.vec3(1)).greaterThan(0);
+    const cutoff = lightNode.cutoffDistanceNode;
+    const inRange = cutoff
+      ? cutoff.equal(0).or(T.length(lightNode.getLightVector(builder)).lessThan(cutoff))
+      : T.bool(true);
+    T.If(lit.and(inRange), () => { setupDirectLight.call(this, builder, lightNode, lightData); });
+  };
+}
+
 // GLSL shader chunks don't exist under WebGPU; kept as empty objects for code that still reads them
 export const ShaderChunk = { lights_fragment_begin: '' };
 export const UniformsUtils = UU;
 export const UniformsLib = {};
+
+// ?nodetrace: node errors carry the stack of where the node was made (debugging the TSL ports)
+if (typeof location !== 'undefined' && /[?&]nodetrace/.test(location.search)) W.Node.captureStackTrace = true;
