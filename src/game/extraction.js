@@ -18,6 +18,7 @@ import { groundH } from '../world/terrain.js';
 import { Survivor, ADULTS } from './survivor.js';
 import { Soldier } from './soldier.js';
 import { buildBomber, buildBomb } from './air.js';
+import { NavLights } from '../fx/navlights.js';
 import { makeAttackHeli, makeLifter, spinRotors, makeBeam, aimBeam } from './helis.js';
 import { FlightPath, Attitude, racetrack } from './flight.js';
 
@@ -229,16 +230,19 @@ export class ExtractionScene {
     if (this.built) return;
     this.built = true;
     const scene = this.g.scene;
-    this.bombers = [0, 1, 2].map(() => { const b = buildBomber(); b.group.scale.setScalar(0.42); b.group.visible = false; scene.add(b.group); return b; });
+    const pool = this.g.fx.lights;
+    this.bombers = [0, 1, 2].map((k) => { const b = buildBomber(); b.group.scale.setScalar(0.42); b.group.visible = false; scene.add(b.group); b.nav = new NavLights(b, { lens: 0.12, pool, phase: k * 0.31 }); return b; });
     this.bombPool = Array.from({ length: 20 }, () => { const m = buildBomb(); m.visible = false; m.scale.setScalar(0.8); scene.add(m); return m; });
     this.helos = [0, 1].map((k) => {
       const h = makeAttackHeli(); h.group.visible = false; scene.add(h.group);
       h.beam = makeBeam(); h.beam.visible = false; scene.add(h.beam);
       h.k = k; h.att = new Attitude({ drag: 0.0011, turn: 2.8, yawTurn: 1.8, maxBank: 0.8 });
+      h.nav = new NavLights(h, { lens: 0.07, pool, phase: k * 0.4 });
       return h;
     });
     this.lifters = LZ.map((lz, k) => {
       const l = makeLifter(); l.group.visible = false; scene.add(l.group);
+      l.nav = new NavLights(l, { lens: 0.08, pool, phase: k * 0.27 });
       l.k = k; l.lz = lz; l.att = new Attitude({ drag: 0.0007, turn: 1.6, yawTurn: 0.9, maxBank: 0.5, maxPitch: 0.3, pitch0: -0.02 });
       return l;
     });
@@ -349,13 +353,11 @@ export class ExtractionScene {
       for (const p of r.b.props) p.rotation.z += dt * 30;
       for (const e of r.b.engines) { _v.copy(e).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1.1, 3.4, 1.5, 0.5, 0.05); }
       // position lights and the beacon: how you see them coming in the dark
-      _v.copy(r.b.lights.port).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.4, 7, 0.5, 0.3, 0.05);
-      _v.copy(r.b.lights.stbd).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.4, 0.4, 6, 0.9, 0.05);
+      r.b.nav.update(t, g.camera);
       // landing lights in the wing roots, burning straight ahead: blinding head-on, nothing from behind
       const cam = g.camera.position, dz = cam.z - z, dd = Math.hypot(cam.x - x, cam.y - y, dz);
       const face = Math.pow(clamp(-dz / dd, 0, 1), 3);
       if (face > 0.02) for (const sx of [-9, 9]) { _v.set(sx, -2.4, 6).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3.2 + face * 3, 9 * face, 8.6 * face, 7.5 * face, 0.05); }
-      if (((t + 5 + r.x * 0.01) % 1.1) < 0.09) { _v.copy(r.b.lights.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3, 9, 9, 9, 0.05); }
       if (!r.loop && g.audio.ready) r.loop = g.audio.loop(g.audio.bomberBuf(), { ref: 170, reverb: 0.4, rate: 0.96 + (r.x % 7) * 0.01 });
       if (r.loop) r.loop.update(x, y, z, 0, 0, -r.v, 3.4 * g.audio.bomberGain);
     }
@@ -451,9 +453,7 @@ export class ExtractionScene {
       const p = a.pos;
       spinRotors(h, dt, 1);
       // nav lights, the anti-collision strobe
-      _v.copy(h.lights.port).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 0.9, 6, 0.4, 0.3, 0.05);
-      _v.copy(h.lights.stbd).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 0.9, 0.3, 5, 0.8, 0.05);
-      if (((t * 1.3 + h.k * 0.4) % 1) < 0.08) { _v.copy(h.lights.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2, 8, 8, 8, 0.05); }
+      h.nav.update(t, g.camera);
       // the rotor: the recording, panned and Doppler-shifted with it
       if (!h.loop && g.audio.ready) { const b = g.audio.rotorBuf(0); if (b) h.loop = g.audio.loop(b, { ref: 150, reverb: 0.35, rate: 0.97 + h.k * 0.06 }); }
       if (h.loop) h.loop.update(p.x, p.y, p.z, a.vel.x, a.vel.y, a.vel.z, 3.2);
@@ -671,9 +671,7 @@ export class ExtractionScene {
       L.shut = shut;
       this.rotorWash(L, dt);
       // lights: nav, strobe, and the red glow of the open ramp
-      _v.copy(L.lights.port).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1, 6, 0.4, 0.3, 0.05);
-      _v.copy(L.lights.stbd).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1, 0.3, 5, 0.8, 0.05);
-      if (((t * 1.1 + L.k * 0.3) % 1) < 0.07) { _v.copy(L.lights.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.4, 8, 8, 8, 0.05); }
+      L.nav.update(t, g.camera);
       const open = 1 - shut;
       if (open > 0.2) { _v.set(0, -0.6, -5.2).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 2.6, 5 * open, 0.5, 0.25, 0.05); }
       // the lead lifter's hold spills red light down the ramp onto the yard

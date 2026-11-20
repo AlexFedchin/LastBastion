@@ -7,6 +7,7 @@ import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
 import { groundH } from '../world/terrain.js';
 import { cloneModel } from '../world/models.js';
+import { NavLights } from '../fx/navlights.js';
 
 const R = Math.random;
 const _v = new THREE.Vector3();
@@ -86,6 +87,7 @@ export class AirSupport {
     const bm = buildBomber();
     bm.group.scale.setScalar(ABILITY.bomber.scale); // high up and small, like the gunship
     this.bomberModel = bm;
+    this.bomberNav = new NavLights(bm, { lens: 0.14, pool: this.fx.lights });
     bm.group.visible = false;
     this.scene.add(bm.group);
     this.bombMesh = buildBomb();
@@ -103,6 +105,7 @@ export class AirSupport {
       vel: new THREE.Vector3(), loop: null, introDone: false, radioCd: 30,
     };
     gs.group.visible = false;
+    this.gsNav = new NavLights(gs, { lens: 0.13, pool: this.fx.lights, phase: 0.4 });
     gs.group.scale.setScalar(GUNSHIP.scale); // high and far: a small shape against the clouds
     this.scene.add(gs.group);
     this.inFlight = []; // gunship rounds on their way down
@@ -276,10 +279,7 @@ export class AirSupport {
     for (const p of this.bomberModel.props) p.rotation.z += dt * 30;
     // engine glow and nav lights
     for (const e of this.bomberModel.engines) { _v.copy(e).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1.3, 3.2, 1.4, 0.5, 0.05); }
-    const L = this.bomberModel.lights;
-    _v.copy(L.port).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1.6, 6, 0.4, 0.3, 0.05);
-    _v.copy(L.stbd).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 1.6, 0.3, 5, 0.8, 0.05);
-    if ((performance.now() % 1000) < 90) { _v.copy(L.tail).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3, 8, 8, 8, 0.05); }
+    this.bomberNav.update(performance.now() / 1000);
     // sound: a roar that grows over the wall and tears away down the valley
     if (!b.loop && this.audio.ready) b.loop = this.audio.loop(this.audio.bomberBuf(), { ref: 140, reverb: 0.35 });
     if (b.loop) b.loop.update(x, y, z, b.dx * B.speed, 0, b.dz * B.speed, 3.2 * this.audio.bomberGain);
@@ -394,13 +394,9 @@ export class AirSupport {
     grp.updateMatrixWorld();
     for (const p of g.props) p.rotation.z += dt * 40;
     // nav lights (dim — they fly blacked out, but we let you see your friends)
-    const L = g.lights, M = grp.matrixWorld, fx = this.fx;
-    _v.copy(L.port).applyMatrix4(M); fx.glowDot(_v.x, _v.y, _v.z, 3.2, 7, 0.4, 0.25, 0.05);
-    _v.copy(L.stbd).applyMatrix4(M); fx.glowDot(_v.x, _v.y, _v.z, 3.2, 0.25, 5.5, 0.9, 0.05);
+    const M = grp.matrixWorld, fx = this.fx;
+    this.gsNav.update(performance.now() / 1000);
     for (const e of g.exhausts) { _v.copy(e).applyMatrix4(M); fx.glowDot(_v.x, _v.y, _v.z, 1.8, 2.2, 0.9, 0.3, 0.05); }
-    const now = performance.now();
-    if (now % 1500 < 100) { _v.copy(L.tail).applyMatrix4(M); fx.glowDot(_v.x, _v.y, _v.z, 4, 9, 9, 9, 0.05); }
-    if ((now + 700) % 1500 < 100) { _v.copy(L.belly).applyMatrix4(M); fx.glowDot(_v.x, _v.y, _v.z, 3.5, 8, 0.5, 0.3, 0.05); }
     // four turboprops droning overhead all night
     if (!g.loop && this.audio.ready) g.loop = this.audio.loop(this.audio.B.prop && this.audio.B.prop[0], { ref: 160, reverb: 0.4 });
     if (g.loop) g.loop.update(x, y, z, g.vel.x, g.vel.y, g.vel.z, g.leaving > 0 ? 2.6 * Math.max(0, 1 - g.leaving / 14) : 2.6);

@@ -11,6 +11,7 @@ import { clamp, rand, lerp } from '../core/util.js';
 import { PF } from '../world/textures.js';
 import { groundH } from '../world/terrain.js';
 import { buildGunship } from './air.js';
+import { NavLights } from '../fx/navlights.js';
 import { cylX } from '../world/kit.js';
 import { makeUral, URAL_BED, URAL_LAMPS, TRUCK_SIZE } from '../world/vehicles.js';
 import { cloneModel } from '../world/models.js';
@@ -476,8 +477,7 @@ class SupplyDrop {
       grp.lookAt(pl.x + pl.vx, pl.y, pl.z + pl.vz);
       grp.updateMatrixWorld();
       for (const pr of E.c130.props) pr.rotation.z += dt * 40;
-      _v.copy(E.c130.lights.port).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3, 7, 0.4, 0.25, 0.05);
-      _v.copy(E.c130.lights.stbd).applyMatrix4(grp.matrixWorld); fx.glowDot(_v.x, _v.y, _v.z, 3, 0.25, 5.5, 0.9, 0.05);
+      E.c130.nav.update(performance.now() / 1000, g.camera);
       if (!pl.loop && g.audio.ready) pl.loop = g.audio.loop(g.audio.B.prop && g.audio.B.prop[0], { ref: 150, reverb: 0.4 });
       if (pl.loop) pl.loop.update(pl.x, pl.y, pl.z, pl.vx, 0, pl.vz, 3);
       if (this.phase === 'inbound' && pl.z <= this.tz + 85 * 1.2) {
@@ -1308,6 +1308,7 @@ export class NightEvents {
     this.c130 = buildGunship();
     this.c130.group.scale.setScalar(1.5);
     this.c130.group.visible = false;
+    this.c130.nav = new NavLights(this.c130, { lens: 0.13, pool: game.fx.lights, phase: 0.7 });
     scene.add(this.c130.group);
     const crateMat = new THREE.MeshStandardMaterial({ color: 0x4a4f36, roughness: 0.85 });
     const strap = new THREE.MeshStandardMaterial({ color: 0x1c1d18, roughness: 0.9 });
