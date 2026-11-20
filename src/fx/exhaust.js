@@ -3,43 +3,32 @@
 // metres back. One mesh per engine, carried on the aircraft; drawn additively and soft at its
 // edges (brightest where you look through the most of it), with a faint flutter along it.
 import * as THREE from 'three';
+import { Fn, float, uniform, positionLocal, positionWorld, normalWorld, cameraPosition, clamp, pow, abs, dot, normalize, smoothstep, mix, fract, floor, sin } from 'three/tsl';
 
-const VERT = /* glsl */`
-  uniform float uLen;
-  varying float vU;
-  varying vec3 vN;
-  varying vec3 vV;
-  void main() {
-    vU = clamp(-position.z / uLen, 0.0, 1.0);
-    vec4 wp = modelMatrix * vec4(position, 1.0);
-    vN = normalize(transpose(inverse(mat3(modelMatrix))) * normal); // (the flame is squashed: a true normal matrix)
-    vV = normalize(cameraPosition - wp.xyz);
-    gl_Position = projectionMatrix * viewMatrix * wp;
-  }
-`;
-const FRAG = /* glsl */`
-  uniform float uK;
-  uniform float uTime;
-  uniform float uSeed;
-  uniform vec3 uCore;
-  uniform vec3 uBody;
-  varying float vU;
-  varying vec3 vN;
-  varying vec3 vV;
-  float h(float x) { return fract(sin(x * 91.7 + uSeed * 13.1) * 43758.5); }
-  float n1(float x) { float i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f); return mix(h(i), h(i + 1.0), f); }
-  void main() {
-    float u = vU;
+// (WebGPU: the WebGL build's GLSL ported to TSL, the same maths. normalWorld is the true normal
+// matrix the GLSL built by hand for the squashed flame.)
+const h = (x, seed) => fract(sin(x.mul(91.7).add(seed.mul(13.1))).mul(43758.5));
+const n1 = (x, seed) => {
+  const i = floor(x), f0 = fract(x);
+  const f = f0.mul(f0).mul(float(3).sub(f0.mul(2)));
+  return mix(h(i, seed), h(i.add(1), seed), f);
+};
+function flameMaterial(u) {
+  const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false });
+  mat.uniforms = u;
+  mat.colorNode = Fn(() => {
+    const uu = clamp(positionLocal.z.negate().div(u.uLen), 0, 1);
     // soft edges: through the middle of the flame there is more of it to see
-    float thick = pow(abs(dot(normalize(vN), normalize(vV))), 2.4);
+    const thick = pow(abs(dot(normalize(normalWorld), normalize(cameraPosition.sub(positionWorld)))), 2.4);
     // fading down its length, with a flutter running back along it
-    float fall = pow(1.0 - u, 1.7) * smoothstep(0.0, 0.04, u + 0.02);
-    float flut = 0.82 + 0.18 * n1(u * 9.0 - uTime * 38.0) + 0.06 * n1(uTime * 21.0);
+    const fall = pow(float(1).sub(uu), 1.7).mul(smoothstep(0, 0.04, uu.add(0.02)));
+    const flut = float(0.82).add(n1(uu.mul(9).sub(u.uTime.mul(38)), u.uSeed).mul(0.18)).add(n1(u.uTime.mul(21), u.uSeed).mul(0.06));
     // the colour: white-hot blue at the nozzle, cooling to deep blue
-    vec3 col = mix(uBody, uCore, pow(1.0 - u, 5.0));
-    gl_FragColor = vec4(col * fall * thick * flut * uK, 1.0);
-  }
-`;
+    const col = mix(u.uBody, u.uCore, pow(float(1).sub(uu), 5));
+    return col.mul(fall).mul(thick).mul(flut).mul(u.uK);
+  })();
+  return mat;
+}
 
 /**
  * Exhaust flames for an aircraft's engines.
@@ -54,13 +43,9 @@ export class Exhaust {
     this.flames = [];
     const mk = (L, r0, r1, coreCol, bodyCol, k, seed) => {
       const geo = new THREE.CylinderGeometry(r1, r0, L, 20, 8, true).rotateX(-Math.PI / 2).translate(0, 0, -L / 2);
-      const mat = new THREE.ShaderMaterial({
-        uniforms: {
-          uLen: { value: L }, uK: { value: 0 }, uTime: { value: 0 }, uSeed: { value: seed },
-          uCore: { value: coreCol }, uBody: { value: bodyCol },
-        },
-        vertexShader: VERT, fragmentShader: FRAG,
-        transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false,
+      const mat = flameMaterial({
+        uLen: uniform(L), uK: uniform(0), uTime: uniform(0), uSeed: uniform(seed),
+        uCore: uniform(coreCol), uBody: uniform(bodyCol),
       });
       const m = new THREE.Mesh(geo, mat);
       m.renderOrder = 6;
