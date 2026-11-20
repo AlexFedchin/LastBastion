@@ -20,7 +20,7 @@ import { GUNSHIP, WORLD } from '../config.js';
 /** The new take is in use (its tails are the developer's own valley). */
 const set2 = (a) => a.gunSet() === 'hmg2';
 const SFX = {
-  hmg: [4, 44100], hmg_tail: [2, 32000], hmg2: [4, 44100], hmg2_tail: [2, 32000], mg: [5, 32000], casing: [6, 44100],
+  hmg: [4, 44100], hmg_tail: [2, 32000], hmg2: [4, 44100], hmg2_tail: [2, 32000], hmg3: [0, 44100], mg: [5, 32000], casing: [6, 44100],
   boom: [5, 44100], boom_far: [3, 22050], boom_sub: [0, 22050], mortar: [3, 44100], incoming: [5, 32000], shell_in: [0, 44100],
   molotov: [4, 44100], molotov_light: [0, 44100], molotov_flight: [0, 32000], ignite: [0, 32000], burn: [12, 32000], flesh: [5, 32000], headshot: [3, 32000], gib: [4, 32000], bloater: [0, 32000],
   acid: [0, 32000], bodyfall: [0, 32000], groan: [27, 32000], brute: [5, 32000], shriek: [3, 32000],
@@ -482,8 +482,12 @@ export class AudioEngine {
     return { src, gain: g };
   }
 
-  /** Which M2 recording the gun uses (Settings → MACHINE GUN): 'hmg2' (new, default) or 'hmg' (classic). */
-  gunSet() { return this.settings.gunSound === 'classic' || !this.B.hmg2 ? 'hmg' : 'hmg2'; }
+  /** Which M2 recording the gun uses (Settings → MACHINE GUN): 'hmg2' (new, default), 'hmg' (classic) or 'hmg3' (raw: the developer's take untouched). */
+  gunSet() {
+    const g = this.settings.gunSound;
+    if (g === 'raw' && this.B.hmg3 && this.B.hmg3[0]) return 'hmg3';
+    return g === 'classic' || !this.B.hmg2 ? 'hmg' : 'hmg2';
+  }
 
   setListener(x, z, yaw, y) { this.listenerX = x; this.listenerZ = z; this.listenerYaw = yaw; if (y !== undefined) this.listenerY = y; }
 
@@ -585,6 +589,15 @@ export class AudioEngine {
     const pan = rand(-0.04, 0.04);
     // recorded report through the heavy chain
     const set = this.gunSet();
+    // raw: the developer's recording as it is, the whole of it each round, nothing added or shaped
+    // (only the round before is cut off as this one fires; the last of a burst rings out to its end)
+    if (set === 'hmg3') {
+      // (on the plain effects bus: not through the gun bus's EQ, saturation, squeeze and reverb)
+      const r = this.play(this.B.hmg3[0], { gain: 0.8, pan: 0, force: true });
+      this._hmgVoices = [r];
+      this._hmgLast = t;
+      return;
+    }
     // the new take is mastered tighter (less bloom): lifted so its attack lands as hard as the classic's
     const report = this.play(this.pickVar(set), { gain: set === 'hmg2' ? 1.24 : 0.95, rate: rand(0.97, 1.03), pan, reverb: 0.2, bus: 'hmg', force: true });
     // the recorded slices hold their level for ~150 ms (they're cut from continuous

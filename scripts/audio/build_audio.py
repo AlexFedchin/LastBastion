@@ -321,6 +321,9 @@ for k, (rate, fo) in enumerate([(1.0, 0.35), (0.965, 0.3), (1.035, 0.38), (0.985
         dict(src=CRACK, ss=0.0154, t=0.25, rate=rate, hp=1500, vol=-6, fo=0.1, delay=0.007),
     ], sr=44100, ch=2, target=-11, limit=5, q=6)
 clip('sfx/hmg2_tail_1', U50, 0.3, 3.0, ch=2, fi=0.04, fo=1.6, hp=70, target=-24, sr=32000)
+# take three (2026-11-20): the same recording raw, the whole file (the shot and its valley tail), only
+# level-matched to the others (limit=0: the gain stops short of the limiter, so nothing touches it)
+clip('sfx/hmg3', U50, 0.0, 3.744, ch=2, sr=44100, fo=0.02, target=-11, limit=0, q=6)
 clip('sfx/hmg2_tail_2', U50, 0.42, 2.8, ch=2, fi=0.04, fo=1.5, hp=70, lp=2500, rate=0.94, target=-24, sr=32000)
 
 # the developer's own (2026-11-20, SFX/): the M2 being charged, and a round ringing off steel
