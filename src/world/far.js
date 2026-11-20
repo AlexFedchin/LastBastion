@@ -363,8 +363,8 @@ function buildRanges(env, rng) {
     g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     g.setIndex(idx);
     g.computeVertexNormals();
-    const mm = new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: 1, side: THREE.DoubleSide });
-    fogMaterial(mm, { scale: 0.42 });
+    const mm = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 1, side: THREE.DoubleSide });
+    farFog(mm, L.fog);
     const mtn = new THREE.Mesh(g, mm);
     mtn.frustumCulled = false;
     scene.add(mtn);
@@ -454,7 +454,7 @@ function buildRanges(env, rng) {
 
 /** The atmosphere's haze on a far material, thinned by `scale` (the far things would be lost in it). */
 function farFog(mat, scale) {
-  mat.defines = { ...(mat.defines || {}), LB_FOG_SCALE: String(scale) };
+  fogMaterial(mat, { scale });
 }
 
 // ── the burning city ────────────────────────────────────────────────────────
@@ -648,7 +648,7 @@ function buildCity(env, rng) {
   cg.setAttribute('aBld', new THREE.BufferAttribute(Bd, 1));
   cg.setAttribute('color', new THREE.BufferAttribute(Cl, 3));
   cg.computeBoundingSphere();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x24221f, roughness: 0.9, metalness: 0.1, emissive: 0xffffff });
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.9, metalness: 0.1, emissive: 0xffffff });
   fogMaterial(mat, { scale: 0.5 });
   env.cityUniforms = { uTime: uniform(0), uDawn: uniform(0), uBurn: uniform(1) };
   mat.emissiveNode = cityEmissive(env.cityUniforms);
