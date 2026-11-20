@@ -11,6 +11,7 @@
 // The strobe double-flashes the way the real ones do and, near the camera, lights the airframe
 // for the length of the flash (a light from the effects pool).
 import * as THREE from 'three';
+import { fogMaterial } from '../render/atmosphere.js';
 
 const COLOR = {
   red: new THREE.Color(1, 0.05, 0.025),
@@ -79,7 +80,7 @@ export class NavLights {
     lens.renderOrder = 6; // (no depth of its own: its glint sits at its centre and must show through it)
     lens.position.copy(at);
     const m = new THREE.SpriteMaterial({ map: glow(), color: 0x000000, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: false });
-    m.defines = { LB_FOG_ADD: '' }; // (additive: the fog takes it away rather than tinting it)
+    fogMaterial(m, { add: true }); // (additive: the fog takes it away rather than tinting it)
     const sp = new THREE.Sprite(m);
     sp.position.copy(at);
     sp.renderOrder = 7;
