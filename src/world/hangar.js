@@ -141,6 +141,7 @@ export class Hangar {
     if (this.built) return;
     this.built = true;
     const scene = this.scene = new THREE.Scene();
+    if (this.g.renderer.asyncScenes) this.g.renderer.asyncScenes.add(scene); // (see render/three-shim.js)
     scene.background = new THREE.Color(0x0b0a09);
     scene.fog = new THREE.FogExp2(0x1d1a17, 0.012);
     const cam = this.camera = new THREE.PerspectiveCamera(50, 16 / 9, 0.05, 400);
@@ -704,6 +705,9 @@ export class Hangar {
   // ── the duty board: last night's numbers in chalk ─────────────────────────────
   buildBoard() {
     const c = this.boardCanvas = document.createElement('canvas'); c.width = 1536; c.height = 900;
+    // (blank slate till the hangar opens: a canvas never drawn on can't be uploaded, and the hall is
+    // drawn once under the first loader, before anything is written on the board)
+    { const x = c.getContext('2d'); x.fillStyle = '#1d211d'; x.fillRect(0, 0, c.width, c.height); }
     const t = this.boardTex = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
     const g = new THREE.Group();
     const face = new THREE.Mesh(new THREE.PlaneGeometry(3.3, 1.93), new THREE.MeshStandardMaterial({ map: t, roughness: 0.95 }));

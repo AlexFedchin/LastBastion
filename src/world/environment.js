@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { WORLD, wallZ } from '../config.js';
 import { Soldier } from '../game/soldier.js';
 import { modelScene } from './models.js';
+import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 
 // scans whose albedo is too clean for a sooty, rain-soaked base: darkened in place
 const KIT_TINT = { barrier: 0.55, barrierTall: 0.55, cement: 0.7, foodCans: 0.8, rations: 0.8 };
@@ -198,29 +199,67 @@ export class Environment {
         list.forEach((mm, j) => im.setMatrixAt(j, m.multiplyMatrices(mm, o.matrixWorld)));
         im.castShadow = cast; im.receiveShadow = true;
         im.computeBoundingSphere();
+        im.matrixAutoUpdate = false; // (fixed in place: no matrix to recompose every frame)
         im.name = 'kit/' + name;
         this.scene.add(im);
       });
     }
-    // whole models: one instanced mesh per mesh of the model (vehicles keep their part nodes)
+    // whole models: one instanced mesh per material of the model (vehicles keep their part nodes).
+    // The model's meshes that share a material are merged first: the church came as 49 meshes in
+    // 5 materials, the house 43 in 4, and every one of them was a draw in the view and in each
+    // searchlight's shadow map, ~300 of a night's ~700 draws
     for (const { name, skip, tint, swap, node, cast, matte, list, mat: own } of this.placed.values()) {
       const src = modelScene(name);
       src.updateMatrixWorld(true);
+      const groups = new Map(); // source material + vertex layout -> meshes
+      let order = 0;
       src.traverse((o) => {
         if (!o.isMesh) return;
         for (let p = o; p; p = p.parent) if (skip && p.name === skip) return;
         if (node) { let p = o; while (p && p.name !== node) p = p.parent; if (!p) return; }
-        let mat = own || (swap && swap[o.material.name]) || o.material;
+        const base = own || (swap && swap[o.material.name]) || o.material;
+        const g = o.geometry;
+        const layout = Object.keys(g.attributes).sort().join(',') + (g.index ? '|i' : '') + (Object.keys(g.morphAttributes).length ? '|m' + g.uuid : '');
+        const key = base.uuid + '|' + layout;
+        if (!groups.has(key)) groups.set(key, { base, src: o.material, meshes: [], last: 0 });
+        const gr = groups.get(key);
+        gr.meshes.push(o);
+        gr.last = order++;
+      });
+      // Layers that lie on each other (the house's red roof over the charred one the burnt houses
+      // show) are settled by draw order, and three orders opaque draws by distance, then by when
+      // the mesh was made. So the parts are made in the order of their last mesh in the model and
+      // share one bounding sphere (one distance): the later layer draws last and wins, as it did
+      // when every mesh of the model was its own draw.
+      // and when any part is merged every part is baked the same way, so layers that coincide
+      // still come out at the same depth (a part placed by its node's matrix on the GPU rounds
+      // differently from one baked into the model on the CPU)
+      const made = [];
+      const bake = [...groups.values()].some((gr) => gr.meshes.length > 1);
+      for (const { base, src: srcMat, meshes } of [...groups.values()].sort((a, b) => a.last - b.last)) {
+        let mat = base;
         if (tint != null) { mat = mat.clone(); mat.color.multiply(new THREE.Color(tint)); }
         // matte: bare stone, no sheen (the pack's rocks come in with a gloss)
-        if (matte) { if (mat === o.material) mat = mat.clone(); mat.roughness = 1; mat.roughnessMap = null; mat.metalness = 0; mat.metalnessMap = null; mat.envMapIntensity = 0.6; }
-        const im = new THREE.InstancedMesh(o.geometry, mat, list.length);
-        list.forEach((mm, j) => im.setMatrixAt(j, m.multiplyMatrices(mm, o.matrixWorld)));
-        im.castShadow = cast; im.receiveShadow = true;
-        im.computeBoundingSphere();
-        im.name = node ? name + '/' + node : name;
-        this.scene.add(im);
-      });
+        if (matte) { if (mat === srcMat) mat = mat.clone(); mat.roughness = 1; mat.roughnessMap = null; mat.metalness = 0; mat.metalnessMap = null; mat.envMapIntensity = 0.6; }
+        const merged = meshes.length > 1 || bake ? mergeInModel(meshes) : null;
+        // (a merged geometry is in the model's space already; a lone mesh keeps its node's matrix)
+        const parts = merged ? [[merged, null]] : meshes.map((o) => [o.geometry, o.matrixWorld]);
+        for (const [geo, local] of parts) {
+          const im = new THREE.InstancedMesh(geo, mat, list.length);
+          list.forEach((mm, j) => im.setMatrixAt(j, local ? m.multiplyMatrices(mm, local) : mm));
+          im.castShadow = cast; im.receiveShadow = true;
+          im.computeBoundingSphere();
+          im.matrixAutoUpdate = false;
+          im.name = node ? name + '/' + node : name;
+          this.scene.add(im);
+          made.push(im);
+        }
+      }
+      if (made.length > 1) {
+        const all = made[0].boundingSphere.clone();
+        for (const im of made) all.union(im.boundingSphere);
+        for (const im of made) im.boundingSphere = all.clone();
+      }
     }
   }
 
@@ -579,3 +618,30 @@ const _duskV = new THREE.Vector3();
 
 /** Small seeded RNG for placement. */
 function makeRngLocal(seed) { let a = seed >>> 0; return () => { a = (a + 0x6d2b79f5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; }
+
+/**
+ * One geometry of several meshes of a model (all in one material), each baked into the model's
+ * space by its node's matrix. The attributes come out as plain floats (a meshopt model's are
+ * often quantized or interleaved, which a matrix can't be applied to). null if they don't merge.
+ */
+function mergeInModel(meshes) {
+  try {
+    const geos = meshes.map((o) => {
+      const src = o.geometry, g = new THREE.BufferGeometry();
+      for (const [k, a] of Object.entries(src.attributes)) {
+        const n = a.count, sz = a.itemSize, arr = new Float32Array(n * sz);
+        for (let i = 0; i < n; i++) for (let c = 0; c < sz; c++) arr[i * sz + c] = a.getComponent(i, c);
+        g.setAttribute(k, new THREE.BufferAttribute(arr, sz));
+      }
+      if (src.index) g.setIndex(new THREE.BufferAttribute(Uint32Array.from(src.index.array), 1));
+      g.applyMatrix4(o.matrixWorld);
+      return g;
+    });
+    const out = mergeGeometries(geos, false);
+    for (const g of geos) g.dispose();
+    return out || null;
+  } catch (err) {
+    console.warn('[models] merge failed', err);
+    return null;
+  }
+}

@@ -81,6 +81,9 @@ export function modelMesh(name, node = null) {
   return found;
 }
 
+/** Names of every model loaded (for warming their shaders before they're first seen). */
+export function modelNames() { return Object.keys(scenes); }
+
 export function cloneModel(name) {
   const src = scenes[name];
   if (!src) throw new Error(`model ${name} not loaded`);

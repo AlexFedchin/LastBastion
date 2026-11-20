@@ -84,3 +84,57 @@ export const UniformsLib = {};
 // ?nodetrace: node errors carry the stack of where the node was made (debugging the TSL ports)
 if (typeof location !== 'undefined' && /[?&]nodetrace/.test(location.search)) W.Node.captureStackTrace = true;
 if (typeof window !== 'undefined' && typeof location !== 'undefined' && /[?&]test/.test(location.search)) { window.__TSL = T; window.__THREE = W; }
+
+// Pipelines compile in the background. three creates a render pipeline the first time it draws
+// something new (a helicopter coming into view, a light added to the night, the shadow pass of a
+// new prop) with the synchronous createRenderPipeline; the D3D12 compile behind it then stalls
+// the next frame, for a third of a second per material and for many seconds when a lot change at
+// once. Here every pipeline the render path asks for is made with createRenderPipelineAsync: the
+// object isn't drawn until its pipeline is ready (a frame or a few later), and the game runs on.
+// Only the game's own scenes (renderer.asyncScenes: the night, the hangar) are compiled like this:
+// a render that has to be whole the first time, like three's PMREM baking an environment map
+// once, stays synchronous (async, it baked a black map: no sky in any reflection), and so do
+// full-screen passes (the post chain), so a frame never comes out without them.
+// renderer.pipelinesSettled() resolves once everything asked for so far is ready (loading screens
+// wait on it).
+export function asyncPipelines(renderer) {
+  const pu = renderer.backend && renderer.backend.pipelineUtils;
+  const pending = new Map(); // promise -> [what, since]
+  renderer.asyncScenes = new Set();
+  renderer.pipelinesSettled = () => Promise.all([...pending.keys()]);
+  renderer.pipelinesPending = () => pending.size;
+  renderer.pipelinesPendingList = () => [...pending.values()].map(([w, t]) => `${w} ${((performance.now() - t) / 1000).toFixed(1)}s`);
+  // compileAsync builds each material's shader in steps, yielding to the main thread between
+  // them, and the game's frames run in the gaps: a texture changing state meanwhile (an upload
+  // finishing) gave the grenade a shader declaring a sampler its bind group didn't have, a pipeline
+  // that never compiled and a grenade never drawn. Built in one go here instead (it's under a
+  // loading screen anyway).
+  const nodes = renderer._nodes;
+  if (nodes && typeof nodes.getForRenderAsync === 'function') {
+    nodes.getForRenderAsync = function (renderObject) { return Promise.resolve(this.getForRender(renderObject)); };
+  }
+  if (!pu || typeof pu.createRenderPipeline !== 'function') return; // the WebGL2 fallback
+  const create = pu.createRenderPipeline, backend = renderer.backend;
+  // a pipeline that fails to compile (rarely, a bind group layout raced by a background compile)
+  // is tried again a couple of times rather than leaving whatever shares it undrawn for good
+  const attempt = (renderObject, tries, out = null) => {
+    const pipe = renderObject.pipeline, list = [];
+    create.call(pu, renderObject, list);
+    for (const p of list) {
+      const m = renderObject.material, o = renderObject.object;
+      pending.set(p, [`${m && m.type}:${m && m.name} / ${o && o.type}:${o && o.name}`, performance.now()]);
+      if (out) out.push(p);
+      p.then(() => {
+        pending.delete(p);
+        const d = backend.get(pipe);
+        if (!d.error || tries >= 2 || renderObject.pipeline !== pipe) return;
+        d.error = false;
+        setTimeout(() => { try { if (renderObject.pipeline === pipe) attempt(renderObject, tries + 1); } catch { /* disposed */ } }, 100);
+      });
+    }
+  };
+  pu.createRenderPipeline = function (renderObject, promises) {
+    if (!promises && ((renderObject.object && renderObject.object.isQuadMesh) || !renderer.asyncScenes.has(renderObject.scene))) return create.call(this, renderObject, promises);
+    attempt(renderObject, 0, promises); // (compileAsync passes its list and waits on it)
+  };
+}

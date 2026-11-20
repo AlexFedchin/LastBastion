@@ -259,6 +259,10 @@ export class Post {
   }
 
   render(dt, time) {
+    // a frame always goes to the canvas: a background compile for the scene pass (main.js
+    // compileScene) leaves the renderer pointed at that pass's target between its steps
+    this.renderer.setRenderTarget(null);
+    this.renderer.setMRT(null);
     this.u.uTime.value = time;
     if (this.vol) this.vol.update(time);
     this.pipeline.render();

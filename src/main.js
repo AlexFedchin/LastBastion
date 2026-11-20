@@ -28,7 +28,7 @@ import { HUD } from './ui/hud.js';
 import { Screens } from './ui/screens.js';
 import { NightCard } from './ui/nightcard.js';
 import { Loader } from './ui/loader.js';
-import { loadModels, modelMesh, zombieAnimData } from './world/models.js';
+import { loadModels, modelMesh, zombieAnimData, modelNames, cloneModel } from './world/models.js';
 import { zombieSkin } from './game/zombieSkin.js';
 import { loadTextures } from './world/texlib.js';
 import { setSoldierLamps, setSoldierClock } from './game/soldier.js';
@@ -88,6 +88,7 @@ class Game {
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.quality.pixelRatio));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
     await renderer.init();
+    THREE.asyncPipelines(renderer); // new pipelines compile in the background (render/three-shim.js)
     console.info(`[render] ${renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL2 fallback'}`);
     renderer.toneMapping = THREE.NoToneMapping;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -96,6 +97,7 @@ class Game {
     this.renderer = renderer;
 
     this.scene = new THREE.Scene();
+    if (renderer.asyncScenes) renderer.asyncScenes.add(this.scene);
     this.camera = new THREE.PerspectiveCamera(this.settings.fov, window.innerWidth / window.innerHeight, 0.1, 3200);
 
     await texturesLoaded;
@@ -170,8 +172,9 @@ class Game {
     this.horde.update(0.016, 0);
     this.horde.syncRender();
     this.updateMenuCamera(0);
-    await renderer.compileAsync(this.scene, this.camera);
+    await this.compileScene(this.scene, this.camera);
     this.post.render(0.016, 0);
+    await this.pipelinesSettled();
 
     // first launch: measure this machine and pick the graphics preset
     await this.autoQuality(step);
@@ -310,6 +313,8 @@ class Game {
       this.loader.step('manning the wall…', 0.8);
       while (performance.now() - t0 < 1500) await nextFrame();
       begin();
+      // the night's own set-up changes a few materials: their shaders too, before the loader lifts
+      await this.precompile();
       this.loader.step('stand to', 1);
       await nextFrame();
       this.loader.hide();
@@ -320,30 +325,101 @@ class Game {
 
   /** Compile the shaders of everything not on screen yet (giants, aircraft, people, props). */
   async precompile() {
-    const hidden = [];
-    this.scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
+    // a copy of every model, so the props, aircraft and people an event brings in later don't
+    // build their shaders the moment they first come into view (a hitch of ~20 ms a material)
+    if (!this.warmModels) {
+      const g = this.warmModels = new THREE.Group();
+      g.name = 'warm-models';
+      for (const name of modelNames()) {
+        if (name === 'hangar' || name === 'zombie') continue; // the hall is its own scene; the dead have their own material
+        const m = cloneModel(name);
+        m.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.frustumCulled = false; } });
+        g.add(m);
+      }
+    }
+    this.scene.add(this.warmModels);
+    await this.warmScene(this.scene, this.camera);
+    this.scene.remove(this.warmModels);
+    // the dawn resupply's hall: built and compiled under the first loader rather than at the
+    // first dawn (a second's stall on the way in)
+    if (!this.hangar.built) {
+      try { this.hangar.build(); } catch (err) { console.warn('[precompile] hangar', err); }
+      if (this.hangar.built && this.hangar.scene) await this.warmScene(this.hangar.scene, this.hangar.camera);
+    }
+    // that frame's pipelines compile in the background: the loader stays up until they're in
+    await this.pipelinesSettled();
+  }
+
+  /**
+   * Build the shaders of everything in `scene`, hidden or not, on camera or not: compile it for
+   * the scene pass, upload its textures, and draw one frame of it through the post chain with
+   * everything showing and nothing culled (that builds the shadow-pass shaders too). Compiling
+   * only takes what the camera sees, so a prop behind the gun built its shaders when the player
+   * turned round to it. (Call it under a loading screen: the frame goes to the canvas.)
+   */
+  async warmScene(scene, camera) {
+    const hidden = [], culled = [], lit = new Set(), dark = [];
+    scene.traverseVisible((o) => { if (o.isLight) lit.add(o); });
+    scene.traverse((o) => {
+      if (!o.visible) { hidden.push(o); o.visible = true; }
+      if (o.frustumCulled) { culled.push(o); o.frustumCulled = false; }
+    });
+    // but the lights stay as they are: the set of lights is part of every shader's key, and a light
+    // in a hidden group showing for this frame would build every shader for a night that never is
+    scene.traverse((o) => { if (o.isLight && o.visible && !lit.has(o)) { dark.push(o); o.visible = false; } });
+    const sp = this.post.scenePass, prevScene = sp.scene, prevCam = sp.camera;
     try {
-      await this.renderer.compileAsync(this.scene, this.camera);
-      // compiling doesn't upload textures or build the shadow-pass shaders: the first sight of
-      // a helicopter or a bomber still hitched for a third of a second. Upload every texture
-      // now, and draw one frame offscreen with everything showing and nothing culled.
+      await this.compileScene(scene, camera);
       const seen = new Set();
-      this.scene.traverse((o) => {
+      scene.traverse((o) => {
         if (!o.material) return;
         for (const m of Array.isArray(o.material) ? o.material : [o.material]) {
-          for (const k in m) { const v = m[k]; if (v && v.isTexture && !seen.has(v)) { seen.add(v); this.renderer.initTexture(v); } }
+          for (const k in m) {
+            const v = m[k];
+            if (!v || !v.isTexture || seen.has(v)) continue;
+            seen.add(v);
+            // (an image still loading uploads when it comes in, and a canvas when it's drawn on:
+            // the hangar's board, blank till the hangar opens, only failed to upload here)
+            const img = v.image;
+            if (img && (img.complete === false || (typeof HTMLCanvasElement !== 'undefined' && img instanceof HTMLCanvasElement))) continue;
+            this.renderer.initTexture(v);
+          }
         }
       });
-      const culled = [];
-      for (const h of hidden) h.traverse((o) => { if (o.frustumCulled) { culled.push(o); o.frustumCulled = false; } });
-      const rt = this.warmRT || (this.warmRT = new THREE.RenderTarget(64, 64, { type: THREE.HalfFloatType }));
-      const prev = this.renderer.getRenderTarget();
-      this.renderer.setRenderTarget(rt);
-      this.renderer.render(this.scene, this.camera);
-      this.renderer.setRenderTarget(prev);
-      for (const o of culled) o.frustumCulled = true;
+      sp.scene = scene; sp.camera = camera;
+      this.post.render(1 / 60, this.time);
     } catch (err) { console.warn('[precompile]', err); }
+    sp.scene = prevScene; sp.camera = prevCam;
+    for (const o of dark) o.visible = true;
+    for (const o of culled) o.frustumCulled = true;
     for (const o of hidden) o.visible = false;
+  }
+
+  /**
+   * Compile a scene's shaders for the post chain's scene pass: its render target and outputs are
+   * part of every shader's key, so compiling for the canvas built shaders no frame ever used.
+   * (PassNode.compileAsync leaves the renderer pointed at the pass until the compile is done, and
+   * the game's frames go on meanwhile; three takes the target when the compile starts, so it is
+   * set back straight away here.)
+   */
+  compileScene(scene, camera) {
+    const r = this.renderer, sp = this.post.scenePass;
+    const prevRT = r.getRenderTarget(), prevMRT = r.getMRT(), prevCtx = r.contextNode;
+    sp.renderTarget.samples = sp.options.samples === undefined ? r.samples : sp.options.samples;
+    const size = r.getDrawingBufferSize(new THREE.Vector2());
+    sp.setSize(size.width, size.height);
+    r.setRenderTarget(sp.renderTarget);
+    r.setMRT(sp._mrt);
+    if (sp.contextNode !== null) r.contextNode = sp._getContextNode(r);
+    let done;
+    try { done = r.compileAsync(scene, camera); } finally { r.setRenderTarget(prevRT); r.setMRT(prevMRT); r.contextNode = prevCtx; }
+    return done;
+  }
+
+  /** Wait (at most `maxMs`) for every pipeline asked for so far to finish compiling. */
+  async pipelinesSettled(maxMs = 30000) {
+    if (!this.renderer.pipelinesSettled) return;
+    await Promise.race([this.renderer.pipelinesSettled(), new Promise((r) => setTimeout(r, maxMs))]);
   }
 
   applyPlayerSettings() {
@@ -846,7 +922,7 @@ class Game {
     this.hud.show(false);
     const first = !this.hangar.built;
     this.hangar.enter(this.run, this.report);
-    if (first) this.renderer.compileAsync(this.hangar.scene, this.hangar.camera).catch(() => {});
+    if (first) this.compileScene(this.hangar.scene, this.hangar.camera).catch(() => {});
     this.screens.buildShop(this.run, this.report);
     this.screens.show('shop');
   }
@@ -915,7 +991,10 @@ class Game {
       document.getElementById('s-shop')?.classList.remove('leaving');
       this.fromCard = true;
       this.startNight();
-      await wait(3200);
+      // under the card: anything the night brings that hasn't had its shaders built yet
+      const t0 = performance.now();
+      await this.precompile();
+      await wait(Math.max(0, 3200 - (performance.now() - t0)));
       await this.nightCard.hide();
     } finally {
       this.fromCard = false;

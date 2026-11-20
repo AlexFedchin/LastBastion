@@ -41,7 +41,9 @@ export function setLamps(pos, aim, scene) {
 export function setLampPower(k) {
   if (k === power) return;
   power = k;
-  for (const s of lights) if (s) { s.intensity = LAMP_I * k; s.visible = k > 0.001; }
+  // (never hidden: a light leaving the scene's set of lights rebuilds every lit material's shader,
+  // seconds of stall on the blackout and at dawn; a dark light costs nothing, see three-shim.js)
+  for (const s of lights) if (s) s.intensity = LAMP_I * k;
 }
 
 /** Kept for the callers: the lamps light every material by themselves now. */
