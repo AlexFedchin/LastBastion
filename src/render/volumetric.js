@@ -50,6 +50,10 @@ export const VOL = {
   src1: uniform(new THREE.Vector3(77, 17, 0)),
 };
 const NEAR = 40;
+// the box of air: the field and the slopes either side, the bastion and the base behind it;
+// the scattering fades to nothing over the last EDGE metres to each side (and toward the top)
+const BOX = { w: 560, h: 110, d: 520, y: 45, z: -130 };
+const EDGE = 110;
 
 /**
  * Build the volumetric pass for `scene` seen by `camera`, using `scenePass`'s depth.
@@ -73,12 +77,18 @@ export function volumetricPass(scene, camera, scenePass, quality, renderer = nul
     const low = exp(positionRay.y.mul(-0.04));
     const dl = min(distance(positionRay, VOL.src0), distance(positionRay, VOL.src1));
     const near = pow(clamp(dl.div(NEAR), 0.02, 1), 1.15);
-    return mist.mul(0.9).add(0.55).mul(0.35).mul(low).add(rain.mul(0.35)).mul(VOL.density).mul(near);
+    // the air thins out toward every side of its box, so from high up (the bomber's wingtip)
+    // there is no wall or lid to see, only mist that fades away over the hills
+    const ex = positionRay.x.abs(), ez = positionRay.z.sub(BOX.z).abs();
+    const fade = smoothstep(BOX.w * 0.5, BOX.w * 0.5 - EDGE, ex)
+      .mul(smoothstep(BOX.d * 0.5, BOX.d * 0.5 - EDGE, ez))
+      .mul(smoothstep(BOX.y + BOX.h * 0.5, BOX.y + BOX.h * 0.5 - 45, positionRay.y));
+    return mist.mul(0.9).add(0.55).mul(0.35).mul(low).add(rain.mul(0.35)).mul(VOL.density).mul(near).mul(fade);
   });
   mat.depthNode = scenePass.getTextureNode('depth').sample(screenUV);
   // the field in front of the wall, out past where the beams reach
-  const box = new THREE.Mesh(new THREE.BoxGeometry(380, 80, 320), mat);
-  box.position.set(0, 34, -150);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(BOX.w, BOX.h, BOX.d), mat);
+  box.position.set(0, BOX.y, BOX.z);
   box.receiveShadow = true;
   box.frustumCulled = false;
   box.layers.disableAll();
