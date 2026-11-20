@@ -1,12 +1,12 @@
 // Volumetric searchlights: the beams are light scattered by the rain and mist in the air,
-// ray-marched through a box over the field and lit by the searchlights' own spot lights,
+// ray-marched through a box round the camera and lit by the searchlights' own spot lights,
 // shadow maps included (the wall, the dead and the wrecks cut dark shafts through them).
 //
 // Drawn in its own pass at a fraction of the resolution (scene depth stops the march at
 // whatever is in front), blurred, and added to the HDR scene before bloom (post.js).
 // The spot lights that light it are tagged by environment.js (layer VOL_LAYER).
 import * as THREE from 'three';
-import { Fn, vec3, uniform, pass, screenUV, screenCoordinate, texture3D, smoothstep, exp, min, pow, clamp, distance } from 'three/tsl';
+import { Fn, vec3, uniform, pass, screenUV, screenCoordinate, texture3D, smoothstep, exp, min, pow, clamp, distance, cameraPosition } from 'three/tsl';
 import { bayer16 } from 'three/examples/jsm/tsl/math/Bayer.js';
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js';
 import { ImprovedNoise } from 'three/examples/jsm/math/ImprovedNoise.js';
@@ -51,9 +51,18 @@ export const VOL = {
 };
 const NEAR = 40;
 // the box of air: the field and the slopes either side, the bastion and the base behind it;
-// the scattering fades to nothing over the last EDGE metres to each side (and toward the top)
-const BOX = { w: 560, h: 110, d: 520, y: 45, z: -130 };
-const EDGE = 110;
+// The box of air: its floor just under the valley floor, its lid at TOP, well above the highest
+// camera there is (riding with the bombers, ~125 m), and it goes with the camera across the
+// ground, RANGE metres out to each side. So no camera ever sees a lid, and the sides are no wall
+// either: the mist fades out with distance across the ground from the camera over FADE, a circle
+// round wherever the camera is, well inside the box. The mist itself thins with height (low,
+// below).
+// (The march spreads its steps evenly from the camera to the box's far side and drops those
+// behind the scene: a floor deep underground would spend most of them under the field, where the
+// beams are, and the beams would fall between the rest.)
+const FLOOR = -8, TOP = 280;
+const RANGE = 300;
+const FADE = [190, 290];
 
 /**
  * Build the volumetric pass for `scene` seen by `camera`, using `scenePass`'s depth.
@@ -71,24 +80,20 @@ export function volumetricPass(scene, camera, scenePass, quality, renderer = nul
     // rain: thin streaks falling fast through the light
     const fall = vec3(t.mul(0.6), t.mul(9.0), t.mul(0.25));
     const streak = texture3D(nTex, positionRay.add(fall).mul(vec3(0.25, 0.012, 0.25)).mod(1), 0).r;
-    const rain = smoothstep(0.55, 0.85, streak).mul(VOL.rain);
+    const rain = smoothstep(0.55, 0.85, streak).mul(VOL.rain).mul(exp(positionRay.y.max(0).mul(-0.012))); // (thinning with height too)
     // slow drifting mist, heavier near the ground
     const mist = texture3D(nTex, positionRay.mul(0.006).add(vec3(t.mul(0.002), 0, t.mul(0.001))).mod(1), 0).r;
     const low = exp(positionRay.y.mul(-0.04));
     const dl = min(distance(positionRay, VOL.src0), distance(positionRay, VOL.src1));
     const near = pow(clamp(dl.div(NEAR), 0.02, 1), 1.15);
-    // the air thins out toward every side of its box, so from high up (the bomber's wingtip)
-    // there is no wall or lid to see, only mist that fades away over the hills
-    const ex = positionRay.x.abs(), ez = positionRay.z.sub(BOX.z).abs();
-    const fade = smoothstep(BOX.w * 0.5, BOX.w * 0.5 - EDGE, ex)
-      .mul(smoothstep(BOX.d * 0.5, BOX.d * 0.5 - EDGE, ez))
-      .mul(smoothstep(BOX.y + BOX.h * 0.5, BOX.y + BOX.h * 0.5 - 45, positionRay.y));
+    // (1 - smoothstep(near, far): WGSL leaves a smoothstep with its edges reversed undefined)
+    const fade = smoothstep(FADE[0], FADE[1], distance(positionRay.xz, cameraPosition.xz)).oneMinus();
     return mist.mul(0.9).add(0.55).mul(0.35).mul(low).add(rain.mul(0.35)).mul(VOL.density).mul(near).mul(fade);
   });
   mat.depthNode = scenePass.getTextureNode('depth').sample(screenUV);
   // the field in front of the wall, out past where the beams reach
-  const box = new THREE.Mesh(new THREE.BoxGeometry(BOX.w, BOX.h, BOX.d), mat);
-  box.position.set(0, BOX.y, BOX.z);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(RANGE * 2, TOP - FLOOR, RANGE * 2), mat);
+  box.position.y = (TOP + FLOOR) / 2;
   box.receiveShadow = true;
   box.frustumCulled = false;
   box.layers.disableAll();
@@ -120,6 +125,7 @@ export function volumetricPass(scene, camera, scenePass, quality, renderer = nul
       }
       volPass.scene = scenePass.scene;
       volPass.camera = scenePass.camera;
+      box.position.x = scenePass.camera.position.x; box.position.z = scenePass.camera.position.z; // (with the camera, across the ground)
     },
   };
 }
