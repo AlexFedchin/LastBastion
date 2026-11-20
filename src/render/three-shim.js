@@ -83,3 +83,4 @@ export const UniformsLib = {};
 
 // ?nodetrace: node errors carry the stack of where the node was made (debugging the TSL ports)
 if (typeof location !== 'undefined' && /[?&]nodetrace/.test(location.search)) W.Node.captureStackTrace = true;
+if (typeof window !== 'undefined' && typeof location !== 'undefined' && /[?&]test/.test(location.search)) { window.__TSL = T; window.__THREE = W; }

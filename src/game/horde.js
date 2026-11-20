@@ -1,6 +1,7 @@
 // The horde: SoA simulation of thousands of zombies, the pile-up/breach
 // mechanic, hit detection, explosions and the corpse field.
 import * as THREE from 'three';
+import { instanceMatrixNode } from '../render/nodeUtil.js';
 import { Fn, float, vec3, vec4, attribute, instancedBufferAttribute, varyingProperty, cameraProjectionMatrix, cameraViewMatrix, length, max, pow } from 'three/tsl';
 import {
   ZOMBIE_TYPES, ZT, WORLD, wallZ, wallDist, wallFacing, sectionOf, PILE,
@@ -505,7 +506,7 @@ export class Horde {
       this.blobs = new THREE.InstancedMesh(bg, bm, N);
       this.blobs.instanceMatrix = this.eyes.instanceMatrix;
       {
-        const IM = instancedBufferAttribute(this.eyes.instanceMatrix, 'mat4');
+        const IM = instanceMatrixNode(this.eyes.instanceMatrix);
         const corner = attribute('position', 'vec3');
         const vB = varyingProperty('vec2', 'vBlob');
         bm.vertexNode = Fn(() => {

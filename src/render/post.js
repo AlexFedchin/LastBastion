@@ -76,15 +76,16 @@ export class Post {
     };
     // the volumetric searchlights (volumetric.js) are added to the scene before anything else
     this.vol = volumetricPass(scene, camera, this.scenePass, quality, renderer);
-    const hdr = Fn(([uvS]) => {
-      const c = clampHDR(sceneTex.sample(uvS));
-      if (!this.vol) return c;
-      // the lit air, compressed at the top (a beam swinging across the lens glows, it doesn't
-      // white out the frame): dim beams stay linear, the core rolls off
+    // the lit air, compressed at the top (a beam swinging across the lens glows, it doesn't white
+    // out the frame): dim beams stay linear, the core rolls off towards 0.15. It is kept out of the
+    // bloom: a beam is already soft, and bloomed it would flood the lens with glare
+    const air = Fn(([uvS]) => {
       const v = this.vol.sample(uvS).rgb;
-      return c.add(v.div(dot(v, vec3(0.3, 0.5, 0.2)).mul(2.2).add(1)));
+      return v.div(dot(v, vec3(0.3, 0.5, 0.2)).mul(6.5).add(1));
     });
-    const bloomIn = Fn(() => vec4(hdr(screenUV), 1))();
+    const sceneHDR = Fn(([uvS]) => clampHDR(sceneTex.sample(uvS)));
+    const hdr = Fn(([uvS]) => (this.vol ? sceneHDR(uvS).add(air(uvS)) : sceneHDR(uvS)));
+    const bloomIn = Fn(() => vec4(sceneHDR(screenUV), 1))();
     this.bloom = bloom(bloomIn, 0.42, 0.22, 1.0);
     // (UnrealBloomPass was sized to bloomScale of the buffer and started its mips at half that)
     this.bloom.setResolutionScale(quality.bloomScale * 0.5);

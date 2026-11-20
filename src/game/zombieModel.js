@@ -10,6 +10,7 @@
 // soldiers, workers and civilians without extra draw calls.
 import * as THREE from 'three';
 import { Fn, If, Discard, float, int, vec2, vec3, vec4, mat3, uniform, attribute, instancedBufferAttribute, varyingProperty, screenCoordinate, normalLocal, normalView, positionViewDirection, modelWorldMatrix, cameraViewMatrix, cameraProjectionMatrix, cameraPosition, mix, smoothstep, clamp, max, min, abs, exp, pow, sin, cos, dot, length, normalize, fract, floor, step, select } from 'three/tsl';
+import { instanceMatrixNode } from '../render/nodeUtil.js';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { lbFog } from '../render/atmosphere.js';
 
@@ -618,7 +619,7 @@ export function createEyeMesh(cap, uniforms, fogU, aAnimA, aStateA, aEyeA) {
   });
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
-  const IM = instancedBufferAttribute(mesh.instanceMatrix, 'mat4');
+  const IM = instanceMatrixNode(mesh.instanceMatrix);
   const aAnim = attribute('aAnim', 'vec4'), aState = attribute('aState', 'vec4'), aEye = attribute('aEye', 'vec3');
   const uColor = uniform(new THREE.Color(2.4, 1.9, 1.1));
   const vUv = varyingProperty('vec2', 'vEyeUv'), vA = varyingProperty('float', 'vEyeA');
