@@ -2,19 +2,19 @@
 
 export const QUALITY = {
   low: {
-    label: 'LOW', pixelRatio: 0.7, msaa: 0, bloomScale: 0.35, spotShadows: 0, shadowMap: 512,
+    label: 'LOW', volumetric: false, pixelRatio: 0.7, msaa: 0, bloomScale: 0.35, spotShadows: 0, shadowMap: 512,
     maxZombies: 900, corpses: 1500, particles: 4500, decals: 2000, gibs: 500, lights: 6, rain: 2500, texSize: 512, zombieShadows: false, grass: 5000,
   },
   medium: {
-    label: 'MEDIUM', pixelRatio: 0.85, msaa: 2, bloomScale: 0.45, spotShadows: 1, shadowMap: 1024,
+    label: 'MEDIUM', volumetric: true, pixelRatio: 0.85, msaa: 2, bloomScale: 0.45, spotShadows: 1, shadowMap: 1024,
     maxZombies: 1400, corpses: 2500, particles: 7000, decals: 3500, gibs: 900, lights: 8, rain: 4500, texSize: 1024, zombieShadows: true, grass: 12000,
   },
   high: {
-    label: 'HIGH', pixelRatio: 1, msaa: 4, bloomScale: 0.5, spotShadows: 2, shadowMap: 1024,
+    label: 'HIGH', volumetric: true, pixelRatio: 1, msaa: 4, bloomScale: 0.5, spotShadows: 2, shadowMap: 1024,
     maxZombies: 2000, corpses: 3500, particles: 10000, decals: 5000, gibs: 1200, lights: 9, rain: 6500, texSize: 1024, zombieShadows: true, grass: 20000,
   },
   ultra: {
-    label: 'ULTRA', pixelRatio: 1.5, msaa: 4, bloomScale: 0.6, spotShadows: 2, shadowMap: 2048,
+    label: 'ULTRA', volumetric: true, pixelRatio: 1.5, msaa: 4, bloomScale: 0.6, spotShadows: 2, shadowMap: 2048,
     maxZombies: 2800, corpses: 5000, particles: 14000, decals: 7000, gibs: 1600, lights: 10, rain: 9000, texSize: 1024, zombieShadows: true, grass: 30000,
   },
 };

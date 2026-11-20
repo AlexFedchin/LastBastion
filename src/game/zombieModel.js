@@ -9,8 +9,9 @@
 // every mesh and collapsed per instance from a seed, so the horde is a mix of
 // soldiers, workers and civilians without extra draw calls.
 import * as THREE from 'three';
+import { Fn, If, Discard, float, int, vec2, vec3, vec4, mat3, uniform, attribute, instancedBufferAttribute, varyingProperty, screenCoordinate, normalLocal, normalView, positionViewDirection, modelWorldMatrix, cameraViewMatrix, cameraProjectionMatrix, cameraPosition, mix, smoothstep, clamp, max, min, abs, exp, pow, sin, cos, dot, length, normalize, fract, floor, step, select } from 'three/tsl';
 import { mergeVertices } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { FOG_CUSTOM_GLSL } from '../render/atmosphere.js';
+import { lbFog } from '../render/atmosphere.js';
 
 // Part ids (pivots in the pose code must match these positions)
 // 0 hips · 1 chest · 2 head · 3 L upper arm · 4 R upper arm · 5 L thigh · 6 L shin
@@ -351,358 +352,303 @@ function createBoxyGeometry() {
   return G.build();
 }
 
-const POSE_HEADER = /* glsl */`
-uniform float uTime;
-uniform float uCorpse;
-attribute float aPart;
-attribute float aMat;
-attribute float aGear;
-attribute vec4 aAnim;   // phase, rate, type, lean
-attribute vec4 aState;  // flash, burn, attack, headless
-attribute vec3 aTint;
-mat3 zRX(float a){ float c = cos(a), s = sin(a); return mat3(1.0,0.0,0.0, 0.0,c,s, 0.0,-s,c); }
-mat3 zRZ(float a){ float c = cos(a), s = sin(a); return mat3(c,s,0.0, -s,c,0.0, 0.0,0.0,1.0); }
-mat3 zRY(float a){ float c = cos(a), s = sin(a); return mat3(c,0.0,-s, 0.0,1.0,0.0, s,0.0,c); }
-void zRot(inout vec3 p, inout vec3 n, mat3 m, vec3 piv){ p = m * (p - piv) + piv; n = m * n; }
+// ── the pose (WebGPU / TSL): the procedural body (the giants, alive and dead) ────────
+// aPart, aMat, aGear per vertex; per instance aAnim (phase, rate, type, lean), aState (flash,
+// burn, attack, headless), aTint.
+const zRX = (a) => { const c = cos(a), s = sin(a); return mat3(vec3(1, 0, 0), vec3(0, c, s), vec3(0, s.negate(), c)); };
+const zRZ = (a) => { const c = cos(a), s = sin(a); return mat3(vec3(c, s, 0), vec3(s.negate(), c, 0), vec3(0, 0, 1)); };
+const zRY = (a) => { const c = cos(a), s = sin(a); return mat3(vec3(c, 0, s.negate()), vec3(0, 1, 0), vec3(s, 0, c)); };
 
-// which outfit pieces this instance wears
-bool zGearOn(float gear, float seed, float type){
-  if (gear < 0.5) return true;
-  bool brute = type > 1.5 && type < 2.5;
-  bool soldier = seed < 0.16 || brute;
-  float s2 = fract(seed * 7.31);
-  if (gear < 1.5) return soldier && (!brute || s2 < 0.6);
-  if (gear < 2.5) return soldier;
-  if (gear < 3.5) return seed < 0.16 && s2 < 0.55;
-  if (gear < 4.5) return !soldier && seed > 0.45 && seed < 0.63;
-  if (gear < 5.5) return !soldier && seed > 0.3 && seed < 0.38;
-  return !soldier && seed > 0.86 && seed < 0.93;
+/** Pose position p and normal n (vars) in place. */
+function zPose(p, n, uTime, corpse) {
+  const aPart = attribute('aPart', 'float'), aGear = attribute('aGear', 'float');
+  const aAnim = attribute('aAnim', 'vec4'), aState = attribute('aState', 'vec4');
+  const rot = (m, piv) => { p.assign(m.mul(p.sub(piv)).add(piv)); n.assign(m.mul(n)); };
+  const ip = int(aPart.add(0.5)).toVar();
+  const seed = fract(aAnim.x.mul(0.15915)).toVar();
+  const type = aAnim.z;
+  // which outfit pieces this instance wears
+  const brute0 = type.greaterThan(1.5).and(type.lessThan(2.5));
+  const soldier = seed.lessThan(0.16).or(brute0);
+  const s2 = fract(seed.mul(7.31));
+  const g = aGear;
+  const gearOn = select(g.lessThan(0.5), true,
+    select(g.lessThan(1.5), soldier.and(brute0.not().or(s2.lessThan(0.6))),
+      select(g.lessThan(2.5), soldier,
+        select(g.lessThan(3.5), seed.lessThan(0.16).and(s2.lessThan(0.55)),
+          select(g.lessThan(4.5), soldier.not().and(seed.greaterThan(0.45)).and(seed.lessThan(0.63)),
+            select(g.lessThan(5.5), soldier.not().and(seed.greaterThan(0.3)).and(seed.lessThan(0.38)),
+              soldier.not().and(seed.greaterThan(0.86)).and(seed.lessThan(0.93))))))));
+  const isHead = ip.equal(2);
+  const armL = ip.equal(3).or(ip.equal(9)), armR = ip.equal(4).or(ip.equal(10));
+  const shL = vec3(0.225, SH, 0), shR = vec3(-0.225, SH, 0);
+  const elL = vec3(0.24, EL, 0), elR = vec3(-0.24, EL, 0);
+  const hipLp = vec3(0.1, HIP, 0), hipRp = vec3(-0.1, HIP, 0);
+  const knLp = vec3(0.1, KNEE, 0.01), knRp = vec3(-0.1, KNEE, 0.01);
+  If(gearOn.not(), () => { p.assign(vec3(0, 1.2, 0)); })
+    .ElseIf(isHead.and(aState.w.greaterThan(0.5)), () => { p.assign(vec3(0, 1.5, 0)); })
+    .Else(() => {
+      if (corpse) {
+        const s1 = sin(aAnim.x.mul(3.1)), s2b = sin(aAnim.x.mul(5.7)), s3 = sin(aAnim.x.mul(7.3));
+        If(ip.equal(9), () => rot(zRX(float(-0.4).sub(abs(s3).mul(1.6))), elL));
+        If(ip.equal(10), () => rot(zRX(float(-0.3).sub(abs(s1).mul(1.7))), elR));
+        If(armL, () => rot(zRZ(s1.mul(0.9).add(1.1)).mul(zRX(s2b.mul(0.9))), shL))
+          .ElseIf(armR, () => rot(zRZ(float(-1.1).sub(s2b.mul(0.9))).mul(zRX(s3.mul(0.9))), shR));
+        If(ip.equal(6), () => rot(zRX(abs(s2b).mul(0.9)), knLp));
+        If(ip.equal(8), () => rot(zRX(abs(s3).mul(0.7)), knRp));
+        If(ip.equal(5).or(ip.equal(6)), () => rot(zRZ(s3.mul(0.2).add(0.22)).mul(zRX(s1.mul(0.35))), hipLp))
+          .ElseIf(ip.equal(7).or(ip.equal(8)), () => rot(zRZ(float(-0.22).sub(s1.mul(0.2))).mul(zRX(s2b.mul(0.35))), hipRp))
+          .ElseIf(isHead, () => rot(zRY(s1.mul(1.1)).mul(zRX(s2b.mul(0.35))), vec3(0, 1.58, 0)));
+        return;
+      }
+      const t = uTime.mul(aAnim.y).add(aAnim.x).toVar();
+      const sw = sin(t), cw = cos(t);
+      const atk = aState.z;
+      const burn = clamp(aState.y, 0, 1);
+      const runner = type.greaterThan(0.5).and(type.lessThan(1.5));
+      const brute = type.greaterThan(1.5).and(type.lessThan(2.5)).or(type.greaterThan(3.5)); // giants move like brutes
+      const bloater = type.greaterThan(2.5).and(type.lessThan(3.5));
+      // ── legs ──
+      const amp = select(runner, float(0.95), select(brute, float(0.42), select(bloater, float(0.35), float(0.55)))).toVar();
+      const limp = step(0.62, seed);
+      const stomp = sin(uTime.mul(2.3).add(aAnim.x)).mul(0.5).add(0.5);
+      const hipL = mix(sw.negate().mul(amp).mul(float(1).sub(limp.mul(0.55))), float(-0.25).sub(stomp.mul(0.1)), atk);
+      const hipR = mix(sw.mul(amp), 0.2, atk);
+      const kneeL = mix(max(0, cw).mul(amp).mul(1.5).mul(float(1).sub(limp.mul(0.5))).add(0.08), 0.5, atk);
+      const kneeR = mix(max(0, cw.negate()).mul(amp).mul(1.5).add(0.08), stomp.mul(0.2).add(0.15), atk);
+      If(ip.equal(6), () => rot(zRX(kneeL), knLp));
+      If(ip.equal(8), () => rot(zRX(kneeR), knRp));
+      If(ip.equal(5).or(ip.equal(6)), () => rot(zRX(hipL), hipLp));
+      If(ip.equal(7).or(ip.equal(8)), () => rot(zRX(hipR), hipRp));
+      // ── arms ──
+      const aL = float(0).toVar(), aR = float(0).toVar(), sprL = float(0.12).toVar(), sprR = float(-0.12).toVar();
+      const elbL = float(0.25).toVar(), elbR = float(0.25).toVar();
+      If(runner, () => {
+        aL.assign(sw.sub(0.3)); aR.assign(sw.negate().sub(0.3)); sprL.assign(0.15); sprR.assign(-0.15);
+        elbL.assign(sw.mul(0.3).add(1.15)); elbR.assign(float(1.15).sub(sw.mul(0.3)));
+      }).ElseIf(brute, () => {
+        aL.assign(sw.mul(0.35).sub(0.25)); aR.assign(float(-0.25).sub(sw.mul(0.35))); sprL.assign(0.3); sprR.assign(-0.3); elbL.assign(0.45); elbR.assign(0.45);
+      }).ElseIf(bloater, () => {
+        aL.assign(sw.mul(0.15).sub(0.5)); aR.assign(float(-0.5).sub(sw.mul(0.15))); sprL.assign(0.7); sprR.assign(-0.7); elbL.assign(0.6); elbR.assign(0.6);
+      }).Else(() => {
+        aL.assign(sin(t.add(1.3)).mul(0.14).sub(1.3));
+        aR.assign(sin(t.add(2.2)).mul(0.14).sub(1.25));
+        elbL.assign(sin(t.mul(0.7).add(1)).mul(0.15).add(0.2)); elbR.assign(sin(t.mul(0.8)).mul(0.15).add(0.25));
+        If(seed.greaterThan(0.78), () => { aR.assign(sw.mul(0.15).add(0.1)); sprR.assign(-0.05); elbR.assign(0.05); });
+        If(seed.lessThan(0.12), () => { aL.assign(sw.mul(0.2).sub(0.6)); elbL.assign(0.9); });
+      });
+      const clawT = uTime.mul(7.5).add(aAnim.x);
+      aL.assign(mix(aL, sin(clawT).mul(0.5).sub(2.45), atk));
+      aR.assign(mix(aR, sin(clawT.add(2)).mul(0.5).sub(2.45), atk));
+      elbL.assign(mix(elbL, sin(clawT.add(0.8)).mul(0.5).add(0.5), atk));
+      elbR.assign(mix(elbR, sin(clawT.add(2.8)).mul(0.5).add(0.5), atk));
+      sprL.assign(mix(sprL, 0.25, atk));
+      sprR.assign(mix(sprR, -0.25, atk));
+      aL.assign(mix(aL, sin(uTime.mul(13).add(aAnim.x)).mul(1.7).sub(1.3), burn.mul(0.85)));
+      aR.assign(mix(aR, sin(uTime.mul(11).add(aAnim.x).add(1.7)).mul(1.7).sub(1.3), burn.mul(0.85)));
+      elbL.assign(mix(elbL, sin(uTime.mul(15).add(aAnim.x)).mul(0.6).add(1.2), burn.mul(0.85)));
+      elbR.assign(mix(elbR, sin(uTime.mul(12).add(aAnim.x)).mul(0.6).add(1.2), burn.mul(0.85)));
+      If(ip.equal(9), () => rot(zRX(elbL.negate()), elL));
+      If(ip.equal(10), () => rot(zRX(elbR.negate()), elR));
+      If(armL, () => rot(zRX(aL).mul(zRZ(sprL)), shL));
+      If(armR, () => rot(zRX(aR).mul(zRZ(sprR)), shR));
+      // bloater belly pulses
+      If(bloater.and(ip.equal(1)), () => {
+        const b = sin(uTime.mul(3).add(aAnim.x)).mul(0.1).add(1);
+        const belly = smoothstep(1.42, 1.15, p.y);
+        p.x.mulAssign(mix(1, b.mul(1.12), belly));
+        p.z.assign(p.z.mul(mix(1, b.mul(1.25), belly)).add(belly.mul(0.03)));
+      });
+      // ── head ──
+      If(isHead, () => {
+        const tilt = seed.sub(0.5).mul(0.9).add(sin(t.mul(0.5)).mul(0.08));
+        rot(zRZ(tilt).mul(zRX(float(-0.15).add(atk.mul(-0.5)).add(sin(t.mul(2)).mul(0.05)))), vec3(0, 1.58, 0));
+      });
+      // ── upper body lean & sway ──
+      If(ip.greaterThanEqual(1).and(ip.lessThanEqual(4)).or(ip.greaterThanEqual(9)), () => {
+        const lean = aAnim.w.add(cos(t.mul(2)).mul(0.05)).add(atk.mul(0.2)).add(burn.mul(sin(uTime.mul(9).add(aAnim.x))).mul(0.2));
+        const sway = sin(t).mul(select(brute, float(0.1), float(0.07))).add(seed.sub(0.5).mul(0.12));
+        rot(zRX(lean).mul(zRZ(sway)), vec3(0, 0.95, 0));
+      });
+      p.y.addAssign(select(runner, float(0.06), float(0.03)).mul(cos(t.mul(2))).mul(float(1).sub(atk)));
+    });
 }
 
-void zPose(inout vec3 p, inout vec3 n) {
-  int ip = int(aPart + 0.5);
-  float seed = fract(aAnim.x * 0.15915);
-  float type = aAnim.z;
-  if (!zGearOn(aGear, seed, type)) { p = vec3(0.0, 1.2, 0.0); return; }
-  bool isHead = ip == 2;
-  if (isHead && aState.w > 0.5) { p = vec3(0.0, 1.5, 0.0); return; }
-  bool armL = ip == 3 || ip == 9, armR = ip == 4 || ip == 10;
-  vec3 shL = vec3(0.225, ${SH.toFixed(3)}, 0.0), shR = vec3(-0.225, ${SH.toFixed(3)}, 0.0);
-  vec3 elL = vec3(0.24, ${EL.toFixed(3)}, 0.0), elR = vec3(-0.24, ${EL.toFixed(3)}, 0.0);
-  vec3 hipLp = vec3(0.1, ${HIP.toFixed(3)}, 0.0), hipRp = vec3(-0.1, ${HIP.toFixed(3)}, 0.0);
-  vec3 knLp = vec3(0.1, ${KNEE.toFixed(3)}, 0.01), knRp = vec3(-0.1, ${KNEE.toFixed(3)}, 0.01);
+const zh3 = Fn(([p0]) => {
+  const p = fract(p0.mul(0.3183099).add(0.1)).mul(17).toVar();
+  return fract(p.x.mul(p.y).mul(p.z).mul(p.x.add(p.y).add(p.z)));
+}).setLayout({ name: 'zh3', type: 'float', inputs: [{ name: 'p0', type: 'vec3' }] });
+const zn3 = Fn(([x]) => {
+  const i = floor(x), f0 = fract(x);
+  const f = f0.mul(f0).mul(f0.mul(-2).add(3));
+  const h = (o) => zh3(i.add(vec3(...o)));
+  return mix(mix(mix(h([0, 0, 0]), h([1, 0, 0]), f.x), mix(h([0, 1, 0]), h([1, 1, 0]), f.x), f.y),
+    mix(mix(h([0, 0, 1]), h([1, 0, 1]), f.x), mix(h([0, 1, 1]), h([1, 1, 1]), f.x), f.y), f.z);
+}).setLayout({ name: 'zn3', type: 'float', inputs: [{ name: 'x', type: 'vec3' }] });
 
-  if (uCorpse > 0.5) {
-    float s1 = sin(aAnim.x * 3.1), s2 = sin(aAnim.x * 5.7), s3 = sin(aAnim.x * 7.3);
-    if (ip == 9) zRot(p, n, zRX(-0.4 - abs(s3) * 1.6), elL);
-    if (ip == 10) zRot(p, n, zRX(-0.3 - abs(s1) * 1.7), elR);
-    if (armL) zRot(p, n, zRZ(1.1 + s1 * 0.9) * zRX(s2 * 0.9), shL);
-    else if (armR) zRot(p, n, zRZ(-1.1 - s2 * 0.9) * zRX(s3 * 0.9), shR);
-    if (ip == 6) zRot(p, n, zRX(abs(s2) * 0.9), knLp);
-    if (ip == 8) zRot(p, n, zRX(abs(s3) * 0.7), knRp);
-    if (ip == 5 || ip == 6) zRot(p, n, zRZ(0.22 + s3 * 0.2) * zRX(s1 * 0.35), hipLp);
-    else if (ip == 7 || ip == 8) zRot(p, n, zRZ(-0.22 - s1 * 0.2) * zRX(s2 * 0.35), hipRp);
-    else if (isHead) zRot(p, n, zRY(s1 * 1.1) * zRX(0.35 * s2), vec3(0.0, 1.58, 0.0));
-    return;
-  }
-
-  float t = uTime * aAnim.y + aAnim.x;
-  float sw = sin(t), cw = cos(t);
-  float atk = aState.z;
-  float burn = clamp(aState.y, 0.0, 1.0);
-  bool runner = type > 0.5 && type < 1.5;
-  bool brute = (type > 1.5 && type < 2.5) || type > 3.5; // giants move like brutes
-  bool bloater = type > 2.5 && type < 3.5;
-
-  // ── legs ──
-  float amp = runner ? 0.95 : (brute ? 0.42 : (bloater ? 0.35 : 0.55));
-  float limp = step(0.62, seed);
-  float hipL = -sw * amp * (1.0 - limp * 0.55);
-  float hipR = sw * amp;
-  float kneeL = max(0.0, cw) * amp * 1.5 * (1.0 - limp * 0.5) + 0.08;
-  float kneeR = max(0.0, -cw) * amp * 1.5 + 0.08;
-  float stomp = 0.5 + 0.5 * sin(uTime * 2.3 + aAnim.x);
-  hipL = mix(hipL, -0.25 - 0.1 * stomp, atk);
-  hipR = mix(hipR, 0.2, atk);
-  kneeL = mix(kneeL, 0.5, atk);
-  kneeR = mix(kneeR, 0.15 + 0.2 * stomp, atk);
-  if (ip == 6) zRot(p, n, zRX(kneeL), knLp);
-  if (ip == 8) zRot(p, n, zRX(kneeR), knRp);
-  if (ip == 5 || ip == 6) zRot(p, n, zRX(hipL), hipLp);
-  if (ip == 7 || ip == 8) zRot(p, n, zRX(hipR), hipRp);
-
-  // ── arms ──
-  float aL, aR, sprL = 0.12, sprR = -0.12, elbL = 0.25, elbR = 0.25;
-  if (runner) {
-    aL = sw * 1.0 - 0.3; aR = -sw * 1.0 - 0.3; sprL = 0.15; sprR = -0.15;
-    elbL = 1.15 + sw * 0.3; elbR = 1.15 - sw * 0.3;
-  } else if (brute) {
-    aL = -0.25 + sw * 0.35; aR = -0.25 - sw * 0.35; sprL = 0.3; sprR = -0.3; elbL = 0.45; elbR = 0.45;
-  } else if (bloater) {
-    aL = -0.5 + sw * 0.15; aR = -0.5 - sw * 0.15; sprL = 0.7; sprR = -0.7; elbL = 0.6; elbR = 0.6;
-  } else {
-    aL = -1.3 + sin(t + 1.3) * 0.14;
-    aR = -1.25 + sin(t + 2.2) * 0.14;
-    elbL = 0.2 + 0.15 * sin(t * 0.7 + 1.0); elbR = 0.25 + 0.15 * sin(t * 0.8);
-    if (seed > 0.78) { aR = 0.1 + sw * 0.15; sprR = -0.05; elbR = 0.05; }
-    if (seed < 0.12) { aL = -0.6 + sw * 0.2; elbL = 0.9; }
-  }
-  float clawT = uTime * 7.5 + aAnim.x;
-  aL = mix(aL, -2.45 + sin(clawT) * 0.5, atk);
-  aR = mix(aR, -2.45 + sin(clawT + 2.0) * 0.5, atk);
-  elbL = mix(elbL, 0.5 + 0.5 * sin(clawT + 0.8), atk);
-  elbR = mix(elbR, 0.5 + 0.5 * sin(clawT + 2.8), atk);
-  sprL = mix(sprL, 0.25, atk);
-  sprR = mix(sprR, -0.25, atk);
-  aL = mix(aL, sin(uTime * 13.0 + aAnim.x) * 1.7 - 1.3, burn * 0.85);
-  aR = mix(aR, sin(uTime * 11.0 + aAnim.x + 1.7) * 1.7 - 1.3, burn * 0.85);
-  elbL = mix(elbL, 1.2 + sin(uTime * 15.0 + aAnim.x) * 0.6, burn * 0.85);
-  elbR = mix(elbR, 1.2 + sin(uTime * 12.0 + aAnim.x) * 0.6, burn * 0.85);
-  if (ip == 9) zRot(p, n, zRX(-elbL), elL);
-  if (ip == 10) zRot(p, n, zRX(-elbR), elR);
-  if (armL) zRot(p, n, zRX(aL) * zRZ(sprL), shL);
-  if (armR) zRot(p, n, zRX(aR) * zRZ(sprR), shR);
-
-  // bloater belly pulses
-  if (bloater && ip == 1) {
-    float b = 1.0 + 0.1 * sin(uTime * 3.0 + aAnim.x);
-    float belly = smoothstep(1.42, 1.15, p.y);
-    p.x *= mix(1.0, b * 1.12, belly); p.z = p.z * mix(1.0, b * 1.25, belly) + 0.03 * belly;
-  }
-
-  // ── head ──
-  if (isHead) {
-    float tilt = (seed - 0.5) * 0.9 + sin(t * 0.5) * 0.08;
-    zRot(p, n, zRZ(tilt) * zRX(-0.15 + atk * -0.5 + sin(t * 2.0) * 0.05), vec3(0.0, 1.58, 0.0));
-  }
-
-  // ── upper body lean & sway ──
-  if (ip >= 1 && ip <= 4 || ip >= 9) {
-    float lean = aAnim.w + 0.05 * cos(2.0 * t) + atk * 0.2 + burn * sin(uTime * 9.0 + aAnim.x) * 0.2;
-    float sway = sin(t) * (brute ? 0.1 : 0.07) + (seed - 0.5) * 0.12;
-    zRot(p, n, zRX(lean) * zRZ(sway), vec3(0.0, 0.95, 0.0));
-  }
-  p.y += (runner ? 0.06 : 0.03) * cos(2.0 * t) * (1.0 - atk);
-}
-`;
-
-/** Patch a MeshStandardMaterial into the animated zombie material. */
+/** The procedural body's material (the giants): posed in the vertex stage, painted per pixel. */
 export function createZombieMaterial(uniforms, { corpse = false } = {}) {
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.82, metalness: 0.0 });
-  const local = { uCorpse: { value: corpse ? 1 : 0 } };
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = uniforms.uTime;
-    shader.uniforms.uEyeGlow = uniforms.uEyeGlow;
-    shader.uniforms.uRim = uniforms.uRim;
-    shader.uniforms.uCorpse = local.uCorpse;
-    shader.uniforms.uLamps = uniforms.uLamps;
-    shader.uniforms.uLampPow = uniforms.uLampPow;
-    shader.vertexShader = POSE_HEADER + `
-      varying float vZMat; varying vec3 vZTint; varying vec4 vZState; varying float vZType; varying float vZSeed; varying vec3 vZL; varying float vZPart;
-    ` + shader.vertexShader
-      .replace('#include <beginnormal_vertex>', `
-        vec3 zPP = position; vec3 objectNormal = normal; zPose(zPP, objectNormal);
-        #ifdef USE_TANGENT
-          vec3 objectTangent = vec3( tangent.xyz );
-        #endif`)
-      .replace('#include <begin_vertex>', `
-        // posed once above (with the normal); reuse it instead of skinning the vertex twice
-        vec3 transformed = zPP;
-        vZMat = aMat; vZTint = aTint; vZState = aState; vZType = aAnim.z; vZSeed = fract(aAnim.x * 0.15915); vZL = position; vZPart = aPart;`);
-
-    shader.fragmentShader = `
-      uniform float uTime; uniform float uEyeGlow; uniform float uCorpse; uniform vec3 uRim;
-      uniform vec3 uLamps[10]; uniform float uLampPow;
-      varying float vZMat; varying vec3 vZTint; varying vec4 vZState; varying float vZType; varying float vZSeed; varying vec3 vZL; varying float vZPart;
-      float zh3(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-      float zn3(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
-        return mix(mix(mix(zh3(i), zh3(i + vec3(1,0,0)), f.x), mix(zh3(i + vec3(0,1,0)), zh3(i + vec3(1,1,0)), f.x), f.y),
-                   mix(mix(zh3(i + vec3(0,0,1)), zh3(i + vec3(1,0,1)), f.x), mix(zh3(i + vec3(0,1,1)), zh3(i + vec3(1,1,1)), f.x), f.y), f.z); }
-    ` + shader.fragmentShader
-      .replace('#include <color_fragment>', `
-        if (vZState.w < -0.002) {
-          float zd = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
-          if (zd < -vZState.w) discard;
-        }
-        vec3 zc;
-        float zEyeF = step(1.5, vZMat) * step(vZMat, 2.5);
-        float zGore = 0.0;
-        vec3 zp = vZL + vZSeed * 13.0;
-        float zN1 = zn3(zp * 9.0), zN2 = zn3(zp * 23.0), zN3 = zn3(zp * 4.0);
-        vec3 skin = mix(vec3(0.19, 0.2, 0.16), vec3(0.25, 0.22, 0.2), fract(vZSeed * 3.7)) * (0.7 + 0.5 * zN1);
-        skin = mix(skin, vec3(0.16, 0.13, 0.15), smoothstep(0.62, 0.8, zN3) * 0.6);  // bruising
-        if (vZType > 3.5) {
-          // the giant's hide: grey-green, mottled with necrotic patches and dark veins
-          skin = vec3(0.085, 0.09, 0.075) * (0.6 + 0.6 * zN1);
-          skin = mix(skin, vec3(0.1, 0.07, 0.08), smoothstep(0.55, 0.78, zN3) * 0.75);
-          float vein = 1.0 - smoothstep(0.0, 0.035, abs(zn3(zp * 5.0) - 0.5));
-          skin = mix(skin, vec3(0.09, 0.02, 0.03), vein * 0.7);
-          skin = mix(skin, vec3(0.2, 0.03, 0.02), smoothstep(0.78, 0.9, zn3(zp * 11.0)) * 0.8); // raw sores
-        }
-        float sleeveLong = step(0.5, fract(vZSeed * 5.3));
-        float mid = vZMat;
-        if (mid > 0.5 && mid < 1.5 && (vZPart > 8.5) && sleeveLong > 0.5 && vZL.y > 0.95) mid = 0.0;
-        if (mid < 0.5) {
-          zc = vZTint * (0.75 + 0.35 * zN2) * (0.85 + 0.3 * zN1);
-          // tears reveal skin, stains spread from the mouth down the chest
-          float tear = smoothstep(0.7, 0.76, zn3(zp * 13.0)) * step(0.3, fract(vZSeed * 2.1));
-          zc = mix(zc, skin * 0.8, tear);
-          float stain = smoothstep(0.45, 0.75, zN3 + (vZL.z > 0.05 ? 0.25 : -0.2) + (vZL.y - 1.2) * 0.6);
-          zGore = max(zGore, stain * 0.8);
-          zc *= mix(1.0, 0.55, smoothstep(1.2, 0.95, vZL.y));
-        } else if (mid < 1.5) {
-          zc = skin;
-          if (vZL.y > 1.6 && vZL.y < 1.67 && vZL.z > 0.04) zGore = max(zGore, 0.75);   // chin
-          if (vZPart > 8.5 && vZL.y < 0.95) zGore = max(zGore, smoothstep(0.35, 0.7, zN1) * 0.9); // hands
-        } else if (mid < 2.5) zc = vec3(0.9, 0.85, 0.7);
-        else if (mid < 3.5) {
-          zc = vZTint * vec3(0.5, 0.55, 0.6) * (0.8 + 0.35 * zN2);
-          zc = mix(zc, vec3(0.09, 0.07, 0.05), smoothstep(0.55, 0.2, vZL.y) * (0.6 + 0.4 * zN1)); // mud
-          zGore = max(zGore, smoothstep(0.7, 0.85, zN3) * 0.7);
-        } else if (mid < 4.5) { zc = (vZType > 2.5 && vZType < 3.5) ? vec3(0.25, 0.32, 0.08) : vec3(0.2, 0.015, 0.012); }
-        else if (mid < 5.5) zc = vec3(0.17, 0.19, 0.12) * (0.75 + 0.4 * zN2) * (0.8 + 0.3 * zN1);
-        else if (mid < 6.5) zc = vec3(0.07, 0.06, 0.05) * (0.8 + 0.4 * zN2);
-        else if (mid < 7.5) {
-          zc = vec3(0.55, 0.62, 0.08) * (0.7 + 0.3 * zN2);
-          float band = step(abs(vZL.y - 1.16), 0.025) + step(abs(vZL.y - 1.3), 0.025);
-          zc = mix(zc, vec3(0.7), clamp(band, 0.0, 1.0));
-          zGore = max(zGore, smoothstep(0.5, 0.8, zN3) * 0.6);
-        } else if (mid < 8.5) zc = mix(vec3(0.05, 0.035, 0.025), vec3(0.32, 0.24, 0.12), step(0.8, fract(vZSeed * 9.1))) * (0.7 + 0.5 * zN2);
-        else {
-          // bone: dirty ivory, darker and bloodied at the root
-          zc = vec3(0.42, 0.38, 0.3) * (0.7 + 0.45 * zN2);
-          zGore = max(zGore, smoothstep(0.55, 0.85, zN1) * 0.55);
-        }
-        zc = mix(zc, vec3(0.13, 0.01, 0.008), zGore * (1.0 - zEyeF));
-        // cavity darkening: armpits, crotch, under the chin
-        float zAO = 0.65 + 0.35 * smoothstep(0.0, 0.5, vZL.y);
-        zAO *= 1.0 - 0.25 * smoothstep(0.17, 0.0, abs(vZL.x)) * smoothstep(1.0, 0.85, vZL.y) * step(0.5, vZL.y);
-        zc *= zAO;
-        zc = mix(zc, vec3(0.025, 0.02, 0.018), clamp(vZState.y * 1.2 + (uCorpse > 0.5 ? vZState.y : 0.0), 0.0, 1.0));
-        diffuseColor.rgb *= zc;`)
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = mix(roughnessFactor, 0.28, max(step(3.5, vZMat) * step(vZMat, 4.5), zGore * 0.8));
-        roughnessFactor = mix(roughnessFactor, 0.55, step(5.5, vZMat) * step(vZMat, 6.5));
-        roughnessFactor = mix(roughnessFactor, 0.45, step(8.5, vZMat));
-        if (vZType > 3.5 && vZMat > 0.5 && vZMat < 1.5) roughnessFactor = 0.78 + 0.2 * zN2; // leathery, matte: the searchlights live on it`)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        totalEmissiveRadiance += zEyeF * vec3(1.0, 0.82, 0.5) * uEyeGlow * (1.0 - uCorpse);
-        float zRim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
-        totalEmissiveRadiance += zRim * uRim * (1.0 - uCorpse * 0.7);
-        #ifdef USE_FOG
-        if (uLampPow > 0.001) {
-          // sodium lamps on the wall: a warm wash on everything that reaches the wall
-          vec3 zWN = normalize(transpose(mat3(viewMatrix)) * normal);
-          float zLamp = 0.0;
-          for (int k = 0; k < 10; k++) {
-            vec3 L = uLamps[k] - vLbFogW;
-            float d = length(L);
-            float att = clamp(1.0 - d / 17.0, 0.0, 1.0);
-            zLamp += att * att * (0.25 + 0.75 * clamp(dot(zWN, L / max(d, 1e-3)), 0.0, 1.0));
-          }
-          totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.52, 0.18) * zLamp * uLampPow * 2.6 * (1.0 - zEyeF);
-        }
-        #endif
-        // burning (living only): a steady smoulder in patches of the charring skin — no strobing,
-        // the flames drawn over them carry the motion; the dead are just char
-        totalEmissiveRadiance += clamp(vZState.y, 0.0, 1.0) * (1.0 - uCorpse) * vec3(0.75, 0.24, 0.04) * smoothstep(0.5, 0.85, zN1);
-        if (vZType > 2.5 && vZType < 3.5) totalEmissiveRadiance += step(3.5, vZMat) * step(vZMat, 4.5) * vec3(0.3, 0.6, 0.05) * (0.6 + 0.4 * sin(uTime * 4.0 + vZSeed * 9.0));`)
-      .replace('#include <fog_fragment>', `
-        #ifdef USE_FOG
-          vec4 lbF = lbFog(vLbFogW, cameraPosition, fogColor, fogNear, fogFar);
-          lbF.a *= 1.0 - 0.65 * zEyeF * (1.0 - uCorpse) * (1.0 - 0.6 * clamp(fogFar - 2.0, 0.0, 1.0));
-          gl_FragColor.rgb = mix(gl_FragColor.rgb, lbF.rgb, lbF.a);
-        #endif`);
+  const uCorpse = corpse ? 1 : 0;
+  const aMat = attribute('aMat', 'float'), aPart = attribute('aPart', 'float');
+  const aAnim = attribute('aAnim', 'vec4'), aState = attribute('aState', 'vec4'), aTint = attribute('aTint', 'vec3');
+  const vL = varyingProperty('vec3', 'vZL');
+  mat.positionNode = Fn(() => {
+    const p = vec3(attribute('position', 'vec3')).toVar();
+    const n = vec3(attribute('normal', 'vec3')).toVar();
+    vL.assign(p);
+    zPose(p, n, uniforms.uTime, corpse);
+    normalLocal.assign(n);
+    return p;
+  })();
+  // everything the colour, roughness and glow share
+  const paint = () => {
+    const seed = fract(aAnim.x.mul(0.15915));
+    const type = aAnim.z;
+    const zEyeF = step(1.5, aMat).mul(step(aMat, 2.5));
+    const zp = vL.add(seed.mul(13));
+    const zN1 = zn3(zp.mul(9)), zN2 = zn3(zp.mul(23)), zN3 = zn3(zp.mul(4));
+    return { seed, type, zEyeF, zp, zN1, zN2, zN3 };
   };
-  mat.customProgramCacheKey = () => 'zombie-v6';
+  mat.colorNode = Fn(() => {
+    If(aState.w.lessThan(-0.002), () => {
+      If(fract(sin(dot(floor(screenCoordinate.xy), vec2(12.9898, 78.233))).mul(43758.5453)).lessThan(aState.w.negate()), () => { Discard(); });
+    });
+    const P = paint();
+    const { seed, type, zEyeF, zp, zN1, zN2, zN3 } = P;
+    const zGore = float(0).toVar();
+    const skin = mix(vec3(0.19, 0.2, 0.16), vec3(0.25, 0.22, 0.2), fract(seed.mul(3.7))).mul(zN1.mul(0.5).add(0.7)).toVar();
+    skin.assign(mix(skin, vec3(0.16, 0.13, 0.15), smoothstep(0.62, 0.8, zN3).mul(0.6))); // bruising
+    If(type.greaterThan(3.5), () => {
+      // the giant's hide: grey-green, mottled with necrotic patches and dark veins
+      skin.assign(vec3(0.085, 0.09, 0.075).mul(zN1.mul(0.6).add(0.6)));
+      skin.assign(mix(skin, vec3(0.1, 0.07, 0.08), smoothstep(0.55, 0.78, zN3).mul(0.75)));
+      const vein = float(1).sub(smoothstep(0, 0.035, abs(zn3(zp.mul(5)).sub(0.5))));
+      skin.assign(mix(skin, vec3(0.09, 0.02, 0.03), vein.mul(0.7)));
+      skin.assign(mix(skin, vec3(0.2, 0.03, 0.02), smoothstep(0.78, 0.9, zn3(zp.mul(11))).mul(0.8))); // raw sores
+    });
+    const sleeveLong = step(0.5, fract(seed.mul(5.3)));
+    const mid = float(aMat).toVar();
+    If(mid.greaterThan(0.5).and(mid.lessThan(1.5)).and(aPart.greaterThan(8.5)).and(sleeveLong.greaterThan(0.5)).and(vL.y.greaterThan(0.95)), () => { mid.assign(0); });
+    const zc = vec3(0).toVar();
+    If(mid.lessThan(0.5), () => {
+      zc.assign(aTint.mul(zN2.mul(0.35).add(0.75)).mul(zN1.mul(0.3).add(0.85)));
+      // tears reveal skin, stains spread from the mouth down the chest
+      const tear = smoothstep(0.7, 0.76, zn3(zp.mul(13))).mul(step(0.3, fract(seed.mul(2.1))));
+      zc.assign(mix(zc, skin.mul(0.8), tear));
+      const stain = smoothstep(0.45, 0.75, zN3.add(select(vL.z.greaterThan(0.05), float(0.25), float(-0.2))).add(vL.y.sub(1.2).mul(0.6)));
+      zGore.assign(max(zGore, stain.mul(0.8)));
+      zc.mulAssign(mix(1, 0.55, smoothstep(1.2, 0.95, vL.y)));
+    }).ElseIf(mid.lessThan(1.5), () => {
+      zc.assign(skin);
+      If(vL.y.greaterThan(1.6).and(vL.y.lessThan(1.67)).and(vL.z.greaterThan(0.04)), () => { zGore.assign(max(zGore, 0.75)); }); // chin
+      If(aPart.greaterThan(8.5).and(vL.y.lessThan(0.95)), () => { zGore.assign(max(zGore, smoothstep(0.35, 0.7, zN1).mul(0.9))); }); // hands
+    }).ElseIf(mid.lessThan(2.5), () => { zc.assign(vec3(0.9, 0.85, 0.7)); })
+      .ElseIf(mid.lessThan(3.5), () => {
+        zc.assign(aTint.mul(vec3(0.5, 0.55, 0.6)).mul(zN2.mul(0.35).add(0.8)));
+        zc.assign(mix(zc, vec3(0.09, 0.07, 0.05), smoothstep(0.55, 0.2, vL.y).mul(zN1.mul(0.4).add(0.6)))); // mud
+        zGore.assign(max(zGore, smoothstep(0.7, 0.85, zN3).mul(0.7)));
+      })
+      .ElseIf(mid.lessThan(4.5), () => { zc.assign(select(type.greaterThan(2.5).and(type.lessThan(3.5)), vec3(0.25, 0.32, 0.08), vec3(0.2, 0.015, 0.012))); })
+      .ElseIf(mid.lessThan(5.5), () => { zc.assign(vec3(0.17, 0.19, 0.12).mul(zN2.mul(0.4).add(0.75)).mul(zN1.mul(0.3).add(0.8))); })
+      .ElseIf(mid.lessThan(6.5), () => { zc.assign(vec3(0.07, 0.06, 0.05).mul(zN2.mul(0.4).add(0.8))); })
+      .ElseIf(mid.lessThan(7.5), () => {
+        zc.assign(vec3(0.55, 0.62, 0.08).mul(zN2.mul(0.3).add(0.7)));
+        const band = step(abs(vL.y.sub(1.16)), 0.025).add(step(abs(vL.y.sub(1.3)), 0.025));
+        zc.assign(mix(zc, vec3(0.7), clamp(band, 0, 1)));
+        zGore.assign(max(zGore, smoothstep(0.5, 0.8, zN3).mul(0.6)));
+      })
+      .ElseIf(mid.lessThan(8.5), () => { zc.assign(mix(vec3(0.05, 0.035, 0.025), vec3(0.32, 0.24, 0.12), step(0.8, fract(seed.mul(9.1)))).mul(zN2.mul(0.5).add(0.7))); })
+      .Else(() => {
+        // bone: dirty ivory, darker and bloodied at the root
+        zc.assign(vec3(0.42, 0.38, 0.3).mul(zN2.mul(0.45).add(0.7)));
+        zGore.assign(max(zGore, smoothstep(0.55, 0.85, zN1).mul(0.55)));
+      });
+    zc.assign(mix(zc, vec3(0.13, 0.01, 0.008), zGore.mul(float(1).sub(zEyeF))));
+    // cavity darkening: armpits, crotch, under the chin
+    const zAO = smoothstep(0, 0.5, vL.y).mul(0.35).add(0.65)
+      .mul(float(1).sub(smoothstep(0.17, 0, abs(vL.x)).mul(smoothstep(1.0, 0.85, vL.y)).mul(step(0.5, vL.y)).mul(0.25)));
+    zc.mulAssign(zAO);
+    zc.assign(mix(zc, vec3(0.025, 0.02, 0.018), clamp(aState.y.mul(1.2).add(corpse ? aState.y : 0), 0, 1)));
+    S.gore = zGore;
+    return vec4(zc, 1);
+  })();
+  const S = {};
+  mat.roughnessNode = Fn(() => {
+    const P = paint();
+    const r = float(0.82).toVar();
+    r.assign(mix(r, 0.28, max(step(3.5, aMat).mul(step(aMat, 4.5)), (S.gore || float(0)).mul(0.8))));
+    r.assign(mix(r, 0.55, step(5.5, aMat).mul(step(aMat, 6.5))));
+    r.assign(mix(r, 0.45, step(8.5, aMat)));
+    // leathery, matte: the searchlights live on it
+    If(P.type.greaterThan(3.5).and(aMat.greaterThan(0.5)).and(aMat.lessThan(1.5)), () => { r.assign(P.zN2.mul(0.2).add(0.78)); });
+    return r;
+  })();
+  mat.emissiveNode = Fn(() => {
+    const P = paint();
+    const e = vec3(1.0, 0.82, 0.5).mul(P.zEyeF).mul(uniforms.uEyeGlow).mul(1 - uCorpse).toVar();
+    const rim = pow(float(1).sub(clamp(dot(normalView, positionViewDirection), 0, 1)), 3);
+    e.addAssign(uniforms.uRim.mul(rim).mul(1 - uCorpse * 0.7));
+    // burning (living only): a steady smoulder in patches of the charring skin
+    if (!corpse) e.addAssign(vec3(0.75, 0.24, 0.04).mul(clamp(aState.y, 0, 1)).mul(smoothstep(0.5, 0.85, P.zN1)));
+    If(P.type.greaterThan(2.5).and(P.type.lessThan(3.5)), () => {
+      e.addAssign(vec3(0.3, 0.6, 0.05).mul(step(3.5, aMat).mul(step(aMat, 4.5))).mul(sin(uniforms.uTime.mul(4).add(P.seed.mul(9))).mul(0.4).add(0.6)));
+    });
+    return e;
+  })();
   return mat;
 }
 
-export function createZombieDepthMaterial(uniforms, { corpse = false } = {}) {
-  const mat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-  const local = { uCorpse: { value: corpse ? 1 : 0 } };
-  mat.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = uniforms.uTime;
-    shader.uniforms.uCorpse = local.uCorpse;
-    shader.vertexShader = POSE_HEADER + shader.vertexShader.replace('#include <begin_vertex>', `
-      vec3 transformed = position; vec3 zNN = vec3(0.0, 1.0, 0.0); zPose(transformed, zNN);`);
-  };
-  mat.customProgramCacheKey = () => 'zombie-depth-v2';
-  return mat;
-}
+/** Under WebGPU, shadows draw with the material's own positionNode. */
+export function createZombieDepthMaterial() { return null; }
 
 // ── Glowing eyes that stay visible as pin-pricks at any distance ─────────────
-const EYE_VERT = /* glsl */`
-attribute vec4 aAnim;
-attribute vec4 aState;
-attribute vec3 aEye;     // where the eyes are on this body now, in instance space (the horde works it out from the head)
-uniform float uPixel;
-uniform float uEyeGlow;
-varying vec2 vUv;
-varying float vA;
-${FOG_CUSTOM_GLSL}
-void main() {
-  vec3 local = aEye;
-  vec4 world = modelMatrix * instanceMatrix * vec4(local, 1.0);
-  vec3 fwd = normalize((instanceMatrix * vec4(0.0, 0.0, 1.0, 0.0)).xyz);
-  vec4 mv = viewMatrix * world;
-  float dist = -mv.z;
-  vec3 toCam = normalize(cameraPosition - world.xyz);
-  float facing = smoothstep(-0.05, 0.45, dot(fwd, toCam));
-  float scale = length(instanceMatrix[0].xyz);
-  float worldSize = 0.13 * scale;
-  float minSize = uPixel * dist * 2.6;
-  float size = max(worldSize, minSize);
-  mv.xy += position.xy * size * vec2(1.7, 0.7);
-  gl_Position = projectionMatrix * mv;
-  vUv = position.xy * 2.0;
-  // eyes cut through ordinary haze; in a fog bank they still show, dim and smeared
-  float fogA = lbFog(world.xyz, cameraPosition, lbFogColor, lbTime, lbDawn).a;
-  float fog = mix(fogA * 0.55, 0.45 + 0.4 * fogA, clamp(lbDawn - 2.0, 0.0, 1.0));
-  vA = facing * (1.0 - step(0.5, aState.w)) * (1.0 + min(aState.w, 0.0)) * (1.0 - fog) * pow(worldSize / size, 0.55)
-     * smoothstep(12.0, 30.0, dist) * uEyeGlow * (1.0 - clamp(aState.y, 0.0, 1.0))
-     * (aAnim.z > 3.5 ? smoothstep(90.0, 150.0, dist) : 1.0);  // a giant's own eyes read up close; pin-pricks only far off
-}`;
-
-const EYE_FRAG = /* glsl */`
-uniform vec3 uColor;
-varying vec2 vUv;
-varying float vA;
-void main() {
-  vec2 p = vUv;
-  float d1 = length((p - vec2(-0.42, 0.0)) * vec2(1.0, 1.3));
-  float d2 = length((p - vec2(0.42, 0.0)) * vec2(1.0, 1.3));
-  float g = exp(-d1 * d1 * 14.0) + exp(-d2 * d2 * 14.0);
-  g += 0.12 * exp(-(p.x * p.x * 1.5 + p.y * p.y * 6.0));
-  gl_FragColor = vec4(uColor * g * vA, 1.0);
-}`;
-
 /** Eye billboards for every living zombie (own instance buffers, all LODs). */
-export function createEyeMesh(cap, uniforms, fogU, aAnim, aState, aEye) {
+export function createEyeMesh(cap, uniforms, fogU, aAnimA, aStateA, aEyeA) {
   const geo = new THREE.BufferGeometry();
   geo.setIndex([0, 1, 2, 0, 2, 3]);
   geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]), 3));
-  geo.setAttribute('aAnim', aAnim);
-  geo.setAttribute('aState', aState);
-  geo.setAttribute('aEye', aEye);
-  const mat = new THREE.ShaderMaterial({
-    uniforms: {
-      uPixel: uniforms.uPixel,
-      uEyeGlow: uniforms.uEyeGlowBillboard,
-      uColor: { value: new THREE.Color(2.4, 1.9, 1.1) },
-      ...fogU,
-    },
-    vertexShader: EYE_VERT,
-    fragmentShader: EYE_FRAG,
-    transparent: true,
-    depthWrite: false,
-    blending: THREE.CustomBlending,
-    blendEquation: THREE.AddEquation,
-    blendSrc: THREE.OneFactor,
-    blendDst: THREE.OneFactor,
+  geo.setAttribute('aAnim', aAnimA);
+  geo.setAttribute('aState', aStateA);
+  geo.setAttribute('aEye', aEyeA);
+  const mat = new THREE.MeshBasicNodeMaterial({
+    transparent: true, depthWrite: false, fog: false,
+    blending: THREE.CustomBlending, blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
   });
   const mesh = new THREE.InstancedMesh(geo, mat, cap);
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  const IM = instancedBufferAttribute(mesh.instanceMatrix, 'mat4');
+  const aAnim = attribute('aAnim', 'vec4'), aState = attribute('aState', 'vec4'), aEye = attribute('aEye', 'vec3');
+  const uColor = uniform(new THREE.Color(2.4, 1.9, 1.1));
+  const vUv = varyingProperty('vec2', 'vEyeUv'), vA = varyingProperty('float', 'vEyeA');
+  const corner = attribute('position', 'vec3');
+  mat.vertexNode = Fn(() => {
+    const world = modelWorldMatrix.mul(IM.mul(vec4(aEye, 1)));
+    const fwd = normalize(IM.mul(vec4(0, 0, 1, 0)).xyz);
+    const mv = cameraViewMatrix.mul(world).toVar();
+    const dist = mv.z.negate();
+    const toCam = normalize(cameraPosition.sub(world.xyz));
+    const facing = smoothstep(-0.05, 0.45, dot(fwd, toCam));
+    const scale = length(IM.mul(vec4(1, 0, 0, 0)).xyz);
+    const worldSize = scale.mul(0.13);
+    const minSize = uniforms.uPixel.mul(dist).mul(2.6);
+    const size = max(worldSize, minSize);
+    mv.addAssign(vec4(corner.xy.mul(size).mul(vec2(1.7, 0.7)), 0, 0));
+    vUv.assign(corner.xy.mul(2));
+    // eyes cut through ordinary haze; in a fog bank they still show, dim and smeared
+    const fogA = lbFog(world.xyz, cameraPosition, fogU.lbFogColor, fogU.lbTime, fogU.lbDawn, float(1)).a;
+    const fog = mix(fogA.mul(0.55), fogA.mul(0.4).add(0.45), clamp(fogU.lbDawn.sub(2), 0, 1));
+    vA.assign(facing.mul(float(1).sub(step(0.5, aState.w))).mul(min(aState.w, 0).add(1)).mul(float(1).sub(fog)).mul(pow(worldSize.div(size), 0.55))
+      .mul(smoothstep(12, 30, dist)).mul(uniforms.uEyeGlowBillboard).mul(float(1).sub(clamp(aState.y, 0, 1)))
+      .mul(select(aAnim.z.greaterThan(3.5), smoothstep(90, 150, dist), float(1)))); // a giant's own eyes read up close
+    return cameraProjectionMatrix.mul(mv);
+  })();
+  mat.colorNode = Fn(() => {
+    const p = vUv;
+    const d1 = length(p.sub(vec2(-0.42, 0)).mul(vec2(1, 1.3))), d2 = length(p.sub(vec2(0.42, 0)).mul(vec2(1, 1.3)));
+    const g = exp(d1.mul(d1).mul(-14)).add(exp(d2.mul(d2).mul(-14))).add(exp(p.x.mul(p.x).mul(1.5).add(p.y.mul(p.y).mul(6)).negate()).mul(0.12));
+    return vec4(uColor.mul(g).mul(vA), 1);
+  })();
   mesh.frustumCulled = false;
   mesh.renderOrder = 13;
   return mesh;

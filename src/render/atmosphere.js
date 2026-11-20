@@ -1,148 +1,126 @@
-// Atmosphere: one fog model for every material in the game.
+// Atmosphere: one fog model for every material in the game (WebGPU / TSL).
 //
-// three.js' own fog chunks are replaced globally with a physically-flavoured
-// model: thin exponential haze, a dense height-fog layer that hugs the ground
-// (patchy, drifting mist), and in-scattered light from the burning city that
-// matches the sky shader's horizon glow exactly, so far hills melt into the
-// glow instead of ending at a fog wall.
+// A physically-flavoured model: thin exponential haze, a dense height-fog layer that hugs
+// the ground (patchy, drifting mist), and in-scattered light from the burning city that
+// matches the sky shader's horizon glow exactly, so far hills melt into the glow instead of
+// ending at a fog wall.
 //
-// Built-in materials receive the fog parameters through scene.fog (a plain
-// THREE.Fog whose `near` carries time and `far` carries the dawn blend);
-// custom ShaderMaterials use `fogUniforms` + `FOG_CUSTOM_GLSL`.
+// Every node material gets it through scene.fogNode (installSceneFog). Materials that need
+// it thinner (the far city) or that add light instead of covering (glow sprites) set their
+// own with fogMaterial(); custom node shaders call lbFog() directly.
 import * as THREE from 'three';
+import { Fn, float, vec2, vec3, vec4, uniform, positionWorld, cameraPosition, mix, smoothstep, exp, max, abs, length, normalize, fract, floor, dot, select } from 'three/tsl';
 
 // colour of the city glow (shared with the sky shader)
 export const GLOW_RGB = [0.2, 0.05, 0.012];
-
-const f = (v) => (Number.isInteger(v) ? v.toFixed(1) : String(v));
 const NIGHT = { Db: 0.00155, D0: 0.0085, b: 0.15 };
 const DAWN = { Db: 0.0027, D0: 0.016, b: 0.085 };
 
-export const FOG_FUNCS = /* glsl */`
-#ifndef LB_FOG_SCALE
-#define LB_FOG_SCALE 1.0
-#endif
-float lbHash(vec2 p){ p = fract(p * vec2(233.34, 851.73)); p += dot(p, p + 23.45); return fract(p.x * p.y); }
-float lbNoise(vec2 p){
-  vec2 i = floor(p), q = fract(p);
-  vec2 u = q * q * (3.0 - 2.0 * q);
-  return mix(mix(lbHash(i), lbHash(i + vec2(1.0, 0.0)), u.x), mix(lbHash(i + vec2(0.0, 1.0)), lbHash(i + vec2(1.0, 1.0)), u.x), u.y);
-}
-// returns rgb = in-scattered colour, a = fog amount
-vec4 lbFog(vec3 wp, vec3 cam, vec3 baseCol, float t, float dawn){
-  // a fog bank rides on the dawn channel: values above 2 are 2 + bank strength (night only)
-  float bank = max(0.0, dawn - 2.0);
-  dawn = dawn > 1.5 ? 0.0 : dawn;
-  vec3 rv = wp - cam;
-  float d = length(rv);
-  vec3 rd = rv / max(d, 1e-4);
-  float Db = mix(${f(NIGHT.Db)}, ${f(DAWN.Db)}, dawn);
-  float D0 = mix(${f(NIGHT.D0)}, ${f(DAWN.D0)}, dawn);
-  float b = mix(${f(NIGHT.b)}, ${f(DAWN.b)}, dawn);
-  // a real bank lies out in the valley: the wall base and the first stretch of field stay
-  // clear, it thickens over the next tens of metres, and the far field is gone
-  float bankPath = max(d - 30.0, 0.0);
-  float bankFrac = bankPath / max(d, 1e-4);
-  float bankTau = bank * (0.0016 * 26.0) * bankPath * (0.6 + 0.4 * smoothstep(30.0, 90.0, d));
-  D0 *= 1.0 + bank * 6.0 * bankFrac;
-  b = mix(b, 0.05, bank * bankFrac);
-  // drifting, patchy ground mist
-  float m = lbNoise(wp.xz * 0.012 + t * vec2(0.010, 0.0035)) * 0.62 + lbNoise(wp.xz * 0.041 - t * vec2(0.004, 0.016)) * 0.38;
-  m = 0.22 + 1.65 * m * m;
-  float k = b * rd.y * d;
-  float hi = abs(k) < 1e-3 ? d : (1.0 - exp(-k)) / (b * rd.y);
-  float th = D0 * exp(-b * cam.y) * hi * m;
-  float tb = Db * d + bankTau;
-  vec2 dxz = normalize(rd.xz + 1e-5);
-  float toward = max(0.0, -dxz.y);
-  float glow = toward * toward * exp(-max(rd.y, 0.0) * 13.0) * mix(0.5, 0.35, dawn);
-  glow *= 1.0 - exp(-max(d - 120.0, 0.0) / 700.0);   // only long paths pick up the city's light
-  glow *= 1.0 - 0.75 * bank;                          // a dense bank swallows most of it
-  vec3 G = vec3(${GLOW_RGB.map(f).join(', ')});
-  vec3 cb = baseCol + G * glow;
-  // inside a bank everything is one milky colour: the haze/mist tint split (weighted by
-  // mist noise at the far end of the ray) would otherwise draw fogged-out skylines
-  vec3 ch = mix(baseCol * 1.75 + G * glow * 0.55, cb, bank);
-  float tau = (tb + th) * LB_FOG_SCALE;
-  vec3 col = (cb * tb + ch * th) / max(tb + th, 1e-6);
-  return vec4(col, 1.0 - exp(-tau));
-}
-`;
-
-// For custom ShaderMaterials: declare uniforms + functions.
-export const FOG_CUSTOM_GLSL = /* glsl */`
-uniform vec3 lbFogColor;
-uniform float lbTime;
-uniform float lbDawn;
-${FOG_FUNCS}
-`;
-
+/** The fog's live inputs (environment.js drives them every frame). */
 export const fogUniforms = {
-  lbFogColor: { value: new THREE.Color(0.0055, 0.006, 0.0085) },
-  lbTime: { value: 0 },
-  lbDawn: { value: 0 },
+  lbFogColor: uniform(new THREE.Color(0.0055, 0.006, 0.0085)),
+  lbTime: uniform(0),
+  lbDawn: uniform(0), // 0 night .. 1 dawn; above 2 it carries a fog bank: 2 + bank strength (night only)
 };
 
+const lbHash = Fn(([p]) => {
+  const q = fract(p.mul(vec2(233.34, 851.73))).toVar();
+  q.addAssign(dot(q, q.add(23.45)));
+  return fract(q.x.mul(q.y));
+}).setLayout({ name: 'lbHash', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
+
+export const lbNoise = Fn(([p]) => {
+  const i = floor(p), q = fract(p);
+  const u = q.mul(q).mul(q.mul(-2).add(3));
+  return mix(mix(lbHash(i), lbHash(i.add(vec2(1, 0))), u.x), mix(lbHash(i.add(vec2(0, 1))), lbHash(i.add(vec2(1, 1))), u.x), u.y);
+}).setLayout({ name: 'lbNoise', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
+
+/** rgb = in-scattered colour, a = fog amount, for a point wp seen from cam. */
+export const lbFog = Fn(([wp, cam, baseCol, t, dawnIn, scale]) => {
+  // a fog bank rides on the dawn channel: values above 2 are 2 + bank strength (night only)
+  const bank = max(0, dawnIn.sub(2));
+  const dawn = select(dawnIn.greaterThan(1.5), float(0), dawnIn);
+  const rv = wp.sub(cam);
+  const d = length(rv);
+  const rd = rv.div(max(d, 1e-4));
+  const Db = mix(NIGHT.Db, DAWN.Db, dawn);
+  const D0 = mix(NIGHT.D0, DAWN.D0, dawn).toVar();
+  const b = mix(NIGHT.b, DAWN.b, dawn).toVar();
+  // a real bank lies out in the valley: the wall base and the first stretch of field stay
+  // clear, it thickens over the next tens of metres, and the far field is gone
+  const bankPath = max(d.sub(30), 0);
+  const bankFrac = bankPath.div(max(d, 1e-4));
+  const bankTau = bank.mul(0.0016 * 26).mul(bankPath).mul(smoothstep(30, 90, d).mul(0.4).add(0.6));
+  D0.mulAssign(bank.mul(6).mul(bankFrac).add(1));
+  b.assign(mix(b, 0.05, bank.mul(bankFrac)));
+  // drifting, patchy ground mist
+  const m0 = lbNoise(wp.xz.mul(0.012).add(t.mul(vec2(0.010, 0.0035)))).mul(0.62).add(lbNoise(wp.xz.mul(0.041).sub(t.mul(vec2(0.004, 0.016)))).mul(0.38));
+  const m = m0.mul(m0).mul(1.65).add(0.22);
+  const k = b.mul(rd.y).mul(d);
+  const hi = select(abs(k).lessThan(1e-3), d, float(1).sub(exp(k.negate())).div(b.mul(rd.y)));
+  const th = D0.mul(exp(b.negate().mul(cam.y))).mul(hi).mul(m);
+  const tb = Db.mul(d).add(bankTau);
+  const dxz = normalize(rd.xz.add(1e-5));
+  const toward = max(0, dxz.y.negate());
+  const glow = toward.mul(toward).mul(exp(max(rd.y, 0).mul(-13))).mul(mix(0.5, 0.35, dawn))
+    .mul(float(1).sub(exp(max(d.sub(120), 0).div(-700))))    // only long paths pick up the city's light
+    .mul(float(1).sub(bank.mul(0.75)));                        // a dense bank swallows most of it
+  const G = vec3(...GLOW_RGB);
+  const cb = baseCol.add(G.mul(glow));
+  // inside a bank everything is one milky colour: the haze/mist tint split (weighted by
+  // mist noise at the far end of the ray) would otherwise draw fogged-out skylines
+  const ch = mix(baseCol.mul(1.75).add(G.mul(glow).mul(0.55)), cb, bank);
+  const tau = tb.add(th).mul(scale);
+  const col = cb.mul(tb).add(ch.mul(th)).div(max(tb.add(th), 1e-6));
+  return vec4(col, float(1).sub(exp(tau.negate())));
+}).setLayout({
+  name: 'lbFog', type: 'vec4', inputs: [
+    { name: 'wp', type: 'vec3' }, { name: 'cam', type: 'vec3' }, { name: 'baseCol', type: 'vec3' },
+    { name: 't', type: 'float' }, { name: 'dawnIn', type: 'float' }, { name: 'scale', type: 'float' },
+  ],
+});
+
+/** The fog at this fragment, with the shared uniforms. */
+export const fogHere = (scale = 1, wp = positionWorld) => lbFog(wp, cameraPosition, fogUniforms.lbFogColor, fogUniforms.lbTime, fogUniforms.lbDawn, float(scale));
+
+/** Apply the fog to a colour: covering (mix) or, for additive light, dimming it. */
+export function applyFog(rgb, { scale = 1, add = false, wp = positionWorld } = {}) {
+  const f = fogHere(scale, wp);
+  return add ? rgb.mul(float(1).sub(f.a)) : mix(rgb, f.rgb, f.a);
+}
+
+/**
+ * Fog a material its own way: thinner (scale < 1) or additive (light dimmed by the fog
+ * instead of covered by it). With no options it is the scene's default.
+ */
+export function fogMaterial(mat, { scale = 1, add = false } = {}) {
+  mat.fog = true;
+  mat.setupFog = function (builder, outputNode) {
+    return vec4(applyFog(outputNode.rgb, { scale, add }), outputNode.a);
+  };
+  return mat;
+}
+
+/** The default fog for every NodeMaterial (patched once on the prototype). */
 let patched = false;
 export function patchFogChunks() {
   if (patched) return;
   patched = true;
-  const C = THREE.ShaderChunk;
-  C.fog_pars_vertex = /* glsl */`
-#ifdef USE_FOG
-  varying vec3 vLbFogW;
-#endif`;
-  C.fog_vertex = /* glsl */`
-#ifdef USE_FOG
-  vLbFogW = transpose(mat3(viewMatrix)) * (mvPosition.xyz - viewMatrix[3].xyz);
-#endif`;
-  C.fog_pars_fragment = /* glsl */`
-#ifdef USE_FOG
-  uniform vec3 fogColor;
-  uniform float fogNear;
-  uniform float fogFar;
-  varying vec3 vLbFogW;
-  ${FOG_FUNCS}
-#endif`;
-  C.fog_fragment = /* glsl */`
-#ifdef USE_FOG
-  vec4 lbF = lbFog(vLbFogW, cameraPosition, fogColor, fogNear, fogFar);
-  #ifdef LB_FOG_ADD
-    gl_FragColor.rgb *= 1.0 - lbF.a;
-  #else
-    gl_FragColor.rgb = mix(gl_FragColor.rgb, lbF.rgb, lbF.a);
-  #endif
-#endif`;
+  const threeFog = THREE.NodeMaterial.prototype.setupFog;
+  THREE.NodeMaterial.prototype.setupFog = function (builder, outputNode) {
+    // the valley's fog (createSceneFog); any other scene (the hangar) keeps three's own
+    const f = builder.scene && builder.scene.fog;
+    if (!f || !f.lbFog) return threeFog.call(this, builder, outputNode);
+    return vec4(applyFog(outputNode.rgb), outputNode.a);
+  };
 }
 
-/**
- * Skip the BRDF for lights that contribute nothing at this pixel. three.js
- * already works out directLight.visible (zero colour, out of range, outside a
- * spot cone) but evaluates the full GGX term anyway. The game keeps a fixed pool
- * of point lights (so shaders never recompile) and most of them sit dark, so
- * this is a large, pixel-identical saving on every lit surface.
- */
-let lightsPatched = false;
-export function patchLightChunks() {
-  if (lightsPatched) return;
-  lightsPatched = true;
-  const C = THREE.ShaderChunk;
-  const call = 'RE_Direct( directLight, geometryPosition, geometryNormal, geometryViewDir, geometryClearcoatNormal, material, reflectedLight );';
-  if (C.lights_fragment_begin.includes(call)) {
-    C.lights_fragment_begin = C.lights_fragment_begin.split(call).join('if ( directLight.visible ) ' + call);
-  }
-  // a dark pool light (colour uniform == 0) is skipped before any per-pixel work;
-  // the branch is uniform across the draw, so it costs nothing
-  const info = 'getPointLightInfo( pointLight, geometryPosition, directLight );';
-  if (C.lights_fragment_begin.includes(info)) {
-    C.lights_fragment_begin = C.lights_fragment_begin.replace(info,
-      'directLight.visible = false; if ( any( notEqual( pointLight.color, vec3( 0.0 ) ) ) ) ' + info);
-  }
-}
+/** No-op under WebGPU: there is no GLSL light loop to patch. */
+export function patchLightChunks() {}
 
-/** The scene fog object: color = base fog colour, near = time, far = dawn. */
+/** The scene fog object: color = base fog colour, near = time, far = dawn (read by environment.js). */
 export function createSceneFog(color) {
   const fog = new THREE.Fog(color.clone(), 0, 0);
+  fog.lbFog = true;
   return fog;
 }
-

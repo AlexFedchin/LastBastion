@@ -12,6 +12,7 @@
 // and pipework still standing at the far end. The bays' surfaces are ambientCG CC0 scans (hg* sets,
 // texlib.js); the props are the game's models and Poly Haven kit (app/models/kit).
 import * as THREE from 'three';
+import { Fn, float, vec2, vec3, vec4, uniform, attribute, varyingProperty, positionLocal, modelViewMatrix, cameraProjectionMatrix, mix, smoothstep, clamp, exp, pow, length, sin, cos, fract } from 'three/tsl';
 import { RoomEnvironment } from 'three/examples/jsm/environments/RoomEnvironment.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { UPGRADES, UPGRADE_GROUPS, CLAYMORE, isUnlocked, UNLOCKS, DELIVERY_LINES, CALL } from '../config.js';
@@ -206,20 +207,15 @@ export class Hangar {
     const apron = new THREE.Mesh(wuv(new THREE.PlaneGeometry(80, 60).rotateX(-Math.PI / 2).translate(0, -0.01, -D - 30), 3), M.apron);
     apron.receiveShadow = true;
     this.scene.add(apron);
-    const skyMat = new THREE.ShaderMaterial({
-      fog: false, depthWrite: false,
-      vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: `varying vec3 vP;
-        void main(){
-          float h = clamp((vP.y + 4.0) / 70.0, 0.0, 1.0);
-          vec3 hor = vec3(2.2, 1.25, 0.72), mid = vec3(0.85, 0.55, 0.52), top = vec3(0.16, 0.2, 0.32);
-          vec3 c = mix(hor, mid, smoothstep(0.0, 0.18, h));
-          c = mix(c, top, smoothstep(0.15, 0.75, h));
-          float sun = exp(-pow(length(vec2(vP.x + 18.0, vP.y - 3.0)) / 9.0, 2.0));
-          c += vec3(3.0, 1.9, 1.0) * sun;
-          gl_FragColor = vec4(c, 1.0);
-        }`,
-    });
+    const skyMat = new THREE.MeshBasicNodeMaterial({ fog: false, depthWrite: false });
+    skyMat.colorNode = Fn(() => {
+      const vP = positionLocal;
+      const h = clamp(vP.y.add(4).div(70), 0, 1);
+      const c = mix(vec3(2.2, 1.25, 0.72), vec3(0.85, 0.55, 0.52), smoothstep(0, 0.18, h)).toVar();
+      c.assign(mix(c, vec3(0.16, 0.2, 0.32), smoothstep(0.15, 0.75, h)));
+      const sun = exp(pow(length(vec2(vP.x.add(18), vP.y.sub(3))).div(9), 2).negate());
+      return c.add(vec3(3.0, 1.9, 1.0).mul(sun));
+    })();
     const sky = new THREE.Mesh(new THREE.PlaneGeometry(260, 90).translate(0, 38, 0), skyMat);
     sky.position.z = -95;
     this.scene.add(sky);
@@ -750,18 +746,16 @@ export class Hangar {
     const L = 30;
     const basis = new THREE.Matrix4().makeBasis(V(2 * HW, 0, 0), V(0, CEIL, 0), dir.clone().multiplyScalar(L));
     const geo = new THREE.BoxGeometry(1, 1, 1).translate(0.5, 0.5, 0.5);
-    const shaft = new THREE.Mesh(geo, new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide, fog: false,
-      uniforms: { uT: { value: 0 } },
-      vertexShader: 'varying vec3 vL; void main(){ vL = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
-      fragmentShader: `varying vec3 vL; uniform float uT;
-        void main(){
-          float edge = smoothstep(0.0, 0.18, vL.x) * smoothstep(1.0, 0.82, vL.x) * smoothstep(0.0, 0.25, vL.y) * smoothstep(1.0, 0.85, vL.y);
-          float along = pow(1.0 - vL.z, 1.6) * smoothstep(0.0, 0.04, vL.z);
-          float flick = 0.92 + 0.08 * sin(uT * 0.7 + vL.x * 9.0 + vL.z * 4.0);
-          gl_FragColor = vec4(vec3(1.0, 0.72, 0.48) * edge * along * flick * 0.018, 1.0);
-        }`,
-    }));
+    const shaftMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.BackSide, fog: false });
+    shaftMat.uniforms = { uT: uniform(0) };
+    shaftMat.colorNode = Fn(() => {
+      const vL = positionLocal, uT = shaftMat.uniforms.uT;
+      const edge = smoothstep(0, 0.18, vL.x).mul(smoothstep(1, 0.82, vL.x)).mul(smoothstep(0, 0.25, vL.y)).mul(smoothstep(1, 0.85, vL.y));
+      const along = pow(float(1).sub(vL.z), 1.6).mul(smoothstep(0, 0.04, vL.z));
+      const flick = sin(uT.mul(0.7).add(vL.x.mul(9)).add(vL.z.mul(4))).mul(0.08).add(0.92);
+      return vec3(1.0, 0.72, 0.48).mul(edge).mul(along).mul(flick).mul(0.018);
+    })();
+    const shaft = new THREE.Mesh(geo, shaftMat);
     shaft.applyMatrix4(basis);
     shaft.position.set(-HW, 0, OPEN_Z - 4);
     shaft.renderOrder = 5;
@@ -770,23 +764,28 @@ export class Hangar {
     // motes
     const N = 700, pos = new Float32Array(N * 3), seed = new Float32Array(N);
     for (let i = 0; i < N; i++) { pos[i * 3] = (Math.random() - 0.5) * 2 * HW; pos[i * 3 + 1] = Math.random() * CEIL; pos[i * 3 + 2] = OPEN_Z + Math.random() * 26; seed[i] = Math.random() * 100; }
-    const g = new THREE.BufferGeometry();
-    g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-    g.setAttribute('seed', new THREE.BufferAttribute(seed, 1));
-    this.motes = new THREE.Points(g, new THREE.ShaderMaterial({
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
-      uniforms: { uT: { value: 0 }, uPx: { value: 600 } },
-      vertexShader: `attribute float seed; uniform float uT, uPx; varying float vA;
-        void main(){
-          vec3 p = position;
-          p.x += sin(uT * 0.11 + seed) * 0.6; p.y += sin(uT * 0.07 + seed * 1.7) * 0.4; p.z += cos(uT * 0.09 + seed * 0.6) * 0.5;
-          vec4 mv = modelViewMatrix * vec4(p, 1.0);
-          gl_Position = projectionMatrix * mv;
-          gl_PointSize = uPx * 0.012 / -mv.z;
-          vA = (0.4 + 0.6 * fract(seed * 7.13)) * smoothstep(0.5, 3.0, -mv.z);
-        }`,
-      fragmentShader: `varying float vA; void main(){ float d = length(gl_PointCoord - 0.5); gl_FragColor = vec4(vec3(1.0, 0.82, 0.6) * vA * smoothstep(0.5, 0.0, d) * 0.5, 1.0); }`,
-    }));
+    const g = new THREE.InstancedBufferGeometry();
+    g.setIndex([0, 1, 2, 0, 2, 3]);
+    g.setAttribute('position', new THREE.BufferAttribute(new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]), 3));
+    g.setAttribute('aMote', new THREE.InstancedBufferAttribute(pos, 3));
+    g.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seed, 1));
+    g.instanceCount = N;
+    const moteMat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    moteMat.uniforms = { uT: uniform(0), uPx: uniform(600) };
+    const vA = varyingProperty('float', 'vMoteA'), vQ = varyingProperty('vec2', 'vMoteQ');
+    moteMat.vertexNode = Fn(() => {
+      const uT = moteMat.uniforms.uT, sd = attribute('aSeed', 'float'), corner = attribute('position', 'vec3');
+      const p0 = attribute('aMote', 'vec3');
+      const p = p0.add(vec3(sin(uT.mul(0.11).add(sd)).mul(0.6), sin(uT.mul(0.07).add(sd.mul(1.7))).mul(0.4), cos(uT.mul(0.09).add(sd.mul(0.6))).mul(0.5)));
+      const mv = modelViewMatrix.mul(vec4(p, 1)).toVar();
+      // (the GL points were uPx * 0.012 / depth pixels: about 11 mm across, whatever the distance)
+      mv.addAssign(vec4(corner.xy.mul(0.0115), 0, 0));
+      vQ.assign(corner.xy);
+      vA.assign(fract(sd.mul(7.13)).mul(0.6).add(0.4).mul(smoothstep(0.5, 3.0, mv.z.negate())));
+      return cameraProjectionMatrix.mul(mv);
+    })();
+    moteMat.colorNode = Fn(() => vec3(1.0, 0.82, 0.6).mul(vA).mul(smoothstep(0.5, 0.0, length(vQ))).mul(0.5))();
+    this.motes = new THREE.Mesh(g, moteMat);
     this.motes.frustumCulled = false;
     this.scene.add(this.motes);
     // the floor ring under whatever the cursor is over

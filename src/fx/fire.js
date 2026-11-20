@@ -4,98 +4,102 @@
 // can breathe smoke and embers through the particle system, and reports
 // itself as a heat source for the screen-space haze in the post chain.
 import * as THREE from 'three';
-import { FOG_CUSTOM_GLSL, fogUniforms } from '../render/atmosphere.js';
-import { heightUniforms, HEIGHT_GLSL } from '../world/terrain.js';
+import {
+  Fn, Loop, float, vec2, vec3, vec4, uniform, attribute, varyingProperty, positionLocal, cameraPosition, cameraProjectionMatrix, cameraViewMatrix,
+  mix, smoothstep, clamp, max, abs, exp, log, pow, sin, length, normalize, dot, fract, floor, step,
+} from 'three/tsl';
+import { fogUniforms, lbFog } from '../render/atmosphere.js';
+import { lbTerrainH } from '../world/terrain.js';
 
-const VERT = /* glsl */`
-attribute vec4 iPos;   // xyz, seed
-attribute vec4 iSize;  // width, height, intensity, fog scale
-uniform float uTime;
-uniform vec2 uWind;
-varying vec2 vUv;
-varying float vSeed;
-varying float vInt;
-varying float vFog;
-${FOG_CUSTOM_GLSL}
-void main(){
-  vec3 c = iPos.xyz;
-  vec3 toCam = cameraPosition - c;
-  vec2 tc = normalize(toCam.xz + 1e-4);
-  vec3 right = vec3(tc.y, 0.0, -tc.x);
-  float y = position.y;
-  float x = position.x;
-  vec3 p = c + right * x * iSize.x + vec3(0.0, y * iSize.y, 0.0);
-  float sway = sin(uTime * 2.3 + iPos.w * 17.0) * 0.07 + sin(uTime * 5.3 + iPos.w * 5.0) * 0.035;
-  p.xz += (uWind * 0.12 + vec2(sway, sway * 0.6)) * y * y * iSize.y;
-  // pull the quad slightly towards the camera so it doesn't clip into what it burns
-  p += normalize(toCam) * min(iSize.x * 0.35, 1.5);
-  vUv = vec2(x + 0.5, y);
-  vSeed = iPos.w;
-  vInt = iSize.z;
-  vec4 f = lbFog(p, cameraPosition, lbFogColor, lbTime, lbDawn);
-  // far fires are fogged lightly so the city burns through the haze, but not through a fog bank
-  vFog = 1.0 - exp(log(max(1.0 - f.a, 1e-4)) * mix(abs(iSize.w), 1.0, clamp(lbDawn - 2.0, 0.0, 1.0)));
-  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
-}`;
+const fHash = Fn(([p0]) => {
+  const p = fract(p0.mul(vec2(127.1, 311.7))).toVar();
+  p.addAssign(dot(p, p.add(34.5)));
+  return fract(p.x.mul(p.y));
+}).setLayout({ name: 'fHash', type: 'float', inputs: [{ name: 'p0', type: 'vec2' }] });
+const fNoise = Fn(([p]) => {
+  const i = floor(p), f = fract(p);
+  const u = f.mul(f).mul(f.mul(-2).add(3));
+  return mix(mix(fHash(i), fHash(i.add(vec2(1, 0))), u.x), mix(fHash(i.add(vec2(0, 1))), fHash(i.add(vec2(1, 1))), u.x), u.y);
+}).setLayout({ name: 'fNoise', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
+const fFbm = Fn(([p0]) => {
+  const v = float(0).toVar(), a = float(0.5).toVar(), p = vec2(p0).toVar();
+  Loop(4, () => { v.addAssign(a.mul(fNoise(p))); p.assign(p.mul(2.07).add(13.7)); a.mulAssign(0.5); });
+  return v;
+}).setLayout({ name: 'fFbm', type: 'float', inputs: [{ name: 'p0', type: 'vec2' }] });
 
-const FRAG = /* glsl */`
-uniform float uTime;
-varying vec2 vUv;
-varying float vSeed;
-varying float vInt;
-varying float vFog;
-float fHash(vec2 p){ p = fract(p * vec2(127.1, 311.7)); p += dot(p, p + 34.5); return fract(p.x * p.y); }
-float fNoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(fHash(i), fHash(i + vec2(1.0, 0.0)), u.x), mix(fHash(i + vec2(0.0, 1.0)), fHash(i + vec2(1.0, 1.0)), u.x), u.y); }
-float fFbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 4; i++){ v += a * fNoise(p); p = p * 2.07 + 13.7; a *= 0.5; } return v; }
-void main(){
-  float t = uTime * (0.9 + fract(vSeed * 7.3) * 0.4) + vSeed * 37.0;
-  float x = vUv.x * 2.0 - 1.0;
-  float y = vUv.y;
-  vec2 q = vec2(x * 1.25, y * 1.5 - t * 1.35);
-  float n1 = fFbm(q * 1.7 + vSeed * 9.0);
-  float n2 = fFbm(q * 3.9 + vec2(4.1, -t * 0.7));
-  float xs = x + (n1 - 0.5) * 0.65 * y + sin(y * 6.0 - t * 3.0 + vSeed * 20.0) * 0.06 * y;
-  float width = mix(0.92, 0.06, pow(y, 0.8));
-  float body = 1.0 - abs(xs) / max(width, 0.03);
-  float heat = body * 1.15 - y * 0.95 + (n1 - 0.5) * 1.0 + (n2 - 0.5) * 0.55 + 0.22;
-  heat *= smoothstep(0.0, 0.08, y);
-  // detached licks near the top
-  heat = max(heat, (n2 - 0.62) * 2.0 * smoothstep(0.35, 0.8, y) * (1.0 - smoothstep(0.85, 1.0, y)) * step(abs(xs), 0.4));
-  heat = clamp(heat, 0.0, 1.0);
-  vec3 col = mix(vec3(0.28, 0.025, 0.0), vec3(1.0, 0.26, 0.025), smoothstep(0.04, 0.32, heat));
-  col = mix(col, vec3(1.0, 0.58, 0.13), smoothstep(0.32, 0.62, heat));
-  col = mix(col, vec3(1.0, 0.9, 0.62), smoothstep(0.68, 0.96, heat));
-  float a = smoothstep(0.02, 0.28, heat);
-  gl_FragColor = vec4(col * a * vInt * (1.0 - vFog), 1.0);
-}`;
+/** Flame billboards: camera-facing about the vertical, flames drawn per pixel. */
+function flameMaterial(U) {
+  const iPos = attribute('iPos', 'vec4');   // xyz, seed
+  const iSize = attribute('iSize', 'vec4'); // width, height, intensity, fog scale
+  const vUv = varyingProperty('vec2', 'vFireUv'), vSeed = varyingProperty('float', 'vFireSeed');
+  const vInt = varyingProperty('float', 'vFireInt'), vFog = varyingProperty('float', 'vFireFog');
+  const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  mat.vertexNode = Fn(() => {
+    const c = iPos.xyz;
+    const toCam = cameraPosition.sub(c);
+    const tc = normalize(toCam.xz.add(1e-4));
+    const right = vec3(tc.y, 0, tc.x.negate());
+    const y = positionLocal.y, x = positionLocal.x;
+    const p = c.add(right.mul(x).mul(iSize.x)).add(vec3(0, y.mul(iSize.y), 0)).toVar();
+    const sway = sin(U.uTime.mul(2.3).add(iPos.w.mul(17))).mul(0.07).add(sin(U.uTime.mul(5.3).add(iPos.w.mul(5))).mul(0.035));
+    const dxz = U.uWind.mul(0.12).add(vec2(sway, sway.mul(0.6))).mul(y).mul(y).mul(iSize.y);
+    p.addAssign(vec3(dxz.x, 0, dxz.y));
+    // pull the quad slightly towards the camera so it doesn't clip into what it burns
+    p.addAssign(normalize(toCam).mul(iSize.x.mul(0.35).min(1.5)));
+    vUv.assign(vec2(x.add(0.5), y));
+    vSeed.assign(iPos.w);
+    vInt.assign(iSize.z);
+    const f = lbFog(p, cameraPosition, fogUniforms.lbFogColor, fogUniforms.lbTime, fogUniforms.lbDawn, float(1));
+    // far fires are fogged lightly so the city burns through the haze, but not through a fog bank
+    vFog.assign(float(1).sub(exp(log(max(float(1).sub(f.a), 1e-4)).mul(mix(abs(iSize.w), 1, clamp(fogUniforms.lbDawn.sub(2), 0, 1))))));
+    return cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(p, 1)));
+  })();
+  mat.colorNode = Fn(() => {
+    const t = U.uTime.mul(fract(vSeed.mul(7.3)).mul(0.4).add(0.9)).add(vSeed.mul(37));
+    const x = vUv.x.mul(2).sub(1), y = vUv.y;
+    const q = vec2(x.mul(1.25), y.mul(1.5).sub(t.mul(1.35)));
+    const n1 = fFbm(q.mul(1.7).add(vSeed.mul(9)));
+    const n2 = fFbm(q.mul(3.9).add(vec2(4.1, t.mul(-0.7))));
+    const xs = x.add(n1.sub(0.5).mul(0.65).mul(y)).add(sin(y.mul(6).sub(t.mul(3)).add(vSeed.mul(20))).mul(0.06).mul(y));
+    const width = mix(0.92, 0.06, pow(y, 0.8));
+    const body = float(1).sub(abs(xs).div(max(width, 0.03)));
+    const heat0 = body.mul(1.15).sub(y.mul(0.95)).add(n1.sub(0.5)).add(n2.sub(0.5).mul(0.55)).add(0.22).mul(smoothstep(0, 0.08, y));
+    // detached licks near the top
+    const heat = clamp(max(heat0, n2.sub(0.62).mul(2).mul(smoothstep(0.35, 0.8, y)).mul(float(1).sub(smoothstep(0.85, 1, y))).mul(step(abs(xs), 0.4))), 0, 1);
+    const col = mix(vec3(0.28, 0.025, 0), vec3(1, 0.26, 0.025), smoothstep(0.04, 0.32, heat)).toVar();
+    col.assign(mix(col, vec3(1, 0.58, 0.13), smoothstep(0.32, 0.62, heat)));
+    col.assign(mix(col, vec3(1, 0.9, 0.62), smoothstep(0.68, 0.96, heat)));
+    const a = smoothstep(0.02, 0.28, heat);
+    return col.mul(a).mul(vInt).mul(float(1).sub(vFog));
+  })();
+  return mat;
+}
 
-const GLOW_VERT = /* glsl */`
-${HEIGHT_GLSL}
-attribute vec4 iPos;
-attribute vec4 iSize;
-uniform float uTime;
-varying vec2 vR;
-varying float vK;
-void main(){
-  float r = iSize.x * 1.7 + 1.2;
-  vec2 xz = iPos.xz + position.xz * r;
-  float y = lbTerrainH(xz) + 0.07;
-  vR = position.xz;
-  float fl = 0.8 + 0.2 * sin(uTime * 9.0 + iPos.w * 40.0) * sin(uTime * 13.7 + iPos.w * 10.0);
-  // only fires near the ground light it
-  float nearGround = 1.0 - smoothstep(1.5, 5.0, iPos.y - lbTerrainH(iPos.xz));
-  vK = iSize.z * fl * nearGround * step(0.5, iSize.w);
-  gl_Position = projectionMatrix * viewMatrix * vec4(xz.x, y, xz.y, 1.0);
-}`;
-const GLOW_FRAG = /* glsl */`
-varying vec2 vR;
-varying float vK;
-void main(){
-  float r = length(vR);
-  float a = pow(max(0.0, 1.0 - r), 2.2) * vK * 0.016;
-  gl_FragColor = vec4(vec3(1.0, 0.42, 0.11) * a, 1.0);
-}`;
+/** The additive glow each fire lays on the ground under it. */
+function groundGlowMaterial(U) {
+  const iPos = attribute('iPos', 'vec4'), iSize = attribute('iSize', 'vec4');
+  const vR = varyingProperty('vec2', 'vGlowR'), vK = varyingProperty('float', 'vGlowK');
+  const mat = new THREE.MeshBasicNodeMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
+    polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
+  });
+  mat.vertexNode = Fn(() => {
+    const r = iSize.x.mul(1.7).add(1.2);
+    const xz = iPos.xz.add(positionLocal.xz.mul(r));
+    const y = lbTerrainH(xz).add(0.07);
+    vR.assign(positionLocal.xz);
+    const fl = sin(U.uTime.mul(9).add(iPos.w.mul(40))).mul(sin(U.uTime.mul(13.7).add(iPos.w.mul(10)))).mul(0.2).add(0.8);
+    // only fires near the ground light it
+    const nearGround = float(1).sub(smoothstep(1.5, 5.0, iPos.y.sub(lbTerrainH(iPos.xz))));
+    vK.assign(iSize.z.mul(fl).mul(nearGround).mul(step(0.5, iSize.w)));
+    return cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(xz.x, y, xz.y, 1)));
+  })();
+  mat.colorNode = Fn(() => {
+    const a = pow(max(0, float(1).sub(length(vR))), 2.2).mul(vK).mul(0.016);
+    return vec3(1, 0.42, 0.11).mul(a);
+  })();
+  return mat;
+}
 
 export class FireSystem {
   constructor(scene, quality) {
@@ -127,11 +131,8 @@ export class FireSystem {
     quad.setAttribute('iSize', this.aSize);
     quad.instanceCount = 0;
     this.geo = quad;
-    this.uniforms = { uTime: { value: 0 }, uWind: { value: new THREE.Vector2(0.8, 0.3) }, ...fogUniforms };
-    this.mesh = new THREE.Mesh(quad, new THREE.ShaderMaterial({
-      uniforms: this.uniforms, vertexShader: VERT, fragmentShader: FRAG,
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    }));
+    this.uniforms = { uTime: uniform(0), uWind: uniform(new THREE.Vector2(0.8, 0.3)) };
+    this.mesh = new THREE.Mesh(quad, flameMaterial(this.uniforms));
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = 13;
     scene.add(this.mesh);
@@ -145,12 +146,7 @@ export class FireSystem {
     g2.setAttribute('iSize', this.aSize);
     g2.instanceCount = 0;
     this.geo2 = g2;
-    this.glowMesh = new THREE.Mesh(g2, new THREE.ShaderMaterial({
-      uniforms: { uTime: this.uniforms.uTime, ...heightUniforms() },
-      vertexShader: GLOW_VERT, fragmentShader: GLOW_FRAG,
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-      polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
-    }));
+    this.glowMesh = new THREE.Mesh(g2, groundGlowMaterial(this.uniforms));
     this.glowMesh.frustumCulled = false;
     this.glowMesh.renderOrder = 3;
     scene.add(this.glowMesh);

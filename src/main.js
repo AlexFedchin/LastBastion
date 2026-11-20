@@ -2,6 +2,7 @@
 //  LAST BASTION — entry point and game state machine
 // ─────────────────────────────────────────────────────────────────────────────
 import * as THREE from 'three';
+import { uniform } from 'three/tsl';
 import {
   WORLD, DIFFICULTY, ZOMBIE_TYPES, ZT, UPGRADES, CLAYMORE, FINAL_NIGHT, RADIO, BARKS,
   nightPlan, baseStats, SUPPLY_BONUS, sectionCenterX, wallZ, wallDist, ABILITY, CALL, COMMS,
@@ -76,15 +77,18 @@ class Game {
     this.loader = new Loader();
     const BOOT_STEPS = 9;
     let stepN = 0;
-    const step = async (t) => { this.loader.step(t, stepN++ / BOOT_STEPS); await nextFrame(); };
+    const step = async (t) => { if (TEST) console.info('[boot]', t); this.loader.step(t, stepN++ / BOOT_STEPS); await nextFrame(); };
     await step('warming the generators…');
     const modelsLoaded = loadModels();
     const texturesLoaded = loadTextures(this.quality);
     const canvas = document.getElementById('game');
     this.canvas = canvas;
-    const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false });
+    // WebGPU (three's WebGPURenderer; it falls back to WebGL2 where WebGPU is missing)
+    const renderer = new THREE.WebGPURenderer({ canvas, antialias: false, powerPreference: 'high-performance', stencil: false, trackTimestamp: true });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, this.quality.pixelRatio));
     renderer.setSize(window.innerWidth, window.innerHeight, false);
+    await renderer.init();
+    console.info(`[render] ${renderer.backend.isWebGPUBackend ? 'WebGPU' : 'WebGL2 fallback'}`);
     renderer.toneMapping = THREE.NoToneMapping;
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.shadowMap.enabled = this.quality.spotShadows > 0;
@@ -106,12 +110,13 @@ class Game {
       const f = this.fx[k].bind(this.fx);
       this.fx[k] = (x, y, z, ...rest) => { if (this.env.crows) this.env.crows.scare(x, z, k === 'bigExplosion' ? 70 : 40); return f(x, y, z, ...rest); };
     }
+    // (TSL uniforms: the zombie, eye and soldier node materials read them; each has a .value)
     this.uniforms = {
-      uTime: { value: 0 },
-      uEyeGlow: { value: 9 },
-      uRim: { value: new THREE.Color(0.075, 0.032, 0.014) },
-      uEyeGlowBillboard: { value: 1 },
-      uPixel: { value: 0.001 },
+      uTime: uniform(0),
+      uEyeGlow: uniform(9),
+      uRim: uniform(new THREE.Color(0.075, 0.032, 0.014)),
+      uEyeGlowBillboard: uniform(1),
+      uPixel: uniform(0.001),
       // the sodium lamps on the wall light the dead beneath them
       uLamps: { value: (this.env.wallLamps || []).slice(0, 10) },
       uLampPow: { value: 1 },
@@ -165,7 +170,7 @@ class Game {
     this.horde.update(0.016, 0);
     this.horde.syncRender();
     this.updateMenuCamera(0);
-    renderer.compile(this.scene, this.camera);
+    await renderer.compileAsync(this.scene, this.camera);
     this.post.render(0.016, 0);
 
     // first launch: measure this machine and pick the graphics preset
@@ -218,8 +223,8 @@ class Game {
 
   /** Median GPU time (ms) of a heavy night frame seen from the gun. */
   async benchmarkFrame() {
-    const r = this.renderer, gl = r.getContext(), cam = this.camera;
-    const ext = gl.getExtension('EXT_disjoint_timer_query_webgl2');
+    const r = this.renderer, cam = this.camera;
+    const device = r.backend.device; // (WebGPU; the WebGL2 fallback has none and uses wall time)
     // the gunner's view
     cam.position.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z);
     cam.rotation.order = 'YXZ';
@@ -230,7 +235,8 @@ class Game {
     // a heavy night: a big horde, fire and blasts
     for (let i = 0; i < 700; i++) this.horde.spawn(Math.random() < 0.8 ? ZT.SHAMBLER : ZT.RUNNER, rand(-80, 80), rand(-190, -20), 1, 1);
     for (let k = 0; k < 6; k++) this.fx.explosion(rand(-40, 40), 0, rand(-120, -40), 1.4);
-    const frames = 36, warm = 10, qs = [], wall = [];
+    const frames = 36, warm = 10, wall = [];
+    let times = [];
     let t = 0;
     for (let k = 0; k < frames + warm; k++) {
       t += 1 / 60;
@@ -238,23 +244,16 @@ class Game {
       this.horde.syncRender();
       this.env.update(1 / 60, t, this.horde, this.fx, this.audio);
       this.fx.update(1 / 60);
-      let q = null;
-      if (ext && k >= warm) { q = gl.createQuery(); gl.beginQuery(ext.TIME_ELAPSED_EXT, q); }
       const a = performance.now();
       this.post.render(1 / 60, t);
-      if (q) { gl.endQuery(ext.TIME_ELAPSED_EXT); qs.push(q); }
-      const px = new Uint8Array(4);
-      gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, px); // wait for the GPU
+      if (device) await device.queue.onSubmittedWorkDone(); // wait for the GPU
       if (k >= warm) wall.push(performance.now() - a);
+      // GPU time: every render pass of the frame, from timestamp queries
+      try {
+        const ms = await r.resolveTimestampsAsync(THREE.TimestampQuery.RENDER);
+        if (k >= warm && ms > 0) times.push(ms);
+      } catch { /* no timestamp queries */ }
       if (k % 6 === 0) await nextFrame();
-    }
-    let times = [];
-    if (ext && !gl.getParameter(ext.GPU_DISJOINT_EXT)) {
-      for (const q of qs) {
-        for (let n = 0; n < 60 && !gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE); n++) await nextFrame();
-        if (gl.getQueryParameter(q, gl.QUERY_RESULT_AVAILABLE)) times.push(gl.getQueryParameter(q, gl.QUERY_RESULT) / 1e6);
-        gl.deleteQuery(q);
-      }
     }
     if (times.length < frames / 2) times = wall; // no timer queries: wall time with a GPU sync
     // back to the attract mode the menu expects
@@ -324,8 +323,7 @@ class Game {
     const hidden = [];
     this.scene.traverse((o) => { if (!o.visible) { hidden.push(o); o.visible = true; } });
     try {
-      if (this.renderer.compileAsync) await this.renderer.compileAsync(this.scene, this.camera);
-      else this.renderer.compile(this.scene, this.camera);
+      await this.renderer.compileAsync(this.scene, this.camera);
       // compiling doesn't upload textures or build the shadow-pass shaders: the first sight of
       // a helicopter or a bomber still hitched for a third of a second. Upload every texture
       // now, and draw one frame offscreen with everything showing and nothing culled.
@@ -338,7 +336,7 @@ class Game {
       });
       const culled = [];
       for (const h of hidden) h.traverse((o) => { if (o.frustumCulled) { culled.push(o); o.frustumCulled = false; } });
-      const rt = this.warmRT || (this.warmRT = new THREE.WebGLRenderTarget(64, 64, { type: THREE.HalfFloatType }));
+      const rt = this.warmRT || (this.warmRT = new THREE.RenderTarget(64, 64, { type: THREE.HalfFloatType }));
       const prev = this.renderer.getRenderTarget();
       this.renderer.setRenderTarget(rt);
       this.renderer.render(this.scene, this.camera);
@@ -848,7 +846,7 @@ class Game {
     this.hud.show(false);
     const first = !this.hangar.built;
     this.hangar.enter(this.run, this.report);
-    if (first) this.renderer.compile(this.hangar.scene, this.hangar.camera);
+    if (first) this.renderer.compileAsync(this.hangar.scene, this.hangar.camera).catch(() => {});
     this.screens.buildShop(this.run, this.report);
     this.screens.show('shop');
   }
@@ -1477,7 +1475,7 @@ class Game {
 
 const game = new Game();
 game.boot().catch((err) => {
-  console.error(err);
+  console.error(err && err.stack ? err.stack : err);
   const sub = document.getElementById('ld-sub');
   if (sub) sub.textContent = 'Failed to start: ' + (err && err.message ? err.message : err);
 });

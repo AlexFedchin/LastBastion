@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import { makeRng } from '../core/util.js';
+import { Fn, float, vec3, vec4, positionWorld, materialColor, materialRoughness, mix, smoothstep, fract, floor } from 'three/tsl';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -119,40 +120,42 @@ export function extrude(points, depth, bevel = 0.02, holes = []) {
 // ── materials ───────────────────────────────────────────────────────────────
 /** World-space grime / soot / variation added to any standard material. */
 export function weather(mat, { soot = 0.5, rust = 0.0, wet = 0.3, scale = 0.6, key = 'w' } = {}) {
-  const prev = mat.onBeforeCompile;
-  mat.onBeforeCompile = (sh, r) => {
-    if (prev) prev(sh, r);
-    sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nvarying vec3 vWW;')
-      .replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
-      {
-        vec4 wpw = vec4(transformed, 1.0);
-        #ifdef USE_INSTANCING
-          wpw = instanceMatrix * wpw;
-        #endif
-        vWW = (modelMatrix * wpw).xyz;
-      }`);
-    sh.fragmentShader = sh.fragmentShader.replace('#include <common>', `#include <common>
-      varying vec3 vWW;
-      float wHash(vec3 p){ p = fract(p * 0.3183099 + 0.1); p *= 17.0; return fract(p.x * p.y * p.z * (p.x + p.y + p.z)); }
-      float wNoise(vec3 x){ vec3 i = floor(x), f = fract(x); f = f * f * (3.0 - 2.0 * f);
-        return mix(mix(mix(wHash(i), wHash(i + vec3(1,0,0)), f.x), mix(wHash(i + vec3(0,1,0)), wHash(i + vec3(1,1,0)), f.x), f.y),
-                   mix(mix(wHash(i + vec3(0,0,1)), wHash(i + vec3(1,0,1)), f.x), mix(wHash(i + vec3(0,1,1)), wHash(i + vec3(1,1,1)), f.x), f.y), f.z); }`)
-      .replace('#include <map_fragment>', `#include <map_fragment>
-      {
-        float wn = wNoise(vWW * ${scale.toFixed(3)}) * 0.6 + wNoise(vWW * ${(scale * 4.3).toFixed(3)}) * 0.4;
-        float sootM = smoothstep(0.35, 0.8, wn) * ${soot.toFixed(3)};
-        diffuseColor.rgb *= 1.0 - sootM * 0.8;
-        float rustM = smoothstep(0.55, 0.85, wNoise(vWW * ${(scale * 2.1).toFixed(3)} + 7.0)) * ${rust.toFixed(3)};
-        diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.16, 0.07, 0.03), rustM);
-        diffuseColor.rgb *= 0.82 + 0.36 * wNoise(vWW * ${(scale * 0.35).toFixed(3)} + 3.0);
-      }`)
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-      roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.6, ${wet.toFixed(3)} * smoothstep(0.4, 0.7, wNoise(vWW * 0.9 + 11.0)));`);
-  };
-  const ck = mat.customProgramCacheKey ? mat.customProgramCacheKey.bind(mat) : () => '';
-  mat.customProgramCacheKey = () => ck() + '|weather-' + key + soot + rust + wet + scale;
+  void key;
+  const base = mat.colorNode || materialColor, baseR = mat.roughnessNode || materialRoughness;
+  const wp = positionWorld; // (instancing included)
+  mat.colorNode = Fn(() => {
+    const b4 = vec4(base);
+    const wn = wNoise(wp.mul(scale)).mul(0.6).add(wNoise(wp.mul(scale * 4.3)).mul(0.4));
+    const sootM = smoothstep(0.35, 0.8, wn).mul(soot);
+    let c = b4.rgb.mul(float(1).sub(sootM.mul(0.8)));
+    if (rust > 0) {
+      const rustM = smoothstep(0.55, 0.85, wNoise(wp.mul(scale * 2.1).add(7))).mul(rust);
+      c = mix(c, vec3(0.16, 0.07, 0.03), rustM);
+    }
+    c = c.mul(wNoise(wp.mul(scale * 0.35).add(3)).mul(0.36).add(0.82));
+    return vec4(c, b4.a);
+  })();
+  mat.roughnessNode = Fn(() => {
+    const r = float(baseR);
+    return mix(r, r.mul(0.6), smoothstep(0.4, 0.7, wNoise(wp.mul(0.9).add(11))).mul(wet));
+  })();
   return mat;
 }
+
+const wHash = Fn(([p0]) => {
+  const p = fract(p0.mul(0.3183099).add(0.1)).mul(17).toVar();
+  return fract(p.x.mul(p.y).mul(p.z).mul(p.x.add(p.y).add(p.z)));
+}).setLayout({ name: 'wHash', type: 'float', inputs: [{ name: 'p0', type: 'vec3' }] });
+
+/** Value noise in 3D (world-space grime, shared by the weathered materials). */
+export const wNoise = Fn(([x]) => {
+  const i = floor(x), f0 = fract(x);
+  const f = f0.mul(f0).mul(f0.mul(-2).add(3));
+  const h = (o) => wHash(i.add(vec3(...o)));
+  return mix(
+    mix(mix(h([0, 0, 0]), h([1, 0, 0]), f.x), mix(h([0, 1, 0]), h([1, 1, 0]), f.x), f.y),
+    mix(mix(h([0, 0, 1]), h([1, 0, 1]), f.x), mix(h([0, 1, 1]), h([1, 1, 1]), f.x), f.y), f.z);
+}).setLayout({ name: 'wNoise', type: 'float', inputs: [{ name: 'x', type: 'vec3' }] });
 
 export function makeMaterials(tex) {
   const M = {};

@@ -1,10 +1,10 @@
-// WebGPU spike bundle: src/spike/webgpu.js -> app/build/spike.js, opened by app/spike.html.
+﻿// WebGPU spike bundle: src/spike/webgpu.js -> app/build/spike.js, opened by app/spike.html.
 // Every bare `three` import (the game's world code, GLTFLoader) goes to the WebGPU build
-// through src/spike/three-shim.js; the game's own bundle (scripts/build.mjs) is untouched.
+// through src/render/three-shim.js; the game's own bundle (scripts/build.mjs) is untouched.
 import * as esbuild from 'esbuild';
 import path from 'node:path';
 
-const shim = path.resolve('src/spike/three-shim.js');
+const shim = path.resolve('src/render/three-shim.js');
 const threeToWebGPU = {
   name: 'three-to-webgpu',
   setup(b) {

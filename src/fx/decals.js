@@ -1,7 +1,8 @@
 // Ground decals (blood, scorch marks, craters) as one instanced mesh that
 // takes part in lighting, so wet blood catches the searchlights.
 import * as THREE from 'three';
-import { heightUniforms, HEIGHT_GLSL } from '../world/terrain.js';
+import { Fn, vec2, vec3, vec4, attribute, texture, uv, positionLocal, floor, mod } from 'three/tsl';
+import { lbTerrainH } from '../world/terrain.js';
 
 export class Decals {
   constructor(scene, atlas, capacity = 4000) {
@@ -11,6 +12,10 @@ export class Decals {
     const geo = new THREE.PlaneGeometry(1, 1, 4, 4).rotateX(-Math.PI / 2);
     this.aFrame = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1).setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aFrame', this.aFrame);
+    // the placement again as (x, z, cos * size, sin * size): the vertex shader lays each corner on
+    // the ground under it before the instance matrix moves it there
+    this.aDec = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4).setUsage(THREE.DynamicDrawUsage);
+    geo.setAttribute('aDec', this.aDec);
     const mat = new THREE.MeshStandardMaterial({
       map: atlas,
       transparent: true,
@@ -21,19 +26,19 @@ export class Decals {
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -4,
     });
-    const hu = heightUniforms();
-    mat.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, hu);
-      shader.vertexShader = 'attribute float aFrame;\n' + HEIGHT_GLSL + shader.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-        { vec4 dw = instanceMatrix * vec4(transformed, 1.0); transformed.y += lbTerrainH(dw.xz); }`).replace(
-        '#include <uv_vertex>',
-        `#include <uv_vertex>
-        #ifdef USE_MAP
-          float zfr = floor(aFrame + 0.5);
-          vec2 zcell = vec2(mod(zfr, 4.0), 3.0 - floor(zfr / 4.0));
-          vMapUv = (zcell + uv) / 4.0;
-        #endif`);
-    };
+    const aDec = attribute('aDec', 'vec4'), aFrame = attribute('aFrame', 'float');
+    mat.positionNode = Fn(() => {
+      const p = positionLocal;
+      const wx = aDec.x.add(aDec.z.mul(p.x)).add(aDec.w.mul(p.z));
+      const wz = aDec.y.sub(aDec.w.mul(p.x)).add(aDec.z.mul(p.z));
+      return vec3(p.x, p.y.add(lbTerrainH(vec2(wx, wz))), p.z);
+    })();
+    const map = texture(atlas);
+    mat.colorNode = Fn(() => {
+      const zfr = floor(aFrame.add(0.5));
+      const zcell = vec2(mod(zfr, 4), floor(zfr.div(4)).negate().add(3));
+      return map.sample(zcell.add(uv()).div(4));
+    })();
     this.mesh = new THREE.InstancedMesh(geo, mat, capacity);
     this.mesh.count = 0;
     this.mesh.frustumCulled = false;
@@ -59,6 +64,8 @@ export class Decals {
     m[o + 8] = s; m[o + 9] = 0; m[o + 10] = c; m[o + 11] = 0;
     m[o + 12] = x; m[o + 13] = y + 0.015 + this._yJitter * 0.0006; m[o + 14] = z; m[o + 15] = 1;
     this.aFrame.array[i] = frame;
+    const D = this.aDec.array;
+    D[i * 4] = x; D[i * 4 + 1] = z; D[i * 4 + 2] = c; D[i * 4 + 3] = s;
     const col = this.mesh.instanceColor.array;
     col[i * 3] = r; col[i * 3 + 1] = g; col[i * 3 + 2] = b;
     this._dirty = true;
@@ -73,5 +80,6 @@ export class Decals {
     this.mesh.instanceMatrix.needsUpdate = true;
     this.mesh.instanceColor.needsUpdate = true;
     this.aFrame.needsUpdate = true;
+    this.aDec.needsUpdate = true;
   }
 }

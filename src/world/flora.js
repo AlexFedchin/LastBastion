@@ -7,6 +7,7 @@
 // The tall trees are low-poly cards: they go only on the hills. The bushes and rocks go on
 // the battlefield (and the farmland behind the base); the dead trees stand in the field.
 import * as THREE from 'three';
+import { Fn, uv, max, dot, dFdx, dFdy, log2, materialOpacity } from 'three/tsl';
 
 // heights of the pack's variants (build log), and what each one is
 const TREES = [
@@ -98,14 +99,10 @@ export function placeDeadTree(env, m, group = '') {
 export function patchFoliage(mat) {
   if (!mat || !(mat.alphaTest > 0) || mat.userData.foliage) return;
   mat.userData.foliage = true;
-  mat.onBeforeCompile = (sh) => {
-    sh.fragmentShader = sh.fragmentShader.replace('#include <alphatest_fragment>', `
-      #ifdef USE_MAP
-        { vec2 tu = vMapUv * 1024.0; float lod = max(0.0, 0.5 * log2(max(dot(dFdx(tu), dFdx(tu)), dot(dFdy(tu), dFdy(tu)))));
-          diffuseColor.a = min(1.0, diffuseColor.a * (1.0 + 0.33 * lod)); }
-      #endif
-      #include <alphatest_fragment>`);
-  };
-  mat.customProgramCacheKey = () => 'lb-foliage-v1';
+  mat.opacityNode = Fn(() => {
+    const tu = uv().mul(1024);
+    const lod = max(0, log2(max(dot(dFdx(tu), dFdx(tu)), dot(dFdy(tu), dFdy(tu)))).mul(0.5));
+    return materialOpacity.mul(lod.mul(0.33).add(1));
+  })();
   mat.needsUpdate = true;
 }

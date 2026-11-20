@@ -2,86 +2,81 @@
 // Supports round (rotating) billboards and velocity-stretched streaks
 // (tracers, sparks, blood jets) with correct perspective.
 import * as THREE from 'three';
-import { FOG_CUSTOM_GLSL } from '../render/atmosphere.js';
+import {
+  Fn, If, Discard, float, vec2, vec3, vec4, uniform, attribute, texture, varyingProperty, positionLocal, cameraPosition, cameraProjectionMatrix,
+  modelViewMatrix, mix, smoothstep, clamp, max, length, normalize, cross, cos, sin, floor, mod, select,
+} from 'three/tsl';
+import { fogUniforms, lbFog } from '../render/atmosphere.js';
 
-const VERT = /* glsl */`
-attribute vec3 iPos;
-attribute vec3 iVel;
-attribute vec4 iData;   // size, rotation, stretch, frame
-attribute vec4 iColor;  // rgb (HDR), alpha
-uniform vec2 uAtlas;
-varying vec2 vUv;
-varying vec4 vColor;
-varying float vFog;
-varying vec3 vFogCol;
-${FOG_CUSTOM_GLSL}
-void main() {
-  vec4 mv = modelViewMatrix * vec4(iPos, 1.0);
-  float size = iData.x;
-  float stretch = iData.z;
-  vec2 corner = position.xy;
-  vec3 p = mv.xyz;
-  if (stretch > 0.0) {
-    vec3 vv = (modelViewMatrix * vec4(iVel, 0.0)).xyz;
-    vec3 head = mv.xyz;
-    vec3 tail = head - vv * stretch;
-    vec3 axis = head - tail;
-    float len = length(axis);
-    axis = len > 1e-4 ? axis / len : vec3(0.0, 1.0, 0.0);
-    vec3 viewDir = normalize(mix(head, tail, 0.5));
-    // (viewDir x axis keeps the quad's winding facing the camera; the other order mirrors it and it gets culled)
-    vec3 perp = cross(viewDir, axis);
-    float pl = length(perp);
-    perp = pl > 1e-4 ? perp / pl : vec3(1.0, 0.0, 0.0);
-    // extend the streak by half a size at both ends so it is never degenerate
-    vec3 a = tail - axis * size * 0.5;
-    vec3 b = head + axis * size * 0.5;
-    p = mix(a, b, corner.y + 0.5) + perp * corner.x * size;
+/** Billboards (round, rotating) and velocity-stretched streaks, oriented on the GPU. */
+function particleMaterial(atlas, additive) {
+  const iPos = attribute('iPos', 'vec3'), iVel = attribute('iVel', 'vec3');
+  const iData = attribute('iData', 'vec4');   // size, rotation, stretch, frame
+  const iColor = attribute('iColor', 'vec4'); // rgb (HDR), alpha
+  const uAtlas = uniform(new THREE.Vector2(4, 4));
+  const vUv = varyingProperty('vec2', 'vPUv'), vColor = varyingProperty('vec4', 'vPColor');
+  const vFog = varyingProperty('float', 'vPFog'), vFogCol = varyingProperty('vec3', 'vPFogCol');
+  const map = texture(atlas);
+  const mat = new THREE.MeshBasicNodeMaterial({
+    transparent: true, depthWrite: false, fog: false,
+    blending: additive ? THREE.CustomBlending : THREE.NormalBlending,
+    blendEquation: THREE.AddEquation, blendSrc: THREE.OneFactor, blendDst: THREE.OneFactor,
+  });
+  mat.vertexNode = Fn(() => {
+    const mv = modelViewMatrix.mul(vec4(iPos, 1));
+    const size = iData.x, stretch = iData.z;
+    const corner = positionLocal.xy;
+    const p = vec3(mv.xyz).toVar();
+    If(stretch.greaterThan(0), () => {
+      const vv = modelViewMatrix.mul(vec4(iVel, 0)).xyz;
+      const head = mv.xyz;
+      const tail = head.sub(vv.mul(stretch));
+      const ax0 = head.sub(tail);
+      const len = length(ax0);
+      const axis = select(len.greaterThan(1e-4), ax0.div(len), vec3(0, 1, 0)).toVar();
+      const viewDir = normalize(mix(head, tail, 0.5));
+      // (viewDir x axis keeps the quad's winding facing the camera)
+      const pp = cross(viewDir, axis);
+      const pl = length(pp);
+      const perp = select(pl.greaterThan(1e-4), pp.div(pl), vec3(1, 0, 0));
+      // extend the streak by half a size at both ends so it is never degenerate
+      const A = tail.sub(axis.mul(size).mul(0.5));
+      const B = head.add(axis.mul(size).mul(0.5));
+      p.assign(mix(A, B, corner.y.add(0.5)).add(perp.mul(corner.x).mul(size)));
+    }).Else(() => {
+      const c = cos(iData.y), s = sin(iData.y);
+      p.addAssign(vec3(vec2(c.mul(corner.x).sub(s.mul(corner.y)), s.mul(corner.x).add(c.mul(corner.y))).mul(size), 0));
+    });
+    const f = floor(iData.w.add(0.5));
+    const cell = vec2(mod(f, uAtlas.x), uAtlas.y.sub(1).sub(floor(f.div(uAtlas.x))));
+    vUv.assign(cell.add(corner).add(0.5).div(uAtlas));
+    const lf = lbFog(iPos, cameraPosition, fogUniforms.lbFogColor, fogUniforms.lbTime, fogUniforms.lbDawn, float(1));
+    // fire is a light source: in the fog bank a blast still burns through and lights the murk,
+    // so the hottest particles (colours well above 1) shed most of the bank's veil
+    const hot = smoothstep(1.5, 4.0, max(iColor.r, max(iColor.g, iColor.b)));
+    vFog.assign(lf.a.mul(float(1).sub(hot.mul(0.75).mul(clamp(fogUniforms.lbDawn.sub(2), 0, 1)))));
+    vFogCol.assign(lf.rgb);
+    // fade particles that are right in the camera's face
+    vColor.assign(vec4(iColor.rgb, iColor.a.mul(smoothstep(0.15, 1.2, p.z.negate()))));
+    return cameraProjectionMatrix.mul(vec4(p, 1));
+  })();
+  if (additive) {
+    mat.colorNode = Fn(() => {
+      const t = map.sample(vUv);
+      const a = t.a.mul(vColor.a).mul(float(1).sub(vFog));
+      return vec4(t.rgb.mul(vColor.rgb).mul(a), 1);
+    })();
   } else {
-    float c = cos(iData.y), s = sin(iData.y);
-    p.xy += vec2(c * corner.x - s * corner.y, s * corner.x + c * corner.y) * size;
+    mat.colorNode = Fn(() => {
+      const t = map.sample(vUv);
+      const a = t.a.mul(vColor.a);
+      If(a.lessThan(0.004), () => { Discard(); });
+      return vec4(mix(t.rgb.mul(vColor.rgb), vFogCol, vFog), a.mul(float(1).sub(vFog.mul(0.6))));
+    })();
   }
-  gl_Position = projectionMatrix * vec4(p, 1.0);
-  float f = floor(iData.w + 0.5);
-  vec2 cell = vec2(mod(f, uAtlas.x), uAtlas.y - 1.0 - floor(f / uAtlas.x));
-  vUv = (cell + corner + 0.5) / uAtlas;
-  vColor = iColor;
-  float d = -p.z;
-  vec4 lf = lbFog(iPos, cameraPosition, lbFogColor, lbTime, lbDawn);
-  vFog = lf.a;
-  // fire is a light source: in the fog bank a blast still burns through and lights the murk,
-  // so the hottest particles (colours well above 1) shed most of the bank's veil
-  float hot = smoothstep(1.5, 4.0, max(iColor.r, max(iColor.g, iColor.b)));
-  vFog *= 1.0 - 0.75 * hot * clamp(lbDawn - 2.0, 0.0, 1.0);
-  vFogCol = lf.rgb;
-  // fade particles that are right in the camera's face
-  vColor.a *= smoothstep(0.15, 1.2, d);
-}`;
-
-const FRAG_ADD = /* glsl */`
-uniform sampler2D uMap;
-varying vec2 vUv;
-varying vec4 vColor;
-varying float vFog;
-void main() {
-  vec4 t = texture2D(uMap, vUv);
-  float a = t.a * vColor.a * (1.0 - vFog);
-  gl_FragColor = vec4(t.rgb * vColor.rgb * a, 1.0);
-}`;
-
-const FRAG_ALPHA = /* glsl */`
-uniform sampler2D uMap;
-varying vec2 vUv;
-varying vec4 vColor;
-varying float vFog;
-varying vec3 vFogCol;
-void main() {
-  vec4 t = texture2D(uMap, vUv);
-  float a = t.a * vColor.a;
-  if (a < 0.004) discard;
-  vec3 col = mix(t.rgb * vColor.rgb, vFogCol, vFog);
-  gl_FragColor = vec4(col, a * (1.0 - vFog * 0.6));
-}`;
+  mat.uniforms = { uAtlas };
+  return mat;
+}
 
 export class ParticleSystem {
   /**
@@ -125,22 +120,8 @@ export class ParticleSystem {
     geo.instanceCount = 0;
     this.geo = geo;
 
-    const uniforms = {
-      uMap: { value: atlas },
-      uAtlas: { value: new THREE.Vector2(4, 4) },
-      ...fogUniforms,
-    };
-    this.material = new THREE.ShaderMaterial({
-      uniforms,
-      vertexShader: VERT,
-      fragmentShader: additive ? FRAG_ADD : FRAG_ALPHA,
-      transparent: true,
-      depthWrite: false,
-      blending: additive ? THREE.CustomBlending : THREE.NormalBlending,
-      blendEquation: THREE.AddEquation,
-      blendSrc: THREE.OneFactor,
-      blendDst: THREE.OneFactor,
-    });
+    this.material = particleMaterial(atlas, additive);
+    void fogUniforms;
     this.mesh = new THREE.Mesh(geo, this.material);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = renderOrder;

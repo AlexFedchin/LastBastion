@@ -11,6 +11,7 @@
 // the far ends of the wall, and go up when the gun or a blast comes near them; at first light
 // a flock comes down among the dead to feed.
 import * as THREE from 'three';
+import { Fn, float, vec3, uniform, attribute, positionLocal, cos, sin, cross, dot, select } from 'three/tsl';
 import { modelScene } from './models.js';
 import { WORLD, wallZ } from '../config.js';
 import { groundH } from './terrain.js';
@@ -63,29 +64,17 @@ export class Crows {
       if (isWing) {
         geo.setAttribute('aWing', this.wingAttr);
         mat.side = THREE.DoubleSide;
-        mat.onBeforeCompile = (sh) => {
-          sh.uniforms.uShoulder = { value: shoulder };
-          sh.uniforms.uAxis = { value: spreadAxis };
-          sh.uniforms.uSpread = { value: spreadAngle };
-          sh.vertexShader = sh.vertexShader
-            .replace('#include <common>', `#include <common>
-              attribute vec2 aWing; uniform vec3 uShoulder; uniform vec3 uAxis; uniform float uSpread;
-              vec3 rotAxis(vec3 v, vec3 a, float t) { float c = cos(t), s = sin(t); return v * c + cross(a, v) * s + a * dot(a, v) * (1.0 - c); }
-              vec3 wingPose(vec3 v, float side, bool isPoint) {
-                vec3 piv = vec3(side * uShoulder.x, uShoulder.y, uShoulder.z);
-                vec3 p = isPoint ? v - piv : v;
-                vec3 ax = vec3(uAxis.x, uAxis.y * side, uAxis.z * side);
-                p = rotAxis(p, ax, aWing.x * uSpread);
-                p = rotAxis(p, vec3(0.0, 0.0, 1.0), side * aWing.y);
-                return isPoint ? p + piv : p;
-              }`)
-            .replace('#include <beginnormal_vertex>', `#include <beginnormal_vertex>
-              float lbSide = position.x >= 0.0 ? 1.0 : -1.0;
-              objectNormal = wingPose(objectNormal, lbSide, false);`)
-            .replace('#include <begin_vertex>', `#include <begin_vertex>
-              transformed = wingPose(transformed, lbSide, true);`);
-        };
-        mat.customProgramCacheKey = () => 'crow-wing-v2';
+        const uShoulder = uniform(shoulder), uAxis = uniform(spreadAxis), uSpread = uniform(spreadAngle);
+        const aWing = attribute('aWing', 'vec2');
+        const rotAxis = (v, a, t) => { const c = cos(t), sn = sin(t); return v.mul(c).add(cross(a, v).mul(sn)).add(a.mul(dot(a, v)).mul(float(1).sub(c))); };
+        mat.positionNode = Fn(() => {
+          const v = positionLocal;
+          const side = select(v.x.greaterThanEqual(0), float(1), float(-1));
+          const piv = vec3(side.mul(uShoulder.x), uShoulder.y, uShoulder.z);
+          const ax = vec3(uAxis.x, uAxis.y.mul(side), uAxis.z.mul(side));
+          const p1 = rotAxis(v.sub(piv), ax, aWing.x.mul(uSpread));
+          return rotAxis(p1, vec3(0, 0, 1), side.mul(aWing.y)).add(piv);
+        })();
       }
       const im = new THREE.InstancedMesh(geo, mat, count);
       im.instanceMatrix.setUsage(THREE.DynamicDrawUsage);

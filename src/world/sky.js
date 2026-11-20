@@ -1,114 +1,119 @@
 // Sky dome (domain-warped storm clouds lit from below by the burning city,
 // lightning glowing inside them), lightning bolts on the horizon, rain and
-// the searchlight beam shader.
+// the searchlight beam shader. (WebGPU / TSL node materials.)
 import * as THREE from 'three';
+import {
+  Fn, Loop, If, float, vec2, vec3, vec4, uniform, attribute, varying, positionLocal, positionWorld, normalWorld, cameraPosition,
+  cameraProjectionMatrix, cameraViewMatrix, modelViewMatrix, modelWorldMatrix, mix, smoothstep, clamp, max, min, abs, exp, pow,
+  length, normalize, dot, cross, fract, floor, sin, mod, step, select, varyingProperty,
+} from 'three/tsl';
 import { WORLD } from '../config.js';
 import { makeRng } from '../core/util.js';
 import { groundH } from './terrain.js';
-import { GLOW_RGB, FOG_CUSTOM_GLSL, fogUniforms } from '../render/atmosphere.js';
+import { GLOW_RGB, fogUniforms, lbFog } from '../render/atmosphere.js';
 
-export const NOISE_GLSL = /* glsl */`
-float zHash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-float zNoise(vec2 p){
-  vec2 i = floor(p), f = fract(p);
-  float a = zHash(i), b = zHash(i + vec2(1.0, 0.0)), c = zHash(i + vec2(0.0, 1.0)), d = zHash(i + vec2(1.0, 1.0));
-  vec2 u = f * f * (3.0 - 2.0 * f);
+// ── noise (the GLSL NOISE_GLSL, shared by sky, beams and others) ──
+export const zHash = Fn(([p0]) => {
+  const p = fract(p0.mul(vec2(123.34, 456.21))).toVar();
+  p.addAssign(dot(p, p.add(45.32)));
+  return fract(p.x.mul(p.y));
+}).setLayout({ name: 'zHash', type: 'float', inputs: [{ name: 'p0', type: 'vec2' }] });
+
+export const zNoise = Fn(([p]) => {
+  const i = floor(p), f = fract(p);
+  const a = zHash(i), b = zHash(i.add(vec2(1, 0))), c = zHash(i.add(vec2(0, 1))), d = zHash(i.add(vec2(1, 1)));
+  const u = f.mul(f).mul(f.mul(-2).add(3));
   return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
-}
-float zFbm(vec2 p){ float v = 0.0, a = 0.5; for (int i = 0; i < 5; i++){ v += a * zNoise(p); p = p * 2.03 + 17.1; a *= 0.5; } return v; }
-`;
+}).setLayout({ name: 'zNoise', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
 
-const SKY_VERT = /* glsl */`
-varying vec3 vDir;
-void main(){
-  vDir = position;
-  vec4 p = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  gl_Position = p.xyww;
-}`;
-const SKY_FRAG = /* glsl */`
-${NOISE_GLSL}
-${FOG_CUSTOM_GLSL}
-varying vec3 vDir;
-uniform float uTime;
-uniform float uFlash;
-uniform vec3 uFlashDir;
-uniform vec3 uZenith;
-uniform vec3 uHorizon;
-uniform vec3 uGlow;
-uniform float uGlowAmt;
-uniform float uCloudLight;
-uniform float uBank;
-uniform vec3 uSunDir;
-uniform vec3 uSunCol;
-uniform float uDusk;
-void main(){
-  vec3 d = normalize(vDir);
-  float h = d.y;
-  vec3 col = mix(uHorizon, uZenith, smoothstep(-0.02, 0.45, h));
-  vec2 dxz = normalize(d.xz + 1e-5);
-  float toward = max(0.0, -dxz.y);
-  float glow = toward * toward * exp(-max(h, 0.0) * 13.0) * uGlowAmt;
-  float dome = pow(toward, 3.0) * exp(-max(h, 0.0) * 3.5) * uGlowAmt;
-  col += uGlow * (glow + dome * 0.18);
+export const zFbm = Fn(([p0]) => {
+  const v = float(0).toVar(), a = float(0.5).toVar(), p = vec2(p0).toVar();
+  Loop(5, () => {
+    v.addAssign(a.mul(zNoise(p)));
+    p.assign(p.mul(2.03).add(17.1));
+    a.mulAssign(0.5);
+  });
+  return v;
+}).setLayout({ name: 'zFbm', type: 'float', inputs: [{ name: 'p0', type: 'vec2' }] });
+
+/** The sky's colour for a view direction d (unit), from a set of sky uniforms U. */
+function skyColor(U, d) {
+  const h = d.y;
+  const col = mix(U.uHorizon, U.uZenith, smoothstep(-0.02, 0.45, h)).toVar();
+  const dxz = normalize(d.xz.add(1e-5));
+  const toward = max(0, dxz.y.negate());
+  const glow = toward.mul(toward).mul(exp(max(h, 0).mul(-13))).mul(U.uGlowAmt);
+  const dome = pow(toward, 3).mul(exp(max(h, 0).mul(-3.5))).mul(U.uGlowAmt);
+  col.addAssign(U.uGlow.mul(glow.add(dome.mul(0.18))));
   // sunset (the prologue): a low sun, a burning band under the storm deck, the deck
   // lifting off the horizon so the band shows, undersides lit from below
-  float sd = max(dot(d, uSunDir), 0.0);
-  float az = max(dot(dxz, normalize(uSunDir.xz + 1e-5)), 0.0);
-  float band = exp(-max(h, 0.0) * 11.0);
-  vec3 sunSky = vec3(0.0);
-  if (uDusk > 0.001) {
-    sunSky = uSunCol * (band * (0.05 + 0.55 * pow(az, 5.0)) + pow(sd, 18.0) * 0.6 + pow(sd, 400.0) * 1.1) * uDusk;
-    col += sunSky;
-    col += uSunCol * uDusk * smoothstep(0.99975, 0.9999, sd) * smoothstep(-0.004, 0.004, h) * 7.0;
-    col = mix(col, col * vec3(0.78, 0.82, 1.15), uDusk * smoothstep(0.1, 0.5, h) * 0.6);
-  }
+  const sd = max(dot(d, U.uSunDir), 0);
+  const az = max(dot(dxz, normalize(U.uSunDir.xz.add(1e-5))), 0);
+  const band = exp(max(h, 0).mul(-11));
+  const sunSky = vec3(0).toVar();
+  If(U.uDusk.greaterThan(0.001), () => {
+    sunSky.assign(U.uSunCol.mul(band.mul(pow(az, 5).mul(0.55).add(0.05)).add(pow(sd, 18).mul(0.6)).add(pow(sd, 400).mul(1.1))).mul(U.uDusk));
+    col.addAssign(sunSky);
+    col.addAssign(U.uSunCol.mul(U.uDusk).mul(smoothstep(0.99975, 0.9999, sd)).mul(smoothstep(-0.004, 0.004, h)).mul(7));
+    col.assign(mix(col, col.mul(vec3(0.78, 0.82, 1.15)), U.uDusk.mul(smoothstep(0.1, 0.5, h)).mul(0.6)));
+  });
   // storm deck
-  float ph = max(h, 0.0) + 0.055;
-  vec2 uv = d.xz / ph * 0.5 + vec2(uTime * 0.0042, uTime * 0.0017);
-  vec2 w = vec2(zFbm(uv * 0.7 + 3.1), zFbm(uv * 0.7 + 7.3 + uTime * 0.002));
-  float c = zFbm(uv * 1.15 + w * 1.6);
-  float c2 = zFbm(uv * 3.2 + w * 0.7 + 11.0);
-  float dens = smoothstep(0.34, 0.74, c * 0.82 + c2 * 0.3) * smoothstep(-0.01, 0.09, h);
-  dens *= 1.0 - uDusk * 0.9 * (1.0 - smoothstep(0.035, 0.2, h));
+  const ph = max(h, 0).add(0.055);
+  const uv = d.xz.div(ph).mul(0.5).add(vec2(U.uTime.mul(0.0042), U.uTime.mul(0.0017)));
+  const w = vec2(zFbm(uv.mul(0.7).add(3.1)), zFbm(uv.mul(0.7).add(7.3).add(U.uTime.mul(0.002))));
+  const c = zFbm(uv.mul(1.15).add(w.mul(1.6)));
+  const c2 = zFbm(uv.mul(3.2).add(w.mul(0.7)).add(11));
+  const dens = smoothstep(0.34, 0.74, c.mul(0.82).add(c2.mul(0.3))).mul(smoothstep(-0.01, 0.09, h))
+    .mul(float(1).sub(U.uDusk.mul(0.9).mul(float(1).sub(smoothstep(0.035, 0.2, h)))));
   // undersides lit by the fires: strongest towards the city, thin edges glow
-  float under = (glow * 2.4 + dome * 1.3 + 0.03 * uGlowAmt) * (0.45 + c2 * 1.0) * (1.25 - dens * 0.5);
-  vec3 cloudCol = vec3(0.0065, 0.007, 0.0095) * uCloudLight * (0.55 + 0.9 * c2) + uGlow * under;
-  float fl = uFlash * (0.2 + 0.8 * pow(max(dot(d, uFlashDir), 0.0), 5.0));
-  cloudCol += fl * vec3(0.55, 0.62, 0.86) * (0.35 + c * 1.3);
-  cloudCol += uSunCol * uDusk * (pow(sd, 3.0) * 1.3 * (0.25 + c2) * (1.2 - dens * 0.6) + band * 0.25 + 0.035);
-  col = mix(col, cloudCol, dens * 0.96);
-  col += fl * 0.04 * vec3(0.6, 0.65, 0.8);
-  col = mix(col, uHorizon + uGlow * glow + sunSky * 0.6, smoothstep(0.02, -0.06, h));
-  // fog bank: the sky goes too, leaving only a smear of the city's glow low down
+  const under = glow.mul(2.4).add(dome.mul(1.3)).add(U.uGlowAmt.mul(0.03)).mul(c2.add(0.45)).mul(float(1.25).sub(dens.mul(0.5)));
+  const cloudCol = vec3(0.0065, 0.007, 0.0095).mul(U.uCloudLight).mul(c2.mul(0.9).add(0.55)).add(U.uGlow.mul(under)).toVar();
+  const fl = U.uFlash.mul(pow(max(dot(d, U.uFlashDir), 0), 5).mul(0.8).add(0.2));
+  cloudCol.addAssign(vec3(0.55, 0.62, 0.86).mul(fl).mul(c.mul(1.3).add(0.35)));
+  cloudCol.addAssign(U.uSunCol.mul(U.uDusk).mul(pow(sd, 3).mul(1.3).mul(c2.add(0.25)).mul(float(1.2).sub(dens.mul(0.6))).add(band.mul(0.25)).add(0.035)));
+  col.assign(mix(col, cloudCol, dens.mul(0.96)));
+  col.addAssign(vec3(0.6, 0.65, 0.8).mul(fl).mul(0.04));
+  col.assign(mix(col, U.uHorizon.add(U.uGlow.mul(glow)).add(sunSky.mul(0.6)), smoothstep(0.02, -0.06, h)));
   // fog bank: the sky takes exactly the colour lbFog() gives far geometry, so whatever
   // the bank swallows leaves no silhouette against it
-  if (uBank > 0.001) {
-    vec4 fb = lbFog(cameraPosition + d * 1400.0, cameraPosition, lbFogColor, lbTime, lbDawn);
-    col = mix(col, fb.rgb, uBank * fb.a);
-  }
-  gl_FragColor = vec4(col, 1.0);
-}`;
+  If(U.uBank.greaterThan(0.001), () => {
+    const fb = lbFog(cameraPosition.add(d.mul(1400)), cameraPosition, fogUniforms.lbFogColor, fogUniforms.lbTime, fogUniforms.lbDawn, float(1));
+    col.assign(mix(col, fb.rgb, U.uBank.mul(fb.a)));
+  });
+  return col;
+}
+
+function makeSkyUniforms(env) {
+  return {
+    uTime: uniform(0),
+    uFlash: uniform(0),
+    uFlashDir: uniform(new THREE.Vector3(0, 0.5, -1).normalize()),
+    uZenith: uniform(new THREE.Color(0.0025, 0.003, 0.0055)),
+    uHorizon: uniform(env.nightFog.clone()),
+    uGlow: uniform(new THREE.Color(...GLOW_RGB)),
+    uGlowAmt: uniform(1),
+    uCloudLight: uniform(1),
+    uBank: uniform(0),
+    uSunDir: uniform(new THREE.Vector3(-0.3, 0.05, -1).normalize()),
+    uSunCol: uniform(new THREE.Color(1, 0.42, 0.14)),
+    uDusk: uniform(0),
+  };
+}
+
+function makeSkyMaterial(U) {
+  const mat = new THREE.MeshBasicNodeMaterial({ side: THREE.BackSide, depthWrite: false, fog: false });
+  // at the far plane wherever it is drawn (gl_Position = p.xyww)
+  mat.vertexNode = Fn(() => {
+    const p = cameraProjectionMatrix.mul(modelViewMatrix.mul(vec4(positionLocal, 1)));
+    return vec4(p.x, p.y, p.w, p.w);
+  })();
+  mat.colorNode = Fn(() => skyColor(U, normalize(positionLocal)))();
+  return mat;
+}
 
 export function buildSky(env) {
-  env.skyUniforms = {
-    uTime: { value: 0 },
-    uFlash: { value: 0 },
-    uFlashDir: { value: new THREE.Vector3(0, 0.5, -1).normalize() },
-    uZenith: { value: new THREE.Color(0.0025, 0.003, 0.0055) },
-    uHorizon: { value: env.nightFog.clone() },
-    uGlow: { value: new THREE.Color(...GLOW_RGB) },
-    uGlowAmt: { value: 1 },
-    uCloudLight: { value: 1 },
-    uBank: { value: 0 },
-    uSunDir: { value: new THREE.Vector3(-0.3, 0.05, -1).normalize() },
-    uSunCol: { value: new THREE.Color(1, 0.42, 0.14) },
-    uDusk: { value: 0 },
-    ...fogUniforms,
-  };
-  const sky = new THREE.Mesh(
-    new THREE.SphereGeometry(1500, 48, 24),
-    new THREE.ShaderMaterial({ uniforms: env.skyUniforms, vertexShader: SKY_VERT, fragmentShader: SKY_FRAG, side: THREE.BackSide, depthWrite: false, fog: false })
-  );
+  env.skyUniforms = makeSkyUniforms(env);
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(1500, 48, 24), makeSkyMaterial(env.skyUniforms));
   sky.renderOrder = -10;
   sky.frustumCulled = false;
   env.sky = sky;
@@ -116,19 +121,17 @@ export function buildSky(env) {
 }
 
 export function buildEnvMap(env) {
-  const pm = new THREE.PMREMGenerator(env.renderer);
+  // a brighter copy of the night sky, for the environment light only
+  const U = makeSkyUniforms(env);
+  U.uGlow.value.setRGB(0.55, 0.15, 0.04);
+  U.uZenith.value.setRGB(0.02, 0.025, 0.04);
+  U.uHorizon.value.setRGB(0.05, 0.05, 0.06);
   const envScene = new THREE.Scene();
-  const s = env.sky.clone();
-  s.material = env.sky.material.clone();
-  s.material.uniforms = THREE.UniformsUtils.clone(env.skyUniforms);
-  s.material.uniforms.uGlow.value.setRGB(0.55, 0.15, 0.04);
-  s.material.uniforms.uZenith.value.setRGB(0.02, 0.025, 0.04);
-  s.material.uniforms.uHorizon.value.setRGB(0.05, 0.05, 0.06);
-  envScene.add(s);
+  envScene.add(new THREE.Mesh(new THREE.SphereGeometry(1500, 48, 24), makeSkyMaterial(U)));
+  const pm = new THREE.PMREMGenerator(env.renderer);
   const rt = pm.fromScene(envScene, 0.04, 1, 2000);
   env.scene.environment = rt.texture;
   env.scene.environmentIntensity = 0.55;
-  pm.dispose();
 }
 
 // ── lightning bolt ribbons ──────────────────────────────────────────────────
@@ -141,12 +144,10 @@ export class Bolts {
     this.geo.setAttribute('position', new THREE.BufferAttribute(this.pos, 3));
     this.geo.setAttribute('aA', new THREE.BufferAttribute(this.alpha, 1));
     this.geo.setDrawRange(0, 0);
-    this.mat = new THREE.ShaderMaterial({
-      uniforms: { uI: { value: 0 } },
-      vertexShader: 'attribute float aA; varying float vA; void main(){ vA = aA; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
-      fragmentShader: 'uniform float uI; varying float vA; void main(){ gl_FragColor = vec4(vec3(0.75, 0.82, 1.0) * uI * vA, 1.0); }',
-      transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-    });
+    this.uI = uniform(0);
+    this.mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+    this.mat.colorNode = vec3(0.75, 0.82, 1.0).mul(this.uI).mul(attribute('aA', 'float'));
+    this.mat.uniforms = { uI: this.uI };
     this.mesh = new THREE.Mesh(this.geo, this.mat);
     this.mesh.frustumCulled = false;
     this.mesh.renderOrder = -1;
@@ -209,51 +210,14 @@ export class Bolts {
   }
 
   update(dt, time) {
-    if (this.t <= 0) { this.mat.uniforms.uI.value = 0; return; }
+    if (this.t <= 0) { this.uI.value = 0; return; }
     this.t -= dt;
     const flick = (Math.sin(time * 70) > -0.2 ? 1 : 0.15) * (this.t > 0.32 ? 1 : this.t / 0.32);
-    this.mat.uniforms.uI.value = Math.max(0, flick) * 26;
+    this.uI.value = Math.max(0, flick) * 26;
   }
 }
 
 // ── rain ────────────────────────────────────────────────────────────────────
-const RAIN_VERT = /* glsl */`
-attribute vec4 aSeed;
-uniform float uTime;
-uniform vec3 uCenter;
-uniform vec3 uBox;
-uniform vec3 uWind;
-varying float vA;
-varying vec2 vUv;
-void main(){
-  float speed = 26.0 * (0.75 + 0.5 * aSeed.w);
-  vec3 vel = vec3(uWind.x, -speed, uWind.z);
-  vec3 p = aSeed.xyz * uBox;
-  p += vel * uTime;
-  p = mod(p, uBox);
-  vec3 world = uCenter - uBox * 0.5 + p;
-  vec4 mv = viewMatrix * vec4(world, 1.0);
-  vec3 vv = (viewMatrix * vec4(vel, 0.0)).xyz;
-  vec3 head = mv.xyz;
-  vec3 tail = head - vv * 0.028;
-  vec3 axis = normalize(head - tail);
-  vec3 perp = normalize(cross(axis, normalize(head)));
-  vec3 pos = mix(tail, head, position.y + 0.5) + perp * position.x * 0.012;
-  gl_Position = projectionMatrix * vec4(pos, 1.0);
-  float d = -mv.z;
-  vA = smoothstep(0.5, 3.0, d) * (1.0 - smoothstep(18.0, 34.0, d));
-  vUv = position.xy + 0.5;
-}`;
-const RAIN_FRAG = /* glsl */`
-uniform float uIntensity;
-uniform vec3 uColor;
-varying float vA;
-varying vec2 vUv;
-void main(){
-  float a = (1.0 - abs(vUv.x * 2.0 - 1.0)) * vUv.y * vA * uIntensity;
-  gl_FragColor = vec4(uColor * a, 1.0);
-}`;
-
 export function buildRain(env) {
   const N = env.quality.rain;
   const geo = new THREE.InstancedBufferGeometry();
@@ -263,101 +227,66 @@ export function buildRain(env) {
   for (let i = 0; i < N * 4; i++) seeds[i] = Math.random();
   geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 4));
   geo.instanceCount = N;
-  env.rainUniforms = {
-    uTime: { value: 0 },
-    uCenter: { value: new THREE.Vector3(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z - 14) },
-    uBox: { value: new THREE.Vector3(56, 34, 56) },
-    uWind: { value: new THREE.Vector3(3.5, 0, 1.5) },
-    uIntensity: { value: 0.32 },
-    uColor: { value: new THREE.Color(0.55, 0.6, 0.7) },
+  const U = env.rainUniforms = {
+    uTime: uniform(0),
+    uCenter: uniform(new THREE.Vector3(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z - 14)),
+    uBox: uniform(new THREE.Vector3(56, 34, 56)),
+    uWind: uniform(new THREE.Vector3(3.5, 0, 1.5)),
+    uIntensity: uniform(0.32),
+    uColor: uniform(new THREE.Color(0.55, 0.6, 0.7)),
   };
-  const mat = new THREE.ShaderMaterial({
-    uniforms: env.rainUniforms, vertexShader: RAIN_VERT, fragmentShader: RAIN_FRAG,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
-  });
+  const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false });
+  const vA = varyingProperty('float', 'vRainA');
+  mat.vertexNode = Fn(() => {
+    const seed = attribute('aSeed', 'vec4');
+    const speed = seed.w.mul(0.5).add(0.75).mul(26);
+    const vel = vec3(U.uWind.x, speed.negate(), U.uWind.z);
+    const p = mod(seed.xyz.mul(U.uBox).add(vel.mul(U.uTime)), U.uBox);
+    const world = U.uCenter.sub(U.uBox.mul(0.5)).add(p);
+    const mv = cameraViewMatrix.mul(vec4(world, 1));
+    const vv = cameraViewMatrix.mul(vec4(vel, 0)).xyz;
+    const head = mv.xyz;
+    const tail = head.sub(vv.mul(0.028));
+    const axis = normalize(head.sub(tail));
+    const perp = normalize(cross(axis, normalize(head)));
+    const pos = mix(tail, head, positionLocal.y.add(0.5)).add(perp.mul(positionLocal.x).mul(0.012));
+    const d = mv.z.negate();
+    vA.assign(smoothstep(0.5, 3.0, d).mul(float(1).sub(smoothstep(18.0, 34.0, d))));
+    return cameraProjectionMatrix.mul(vec4(pos, 1));
+  })();
+  mat.colorNode = Fn(() => {
+    const uvq = positionLocal.xy.add(0.5);
+    const a = float(1).sub(abs(uvq.x.mul(2).sub(1))).mul(uvq.y).mul(vA).mul(U.uIntensity);
+    return U.uColor.mul(a);
+  })();
   env.rain = new THREE.Mesh(geo, mat);
   env.rain.frustumCulled = false;
   env.rain.renderOrder = 20;
   env.scene.add(env.rain);
 }
 
-// ── searchlight beam ────────────────────────────────────────────────────────
-export const BEAM_VERT = /* glsl */`
-varying float vV;
-varying vec3 vN;
-varying vec3 vWorld;
-varying vec3 vView;
-uniform float uLen;
-void main(){
-  vV = clamp(-position.y / uLen, 0.0, 1.0);
-  vec4 w = modelMatrix * vec4(position, 1.0);
-  vWorld = w.xyz;
-  vN = normalize(mat3(modelMatrix) * normal);
-  vView = normalize(cameraPosition - w.xyz);
-  gl_Position = projectionMatrix * viewMatrix * w;
-}`;
-export const BEAM_FRAG = /* glsl */`
-${NOISE_GLSL}
-uniform vec3 uColor;
-uniform float uIntensity;
-uniform float uTime;
-varying float vV;
-varying vec3 vN;
-varying vec3 vWorld;
-varying vec3 vView;
-void main(){
-  float edge = pow(abs(dot(vN, vView)), 1.6);
-  // interpolation can push vV a hair past 1: pow() of a negative is NaN on D3D,
-  // and bloom smears a single NaN pixel across the whole frame
-  float along = pow(max(1.0 - vV, 0.0), 1.8) * smoothstep(0.0, 0.02, vV);
-  float dust = 0.6 + 0.4 * zNoise(vWorld.xz * 0.22 + vec2(uTime * 0.4, vWorld.y * 0.2 - uTime * 0.2));
-  // rain streaking through the light
-  float rain = pow(max(zNoise(vec2(vWorld.x * 5.2 + vWorld.z * 3.4, vWorld.y * 0.35 + uTime * 9.0)), 0.0), 9.0) * 1.1 * max(1.0 - vV, 0.0);
-  float ground = smoothstep(0.0, 3.5, vWorld.y);
-  float a = edge * along * (dust + rain) * ground * uIntensity;
-  gl_FragColor = vec4(uColor * a, 1.0);
-}`;
+// ── searchlight beam (the painted cone; volumetric.js replaces it where the air is ray-marched) ──
+export function makeBeamMaterial(len) {
+  const U = { uColor: uniform(new THREE.Color(0.55, 0.6, 0.72)), uIntensity: uniform(0.05), uTime: uniform(0), uLen: uniform(len) };
+  const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, fog: false });
+  mat.uniforms = U;
+  mat.colorNode = Fn(() => {
+    const vV = clamp(positionLocal.y.negate().div(U.uLen), 0, 1);
+    const vWorld = positionWorld;
+    const vN = normalWorld;
+    const vView = normalize(cameraPosition.sub(vWorld));
+    const edge = pow(abs(dot(vN, vView)), 1.6);
+    const along = pow(max(float(1).sub(vV), 0), 1.8).mul(smoothstep(0, 0.02, vV));
+    const dust = zNoise(vWorld.xz.mul(0.22).add(vec2(U.uTime.mul(0.4), vWorld.y.mul(0.2).sub(U.uTime.mul(0.2))))).mul(0.4).add(0.6);
+    // rain streaking through the light
+    const rain = pow(max(zNoise(vec2(vWorld.x.mul(5.2).add(vWorld.z.mul(3.4)), vWorld.y.mul(0.35).add(U.uTime.mul(9)))), 0), 9).mul(1.1).mul(max(float(1).sub(vV), 0));
+    const ground = smoothstep(0, 3.5, vWorld.y);
+    return U.uColor.mul(edge.mul(along).mul(dust.add(rain)).mul(ground).mul(U.uIntensity));
+  })();
+  return mat;
+}
 
 // ── raindrops bursting on the nest deck, the sandbags and the wall walk ─────
-const SPLASH_VERT = /* glsl */`
-attribute vec4 aSeed;      // u, v, phase, area
-uniform float uTime;
-uniform vec4 uA0; uniform vec4 uA1;   // areas: x0, z0, x1, z1 (y in the next vec)
-uniform vec2 uY;
-varying float vA;
-varying vec2 vUv;
-float sh(float n){ return fract(sin(n * 91.345) * 47453.5453); }
-void main(){
-  float rate = 1.6 + aSeed.z;
-  float tt = uTime * rate + aSeed.z * 10.0;
-  float cyc = floor(tt);
-  float f = fract(tt);
-  float id = aSeed.x * 1000.0 + aSeed.y * 37.0 + cyc * 3.17;
-  vec2 r = vec2(sh(id), sh(id + 7.1));
-  bool second = aSeed.w > 0.5;
-  vec4 A = second ? uA1 : uA0;
-  float y = second ? uY.y : uY.x;
-  vec3 c = vec3(mix(A.x, A.z, r.x), y + 0.02, mix(A.y, A.w, r.y));
-  float size = (0.02 + f * 0.08);
-  vec3 toCam = normalize(cameraPosition - c);
-  vec3 right = normalize(cross(vec3(0.0, 1.0, 0.0), toCam));
-  vec3 up = vec3(0.0, 1.0, 0.0);
-  vec3 p = c + right * position.x * size + up * (position.y + 0.5) * size * 0.8;
-  vA = (1.0 - f) * (1.0 - f) * step(f, 0.35) * 3.0;
-  vUv = position.xy + 0.5;
-  gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0);
-}`;
-const SPLASH_FRAG = /* glsl */`
-uniform vec3 uColor;
-varying float vA;
-varying vec2 vUv;
-void main(){
-  vec2 q = vUv * 2.0 - 1.0;
-  float crown = exp(-pow(length(q * vec2(1.0, 1.6)) - 0.6, 2.0) * 30.0) * step(q.y, 0.6);
-  float drop = exp(-dot(q - vec2(0.0, 0.3), q - vec2(0.0, 0.3)) * 40.0);
-  gl_FragColor = vec4(uColor * (crown + drop * 0.6) * vA, 1.0);
-}`;
-
 export function buildSplashes(env) {
   const N = Math.round(env.quality.rain / 18);
   const geo = new THREE.InstancedBufferGeometry();
@@ -368,17 +297,43 @@ export function buildSplashes(env) {
   geo.setAttribute('aSeed', new THREE.InstancedBufferAttribute(seeds, 4));
   geo.instanceCount = N;
   const top = WORLD.TOWER_TOP;
-  env.splashUniforms = {
-    uTime: { value: 0 },
-    uA0: { value: new THREE.Vector4(-2.7, -4.1, 2.7, -0.9) },
-    uA1: { value: new THREE.Vector4(-7.8, -1.0, 7.8, 7.2) },
-    uY: { value: new THREE.Vector2(top, top) },
-    uColor: { value: new THREE.Color(0.32, 0.34, 0.38) },
+  const U = env.splashUniforms = {
+    uTime: uniform(0),
+    uA0: uniform(new THREE.Vector4(-2.7, -4.1, 2.7, -0.9)),
+    uA1: uniform(new THREE.Vector4(-7.8, -1.0, 7.8, 7.2)),
+    uY: uniform(new THREE.Vector2(top, top)),
+    uColor: uniform(new THREE.Color(0.32, 0.34, 0.38)),
   };
-  const mesh = new THREE.Mesh(geo, new THREE.ShaderMaterial({
-    uniforms: env.splashUniforms, vertexShader: SPLASH_VERT, fragmentShader: SPLASH_FRAG,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
-  }));
+  const sh = (n) => fract(sin(n.mul(91.345)).mul(47453.5453));
+  const vA = varyingProperty('float', 'vSplashA');
+  const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+  mat.fog = false;
+  mat.vertexNode = Fn(() => {
+    const seed = attribute('aSeed', 'vec4');
+    const rate = seed.z.add(1.6);
+    const tt = U.uTime.mul(rate).add(seed.z.mul(10));
+    const cyc = floor(tt), f = fract(tt);
+    const id = seed.x.mul(1000).add(seed.y.mul(37)).add(cyc.mul(3.17));
+    const r = vec2(sh(id), sh(id.add(7.1)));
+    const second = seed.w.greaterThan(0.5);
+    const A = select(second, U.uA1, U.uA0);
+    const y = select(second, U.uY.y, U.uY.x);
+    const c = vec3(mix(A.x, A.z, r.x), y.add(0.02), mix(A.y, A.w, r.y));
+    const size = f.mul(0.08).add(0.02);
+    const toCam = normalize(cameraPosition.sub(c));
+    const right = normalize(cross(vec3(0, 1, 0), toCam));
+    const p = c.add(right.mul(positionLocal.x).mul(size)).add(vec3(0, 1, 0).mul(positionLocal.y.add(0.5)).mul(size).mul(0.8));
+    vA.assign(float(1).sub(f).mul(float(1).sub(f)).mul(step(f, 0.35)).mul(3));
+    return cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(p, 1)));
+  })();
+  mat.colorNode = Fn(() => {
+    const q = positionLocal.xy.mul(2);
+    const crown = exp(pow(length(q.mul(vec2(1, 1.6))).sub(0.6), 2).mul(-30)).mul(step(q.y, 0.6));
+    const dq = q.sub(vec2(0, 0.3));
+    const drop = exp(dot(dq, dq).mul(-40));
+    return U.uColor.mul(crown.add(drop.mul(0.6))).mul(vA);
+  })();
+  const mesh = new THREE.Mesh(geo, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 19;
   env.scene.add(mesh);

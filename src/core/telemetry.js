@@ -57,9 +57,15 @@ export class Telemetry {
     const g = this.g;
     let gpu = '?';
     try {
-      const gl = g.renderer.getContext();
-      const ext = gl.getExtension('WEBGL_debug_renderer_info');
-      if (ext) gpu = gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+      const b = g.renderer.backend;
+      if (b && b.isWebGPUBackend) {
+        const info = b.adapter && b.adapter.info;
+        gpu = 'WebGPU ' + (info ? [info.vendor, info.architecture, info.description].filter(Boolean).join(' ') : '');
+      } else {
+        const gl = g.renderer.getContext();
+        const ext = gl.getExtension('WEBGL_debug_renderer_info');
+        if (ext) gpu = 'WebGL2 fallback ' + gl.getParameter(ext.UNMASKED_RENDERER_WEBGL);
+      }
     } catch { /* ignore */ }
     this.write('session', {
       quality: g.settings.quality, gpu, screen: [window.innerWidth, window.innerHeight], dpr: window.devicePixelRatio,

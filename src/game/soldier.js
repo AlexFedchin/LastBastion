@@ -47,27 +47,10 @@ let lampUniforms = null;
 export function setSoldierLamps(u) { lampUniforms = u; }
 const patched = new WeakSet();
 export function lampify(mat) { patchLamps(mat); }
+// (under WebGPU the wall lamps are real spot lights, lamplight.js: they light our men by themselves)
 function patchLamps(mat) {
   if (patched.has(mat) || !lampUniforms) return;
   patched.add(mat);
-  mat.onBeforeCompile = (sh) => {
-    sh.uniforms.uLamps = lampUniforms.uLamps;
-    sh.uniforms.uLampPow = lampUniforms.uLampPow;
-    sh.fragmentShader = 'uniform vec3 uLamps[10]; uniform float uLampPow;\n' + sh.fragmentShader.replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-      #ifdef USE_FOG
-      if (uLampPow > 0.001) {
-        vec3 sWN = normalize(transpose(mat3(viewMatrix)) * normal);
-        float sLamp = 0.0;
-        for (int k = 0; k < 10; k++) {
-          vec3 L = uLamps[k] - vLbFogW; float d = length(L);
-          float att = clamp(1.0 - d / 17.0, 0.0, 1.0);
-          sLamp += att * att * (0.25 + 0.75 * clamp(dot(sWN, L / max(d, 1e-3)), 0.0, 1.0));
-        }
-        totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.52, 0.18) * sLamp * uLampPow * 2.2;
-      }
-      #endif`);
-  };
-  mat.customProgramCacheKey = () => 'soldier-lamps-v1';
 }
 
 export class Soldier {

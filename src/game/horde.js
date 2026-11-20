@@ -1,6 +1,7 @@
 // The horde: SoA simulation of thousands of zombies, the pile-up/breach
 // mechanic, hit detection, explosions and the corpse field.
 import * as THREE from 'three';
+import { Fn, float, vec3, vec4, attribute, instancedBufferAttribute, varyingProperty, cameraProjectionMatrix, cameraViewMatrix, length, max, pow } from 'three/tsl';
 import {
   ZOMBIE_TYPES, ZT, WORLD, wallZ, wallDist, wallFacing, sectionOf, PILE,
   ZOMBIE_HEIGHT, WING_COS,
@@ -477,7 +478,6 @@ export class Horde {
       aAnim: addInstanced(geo, 'aAnim', 4, 4), aState: addInstanced(geo, 'aState', 4, 4), aTint: addInstanced(geo, 'aTint', 4, 3),
     };
     big.mesh = new THREE.InstancedMesh(geo, createZombieMaterial(uniforms), 4);
-    big.mesh.customDepthMaterial = createZombieDepthMaterial(uniforms);
     big.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     big.mesh.count = 0;
     big.mesh.frustumCulled = false;
@@ -499,14 +499,24 @@ export class Horde {
     // soft contact shadows that ground every walker
     {
       const bg = new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2);
-      const bm = new THREE.ShaderMaterial({
-        vertexShader: `varying vec2 vB; void main(){ vB = position.xz * 2.0; vec3 c = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]); float s = length(instanceMatrix[0].xyz);
-          vec3 p = c + vec3(position.x * 1.1 * s, 0.035, position.z * 1.25 * s); gl_Position = projectionMatrix * viewMatrix * vec4(p, 1.0); }`,
-        fragmentShader: `varying vec2 vB; void main(){ float r = length(vB); float a = pow(max(0.0, 1.0 - r), 1.6) * 0.55; gl_FragColor = vec4(0.0, 0.0, 0.0, a); }`,
-        transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+      const bm = new THREE.MeshBasicNodeMaterial({
+        transparent: true, depthWrite: false, fog: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
       });
       this.blobs = new THREE.InstancedMesh(bg, bm, N);
       this.blobs.instanceMatrix = this.eyes.instanceMatrix;
+      {
+        const IM = instancedBufferAttribute(this.eyes.instanceMatrix, 'mat4');
+        const corner = attribute('position', 'vec3');
+        const vB = varyingProperty('vec2', 'vBlob');
+        bm.vertexNode = Fn(() => {
+          vB.assign(corner.xz.mul(2));
+          const c = IM.mul(vec4(0, 0, 0, 1)).xyz;
+          const s = length(IM.mul(vec4(1, 0, 0, 0)).xyz);
+          const p = c.add(vec3(corner.x.mul(1.1).mul(s), 0.035, corner.z.mul(1.25).mul(s)));
+          return cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(p, 1)));
+        })();
+        bm.colorNode = Fn(() => vec4(0, 0, 0, pow(max(0, float(1).sub(length(vB))), 1.6).mul(0.55)))();
+      }
       this.blobs.count = 0;
       this.blobs.frustumCulled = false;
       this.blobs.renderOrder = 2;
@@ -540,7 +550,7 @@ export class Horde {
       const geo = g.clone();
       const L = { aAnim: addInstanced(geo, 'aAnim', N, 4), aState: addInstanced(geo, 'aState', N, 4), aTint: addInstanced(geo, 'aTint', N, 3) };
       L.mesh = new THREE.InstancedMesh(geo, mat, N);
-      L.mesh.customDepthMaterial = depth;
+      if (depth) L.mesh.customDepthMaterial = depth;
       L.mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
       L.mesh.count = 0;
       L.mesh.frustumCulled = false;

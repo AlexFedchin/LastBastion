@@ -4,7 +4,11 @@
 import * as THREE from 'three';
 import { WORLD, wallZ, sectionOf, sectionCenterX } from '../config.js';
 import { makeRng, lerp } from '../core/util.js';
-import { groundH, heightUniforms, HEIGHT_GLSL } from './terrain.js';
+import { groundH, lbTerrainH } from './terrain.js';
+import {
+  Fn, float, vec2, vec3, vec4, uniform, attribute, texture, uv, positionLocal, positionWorld, cameraProjectionMatrix, cameraViewMatrix,
+  materialColor, materialRoughness, materialReference, normalMap as normalMapNode, mix, smoothstep, max, pow, length, fract, floor, dot, sin, step,
+} from 'three/tsl';
 import {
   box, cylY, cylZ, merge, xf, worldUV, sandbagGeo, concertinaGeo, extrude, weather,
 } from './kit.js';
@@ -49,11 +53,39 @@ export function wingMatrix(w, u, y, inward, out = _m, sx = 1, sy = 1, sz = 1, ro
   return out;
 }
 
-const SLAB_GLSL = /* glsl */`
-float sHash(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
-float sNoise(vec2 p){ vec2 i = floor(p), f = fract(p); vec2 u = f * f * (3.0 - 2.0 * f);
-  return mix(mix(sHash(i), sHash(i + vec2(1.0, 0.0)), u.x), mix(sHash(i + vec2(0.0, 1.0)), sHash(i + vec2(1.0, 1.0)), u.x), u.y); }
-`;
+const sHash = Fn(([p0]) => {
+  const p = fract(p0.mul(vec2(123.34, 456.21))).toVar();
+  p.addAssign(dot(p, p.add(45.32)));
+  return fract(p.x.mul(p.y));
+}).setLayout({ name: 'sHash', type: 'float', inputs: [{ name: 'p0', type: 'vec2' }] });
+const sNoise = Fn(([p]) => {
+  const i = floor(p), f = fract(p);
+  const u = f.mul(f).mul(f.mul(-2).add(3));
+  return mix(mix(sHash(i), sHash(i.add(vec2(1, 0))), u.x), mix(sHash(i.add(vec2(0, 1))), sHash(i.add(vec2(1, 1))), u.x), u.y);
+}).setLayout({ name: 'sNoise', type: 'float', inputs: [{ name: 'p', type: 'vec2' }] });
+// the wall face: splash grime at its foot, soot, and the blood the dead leave climbing it
+function slabMasks(aSlab) {
+  const su = positionWorld.x.div(0.876), sy = positionWorld.y;
+  const splash = smoothstep(1.6, 0.0, sy.add(sNoise(vec2(su.mul(3), sy)).sub(0.5).mul(0.8)));
+  const soot = smoothstep(0.55, 0.85, sNoise(vec2(su.mul(0.15), sy.mul(0.1)).add(aSlab.y.mul(9)))).mul(smoothstep(1.0, 4.0, sy));
+  const bl = aSlab.x;
+  const line = bl.mul(6.2).add(0.4);
+  const streak = sNoise(vec2(su.mul(2.6), sy.mul(0.25)));
+  const bm0 = smoothstep(line, line.sub(1.6), sy.add(streak.sub(0.5).mul(2.2))).mul(smoothstep(0.03, 0.2, bl))
+    .mul(smoothstep(0.25, 0.6, sNoise(vec2(su.mul(1.3), sy.mul(0.9))).add(bl.mul(0.4))));
+  // dragged hand smears
+  const hand = smoothstep(0.72, 0.9, sNoise(vec2(su.mul(4), sy.mul(0.6)))).mul(step(sy, line.add(0.6))).mul(smoothstep(0.1, 0.3, bl));
+  return { splash, soot, blood: max(bm0, hand.mul(0.8)) };
+}
+function slabColour(base, aSlab) {
+  const M = slabMasks(aSlab);
+  const c = vec4(base).rgb.mul(aSlab.y.mul(0.3).add(0.82)).mul(float(1).sub(M.splash.mul(0.6))).mul(float(1).sub(M.soot.mul(0.55)));
+  return vec4(mix(c, vec3(0.12, 0.006, 0.004), M.blood.mul(0.92)), vec4(base).a);
+}
+function slabRough(base, aSlab) {
+  const M = slabMasks(aSlab);
+  return mix(mix(float(base), 0.5, M.splash.mul(0.6)), 0.22, M.blood);
+}
 
 export function buildFortification(env) {
   const { scene, tex, mats } = env;
@@ -72,35 +104,20 @@ export function buildFortification(env) {
     map: tex.slab.map, normalMap: tex.slab.normalMap, normalScale: new THREE.Vector2(1.2, 1.2), roughnessMap: tex.slab.roughnessMap,
     color: CONCRETE, roughness: 1, metalness: 0, envMapIntensity: 0.35,
   });
-  slabMat.onBeforeCompile = (sh) => {
-    sh.vertexShader = 'attribute vec2 aSlab;\nvarying vec2 vSlab;\nvarying vec3 vSW;\n' + sh.vertexShader.replace('#include <worldpos_vertex>', `#include <worldpos_vertex>
-      vSW = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
-      vSlab = aSlab;
-      ${tex.slab.file ? '#ifdef USE_MAP\n      vMapUv += vec2(fract(aSlab.y * 7.31) * 3.0, fract(aSlab.y * 3.17) * 2.0);\n      #endif\n      #ifdef USE_NORMALMAP\n      vNormalMapUv += vec2(fract(aSlab.y * 7.31) * 3.0, fract(aSlab.y * 3.17) * 2.0);\n      #endif' : ''}`);
-    sh.fragmentShader = 'varying vec2 vSlab;\nvarying vec3 vSW;\n' + SLAB_GLSL + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
-      float su = vSW.x / 0.876;
-      float sy = vSW.y;
-      diffuseColor.rgb *= 0.82 + 0.3 * vSlab.y;
-      float splash = smoothstep(1.6, 0.0, sy + (sNoise(vec2(su * 3.0, sy)) - 0.5) * 0.8);
-      diffuseColor.rgb *= 1.0 - splash * 0.6;
-      float soot = smoothstep(0.55, 0.85, sNoise(vec2(su * 0.15, sy * 0.1) + vSlab.y * 9.0)) * smoothstep(1.0, 4.0, sy);
-      diffuseColor.rgb *= 1.0 - soot * 0.55;
-      float bl = vSlab.x;
-      float line = 0.4 + bl * 6.2;
-      float streak = sNoise(vec2(su * 2.6, sy * 0.25));
-      float bm = smoothstep(line, line - 1.6, sy + (streak - 0.5) * 2.2) * smoothstep(0.03, 0.2, bl);
-      bm *= smoothstep(0.25, 0.6, sNoise(vec2(su * 1.3, sy * 0.9)) + bl * 0.4);
-      // dragged hand smears
-      float hand = smoothstep(0.72, 0.9, sNoise(vec2(su * 4.0, sy * 0.6))) * step(sy, line + 0.6) * smoothstep(0.1, 0.3, bl);
-      bm = max(bm, hand * 0.8);
-      diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.12, 0.006, 0.004), bm * 0.92);
-      float slabBlood = bm;
-      float slabWet = splash;`)
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-      roughnessFactor = mix(roughnessFactor, 0.5, slabWet * 0.6);
-      roughnessFactor = mix(roughnessFactor, 0.22, slabBlood);`);
-  };
-  slabMat.customProgramCacheKey = () => 'lb-slab';
+  // per slab: aSlab.x the blood on its section, aSlab.y its own random tone (and texture offset)
+  {
+    const aSlab = attribute('aSlab', 'vec2');
+    if (tex.slab.file) {
+      const off = vec2(fract(aSlab.y.mul(7.31)).mul(3), fract(aSlab.y.mul(3.17)).mul(2));
+      slabMat.map = tex.slab.map; // (sampled by hand below with the slab's own offset)
+      const T = texture(tex.slab.map), N = texture(tex.slab.normalMap);
+      slabMat.colorNode = Fn(() => slabColour(T.sample(uv().add(off)).mul(materialReference('color', 'color')), aSlab))();
+      slabMat.normalNode = normalMapNode(N.sample(uv().add(off)), materialReference('normalScale', 'vec2'));
+    } else {
+      slabMat.colorNode = Fn(() => slabColour(materialColor, aSlab))();
+    }
+    slabMat.roughnessNode = Fn(() => slabRough(materialRoughness, aSlab))();
+  }
   lampLit(slabMat); // the face under each lamp catches its light
   let slabCount = 0;
   const slabsPer = wings.map((w) => Math.round(w.len / 1.52));
@@ -371,15 +388,13 @@ function buildBunker(env) {
   flagTex.repeat.set(1, 170 / 256);
   flagTex.offset.set(0, 1 - 170 / 256);
   const flagMat = new THREE.MeshStandardMaterial({ map: flagTex, side: THREE.DoubleSide, roughness: 0.95, transparent: true, alphaTest: 0.3 });
-  env.flagUniforms = { uTime: { value: 0 } };
-  flagMat.onBeforeCompile = (sh) => {
-    sh.uniforms.uTime = env.flagUniforms.uTime;
-    sh.vertexShader = 'uniform float uTime;\n' + sh.vertexShader.replace('#include <begin_vertex>', `
-      vec3 transformed = position;
-      float k = position.x / 3.2;
-      transformed.z += sin(position.x * 2.2 - uTime * 5.0) * 0.28 * k + sin(position.x * 4.1 - uTime * 8.3 + position.y) * 0.08 * k;
-      transformed.y -= k * k * 0.35;`);
-  };
+  env.flagUniforms = { uTime: uniform(0) };
+  flagMat.positionNode = Fn(() => {
+    const t = env.flagUniforms.uTime, p = positionLocal;
+    const k = p.x.div(3.2);
+    return vec3(p.x, p.y.sub(k.mul(k).mul(0.35)),
+      p.z.add(sin(p.x.mul(2.2).sub(t.mul(5))).mul(0.28).mul(k)).add(sin(p.x.mul(4.1).sub(t.mul(8.3)).add(p.y)).mul(0.08).mul(k)));
+  })();
   const flag = new THREE.Mesh(flagGeo, flagMat);
   flag.position.set(-6.8, top + 6.9, 1.5);
   flag.rotation.y = Math.PI * 0.85;
@@ -576,30 +591,22 @@ export function buildLightPools(env) {
   pools.forEach((p, i) => { P.set([p.x, p.z, p.r, p.k], i * 4); C.set(p.color, i * 3); });
   inst.setAttribute('iPool', new THREE.InstancedBufferAttribute(P, 4));
   inst.setAttribute('iCol', new THREE.InstancedBufferAttribute(C, 3));
-  env.poolUniforms = { uScale: { value: 1 }, ...heightUniforms() };
-  const mat = new THREE.ShaderMaterial({
-    uniforms: env.poolUniforms,
-    vertexShader: HEIGHT_GLSL + /* glsl */`
-      attribute vec4 iPool; attribute vec3 iCol;
-      varying vec2 vUv2; varying vec3 vCol; varying float vK;
-      void main(){
-        vec3 p = position;
-        vec2 xz = iPool.xy + p.xz * iPool.z;
-        float y = lbTerrainH(xz) + 0.06;
-        vUv2 = p.xz; vCol = iCol; vK = iPool.w;
-        gl_Position = projectionMatrix * viewMatrix * vec4(xz.x, y, xz.y, 1.0);
-      }`,
-    fragmentShader: /* glsl */`
-      uniform float uScale;
-      varying vec2 vUv2; varying vec3 vCol; varying float vK;
-      void main(){
-        float r = length(vUv2);
-        float a = pow(max(0.0, 1.0 - r), 2.2) * vK * uScale;
-        gl_FragColor = vec4(vCol * a, 1.0);
-      }`,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+  env.poolUniforms = { uScale: uniform(1) };
+  const mat = new THREE.MeshBasicNodeMaterial({
+    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false,
     polygonOffset: true, polygonOffsetFactor: -4, polygonOffsetUnits: -4,
   });
+  const iPool = attribute('iPool', 'vec4'), iCol = attribute('iCol', 'vec3');
+  mat.vertexNode = Fn(() => {
+    const xz = iPool.xy.add(positionLocal.xz.mul(iPool.z));
+    const y = lbTerrainH(xz).add(0.06);
+    return cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(xz.x, y, xz.y, 1)));
+  })();
+  mat.colorNode = Fn(() => {
+    const r = length(positionLocal.xz);
+    const a = pow(max(0, float(1).sub(r)), 2.2).mul(iPool.w).mul(env.poolUniforms.uScale);
+    return iCol.mul(a);
+  })();
   const mesh = new THREE.Mesh(inst, mat);
   mesh.frustumCulled = false;
   mesh.renderOrder = 3;

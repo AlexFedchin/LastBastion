@@ -28,7 +28,9 @@ import { buildDressing } from './dressing.js';
 import { buildFar } from './far.js';
 import { buildRear } from './rear.js';
 import { fileTex } from './texlib.js';
-import { buildSky, buildEnvMap, buildRain, buildSplashes, Bolts, BEAM_VERT, BEAM_FRAG } from './sky.js';
+import { buildSky, buildEnvMap, buildRain, buildSplashes, Bolts, makeBeamMaterial } from './sky.js';
+import { fogMaterial } from '../render/atmosphere.js';
+import { VOL, VOL_LAYER } from '../render/volumetric.js';
 import { PF } from './textures.js';
 
 patchFogChunks();
@@ -108,7 +110,7 @@ export class Environment {
     this.buildLights();
     buildFortification(this);
     // the wall lamps light the ground for real (lamplight.js), not with a glow pasted on it
-    setLamps(this.wallLamps || [], this.wallLampAims || []);
+    setLamps(this.wallLamps || [], this.wallLampAims || [], scene);
     lampLit(this.terrain.mesh.material);
     buildTowers(this);
     buildBase(this);
@@ -284,13 +286,10 @@ export class Environment {
       const rad = Math.tan(spot.angle * 1.05) * len;
       const geo = new THREE.CylinderGeometry(0.45, rad, len, 40, 1, true);
       geo.translate(0, -len / 2, 0);
-      const beamMat = new THREE.ShaderMaterial({
-        uniforms: { uColor: { value: new THREE.Color(0.55, 0.6, 0.72) }, uIntensity: { value: 0.05 }, uTime: { value: 0 }, uLen: { value: len } },
-        vertexShader: BEAM_VERT, fragmentShader: BEAM_FRAG,
-        transparent: true, depthWrite: false, side: THREE.DoubleSide,
-        blending: THREE.AdditiveBlending, fog: false,
-      });
-      const beam = new THREE.Mesh(geo, beamMat);
+      // the light also lights the air (volumetric.js); the painted cone is for presets without it
+      spot.layers.enable(VOL_LAYER);
+      const beam = new THREE.Mesh(geo, makeBeamMaterial(len));
+      beam.visible = !q.volumetric;
       beam.position.copy(spot.position);
       beam.frustumCulled = false;
       beam.renderOrder = 5;
@@ -306,12 +305,13 @@ export class Environment {
     // static fire light for the burning wreck in the field
     this.wreckFire = new THREE.PointLight(0xff6a22, 110, 60, 1.6);
     this.wreckFire.position.set(-38, 2.5, -96);
+    this.wreckFire.layers.enable(VOL_LAYER); // its glow in the smoke and rain round it
     this.scene.add(this.wreckFire);
   }
 
   makeGlowSprite(color, size, intensity = 1, fog = true) {
     const m = new THREE.SpriteMaterial({ map: this.tex.glow, color, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog });
-    if (fog) m.defines = { LB_FOG_ADD: '' };
+    if (fog) fogMaterial(m, { add: true });
     m.color.multiplyScalar(intensity);
     const s = new THREE.Sprite(m);
     s.scale.set(size, size, 1);
@@ -445,6 +445,9 @@ export class Environment {
       const hs = this.towerHousings[k];
       if (hs) hs.lookAt(sl.aim);
     }
+
+    // the air the searchlights light: thinner towards dawn, thicker in a fog bank, a cutscene's boost
+    VOL.density.value = 0.3 * (1 - d * 0.9) * (this.beamBoost > 1 ? 1.5 : 1) * (1 + (d < 0.01 ? this.fogBank : 0) * 1.5);
 
     updateWallBlood(this, horde, dt);
 

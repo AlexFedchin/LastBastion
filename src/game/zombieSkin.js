@@ -8,6 +8,7 @@
 //   aTint  = albedo multiplier (a dirtier shirt, a paler face...)
 // ZombieAnim picks the rows on the CPU (clip, time -> row) and knows where the head is.
 import * as THREE from 'three';
+import { Fn, If, Discard, float, int, vec2, vec3, vec4, ivec2, uniform, attribute, texture, textureLoad, uv, varyingProperty, screenCoordinate, normalLocal, normalView, positionViewDirection, mix, smoothstep, clamp, max, pow, sin, dot, normalize, fract, floor, step, select } from 'three/tsl';
 
 export class ZombieAnim {
   constructor(meta, data) {
@@ -65,160 +66,138 @@ export function zombieGeometry(mesh) {
     v.fromBufferAttribute(P, i).applyMatrix4(m); p[i * 3] = v.x; p[i * 3 + 1] = v.y; p[i * 3 + 2] = v.z;
     v.fromBufferAttribute(N, i).applyMatrix3(nm).normalize(); nr[i * 3] = v.x; nr[i * 3 + 1] = v.y; nr[i * 3 + 2] = v.z;
   }
-  const f = (a, size) => { const o = new Float32Array(n * size); for (let i = 0; i < n; i++) for (let c = 0; c < size; c++) o[i * size + c] = a.getComponent(i, c); return new THREE.BufferAttribute(o, size); };
-  g.setAttribute('position', new THREE.BufferAttribute(p, 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(nr, 3));
-  g.setAttribute('uv', f(src.attributes.uv, 2));
-  g.setAttribute('skinIndex', f(src.attributes.skinIndex, 4));
-  g.setAttribute('skinWeight', f(src.attributes.skinWeight, 4));
+  // WebGPU allows 8 vertex buffers a draw, and the horde's instances bring four of their own
+  // (the matrix, aAnim, aState, aTint): the per-vertex data goes in two interleaved buffers,
+  // position | normal | uv, and skinIndex | skinWeight
+  const UV = src.attributes.uv, SI = src.attributes.skinIndex, SW = src.attributes.skinWeight;
+  const geoB = new Float32Array(n * 8), skinB = new Float32Array(n * 8);
+  for (let i = 0; i < n; i++) {
+    geoB.set([p[i * 3], p[i * 3 + 1], p[i * 3 + 2], nr[i * 3], nr[i * 3 + 1], nr[i * 3 + 2], UV.getX(i), UV.getY(i)], i * 8);
+    for (let c = 0; c < 4; c++) { skinB[i * 8 + c] = SI.getComponent(i, c); skinB[i * 8 + 4 + c] = SW.getComponent(i, c); }
+  }
+  const ig = new THREE.InterleavedBuffer(geoB, 8), is = new THREE.InterleavedBuffer(skinB, 8);
+  g.setAttribute('position', new THREE.InterleavedBufferAttribute(ig, 3, 0));
+  g.setAttribute('normal', new THREE.InterleavedBufferAttribute(ig, 3, 3));
+  g.setAttribute('uv', new THREE.InterleavedBufferAttribute(ig, 2, 6));
+  g.setAttribute('skinIndex', new THREE.InterleavedBufferAttribute(is, 4, 0));
+  g.setAttribute('skinWeight', new THREE.InterleavedBufferAttribute(is, 4, 4));
   g.setIndex(src.index.clone());
   g.computeBoundingSphere();
   return g;
 }
 
-// ── the shader ──────────────────────────────────────────────────────────────
-const SKIN_HEADER = /* glsl */`
-uniform sampler2D uBones;
-uniform float uTime;
-uniform vec3 uHeadJoint;
-attribute vec4 skinIndex;
-attribute vec4 skinWeight;
-attribute vec4 aAnim;
-attribute vec4 aState;
-attribute vec3 aTint;
-// one bone's three rows at a fractional texture row (frames interpolate)
-void zRows(float row, int b, out vec4 r0, out vec4 r1, out vec4 r2) {
-  float f0 = floor(row), t = row - f0;
-  ivec2 c = ivec2(b * 3, int(f0)), d = c + ivec2(0, 1);
-  r0 = mix(texelFetch(uBones, c, 0), texelFetch(uBones, d, 0), t);
-  r1 = mix(texelFetch(uBones, c + ivec2(1, 0), 0), texelFetch(uBones, d + ivec2(1, 0), 0), t);
-  r2 = mix(texelFetch(uBones, c + ivec2(2, 0), 0), texelFetch(uBones, d + ivec2(2, 0), 0), t);
+/// ── the shader (WebGPU / TSL) ───────────────────────────────────────────────
+// One bone's three rows ([R|t]) at a fractional texture row: the two frames either side, blended.
+function boneRows(T, row, b) {
+  const f0 = floor(row), t = row.sub(f0);
+  const c = ivec2(int(b).mul(3), int(f0)), d = c.add(ivec2(0, 1));
+  const r = (k) => mix(textureLoad(T, c.add(ivec2(k, 0)), 0), textureLoad(T, d.add(ivec2(k, 0)), 0), t);
+  return [r(0), r(1), r(2)];
 }
-mat4 zBone(int b) {
-  vec4 r0, r1, r2;
-  zRows(aAnim.x, b, r0, r1, r2);
-  if (aAnim.z > 0.002) {
-    vec4 s0, s1, s2;
-    zRows(aAnim.y, b, s0, s1, s2);
-    r0 = mix(r0, s0, aAnim.z); r1 = mix(r1, s1, aAnim.z); r2 = mix(r2, s2, aAnim.z);
-  }
-  return mat4(r0.x, r1.x, r2.x, 0.0, r0.y, r1.y, r2.y, 0.0, r0.z, r1.z, r2.z, 0.0, r0.w, r1.w, r2.w, 1.0);
-}
-float zHeadW;
-// skin a bind-space point and normal
-void zSkin(inout vec3 p, inout vec3 n) {
-  int type = int(aState.z + 0.5);
-  bool headless = aState.w > 0.5;
-  zHeadW = 0.0;
-  // the bloater: a belly swollen with gas, swelling and settling
-  if (type == 3) {
-    float sw = 0.0;
-    for (int k = 0; k < 4; k++) { int b = int(skinIndex[k] + 0.5); if (b >= 1 && b <= 3) sw += skinWeight[k]; }
-    float belly = sw * smoothstep(0.95, 1.12, p.y) * smoothstep(1.5, 1.25, p.y) * (0.6 + 0.4 * smoothstep(-0.05, 0.12, n.z));
-    p += n * belly * (0.11 + 0.025 * sin(uTime * 3.0 + aAnim.w * 40.0));
-  }
-  vec4 acc = vec4(0.0); vec3 nn = vec3(0.0);
-  for (int k = 0; k < 4; k++) {
-    float w = skinWeight[k];
-    if (w <= 0.0) continue;
-    int b = int(skinIndex[k] + 0.5);
-    mat4 M = zBone(b);
-    bool isHead = b == 5 || b == 6;
-    if (isHead) zHeadW += w;
-    // headless: what hung off the head bone pinches to the stump
-    vec4 q = (isHead && headless) ? M * vec4(uHeadJoint, 1.0) : M * vec4(p, 1.0);
-    acc += w * q;
-    nn += w * mat3(M) * n;
-  }
-  p = acc.xyz;
-  n = normalize(nn);
-}
-`;
 
-const COLOR_FRAG = /* glsl */`
-  if (vZState.w < -0.002) {
-    float zd = fract(sin(dot(floor(gl_FragCoord.xy), vec2(12.9898, 78.233))) * 43758.5453);
-    if (zd < -vZState.w) discard;
-  }
-  float zLook = floor(vZLook);
-  vec4 zTex = texture2D(uLooks, vec2((vZUv.x + zLook) / 3.0, vZUv.y));
-  vec3 zc = zTex.rgb; // (an sRGB texture: sampled linear)
-  zc *= vZTint;
-  // blood reads wet: red over green and blue
-  float zBlood = clamp((zc.r - max(zc.g, zc.b) * 1.6) * 9.0, 0.0, 1.0);
-  float zStump = (vZState.w > 0.5) ? smoothstep(0.02, 0.2, vZHeadW) : 0.0;
-  zc = mix(zc, vec3(0.12, 0.008, 0.006), zStump);
-  // giants have their own mesh; the bloater's skin goes sickly
-  if (vZType > 2.5 && vZType < 3.5) zc *= vec3(0.85, 1.0, 0.7);
-  // charring as it burns, in blotches that spread (the burnt dead: char all over)
-  float zChar = uCorpse > 0.5 ? vZState.y : vZState.y * (0.35 + 0.4 * step(0.45, fract(sin(dot(floor(vZUv * 40.0), vec2(12.9898, 78.233))) * 43758.5453)));
-  zc = mix(zc, vec3(0.022, 0.018, 0.016), clamp(zChar, 0.0, 1.0));
-  diffuseColor.rgb *= zc;
-`;
-
-/** The zombie's material: MeshStandardMaterial skinned from the animation texture. */
-export function createSkinnedZombieMaterial(anim, maps, uniforms, { corpse = false, depth = false } = {}) {
-  const shared = {
-    uBones: { value: anim.texture },
-    uHeadJoint: { value: new THREE.Vector3(...anim.meta.stump) },
-  };
-  if (depth) {
-    const mat = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
-    mat.onBeforeCompile = (shader) => {
-      Object.assign(shader.uniforms, shared, { uTime: uniforms.uTime });
-      shader.vertexShader = SKIN_HEADER + shader.vertexShader.replace('#include <begin_vertex>', `
-        vec3 transformed = position; vec3 zNN = normal; zSkin(transformed, zNN);`);
-    };
-    mat.customProgramCacheKey = () => 'zskin-depth-v1';
-    return mat;
-  }
-  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, normalMap: maps.normal, normalScale: new THREE.Vector2(1, 1) });
-  const local = { uCorpse: { value: corpse ? 1 : 0 }, uLooks: { value: maps.looks } };
-  mat.onBeforeCompile = (shader) => {
-    Object.assign(shader.uniforms, shared, local, {
-      uTime: uniforms.uTime, uRim: uniforms.uRim, uLamps: uniforms.uLamps, uLampPow: uniforms.uLampPow,
+/**
+ * Skin a bind-space point and normal from the animation texture: two clips (rows) crossfading,
+ * the bloater's belly swelling, a headless body's head pinched to the stump. Sets normalLocal;
+ * returns the skinned position. headW (a var) gets the head bones' weight.
+ */
+function skinNodes(T, U, headW) {
+  const skinIndex = attribute('skinIndex', 'vec4'), skinWeight = attribute('skinWeight', 'vec4');
+  const aAnim = attribute('aAnim', 'vec4'), aState = attribute('aState', 'vec4');
+  return Fn(() => {
+    const p = vec3(attribute('position', 'vec3')).toVar();
+    const n = vec3(attribute('normal', 'vec3')).toVar();
+    const type = int(aState.z.add(0.5));
+    const headless = aState.w.greaterThan(0.5);
+    headW.assign(0);
+    // the bloater: a belly swollen with gas, swelling and settling
+    If(type.equal(3), () => {
+      const sw = float(0).toVar();
+      for (const c of ['x', 'y', 'z', 'w']) {
+        const b = int(skinIndex[c].add(0.5));
+        If(b.greaterThanEqual(1).and(b.lessThanEqual(3)), () => { sw.addAssign(skinWeight[c]); });
+      }
+      const belly = sw.mul(smoothstep(0.95, 1.12, p.y)).mul(smoothstep(1.5, 1.25, p.y)).mul(smoothstep(-0.05, 0.12, n.z).mul(0.4).add(0.6));
+      p.addAssign(n.mul(belly).mul(sin(U.uTime.mul(3).add(aAnim.w.mul(40))).mul(0.025).add(0.11)));
     });
-    shader.vertexShader = SKIN_HEADER + `
-      varying vec2 vZUv; varying float vZLook; varying vec3 vZTint; varying vec4 vZState; varying float vZType; varying float vZHeadW;
-    ` + shader.vertexShader
-      .replace('#include <beginnormal_vertex>', `
-        vec3 zP = position; vec3 objectNormal = normal; zSkin(zP, objectNormal);
-        #ifdef USE_TANGENT
-          vec3 objectTangent = vec3( tangent.xyz );
-        #endif`)
-      .replace('#include <begin_vertex>', `
-        vec3 transformed = zP;
-        vZUv = uv; vZLook = aAnim.w; vZTint = aTint; vZState = aState; vZType = aState.z; vZHeadW = zHeadW;`);
-    shader.fragmentShader = `
-      uniform float uTime; uniform float uCorpse; uniform vec3 uRim; uniform sampler2D uLooks;
-      uniform vec3 uLamps[10]; uniform float uLampPow;
-      varying vec2 vZUv; varying float vZLook; varying vec3 vZTint; varying vec4 vZState; varying float vZType; varying float vZHeadW;
-    ` + shader.fragmentShader
-      .replace('#include <color_fragment>', COLOR_FRAG)
-      .replace('#include <roughnessmap_fragment>', `#include <roughnessmap_fragment>
-        roughnessFactor = mix(0.45 + 0.55 * zTex.a, 0.22, max(zBlood, zStump));`)
-      .replace('#include <emissivemap_fragment>', `#include <emissivemap_fragment>
-        float zRim = pow(1.0 - clamp(dot(normal, normalize(vViewPosition)), 0.0, 1.0), 3.0);
-        totalEmissiveRadiance += zRim * uRim * (1.0 - uCorpse * 0.7);
-        #ifdef USE_FOG
-        if (uLampPow > 0.001) {
-          // the sodium lamps on the wall: a warm wash on everything that reaches the wall
-          vec3 zWN = normalize(transpose(mat3(viewMatrix)) * normal);
-          float zLamp = 0.0;
-          for (int k = 0; k < 10; k++) {
-            vec3 L = uLamps[k] - vLbFogW;
-            float d = length(L);
-            float att = clamp(1.0 - d / 17.0, 0.0, 1.0);
-            zLamp += att * att * (0.25 + 0.75 * clamp(dot(zWN, L / max(d, 1e-3)), 0.0, 1.0));
-          }
-          totalEmissiveRadiance += diffuseColor.rgb * vec3(1.0, 0.52, 0.18) * zLamp * uLampPow * 2.6;
-        }
-        #endif
-        // burning: a smoulder in patches of the charring skin (the flames drawn over it carry the motion)
-        float zN = fract(sin(dot(floor(vZUv * 90.0), vec2(12.9898, 78.233))) * 43758.5453);
-        totalEmissiveRadiance += clamp(vZState.y, 0.0, 1.0) * (1.0 - uCorpse) * vec3(0.75, 0.24, 0.04) * smoothstep(0.55, 0.95, zN);
-        if (vZType > 2.5 && vZType < 3.5) totalEmissiveRadiance += zBlood * vec3(0.12, 0.3, 0.02) * (0.6 + 0.4 * sin(uTime * 4.0 + vZLook * 9.0));`);
+    const acc = vec3(0).toVar(), nn = vec3(0).toVar();
+    for (const c of ['x', 'y', 'z', 'w']) {
+      const w = skinWeight[c];
+      If(w.greaterThan(0), () => {
+        const b = int(skinIndex[c].add(0.5)).toVar();
+        const A = boneRows(T, aAnim.x, b);
+        const r0 = vec4(A[0]).toVar(), r1 = vec4(A[1]).toVar(), r2 = vec4(A[2]).toVar();
+        If(aAnim.z.greaterThan(0.002), () => {
+          const B = boneRows(T, aAnim.y, b);
+          r0.assign(mix(r0, B[0], aAnim.z)); r1.assign(mix(r1, B[1], aAnim.z)); r2.assign(mix(r2, B[2], aAnim.z));
+        });
+        const isHead = b.equal(5).or(b.equal(6));
+        If(isHead, () => { headW.addAssign(w); });
+        // headless: what hung off the head bone pinches to the stump
+        const src = select(isHead.and(headless), U.uHeadJoint, p);
+        const q = vec4(src, 1);
+        acc.addAssign(vec3(dot(r0, q), dot(r1, q), dot(r2, q)).mul(w));
+        nn.addAssign(vec3(dot(r0.xyz, n), dot(r1.xyz, n), dot(r2.xyz, n)).mul(w));
+      });
+    }
+    normalLocal.assign(normalize(nn));
+    return acc;
+  })();
+}
+
+const dither = (k) => fract(sin(dot(floor(k), vec2(12.9898, 78.233))).mul(43758.5453));
+
+/** The zombie's material: a standard material skinned from the animation texture. */
+export function createSkinnedZombieMaterial(anim, maps, uniforms, { corpse = false, depth = false } = {}) {
+  // (shadows draw with the material's own positionNode under WebGPU: no separate depth material)
+  if (depth) return null;
+  const T = texture(anim.texture);
+  const U = { uTime: uniforms.uTime, uRim: uniforms.uRim, uHeadJoint: uniform(new THREE.Vector3(...anim.meta.stump)) };
+  const uCorpse = corpse ? 1 : 0;
+  const aAnim = attribute('aAnim', 'vec4'), aState = attribute('aState', 'vec4'), aTint = attribute('aTint', 'vec3');
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, normalMap: maps.normal, normalScale: new THREE.Vector2(1, 1) });
+  const vHeadW = varyingProperty('float', 'vZHeadW');
+  mat.positionNode = Fn(() => {
+    const headW = float(0).toVar();
+    const p = skinNodes(T, U, headW);
+    vHeadW.assign(headW);
+    return p;
+  })();
+  const looks = texture(maps.looks);
+  const sample = () => looks.sample(vec2(uv().x.add(floor(aAnim.w)).div(3), uv().y));
+  const masks = () => {
+    const zTex = sample();
+    const zc = zTex.rgb.mul(aTint).toVar();
+    // blood reads wet: red over green and blue
+    const blood = clamp(zc.r.sub(max(zc.g, zc.b).mul(1.6)).mul(9), 0, 1);
+    const stump = select(aState.w.greaterThan(0.5), smoothstep(0.02, 0.2, vHeadW), float(0));
+    return { zTex, zc, blood, stump };
   };
-  mat.customProgramCacheKey = () => 'zskin-v1' + (corpse ? 'c' : '');
+  mat.colorNode = Fn(() => {
+    // fading out: a screen-door dither
+    If(aState.w.lessThan(-0.002), () => {
+      If(dither(screenCoordinate.xy).lessThan(aState.w.negate()), () => { Discard(); });
+    });
+    const M = masks();
+    const zc = mix(M.zc, vec3(0.12, 0.008, 0.006), M.stump).toVar();
+    // giants have their own mesh; the bloater's skin goes sickly
+    If(aState.z.greaterThan(2.5).and(aState.z.lessThan(3.5)), () => { zc.mulAssign(vec3(0.85, 1.0, 0.7)); });
+    // charring as it burns, in blotches that spread (the burnt dead: char all over)
+    const zChar = corpse ? aState.y : aState.y.mul(step(0.45, dither(uv().mul(40))).mul(0.4).add(0.35));
+    return vec4(mix(zc, vec3(0.022, 0.018, 0.016), clamp(zChar, 0, 1)), 1);
+  })();
+  mat.roughnessNode = Fn(() => {
+    const M = masks();
+    return mix(M.zTex.a.mul(0.55).add(0.45), 0.22, max(M.blood, M.stump));
+  })();
+  mat.emissiveNode = Fn(() => {
+    const rim = pow(float(1).sub(clamp(dot(normalView, positionViewDirection), 0, 1)), 3);
+    const e = U.uRim.mul(rim).mul(1 - uCorpse * 0.7).toVar();
+    // burning: a smoulder in patches of the charring skin (the flames drawn over it carry the motion)
+    if (!corpse) e.addAssign(vec3(0.75, 0.24, 0.04).mul(clamp(aState.y, 0, 1)).mul(smoothstep(0.55, 0.95, dither(uv().mul(90)))));
+    If(aState.z.greaterThan(2.5).and(aState.z.lessThan(3.5)), () => {
+      e.addAssign(vec3(0.12, 0.3, 0.02).mul(masks().blood).mul(sin(U.uTime.mul(4).add(aAnim.w.mul(9))).mul(0.4).add(0.6)));
+    });
+    return e;
+  })();
   return mat;
 }

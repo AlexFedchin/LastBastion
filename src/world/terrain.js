@@ -14,6 +14,8 @@ import { makeRng, clamp, smoothstep as S } from '../core/util.js';
 import { lampLit } from './lamplight.js';
 import { makeTurfTextures, makeRockTextures, makeAsphaltTextures, makeGrassBladeTexture } from './textures2.js';
 import { fileTex } from './texlib.js';
+import { terrainNodes } from './terrainShader.js';
+import { Fn, float, vec2, vec3, vec4, uniform, texture, textureLoad, ivec2, positionLocal, cameraPosition, attribute, uv, smoothstep as sstep, sin, cos, length, mix, clamp as tclamp, floor, materialColor, varyingProperty, instance } from 'three/tsl';
 
 // ── deterministic value noise ───────────────────────────────────────────────
 function h2(ix, iz) {
@@ -351,162 +353,7 @@ function splatAt(x, z, ch) {
 }
 export function wetnessAt(x, z) { return splatAt(x, z, 1); }
 
-// ── shaders ─────────────────────────────────────────────────────────────────
-const T_COMMON = /* glsl */`
-float tHash(vec2 p){ p = fract(p * vec2(443.897, 441.423)); p += dot(p, p.yx + 19.19); return fract((p.x + p.y) * p.x); }
-float tNoise(vec2 p){
-  vec2 i = floor(p), q = fract(p); vec2 u = q * q * (3.0 - 2.0 * q);
-  return mix(mix(tHash(i), tHash(i + vec2(1.0, 0.0)), u.x), mix(tHash(i + vec2(0.0, 1.0)), tHash(i + vec2(1.0, 1.0)), u.x), u.y);
-}
-float tS(float a, float b, float v){ float t = clamp((v - a) / (b - a), 0.0, 1.0); return t * t * (3.0 - 2.0 * t); }
-float roadXg(float z){ return -52.0 * tS(-110.0, -470.0, z) + 96.0 * tS(-540.0, -930.0, z); }
-float rearValleyXg(float z){ return tS(80.0, 320.0, z) * (45.0 * sin(z * 0.0055 + 0.4) - 10.0); }
-float rearRoadXg(float z){ return rearValleyXg(z) + tS(40.0, 160.0, z) * 15.0 * sin(z * 0.02); }
-// Anti-tiling: every tile of a texture is drawn whole, turned by its own random angle
-// (a hash of the tile, so a white noise over the tiles) and shifted by a random offset.
-// Inside a tile that is one plain texture read, as sharp as the texture itself; only in a
-// thin band at a seam (NT_BAND of a tile) does a tile fade into its neighbour, keeping
-// its contrast there (variance-preserving, Heitz & Neyret). The tile grid wobbles a little
-// (a slow noise moves the boundaries), so the seams don't run in ruler-straight lines.
-// rot: how much of a full turn the tiles may turn (directional textures, like furrows, get little).
-#define NT_BAND 0.08
-struct NT { vec2 u0; vec2 u1; vec2 u2; vec2 u3; vec2 c0; vec2 c1; vec2 c2; vec2 c3; vec4 w; vec2 dx; vec2 dy; };
-vec2 ntRot(vec2 v, vec2 cs){ return vec2(cs.x * v.x - cs.y * v.y, cs.y * v.x + cs.x * v.y); }
-vec3 ntHash3(vec2 p){
-  vec3 q = vec3(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)), dot(p, vec2(419.2, 371.9)));
-  return fract(sin(q) * 43758.5453);
-}
-// one tile: turned about its own centre, shifted
-void ntTile(vec2 cell, vec2 uv, float rot, out vec2 u, out vec2 cs){
-  vec3 h = ntHash3(cell);
-  float a = (h.z - 0.5) * 6.2831853 * rot;
-  cs = vec2(cos(a), sin(a));
-  u = ntRot(uv - cell - 0.5, cs) + h.xy * 9.0;
-}
-NT ntBuild(vec2 uv, vec2 dx, vec2 dy, float rot){
-  NT n;
-  // which tile: the grid wobbles by up to 0.35 of a tile, so the tiles are uneven and no row of
-  // seams runs straight (the wobble's slope stays under 1, so no tile folds over)
-  vec2 q = uv + (vec2(tNoise(uv * 0.55 + 3.1), tNoise(uv * 0.55 + 7.7)) - 0.5) * 0.7;
-  vec2 c = floor(q), f = fract(q);
-  vec2 side = vec2(f.x < 0.5 ? -1.0 : 1.0, f.y < 0.5 ? -1.0 : 1.0);
-  // half-and-half on a seam, nothing of the neighbour past the band
-  vec2 a = 0.5 * (1.0 - smoothstep(0.0, NT_BAND, min(f, 1.0 - f)));
-  n.w = vec4((1.0 - a.x) * (1.0 - a.y), a.x * (1.0 - a.y), (1.0 - a.x) * a.y, a.x * a.y);
-  ntTile(c, uv, rot, n.u0, n.c0);
-  ntTile(c + vec2(side.x, 0.0), uv, rot, n.u1, n.c1);
-  ntTile(c + vec2(0.0, side.y), uv, rot, n.u2, n.c2);
-  ntTile(c + side, uv, rot, n.u3, n.c3);
-  n.dx = dx; n.dy = dy;
-  return n;
-}
-// explicit gradients: safe to call inside branches (derivatives aren't, in divergent flow)
-NT ntSetupD(vec2 uv, vec2 dx, vec2 dy){ return ntBuild(uv, dx, dy, 1.0); }
-NT ntSetupR(vec2 uv, vec2 dx, vec2 dy, float rot){ return ntBuild(uv, dx, dy, rot); }
-NT ntSetup(vec2 uv){ return ntBuild(uv, dFdx(uv), dFdy(uv), 1.0); }
-vec4 ntTap(sampler2D t, NT n, vec2 u, vec2 c){ return textureGrad(t, u, ntRot(n.dx, c), ntRot(n.dy, c)); }
-vec4 ntSample(sampler2D t, NT n){
-  vec4 a = ntTap(t, n, n.u0, n.c0);
-  if (n.w.x > 0.999) return a; // inside the tile: one read
-  vec4 b = ntTap(t, n, n.u1, n.c1), c = ntTap(t, n, n.u2, n.c2), d = ntTap(t, n, n.u3, n.c3);
-  vec4 mean = textureLod(t, vec2(0.5), 12.0);
-  vec4 v = (a - mean) * n.w.x + (b - mean) * n.w.y + (c - mean) * n.w.z + (d - mean) * n.w.w;
-  return clamp(mean + v * inversesqrt(dot(n.w, n.w)), 0.0, 1.0);
-}
-// a normal map through the same tiles: each tile's normal turned back by its rotation
-vec3 ntTapN(sampler2D t, NT n, vec2 u, vec2 c){
-  vec3 m = ntTap(t, n, u, c).xyz * 2.0 - 1.0;
-  m.xy = ntRot(m.xy, vec2(c.x, -c.y));
-  return m;
-}
-vec3 ntSampleN(sampler2D t, NT n){
-  vec3 a = ntTapN(t, n, n.u0, n.c0);
-  if (n.w.x > 0.999) return a;
-  return a * n.w.x + ntTapN(t, n, n.u1, n.c1) * n.w.y + ntTapN(t, n, n.u2, n.c2) * n.w.z + ntTapN(t, n, n.u3, n.c3) * n.w.w;
-}
-vec2 rippleN(vec2 p, float t){
-  vec2 acc = vec2(0.0);
-  for (int k = 0; k < 3; k++){
-    float fk = float(k);
-    vec2 q = p * (1.9 + fk * 0.7) + fk * 7.13;
-    vec2 i = floor(q), f = fract(q) - 0.5;
-    float rnd = tHash(i + fk * 3.1);
-    vec2 off = vec2(tHash(i + 1.7), tHash(i + 4.3)) - 0.5;
-    vec2 dv = f - off * 0.5;
-    float d = length(dv) + 1e-4;
-    float ph = fract(t * (0.8 + rnd * 0.5) + rnd);
-    float r = ph * 0.42;
-    float w = exp(-pow((d - r) / 0.03, 2.0)) * (1.0 - ph) * (1.0 - ph);
-    acc += dv / d * w * sin((d - r) * 90.0);
-  }
-  return acc;
-}
-// ── the asphalt: cracks and potholes ──
-// Cracks are the borders of a Voronoi pattern (after Quilez, "Voronoi edges"): the exact
-// distance to the nearest border, and the direction across it, so a crack can be drawn
-// as a groove of a set width in metres and lit from its own slope.
-vec3 crackVor(vec2 x){
-  vec2 n = floor(x), f = fract(x);
-  vec2 mg = vec2(0.0), mr = vec2(0.0); float md = 8.0;
-  for (int j = -1; j <= 1; j++) for (int i = -1; i <= 1; i++){
-    vec2 g = vec2(float(i), float(j));
-    vec2 o = vec2(tHash(n + g), tHash(n + g + 17.31));
-    vec2 r = g + o - f;
-    float d = dot(r, r);
-    if (d < md){ md = d; mr = r; mg = g; }
-  }
-  md = 8.0; vec2 dir = vec2(1.0, 0.0);
-  for (int j = -2; j <= 2; j++) for (int i = -2; i <= 2; i++){
-    vec2 g = mg + vec2(float(i), float(j));
-    vec2 o = vec2(tHash(n + g), tHash(n + g + 17.31));
-    vec2 r = g + o - f;
-    vec2 e = r - mr;
-    if (dot(e, e) > 1e-5){ vec2 nd = normalize(e); float d = dot(0.5 * (mr + r), nd); if (d < md){ md = d; dir = nd; } }
-  }
-  return vec3(md, dir);
-}
-// One family of cracks: cells of 'cell' metres, the line 'width' metres wide, antialiased
-// against the pixel's footprint 'fp' (metres) so a crack thinner than a pixel fades out
-// instead of crawling. Returns (coverage, groove slope x, z): the slope is for the normal.
-vec3 crackLayer(vec2 p, float cell, float width, float fp, float jag){
-  vec2 q = p / cell;
-  q += (vec2(tNoise(q * 2.3 + 1.3), tNoise(q * 2.3 + 6.1)) - 0.5) * jag; // jagged, not ruler-straight
-  vec3 v = crackVor(q);
-  float d = v.x * cell;                                                    // metres to the crack
-  float w = width * (0.6 + 0.8 * tNoise(p * 1.7));                        // opens and closes along its length
-  float cov = 1.0 - smoothstep(w * 0.5, w * 0.5 + fp, d);
-  cov *= min(1.0, w / max(fp, 1e-4));                                      // thinner than a pixel: fainter
-  // the groove's walls: they face the crack (towards it on either side)
-  float wall = smoothstep(w * 0.5 + fp + 0.006, w * 0.5, d) * (1.0 - cov * 0.7);
-  return vec3(cov, -v.yz * wall);
-}
-// Potholes: in each 7 m square of road a one-in-three chance of one, of 0.4-1.2 m, with a
-// ragged edge. Returns (inside 0..1, rim, slope x, z, water): broken steep walls, a flat
-// bottom of wet gravel, and some of them full of rain.
-vec4 pothole(vec2 p, float fp, out float water){
-  vec2 cell = floor(p / 7.0);
-  vec3 h = vec3(tHash(cell + 3.3), tHash(cell + 8.1), tHash(cell + 1.9));
-  water = 0.0;
-  if (h.x > 0.34) return vec4(0.0);
-  vec2 c = (cell + 0.25 + vec2(h.y, h.z) * 0.5) * 7.0; // (far enough in that R x 1.9 stays in the square)
-  vec2 dv = p - c;
-  float R = 0.4 + 0.8 * tHash(cell + 5.7);
-  float dist = length(dv);
-  if (dist > R * 1.9) return vec4(0.0);
-  float a = atan(dv.y, dv.x);
-  float rag = 1.0 + (tNoise(vec2(a * 2.2, 0.0) + cell * 3.1) - 0.5) * 0.55 + (tNoise(dv * 6.0) - 0.5) * 0.18;
-  float Re = R * rag;
-  float q = dist / Re;
-  float inside = 1.0 - smoothstep(1.0 - fp / Re, 1.0 + fp / Re, q);
-  // depth: steep walls in the outer quarter, a flat floor
-  float depth = 0.09 * smoothstep(1.0, 0.72, q);
-  float slope = 0.09 * 6.0 * smoothstep(0.72, 0.86, q) * smoothstep(1.0, 0.9, q) / Re; // d(depth)/d(dist), roughly
-  vec2 nrm = -normalize(dv + 1e-5) * slope;                                // the walls face inward
-  float rim = smoothstep(1.35, 1.0, q) * (1.0 - inside);                   // crumbled asphalt round it
-  water = tHash(cell + 9.4) < 0.6 ? smoothstep(0.78, 0.66, q) : 0.0;
-  return vec4(inside, rim, nrm);
-}
-`;
+// (the terrain material is built in terrainShader.js)
 
 export class Terrain {
   constructor(scene, quality, mudTex) {
@@ -598,229 +445,15 @@ export class Terrain {
       envMapIntensity: 0.35,
     });
     this.uniforms = {
-      tSplat: { value: splat },
-      uSplatBox: { value: new THREE.Vector4(SPLAT.x0, SPLAT.z0, SPLAT.size, SPLAT.size) },
-      tMudA: { value: mud.map }, tMudR: { value: mud.roughnessMap || mud.map },
-      tTrackA: { value: this.tex.track.map }, tTrackN: { value: this.tex.track.normalMap },
-      tPloughA: { value: this.tex.plough.map }, tPloughN: { value: this.tex.plough.normalMap },
-      tTurfA: { value: this.tex.turf.map }, tTurfN: { value: this.tex.turf.normalMap },
-      tRockA: { value: this.tex.rock.map }, tRockN: { value: this.tex.rock.normalMap },
-      tAsphA: { value: this.tex.asph.map }, tAsphN: { value: this.tex.asph.normalMap },
-      uTime: { value: 0 },
-      uRain: { value: 1 },
+      uSplatBox: uniform(new THREE.Vector4(SPLAT.x0, SPLAT.z0, SPLAT.size, SPLAT.size)),
+      uTime: uniform(0),
+      uRain: uniform(1),
     };
-    mat.onBeforeCompile = (sh) => {
-      Object.assign(sh.uniforms, this.uniforms);
-      sh.vertexShader = 'varying vec3 vTW;\nvarying vec3 vTNw;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-        vTW = (modelMatrix * vec4(transformed, 1.0)).xyz;
-        vTNw = normalize(mat3(modelMatrix) * objectNormal);`);
-      sh.fragmentShader = /* glsl */`
-varying vec3 vTW;
-varying vec3 vTNw;
-uniform sampler2D tSplat; uniform vec4 uSplatBox;
-uniform sampler2D tMudA; uniform sampler2D tMudR;
-uniform sampler2D tTurfA; uniform sampler2D tTurfN;
-uniform sampler2D tRockA; uniform sampler2D tRockN;
-uniform sampler2D tAsphA; uniform sampler2D tAsphN;
-uniform sampler2D tTrackA; uniform sampler2D tTrackN;
-uniform sampler2D tPloughA; uniform sampler2D tPloughN;
-uniform float uTime; uniform float uRain;
-${T_COMMON}
-` + sh.fragmentShader
-        .replace('#include <map_fragment>', /* glsl */`
-  vec3 tw = vTW;
-  vec3 tn = normalize(vTNw);
-  vec2 sp = (tw.xz - uSplatBox.xy) / uSplatBox.zw;
-  float inBox = step(0.0, sp.x) * step(sp.x, 1.0) * step(0.0, sp.y) * step(sp.y, 1.0);
-  vec4 SPL = texture2D(tSplat, clamp(sp, 0.0, 1.0)) * inBox;
-  float macro = tNoise(tw.xz * 0.021) * 0.6 + tNoise(tw.xz * 0.0045 + 3.7) * 0.4;
-  float slope = 1.0 - tn.y;
-  float distC = length(tw.xz - cameraPosition.xz);
-  float farGrass = clamp((macro - 0.34) * 2.4, 0.0, 1.0) * 0.9;
-  float tGrass = mix(farGrass * tS(-40.0, -120.0, tw.z), SPL.r, inBox);
-  float tWet = SPL.g;
-  float tBurn = SPL.b;
-  float tTrample = SPL.a;
-  float rdx = abs(tw.x - roadXg(tw.z));
-  float tRoad = tS(4.4 + tNoise(tw.xz * 0.35) * 1.4, 3.0, rdx) * step(tw.z, -2.5);
-  float tRock = tS(0.2, 0.42, slope + (macro - 0.5) * 0.18) + tS(30.0, 70.0, tw.y) * 0.55;
-  tRock = clamp(tRock, 0.0, 1.0) * (1.0 - tRoad);
-  // anti-tiling mud everywhere; the other layers only where they actually show
-  // (weights are zero over most of the field, and a zero-weight mix changes nothing)
-  vec3 gX3 = dFdx(tw), gY3 = dFdy(tw);
-  vec2 gX = gX3.xz, gY = gY3.xz;
-  bool hasTurf = tGrass > 0.002 || tw.z > 40.0, hasRoad = tRoad > 0.002, hasRock = tRock > 0.002;
-  NT ntMud = ntSetup(tw.xz / ${f(TS.mud)});
-  NT ntTurf, ntAsph, ntRock;
-  // the macro layer is anti-tiled too (seen from the air it was the one that repeated), and
-  // with distance the detail hands over to a coarser copy so no tile size can show in a wide view
-  NT ntMacro = ntSetup(tw.xz / ${f(TS.mudMacro)} + 0.37);
-  vec3 mudC = ntSample(tMudA, ntMud).rgb * ${mud.file ? '0.85' : '0.7'} + ntSample(tMudA, ntMacro).rgb * ${mud.file ? '0.15' : '0.3'};
-  float farK = tS(45.0, 220.0, distC);
-  if (farK > 0.0) {
-    NT ntFar = ntSetupD(tw.xz / ${f(TS.mud * 5.3)} + 63.0, gX / ${f(TS.mud * 5.3)}, gY / ${f(TS.mud * 5.3)});
-    mudC = mix(mudC, ntSample(tMudA, ntFar).rgb * ${mud.file ? '0.85' : '0.7'} + ntSample(tMudA, ntMacro).rgb * ${mud.file ? '0.15' : '0.3'}, farK * 0.7);
-  }
-  // large-scale tonal drift so the field never reads as one flat material
-  mudC *= 0.8 + 0.4 * tNoise(tw.xz * 0.013 + 7.0);
-  vec3 turfC = vec3(0.0);
-  if (hasTurf) {
-    ntTurf = ntSetupD(tw.xz / ${f(TS.turf)} + 31.0, gX / ${f(TS.turf)}, gY / ${f(TS.turf)});
-    turfC = ntSample(tTurfA, ntTurf).rgb;
-    if (farK > 0.0) {
-      NT ntTurfFar = ntSetupD(tw.xz / ${f(TS.turf * 5.3)} + 77.0, gX / ${f(TS.turf * 5.3)}, gY / ${f(TS.turf * 5.3)});
-      turfC = mix(turfC, ntSample(tTurfA, ntTurfFar).rgb, farK * 0.7);
-    }
-    turfC *= mix(0.36, 0.6, tNoise(tw.xz * 0.11));
-  }
-  vec3 rockC = vec3(0.0);
-  if (hasRock) {
-    ntRock = ntSetupD(tw.xz / ${f(TS.rock)} + 5.0, gX / ${f(TS.rock)}, gY / ${f(TS.rock)});
-    vec3 bw = pow(abs(tn), vec3(4.0)); bw /= (bw.x + bw.y + bw.z);
-    NT ntRx = ntSetupD(tw.zy / ${f(TS.rock)} + 13.0, gX3.zy / ${f(TS.rock)}, gY3.zy / ${f(TS.rock)});
-    NT ntRz = ntSetupD(tw.xy / ${f(TS.rock)} - 29.0, gX3.xy / ${f(TS.rock)}, gY3.xy / ${f(TS.rock)});
-    rockC = ntSample(tRockA, ntRx).rgb * bw.x + ntSample(tRockA, ntRock).rgb * bw.y + ntSample(tRockA, ntRz).rgb * bw.z;
-  }
-  vec3 asphC = vec3(0.0);
-  // the road's own relief and wetness, for the roughness and normal sections below
-  vec2 rdN = vec2(0.0); float rdWater = 0.0, rdCrack = 0.0, rdHole = 0.0;
-  if (hasRoad) {
-    // each tile turned freely: the asphalt is the same in every direction (a texture with
-    // streaks laid one way read as stretched along the road)
-    ntAsph = ntSetupD(tw.xz / ${f(TS.asph)} - 17.0, gX / ${f(TS.asph)}, gY / ${f(TS.asph)});
-    asphC = ntSample(tAsphA, ntAsph).rgb;
-    // old asphalt: darker patched stretches, paler worn ones
-    asphC *= 0.82 + 0.32 * tNoise(tw.xz * 0.045 + 4.0);
-    // faded centre line on the road
-    float along = tw.z;
-    float paint = (1.0 - tS(0.07, 0.12, abs(tw.x - roadXg(tw.z)))) * step(0.45, fract(along / 7.0)) * tS(0.35, 0.6, tNoise(tw.xz * 0.9));
-    asphC = mix(asphC, vec3(0.32, 0.29, 0.2), paint * 0.7);
-    // potholes, then cracks: long ones in patches, fine "alligator" cracking in others and round the holes
-    float fp = max(length(gX), length(gY)) * 1.2;   // metres a pixel covers here
-    float hw;
-    vec4 ph = pothole(tw.xz, fp, hw);
-    rdHole = ph.x;
-    float near = 1.0 - tS(35.0, 90.0, distC);       // cracks only where they can be seen
-    if (near > 0.0) {
-      float longK = tS(0.38, 0.6, tNoise(tw.xz * 0.06 + 2.0));
-      // (crazing kept rare and faint: a whole road of it reads as dried mud again)
-      float alliK = max(tS(0.72, 0.86, tNoise(tw.xz * 0.11 + 9.0)) * 0.6, ph.y * 1.2);
-      vec3 cl = crackLayer(tw.xz + 31.0, 2.6, 0.022, fp, 0.55);
-      vec3 ca = alliK > 0.0 ? crackLayer(tw.xz - 13.0, 0.42, 0.0075, fp, 0.35) : vec3(0.0);
-      rdCrack = clamp(cl.x * longK + ca.x * alliK, 0.0, 1.0) * near * (1.0 - rdHole);
-      // (a gentle groove: steeper, every crack caught the lamps like a filament)
-      rdN += (cl.yz * longK + ca.yz * alliK) * 0.3 * near * (1.0 - rdHole);
-    }
-    asphC *= 1.0 - 0.7 * rdCrack;
-    asphC *= 1.0 - 0.22 * ph.y;                     // the broken edge round a hole
-    // in the hole: wet gravel and mud, and rain water in some
-    vec3 holeC = mudC * vec3(0.62, 0.6, 0.58);
-    rdWater = hw * rdHole;
-    holeC *= 1.0 - 0.45 * rdWater;
-    asphC = mix(asphC, holeC, rdHole);
-    rdN += ph.zw;
-  }
-  // ── behind the base: a patchwork of fields on the valley floor, a dirt track ──
-  float rz = tS(40.0, 95.0, tw.z);
-  float rRoad = 0.0, rRut = 0.0, fieldW = 0.0, fKind = 0.0, hedge = 0.0;
-  vec3 fieldC = vec3(0.0);
-  if (rz > 0.0) {
-    float rrd = abs(tw.x - rearRoadXg(tw.z));
-    rRoad = tS(3.9 + tNoise(tw.xz * 0.3) * 0.9, 2.6, rrd) * tS(24.0, 34.0, tw.z);
-    rRut = exp(-pow((rrd - 0.95) / 0.28, 2.0)) * rRoad;
-    // plots: a rotated grid, each one ploughed, stubble, meadow or fallow
-    vec2 fr = vec2(${Math.cos(0.32).toFixed(6)} * tw.x - ${Math.sin(0.32).toFixed(6)} * tw.z, ${Math.sin(0.32).toFixed(6)} * tw.x + ${Math.cos(0.32).toFixed(6)} * tw.z);
-    vec2 fc = fr / vec2(54.0, 36.0);
-    vec2 fid = floor(fc), ff = fract(fc);
-    float fh = tHash(fid + 3.7);
-    fKind = fh < 0.3 ? 0.0 : fh < 0.55 ? 1.0 : fh < 0.85 ? 2.0 : 3.0;
-    float edge = min(min(ff.x, 1.0 - ff.x) * 54.0, min(ff.y, 1.0 - ff.y) * 36.0);
-    fieldW = rz * tS(0.09, 0.035, slope) * tS(16.0, 7.0, tw.y) * tS(70.0, 110.0, tw.z) * (1.0 - tS(2.2, 6.5, -(rrd - 9.0)));
-    float wob = tNoise(tw.xz * 0.21) - 0.5;
-    hedge = tS(2.6, 1.0, edge + wob * 1.6) * fieldW;
-    float tone = 0.85 + 0.3 * tHash(fid + 9.1);
-    if (fKind < 0.5) {
-      // ploughed: dark turned earth in furrows along the plot
-      float fur = 0.5 + 0.5 * sin(fr.x * 3.1 + wob * 0.6);
-      vec2 pu = fr / ${f(TS.plough)};
-      vec2 pgx = vec2(dot(gX, vec2(0.94924, -0.31457)), dot(gX, vec2(0.31457, 0.94924))) / ${f(TS.plough)};
-      vec2 pgy = vec2(dot(gY, vec2(0.94924, -0.31457)), dot(gY, vec2(0.31457, 0.94924))) / ${f(TS.plough)};
-      vec3 pc = ntSample(tPloughA, ntSetupR(pu, pgx, pgy, 0.04)).rgb;
-      fieldC = ${fileTex('plough') ? 'pc * mix(0.85, 1.0, fur)' : 'mudC * mix(0.55, 0.95, fur) * vec3(0.95, 0.88, 0.8)'} * tone;
-    } else if (fKind < 1.5) {
-      // stubble: pale, combed in rows
-      float row = 0.5 + 0.5 * sin(fr.y * 4.4);
-      fieldC = vec3(0.25, 0.21, 0.135) * mix(0.75, 1.05, row) * (0.8 + 0.4 * tNoise(tw.xz * 0.6)) * tone;
-    } else if (fKind < 2.5) {
-      fieldC = mix(mudC, turfC + vec3(0.02, 0.025, 0.0), 0.85) * tone;
-    } else {
-      fieldC = mix(mudC * 0.9, turfC * 0.8, tS(0.35, 0.65, tNoise(tw.xz * 0.09))) * tone;
-    }
-  }
-  if (rz > 0.0) {
-    // meadow grass over the hills, thinning on the steep bits
-    float rg = clamp((macro - 0.22) * 2.2, 0.0, 1.0) * (1.0 - tS(0.25, 0.45, slope)) * rz;
-    tGrass = mix(tGrass, max(tGrass, rg), rz) * (1.0 - rRoad);
-    tTrample *= 1.0 - rz;
-  }
-  vec3 tcol = mudC;
-  tcol = mix(tcol, turfC, tGrass);
-  if (rz > 0.0) {
-    tcol = mix(tcol, fieldC, fieldW * (1.0 - rRoad));
-    tcol = mix(tcol, turfC * vec3(0.55, 0.6, 0.45), hedge * 0.85);
-    // the track: wet packed mud, two darker ruts, a grassy crown
-    vec3 trackC = ${fileTex('track') ? `ntSample(tTrackA, ntSetupR(tw.xz / ${f(TS.track)} + 5.0, gX / ${f(TS.track)}, gY / ${f(TS.track)}, 0.12)).rgb` : 'mudC * vec3(0.82, 0.78, 0.72)'};
-    trackC = mix(trackC, mudC * 0.45, rRut / max(rRoad, 1e-3) * 0.8);
-    trackC = mix(trackC, turfC * 0.7, exp(-pow(abs(tw.x - rearRoadXg(tw.z)) / 0.35, 2.0)) * 0.6);
-    tcol = mix(tcol, trackC, rRoad);
-  }
-  tcol = mix(tcol, asphC, tRoad);
-  tcol = mix(tcol, rockC * vec3(0.95, 0.93, 0.9), tRock);
-  tcol *= 0.72 + 0.56 * macro;
-  // a broad wash of light and dark over hundreds of metres, for the wide shots from the air
-  tcol *= 0.84 + 0.32 * tNoise(tw.xz * 0.0023 + 1.3);
-  tcol *= mix(1.0, 0.22, tBurn);
-  tcol *= mix(1.0, 0.55, tTrample * (1.0 - tRoad));
-  float puddle = tS(0.5, 0.72, tWet + (tNoise(tw.xz * 0.55) - 0.5) * 0.18) * (1.0 - tRock);
-  tcol *= mix(0.78, 0.42, max(tWet * 0.7, puddle));
-  diffuseColor.rgb *= tcol;
-`)
-        .replace('#include <roughnessmap_fragment>', /* glsl */`
-  float roughnessFactor = ntSample(tMudR, ntMud).${mud.file ? 'a' : 'g'};
-  roughnessFactor = mix(roughnessFactor, 0.93, tGrass);
-  roughnessFactor = mix(roughnessFactor, mix(mix(0.7, 0.88, rdCrack), mix(0.8, 0.04, rdWater), rdHole), tRoad);
-  roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.72, tTrample);
-  roughnessFactor = max(roughnessFactor, 0.55) * mix(1.0, 0.86, uRain);
-  roughnessFactor = mix(roughnessFactor, 0.35, tWet * 0.6);
-  // bare rock stays matte: weathered stone doesn't sheen in the rain the way mud does
-  roughnessFactor = mix(roughnessFactor, 0.96, tRock);
-  roughnessFactor = mix(roughnessFactor, 0.035, puddle);
-  roughnessFactor = mix(roughnessFactor, 0.4, rRut * 0.7);
-`)
-        // (the include itself: its contents are only pasted in after onBeforeCompile, so a
-        // line inside it can't be matched here; matching one left the plain normal map, tiled
-        // every 9 m with no anti-tiling, as the repeat everyone could see on the road)
-        .replace('#include <normal_fragment_maps>', /* glsl */`
-  vec3 nMud = ntSampleN(normalMap, ntSetupD(tw.xz / ${f(TS.mudN)} + 41.0, gX / ${f(TS.mudN)}, gY / ${f(TS.mudN)}));
-  vec3 mapN = nMud;
-  if (hasTurf) mapN = mix(mapN, ntSampleN(tTurfN, ntTurf), tGrass);
-  // the road: smooth asphalt, its own fine grain, the cracks' grooves and the holes' walls;
-  // standing water in a hole lies flat (rippled by the rain)
-  if (hasRoad) {
-    vec3 aN = ntSampleN(tAsphN, ntAsph);
-    aN.xy = aN.xy * 1.1 + rdN;
-    aN.xy *= 1.0 - rdWater;
-    if (rdWater > 0.01 && distC < 90.0) aN.xy += rippleN(tw.xz * 1.6, uTime) * rdWater * 0.7 * uRain;
-    mapN = mix(mapN, aN, tRoad);
-  }
-  if (hasRock) mapN = mix(mapN, ntSampleN(tRockN, ntRock) * vec3(1.6, 1.6, 1.0), tRock);
-  mapN.xy *= (1.0 - puddle) * (1.0 - 0.35 * tWet);
-  if (puddle > 0.01 && distC < 90.0) mapN.xy += rippleN(tw.xz * 1.6, uTime) * puddle * 0.9 * uRain;
-  mapN.xy *= normalScale;
-  normal = normalize( tbn * mapN );
-`);
-    };
-    mat.customProgramCacheKey = () => 'lb-terrain';
+    terrainNodes(mat, {
+      splat, mudA: mud.map, mudR: mud.roughnessMap || mud.map, mudN: mud.normalMap,
+      turfA: this.tex.turf.map, turfN: this.tex.turf.normalMap, rockA: this.tex.rock.map, rockN: this.tex.rock.normalMap,
+      asphA: this.tex.asph.map, asphN: this.tex.asph.normalMap, trackA: this.tex.track.map, ploughA: this.tex.plough.map,
+    }, TS, { mudFile: !!mud.file, ploughFile: !!fileTex('plough'), trackFile: !!fileTex('track') }, this.uniforms);
     const mesh = new THREE.Mesh(geo, mat);
     mesh.receiveShadow = true;
     this.scene.add(mesh);
@@ -864,23 +497,24 @@ ${T_COMMON}
       map: tex, alphaTest: 0.42, side: THREE.DoubleSide, roughness: 0.95, metalness: 0,
       color: 0xb8ad90, envMapIntensity: 0.15,
     });
-    this.grassUniforms = { uTime: { value: 0 } };
-    mat.onBeforeCompile = (sh) => {
-      sh.uniforms.uTime = this.grassUniforms.uTime;
-      sh.vertexShader = 'uniform float uTime;\nvarying float vGrassAO;\n' + sh.vertexShader.replace('#include <begin_vertex>', `#include <begin_vertex>
-        vec3 ip = vec3(instanceMatrix[3][0], instanceMatrix[3][1], instanceMatrix[3][2]);
-        float gd = length(ip.xz - cameraPosition.xz);
-        float fade = smoothstep(175.0, 120.0, gd);
-        float h = uv.y * uv.y;
-        float gust = sin(uTime * 0.9 + ip.x * 0.05 + ip.z * 0.03) * 0.5 + 0.5;
-        transformed.x += (sin(uTime * 2.1 + ip.x * 0.7 + ip.z * 0.4) * 0.07 + gust * 0.12) * h;
-        transformed.z += cos(uTime * 1.7 + ip.z * 0.6) * 0.05 * h;
-        transformed *= fade;
-        vGrassAO = uv.y;`);
-      sh.fragmentShader = 'varying float vGrassAO;\n' + sh.fragmentShader.replace('#include <map_fragment>', `#include <map_fragment>
-        diffuseColor.rgb *= 0.35 + 0.65 * vGrassAO;`);
-    };
-    mat.customProgramCacheKey = () => 'lb-grass';
+    this.grassUniforms = { uTime: uniform(0) };
+    // each blade sways from its root, the tips most; the far ones shrink away (the instance's
+    // own position comes in aIP: the sway and the fade work in the blade's local space)
+    const gT = this.grassUniforms.uTime;
+    const vAO = varyingProperty('float', 'vGrassAO');
+    mat.positionNode = Fn(() => {
+      const ip = attribute('aIP', 'vec3');
+      const gd = length(ip.xz.sub(cameraPosition.xz));
+      const fade = sstep(175.0, 120.0, gd);
+      const h = uv().y.mul(uv().y);
+      const gust = sin(gT.mul(0.9).add(ip.x.mul(0.05)).add(ip.z.mul(0.03))).mul(0.5).add(0.5);
+      const p = positionLocal.toVar();
+      p.x.addAssign(sin(gT.mul(2.1).add(ip.x.mul(0.7)).add(ip.z.mul(0.4))).mul(0.07).add(gust.mul(0.12)).mul(h));
+      p.z.addAssign(cos(gT.mul(1.7).add(ip.z.mul(0.6))).mul(0.05).mul(h));
+      vAO.assign(uv().y);
+      return p.mul(fade);
+    })();
+    mat.colorNode = Fn(() => vec4(materialColor.rgb.mul(vAO.mul(0.65).add(0.35)), materialColor.a))();
     lampLit(mat); // the blades under a wall lamp catch it like the ground they grow in
 
     // blades are bucketed into angular sectors around the gun, each its own instanced
@@ -915,7 +549,11 @@ ${T_COMMON}
     const group = new THREE.Group();
     for (const b of buckets) {
       if (!b.m.length) continue;
-      const mesh = new THREE.InstancedMesh(geo, mat, b.m.length);
+      const g = geo.clone();
+      const ipA = new Float32Array(b.m.length * 3);
+      b.m.forEach((mm, i) => { ipA[i * 3] = mm.elements[12]; ipA[i * 3 + 1] = mm.elements[13]; ipA[i * 3 + 2] = mm.elements[14]; });
+      g.setAttribute('aIP', new THREE.InstancedBufferAttribute(ipA, 3));
+      const mesh = new THREE.InstancedMesh(g, mat, b.m.length);
       b.m.forEach((mm, i) => { mesh.setMatrixAt(i, mm); mesh.setColorAt(i, b.c[i]); });
       mesh.instanceMatrix.needsUpdate = true;
       if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
@@ -946,18 +584,15 @@ export function heightUniforms() {
   }
   return { tLbHeight: { value: HTEX }, uLbHBox: { value: new THREE.Vector4(HC.x0, HC.z0, HC.step, HC.w) } };
 }
-export const HEIGHT_GLSL = /* glsl */`
-uniform sampler2D tLbHeight;
-uniform vec4 uLbHBox;
-float lbTerrainH(vec2 xz){
-  vec2 f = (xz - uLbHBox.xy) / uLbHBox.z;
-  vec2 i = clamp(floor(f), vec2(0.0), vec2(uLbHBox.w - 2.0));
-  vec2 t = clamp(f - i, 0.0, 1.0);
-  ivec2 ii = ivec2(i);
-  float a = texelFetch(tLbHeight, ii, 0).r;
-  float b = texelFetch(tLbHeight, ii + ivec2(1, 0), 0).r;
-  float c = texelFetch(tLbHeight, ii + ivec2(0, 1), 0).r;
-  float d = texelFetch(tLbHeight, ii + ivec2(1, 1), 0).r;
+/** The terrain's height at xz (bilinear over the height cache), for vertex shaders. */
+export const lbTerrainH = Fn(([xz]) => {
+  const H = texture(heightUniforms().tLbHeight.value);
+  const box = new THREE.Vector4(HC.x0, HC.z0, HC.step, HC.w);
+  const f = xz.sub(vec2(box.x, box.y)).div(box.z);
+  const i = tclamp(floor(f), vec2(0), vec2(box.w - 2));
+  const t = tclamp(f.sub(i), 0, 1);
+  const ii = ivec2(i);
+  const a = textureLoad(H, ii, 0).r, b = textureLoad(H, ii.add(ivec2(1, 0)), 0).r;
+  const c = textureLoad(H, ii.add(ivec2(0, 1)), 0).r, d = textureLoad(H, ii.add(ivec2(1, 1)), 0).r;
   return mix(mix(a, b, t.x), mix(c, d, t.x), t.y);
-}
-`;
+});

@@ -4,6 +4,7 @@
 // ramp (with its treadway boards) are nodes of their own; anchors in the root's extras mark
 // where the game hangs its lights, guns and paths (scripts/models/build_vehicles.mjs).
 import * as THREE from 'three';
+import { Fn, float, vec3, uniform, positionLocal, positionWorld, normalWorld, cameraPosition, pow, abs, dot, normalize } from 'three/tsl';
 import { cloneModel } from '../world/models.js';
 
 let M = null;
@@ -94,26 +95,14 @@ export function spinRotors(h, dt, speed = 1, flip = false) {
 export function makeBeam() {
   const geo = new THREE.CylinderGeometry(0.12, 1, 1, 24, 1, true);
   geo.translate(0, -0.5, 0); // apex at the origin, opening down -y
-  const mat = new THREE.ShaderMaterial({
-    uniforms: { uK: { value: 1 } },
-    vertexShader: /* glsl */`
-      varying float vY; varying vec3 vN; varying vec3 vV;
-      void main(){
-        vY = -position.y;
-        vec4 w = modelMatrix * vec4(position, 1.0);
-        vN = normalize(mat3(modelMatrix) * normal);
-        vV = normalize(cameraPosition - w.xyz);
-        gl_Position = projectionMatrix * viewMatrix * w;
-      }`,
-    fragmentShader: /* glsl */`
-      uniform float uK; varying float vY; varying vec3 vN; varying vec3 vV;
-      void main(){
-        float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.6);
-        float a = edge * (1.0 - vY * 0.8) * 0.075 * uK;
-        gl_FragColor = vec4(vec3(0.85, 0.9, 1.0) * a, 1.0);
-      }`,
-    transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
-  });
+  const uK = uniform(1);
+  const mat = new THREE.MeshBasicNodeMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide, fog: false });
+  mat.uniforms = { uK };
+  mat.colorNode = Fn(() => {
+    const vY = positionLocal.y.negate();
+    const edge = pow(abs(dot(normalize(normalWorld), normalize(cameraPosition.sub(positionWorld)))), 1.6);
+    return vec3(0.85, 0.9, 1.0).mul(edge.mul(float(1).sub(vY.mul(0.8))).mul(0.075).mul(uK));
+  })();
   const m = new THREE.Mesh(geo, mat);
   m.frustumCulled = false;
   m.renderOrder = 5;
