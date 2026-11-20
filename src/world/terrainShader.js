@@ -365,10 +365,11 @@ export function terrainNodes(mat, T, TS, flags, U) {
     const rough = float(ntSample(tex.mudR, ntMud)[flags.mudFile ? 'a' : 'g']).toVar();
     rough.assign(mix(rough, 0.93, tGrass));
     rough.assign(mix(rough, mix(mix(0.7, 0.88, rdCrack), mix(0.8, 0.04, rdWater), rdHole), tRoad));
-    rough.assign(mix(rough, 0.78, tRock));
     rough.assign(mix(rough, rough.mul(0.72), tTrample));
     rough.assign(max(rough, 0.55).mul(mix(1.0, 0.86, U.uRain)));
     rough.assign(mix(rough, 0.35, tWet.mul(0.6)));
+    // bare rock stays matte: weathered stone doesn't sheen in the rain the way mud does
+    rough.assign(mix(rough, 0.96, tRock));
     rough.assign(mix(rough, 0.035, puddle));
     rough.assign(mix(rough, 0.4, rRut.mul(0.7)));
 

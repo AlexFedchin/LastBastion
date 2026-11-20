@@ -7,7 +7,6 @@
 // The tall trees are low-poly cards: they go only on the hills. The bushes and rocks go on
 // the battlefield (and the farmland behind the base); the dead trees stand in the field.
 import * as THREE from 'three';
-import { stoneMaterial } from './stone.js';
 import { Fn, uv, max, dot, dFdx, dFdy, log2, materialOpacity } from 'three/tsl';
 
 // heights of the pack's variants (build log), and what each one is
@@ -78,8 +77,8 @@ export function placeRock(env, m, { group = '', cast = true } = {}) {
   const yaw = hash(serial, 43) * Math.PI * 2;
   q.setFromEuler(new THREE.Euler((hash(serial, 47) - 0.5) * 0.25, yaw, (hash(serial, 53) - 0.5) * 0.25));
   p.y -= high * 0.18; // bedded in
-  // (the pack's own stone is untextured: the boulders wear the valley's rock, stone.js)
-  env.addModel('trees', new THREE.Matrix4().compose(p, q, s.set(k, ky, k)), { node: 'rock_' + v, cast, group, mat: stoneMaterial() });
+  // (the pack's rock is a pale limestone: darkened to the valley's wet, sooty stone)
+  env.addModel('trees', new THREE.Matrix4().compose(p, q, s.set(k, ky, k)), { node: 'rock_' + v, cast, group, tint: 0x6f685e, matte: true });
 }
 
 /** A dead tree in the field for one of the old branching trees' matrices (about 7.5 m at scale 1). */
