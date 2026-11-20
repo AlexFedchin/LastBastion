@@ -9,7 +9,7 @@
 // it thinner (the far city) or that add light instead of covering (glow sprites) set their
 // own with fogMaterial(); custom node shaders call lbFog() directly.
 import * as THREE from 'three';
-import { Fn, float, vec2, vec3, vec4, uniform, positionWorld, cameraPosition, mix, smoothstep, exp, max, abs, length, normalize, fract, floor, dot, select } from 'three/tsl';
+import { Fn, float, vec2, vec3, vec4, uniform, renderGroup, positionWorld, cameraPosition, mix, smoothstep, exp, max, abs, length, normalize, fract, floor, dot, select } from 'three/tsl';
 
 // colour of the city glow (shared with the sky shader)
 export const GLOW_RGB = [0.2, 0.05, 0.012];
@@ -17,10 +17,14 @@ const NIGHT = { Db: 0.00155, D0: 0.0085, b: 0.15 };
 const DAWN = { Db: 0.0027, D0: 0.016, b: 0.085 };
 
 /** The fog's live inputs (environment.js drives them every frame). */
+// (in the shared render group, refreshed once a render for everything: in the default per-object
+// group a material with no node of its own, which takes the fog through setupFog, is never
+// refreshed once drawn, so the far ranges and plain models kept the night's black fog at dawn,
+// dark shapes behind a field fogged pale)
 export const fogUniforms = {
-  lbFogColor: uniform(new THREE.Color(0.0055, 0.006, 0.0085)),
-  lbTime: uniform(0),
-  lbDawn: uniform(0), // 0 night .. 1 dawn; above 2 it carries a fog bank: 2 + bank strength (night only)
+  lbFogColor: uniform(new THREE.Color(0.0055, 0.006, 0.0085)).setGroup(renderGroup),
+  lbTime: uniform(0).setGroup(renderGroup),
+  lbDawn: uniform(0).setGroup(renderGroup), // 0 night .. 1 dawn; above 2 it carries a fog bank: 2 + bank strength (night only)
 };
 
 const lbHash = Fn(([p]) => {
@@ -98,6 +102,12 @@ export function fogMaterial(mat, { scale = 1, add = false } = {}) {
   mat.setupFog = function (builder, outputNode) {
     return vec4(applyFog(outputNode.rgb, { scale, add }), outputNode.a);
   };
+  // three keys a compiled shader on the material's properties and nodes, not on an overridden
+  // setupFog: without this a thinned or additive fog shared its shader with any plain material of
+  // the same settings, and whichever was built first won (at dawn the far ranges lost their haze
+  // and stood dark behind a field fogged white)
+  const base = mat.customProgramCacheKey.bind(mat);
+  mat.customProgramCacheKey = () => base() + `|lbfog:${scale}:${add ? 'a' : 'm'}`;
   return mat;
 }
 

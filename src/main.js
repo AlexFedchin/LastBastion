@@ -1112,7 +1112,9 @@ class Game {
     this.post.scenePass.camera = inHangar ? this.hangar.camera : this.camera;
     // the hangar is graded like daylight indoors, not like the night: a gentle curve, soft
     // colour, no lens glare (the night's look crushed its shadows and blew out every lamp)
-    u.uCurve.value = inHangar ? 0.3 : 0.35; u.uTint.value = inHangar ? 0.75 : 1;
+    // (more contrast in the valley: a stronger S-curve and a black point, so the shadows go to black
+    // and the fires, beams and lit faces stand out of them)
+    u.uCurve.value = inHangar ? 0.3 : 0.55; u.uBlack.value = inHangar ? 0 : 0.0025; u.uTint.value = inHangar ? 0.75 : 1;
     u.uFlare.value = inHangar ? 0.008 : 0.035; u.uStreak.value = inHangar ? 0.004 : 0.025; u.uDirt.value = inHangar ? 0.015 : 0.07;
     this.post.bloom.strength = inHangar ? 0.2 : 0.42;
     if (inHangar) {

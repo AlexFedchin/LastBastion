@@ -44,6 +44,22 @@ npm start             # builds src/ and runs the game, either branch
   interleaved into two buffers, and instance matrices are read as four `vec4` columns
   (`render/nodeUtil.js`).
 
+## Fog and uniforms (why the valley went grey and white)
+
+- **The fog's uniforms live in the shared render group** (`setGroup(renderGroup)` in
+  `render/atmosphere.js`). In three's default per-object group a uniform is only re-uploaded when
+  the render object refreshes, and a material without a node property of its own (a plain model
+  taking the fog through the patched `setupFog`) never refreshes once drawn: the far ranges and
+  plain models kept the fog of the first frame they were drawn in (the night's black fog at dawn,
+  the prologue's bright sunset fog all through night 1). Any `uniform()` read only through an
+  overridden `setup*` function needs the same treatment.
+- **The volumetric air takes additive fog** (dimmed with distance, no fog colour mixed in): it is
+  added on top of the frame, and fogged the normal way it laid the fog's colour over the whole
+  valley, invisible at night and a grey sheet at dawn and in the sunset.
+- **`fogMaterial` adds its scale and mode to the material's shader key**: three keys compiled
+  shaders on properties and nodes, and an overridden function is the same source text for every
+  material, so a thinned fog could share a shader with a plain one.
+
 ## Stalls: shaders and pipelines (what made the game freeze for seconds)
 
 WebGPU builds a shader (TSL → WGSL, on the CPU) and a render pipeline (compiled by the driver)

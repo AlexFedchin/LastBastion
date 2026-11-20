@@ -6,6 +6,7 @@
 // whatever is in front), blurred, and added to the HDR scene before bloom (post.js).
 // The spot lights that light it are tagged by environment.js (layer VOL_LAYER).
 import * as THREE from 'three';
+import { fogMaterial } from './atmosphere.js';
 import { Fn, vec3, uniform, pass, screenUV, screenCoordinate, texture3D, smoothstep, exp, min, pow, clamp, distance, cameraPosition } from 'three/tsl';
 import { bayer16 } from 'three/examples/jsm/tsl/math/Bayer.js';
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js';
@@ -73,6 +74,10 @@ export function volumetricPass(scene, camera, scenePass, quality, renderer = nul
   if (!tier) return null;
   const nTex = noise3D();
   const mat = new THREE.VolumeNodeMaterial();
+  // the air is added on top of the frame, so the fog only dims it with distance: fogged the normal
+  // way it added the fog's own colour over the whole valley (nothing at night, a grey sheet over
+  // everything at dawn and in the prologue's sunset)
+  fogMaterial(mat, { add: true });
   mat.steps = tier.steps;
   mat.offsetNode = bayer16(screenCoordinate); // dithered start: banding becomes noise the blur removes
   mat.scatteringNode = Fn(({ positionRay }) => {

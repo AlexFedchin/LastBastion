@@ -52,6 +52,7 @@ export class Post {
       uFade: uniform(1),
       uWarm: uniform(0),
       uCurve: uniform(0.35),
+      uBlack: uniform(0), // black point (before the gamma): the darks down to black, the rest spread over the range
       uTint: uniform(1),
       uFlare: uniform(0.035),
       uStreak: uniform(0.025),
@@ -189,6 +190,7 @@ export class Post {
       col.mulAssign(mix(vec3(1), vec3(1.06, 0.98, 0.9), u.uWarm));
       col.assign(clamp(col, 0, 1));
       col.assign(mix(col, col.mul(col).mul(col.mul(-2).add(3)), u.uCurve));
+      col.assign(max(col.sub(u.uBlack), 0).div(float(1).sub(u.uBlack)));
 
       // vignette (+ a touch of optical falloff at the very corners)
       const vig = smoothstep(0.95, 0.22, length(c0.mul(vec2(1, 0.82))));
