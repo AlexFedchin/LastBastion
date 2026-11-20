@@ -5,7 +5,9 @@
 // - the lens itself, a small dome of glass that burns (HDR) when lit and is dark glass when not,
 //   so up close you see the lamp on the wingtip, not a cloud of light around it;
 // - a glint, a sprite of fixed size on screen: from far off a lamp is a point of light (the size
-//   of the lens is under a pixel), and it stays a point however far it goes.
+//   of the lens is under a pixel), and it stays a point however far it goes;
+// - a halo, sized in metres: close up the lamp glows in the air round it, far off it shrinks
+//   inside the glint.
 // The strobe double-flashes the way the real ones do and, near the camera, lights the airframe
 // for the length of the flash (a light from the effects pool).
 import * as THREE from 'three';
@@ -81,8 +83,15 @@ export class NavLights {
     const sp = new THREE.Sprite(m);
     sp.position.copy(at);
     sp.renderOrder = 7;
-    this.group.add(lens, sp);
-    return { lens, sp, c, kind, k, was: 0 };
+    // the halo: light scattered in the air and the housing round the lamp, sized in metres, so
+    // close up the lamp glows and far off it shrinks inside the glint
+    const hm = new THREE.SpriteMaterial({ map: glow(), color: 0x000000, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending });
+    hm.defines = { LB_FOG_ADD: '' };
+    const halo = new THREE.Sprite(hm);
+    halo.position.copy(at);
+    halo.renderOrder = 7;
+    this.group.add(lens, sp, halo);
+    return { lens, sp, halo, c, kind, k, was: 0 };
   }
 
   /** Light the lamps for time t (seconds); camera: to light the airframe with the strobe when close. */
@@ -95,6 +104,7 @@ export class NavLights {
       for (const l of this.lamps) {
         l.lens.scale.setScalar(this.lensR / s);
         l.base = this.glint / s;
+        l.halo.scale.setScalar((this.lensR * 9) / s);
       }
     }
     for (const l of this.lamps) {
@@ -107,6 +117,8 @@ export class NavLights {
       l.sp.material.color.copy(l.c).multiplyScalar(4.5 * l.k * on);
       l.sp.scale.setScalar(l.base * (l.kind === 'steady' ? 1 : 1 + 0.8 * on));
       l.sp.visible = on > 0.01;
+      l.halo.material.color.copy(l.c).multiplyScalar(1.4 * l.k * on);
+      l.halo.visible = l.sp.visible;
       // the strobe lights the airframe up for its flash, near the camera only (the pool is small)
       if (l.kind === 'strobe' && on > 0 && !l.was && this.pool && camera) {
         l.lens.getWorldPosition(_w);
