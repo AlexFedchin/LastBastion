@@ -150,13 +150,13 @@ export class Hangar {
     scene.environment = pm.fromScene(new RoomEnvironment(), 0.04).texture;
     // the room's own soft light, bounced off every wall: it is what fills the shadows
     // (1.15 under WebGL; the WebGPU PMREM of the room comes out brighter, so less of it)
-    scene.environmentIntensity = 0.45;
+    scene.environmentIntensity = 0.12;
     pm.dispose();
 
     this.mats = {
-      floor: surf('hgFloor', { color: 0xf2ece2, gain: 2.2, fallback: 0x6d6a64 }),
+      floor: surf('hgFloor', { color: 0xd8d2c8, gain: 1.5, fallback: 0x6d6a64 }),
       apron: surf('hgFloor', { color: 0xe0d8cc, gain: 1.5, fallback: 0x4a4744 }),
-      wall: surf('hgWall', { color: 0xe8e0d2, gain: 1.6, metal: 0.4, fallback: 0x5c6264, side: THREE.DoubleSide }),
+      wall: surf('hgWall', { color: 0xcfc8bb, gain: 1.15, metal: 0.4, fallback: 0x5c6264, side: THREE.DoubleSide }),
       roof: surf('hgWall', { color: 0xc8ccc8, gain: 0.9, metal: 0.4, fallback: 0x3a3e40, side: THREE.DoubleSide }),
       steel: surf('hgSteel', { color: 0xc4cabb, gain: 1.0, metal: 0.55, fallback: 0x4c5048 }),
       hazard: surf('hgHazard', { color: 0xffffff, gain: 1.3, fallback: 0xc9a227 }),
@@ -187,8 +187,8 @@ export class Hangar {
   /** The building: the factory hall model, and the hazard paint on its floor. */
   buildShell() {
     const hall = prop('hangar');
-    // its strip lights glow, but not so they blow out the trusses round them
-    hall.traverse((o) => { if (o.isMesh && o.material.emissive && o.material.emissive.getHex() !== 0) o.material.emissiveIntensity = 0.35; });
+    // its strip lights: a dim, tired glow (the hall is lit by its practicals, not by them)
+    hall.traverse((o) => { if (o.isMesh && o.material.emissive && o.material.emissive.getHex() !== 0) o.material.emissiveIntensity = 0.05; });
     this.scene.add(hall);
     const M = this.mats, geos = { hazard: [] };
     // the walkway painted down the middle of the hall, and the line in front of each bay
@@ -241,9 +241,10 @@ export class Hangar {
 
   buildLights() {
     const scene = this.scene, q = this.g.quality;
-    scene.add(new THREE.HemisphereLight(0xc4bdb0, 0x6a5e4e, 1.2));
+    // a grim, working hangar: little ambient light, the room lit by its practicals in pools
+    scene.add(new THREE.HemisphereLight(0x8a8478, 0x3a3128, 0.22));
     // the sun's patch on the floor throws warm light back up into the hall
-    const bounce = new THREE.PointLight(0xffb880, 26, 22, 1.4);
+    const bounce = new THREE.PointLight(0xffb880, 12, 16, 1.6);
     bounce.position.set(1, 1.2, OPEN_Z + 4.5);
     scene.add(bounce);
     // the low sun through the open door: warm, raking, the one shadow-casting light
@@ -263,19 +264,19 @@ export class Hangar {
     // a lamp over each bay and over the duty board
     this.bayLights = [];
     for (const b of BAYS) {
-      const l = new THREE.SpotLight(0xffd8b0, 60, 14, 0.95, 0.8, 1.4);
+      const l = new THREE.SpotLight(0xffc890, 48, 12, 0.62, 0.55, 1.6);
       l.position.set(b.x + b.n.x * 0.4, CEIL - 0.6, b.z);
       l.target.position.set(b.x + b.n.x * 0.4, 0, b.z);
       scene.add(l, l.target);
       this.bayLights.push(l);
     }
-    const bl = new THREE.SpotLight(0xffe0b8, 30, 12, 0.75, 0.6, 1.4);
+    const bl = new THREE.SpotLight(0xffd4a0, 22, 10, 0.6, 0.5, 1.6);
     bl.position.set(BOARD.x + 2.6, 4.4, BOARD.z);
     bl.target.position.set(BOARD.x, BOARD.y, BOARD.z);
     scene.add(bl, bl.target);
-    // the hall's own ceiling lights, down the middle
-    for (const z of [-4, 4, 12, 20]) {
-      const p = new THREE.PointLight(0xe8ecf4, 8, 16, 1.5);
+    // the hall's own ceiling lights, down the middle: half of them dead, the rest weak
+    for (const z of [-4, 12]) {
+      const p = new THREE.PointLight(0xd8dce4, 2.2, 14, 1.6);
       p.position.set(-1.2, CEIL - 0.3, z);
       scene.add(p);
     }
@@ -283,23 +284,34 @@ export class Hangar {
     this.workLights = [];
     for (const b of BAYS) {
       const r = rightOf(b.n);
-      const w = new THREE.SpotLight(0xffe6c2, 44, 14, 0.65, 0.85, 1.4);
+      const w = new THREE.SpotLight(0xffdcae, 30, 11, 0.5, 0.6, 1.6);
       w.position.set(b.x + b.n.x * 4.6 - r.x * 1.6, 2.6, b.z + b.n.z * 4.6 - r.z * 1.6);
       w.target.position.set(b.x - b.n.x * 0.6, 0.6, b.z - b.n.z * 0.6);
       scene.add(w, w.target);
       this.workLights.push(w);
     }
-    // warm washes along the side walls, a cool fill by the open end
-    for (const x of [XL + 0.8, XR - 0.8]) for (const z of [-3, 9, 21]) {
-      const p = new THREE.PointLight(0xffc890, 6, 8, 1.6);
-      p.position.set(x, 4.2, z);
+    // practicals: caged bulbs on the side walls, each a small warm pool on the wall and the floor
+    // under it (and a bulb you can see), the dark left between them
+    const bulbGeo = new THREE.SphereGeometry(0.07, 10, 8);
+    const cageGeo = new THREE.CylinderGeometry(0.1, 0.1, 0.18, 8, 1, true);
+    const bulbMat = new THREE.MeshBasicMaterial({ color: new THREE.Color(4.5, 2.6, 1.1) });
+    const cageMat = new THREE.MeshStandardMaterial({ color: 0x1c1b19, roughness: 0.6, metalness: 0.7, wireframe: true });
+    for (const x of [XL + 0.35, XR - 0.35]) for (const z of [-6, 2, 10, 18, 26]) {
+      const by = 3.1 + ((z * 7 + x) % 3 === 0 ? 0.3 : 0);
+      const bulb = new THREE.Mesh(bulbGeo, bulbMat);
+      bulb.position.set(x, by, z);
+      const cage = new THREE.Mesh(cageGeo, cageMat);
+      cage.position.copy(bulb.position);
+      scene.add(bulb, cage);
+      const p = new THREE.PointLight(0xffa860, 4.5, 6.5, 2);
+      p.position.set(x + Math.sign(-x) * 0.25, by - 0.1, z);
       scene.add(p);
     }
-    const doorFill = new THREE.PointLight(0xd0d4dc, 16, 16, 1.4);
+    const doorFill = new THREE.PointLight(0xb8c0cc, 6, 12, 1.6);
     doorFill.position.set(0, 4.2, OPEN_Z + 0.5);
     scene.add(doorFill);
     // the entrance, where the overview looks down the hall from
-    const front = new THREE.PointLight(0xffe2c4, 18, 22, 1.4);
+    const front = new THREE.PointLight(0xffd4b0, 5, 14, 1.6);
     front.position.set(0, CEIL - 0.5, OPEN_Z + 3);
     scene.add(front);
     // the pick light: follows what the cursor is over
