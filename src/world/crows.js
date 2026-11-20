@@ -67,8 +67,9 @@ export class Crows {
         const uShoulder = uniform(shoulder), uAxis = uniform(spreadAxis), uSpread = uniform(spreadAngle);
         const aWing = attribute('aWing', 'vec2');
         const rotAxis = (v, a, t) => { const c = cos(t), sn = sin(t); return v.mul(c).add(cross(a, v).mul(sn)).add(a.mul(dot(a, v)).mul(float(1).sub(c))); };
+        mat.positionBeforeInstance = true; // (three-shim.js: the wing pose runs before the instance matrix)
         mat.positionNode = Fn(() => {
-          const v = positionLocal;
+          const v = attribute('position', 'vec3');
           const side = select(v.x.greaterThanEqual(0), float(1), float(-1));
           const piv = vec3(side.mul(uShoulder.x), uShoulder.y, uShoulder.z);
           const ax = vec3(uAxis.x, uAxis.y.mul(side), uAxis.z.mul(side));

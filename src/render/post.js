@@ -78,7 +78,11 @@ export class Post {
     this.vol = volumetricPass(scene, camera, this.scenePass, quality);
     const hdr = Fn(([uvS]) => {
       const c = clampHDR(sceneTex.sample(uvS));
-      return this.vol ? c.add(this.vol.sample(uvS).rgb) : c;
+      if (!this.vol) return c;
+      // the lit air, compressed at the top (a beam swinging across the lens glows, it doesn't
+      // white out the frame): dim beams stay linear, the core rolls off
+      const v = this.vol.sample(uvS).rgb;
+      return c.add(v.div(dot(v, vec3(0.3, 0.5, 0.2)).mul(0.8).add(1)));
     });
     const bloomIn = Fn(() => vec4(hdr(screenUV), 1))();
     this.bloom = bloom(bloomIn, 0.42, 0.22, 1.0);

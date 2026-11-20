@@ -512,7 +512,8 @@ export class Terrain {
       p.x.addAssign(sin(gT.mul(2.1).add(ip.x.mul(0.7)).add(ip.z.mul(0.4))).mul(0.07).add(gust.mul(0.12)).mul(h));
       p.z.addAssign(cos(gT.mul(1.7).add(ip.z.mul(0.6))).mul(0.05).mul(h));
       vAO.assign(uv().y);
-      return p.mul(fade);
+      // (positionLocal is already placed by the instance: shrink it towards the blade's root)
+      return ip.add(p.sub(ip).mul(fade));
     })();
     mat.colorNode = Fn(() => vec4(materialColor.rgb.mul(vAO.mul(0.65).add(0.35)), materialColor.a))();
     lampLit(mat); // the blades under a wall lamp catch it like the ground they grow in

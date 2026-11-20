@@ -492,6 +492,7 @@ export function createZombieMaterial(uniforms, { corpse = false } = {}) {
   const uCorpse = corpse ? 1 : 0;
   const aMat = attribute('aMat', 'float'), aPart = attribute('aPart', 'float');
   const aAnim = attribute('aAnim', 'vec4'), aState = attribute('aState', 'vec4'), aTint = attribute('aTint', 'vec3');
+  mat.positionBeforeInstance = true; // (three-shim.js: posed before the instance matrix)
   const vL = varyingProperty('vec3', 'vZL');
   mat.positionNode = Fn(() => {
     const p = vec3(attribute('position', 'vec3')).toVar();

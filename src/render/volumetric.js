@@ -6,7 +6,7 @@
 // whatever is in front), blurred, and added to the HDR scene before bloom (post.js).
 // The spot lights that light it are tagged by environment.js (layer VOL_LAYER).
 import * as THREE from 'three';
-import { Fn, vec3, uniform, pass, screenUV, screenCoordinate, texture3D, smoothstep, exp } from 'three/tsl';
+import { Fn, vec3, uniform, pass, screenUV, screenCoordinate, texture3D, smoothstep, exp, min, pow, clamp, distance } from 'three/tsl';
 import { bayer16 } from 'three/examples/jsm/tsl/math/Bayer.js';
 import { gaussianBlur } from 'three/examples/jsm/tsl/display/GaussianBlurNode.js';
 import { ImprovedNoise } from 'three/examples/jsm/math/ImprovedNoise.js';
@@ -42,7 +42,14 @@ export const VOL = {
   density: uniform(0.8),   // overall scattering
   rain: uniform(1),        // rain streak strength
   time: uniform(0),
+  // the searchlights' lamps (environment.js): the air right at a lamp would take the light's full
+  // 1/d falloff and burn the frame white whenever a beam swings past the camera, so within NEAR
+  // metres of a lamp the scattering is thinned by the same falloff, and a beam reads evenly bright
+  // from the lamp out, the way the eye (and a camera's exposure) sees one
+  src0: uniform(new THREE.Vector3(-77, 17, 0)),
+  src1: uniform(new THREE.Vector3(77, 17, 0)),
 };
+const NEAR = 40;
 
 /**
  * Build the volumetric pass for `scene` seen by `camera`, using `scenePass`'s depth.
@@ -64,7 +71,9 @@ export function volumetricPass(scene, camera, scenePass, quality) {
     // slow drifting mist, heavier near the ground
     const mist = texture3D(nTex, positionRay.mul(0.006).add(vec3(t.mul(0.002), 0, t.mul(0.001))).mod(1), 0).r;
     const low = exp(positionRay.y.mul(-0.04));
-    return mist.mul(0.9).add(0.55).mul(0.35).mul(low).add(rain.mul(0.35)).mul(VOL.density);
+    const dl = min(distance(positionRay, VOL.src0), distance(positionRay, VOL.src1));
+    const near = pow(clamp(dl.div(NEAR), 0.02, 1), 1.15);
+    return mist.mul(0.9).add(0.55).mul(0.35).mul(low).add(rain.mul(0.35)).mul(VOL.density).mul(near);
   });
   mat.depthNode = scenePass.getTextureNode('depth').sample(screenUV);
   // the field in front of the wall, out past where the beams reach

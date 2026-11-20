@@ -155,6 +155,7 @@ export function createSkinnedZombieMaterial(anim, maps, uniforms, { corpse = fal
   const uCorpse = corpse ? 1 : 0;
   const aAnim = attribute('aAnim', 'vec4'), aState = attribute('aState', 'vec4'), aTint = attribute('aTint', 'vec3');
   const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 1, metalness: 0, normalMap: maps.normal, normalScale: new THREE.Vector2(1, 1) });
+  mat.positionBeforeInstance = true; // (three-shim.js: the skinning runs before the instance matrix)
   const vHeadW = varyingProperty('float', 'vZHeadW');
   mat.positionNode = Fn(() => {
     const headW = float(0).toVar();

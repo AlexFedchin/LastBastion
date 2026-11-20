@@ -12,10 +12,6 @@ export class Decals {
     const geo = new THREE.PlaneGeometry(1, 1, 4, 4).rotateX(-Math.PI / 2);
     this.aFrame = new THREE.InstancedBufferAttribute(new Float32Array(capacity), 1).setUsage(THREE.DynamicDrawUsage);
     geo.setAttribute('aFrame', this.aFrame);
-    // the placement again as (x, z, cos * size, sin * size): the vertex shader lays each corner on
-    // the ground under it before the instance matrix moves it there
-    this.aDec = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 4), 4).setUsage(THREE.DynamicDrawUsage);
-    geo.setAttribute('aDec', this.aDec);
     const mat = new THREE.MeshStandardMaterial({
       map: atlas,
       transparent: true,
@@ -26,12 +22,11 @@ export class Decals {
       polygonOffsetFactor: -2,
       polygonOffsetUnits: -4,
     });
-    const aDec = attribute('aDec', 'vec4'), aFrame = attribute('aFrame', 'float');
+    const aFrame = attribute('aFrame', 'float');
     mat.positionNode = Fn(() => {
+      // (positionLocal is already placed by the instance matrix: it is the corner in the world)
       const p = positionLocal;
-      const wx = aDec.x.add(aDec.z.mul(p.x)).add(aDec.w.mul(p.z));
-      const wz = aDec.y.sub(aDec.w.mul(p.x)).add(aDec.z.mul(p.z));
-      return vec3(p.x, p.y.add(lbTerrainH(vec2(wx, wz))), p.z);
+      return vec3(p.x, p.y.add(lbTerrainH(p.xz)), p.z);
     })();
     const map = texture(atlas);
     mat.colorNode = Fn(() => {
@@ -64,8 +59,6 @@ export class Decals {
     m[o + 8] = s; m[o + 9] = 0; m[o + 10] = c; m[o + 11] = 0;
     m[o + 12] = x; m[o + 13] = y + 0.015 + this._yJitter * 0.0006; m[o + 14] = z; m[o + 15] = 1;
     this.aFrame.array[i] = frame;
-    const D = this.aDec.array;
-    D[i * 4] = x; D[i * 4 + 1] = z; D[i * 4 + 2] = c; D[i * 4 + 3] = s;
     const col = this.mesh.instanceColor.array;
     col[i * 3] = r; col[i * 3 + 1] = g; col[i * 3 + 2] = b;
     this._dirty = true;
@@ -80,6 +73,5 @@ export class Decals {
     this.mesh.instanceMatrix.needsUpdate = true;
     this.mesh.instanceColor.needsUpdate = true;
     this.aFrame.needsUpdate = true;
-    this.aDec.needsUpdate = true;
   }
 }
