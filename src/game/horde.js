@@ -9,7 +9,7 @@ import { nearObstacle, steer, pushOut } from '../world/obstacles.js';
 import { createGiantGeometry, createZombieMaterial, createZombieDepthMaterial, createEyeMesh } from './zombieModel.js';
 import { createSkinnedZombieMaterial } from './zombieSkin.js';
 import { rand } from '../core/util.js';
-import { groundH } from '../world/terrain.js';
+import { groundH, valleyEdge } from '../world/terrain.js';
 import { fogUniforms } from '../render/atmosphere.js';
 
 const _ob = [0, 0];
@@ -583,6 +583,8 @@ export class Horde {
   // ── spawning ─────────────────────────────────────────────────────────────
   spawn(type, x, z, hpMul = 1, speedMul = 1, laneSide = 0) {
     if (this.n >= Math.min(this.cap, this.limit)) return -1;
+    // out on the field: on the valley floor, not up its walls (the edge wanders in and out)
+    if (z < -40) { const e = valleyEdge(z, x) - 14; if (Math.abs(x) > e) x = Math.sign(x) * e; }
     const T = ZOMBIE_TYPES[type];
     const i = this.n++;
     this.alive++;

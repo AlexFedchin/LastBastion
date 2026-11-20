@@ -96,7 +96,7 @@ export function buildRear(env) {
   for (let k = 0; k < (big ? 1600 : 900); k++) {
     const side = rng() < 0.5 ? -1 : 1;
     const z = -160 + rng() * 300;
-    const x = side * (valleyEdge(z) + 4 + Math.pow(rng(), 0.8) * 260);
+    const x = side * (valleyEdge(z, side) + 4 + Math.pow(rng(), 0.8) * 260);
     if (!clearOfBase(x, z) && z > 0) continue;
     const dens = vnoise(x * 0.012 + 3, z * 0.012 + 8);
     if (dens < 0.38 + rng() * 0.15) continue;
@@ -109,7 +109,7 @@ export function buildRear(env) {
   for (let k = 0; k < (big ? 220 : 140); k++) {
     const side = rng() < 0.5 ? -1 : 1;
     const z = -150 + rng() * 270;
-    const x = side * (valleyEdge(z) - 10 + rng() * 40);
+    const x = side * (valleyEdge(z, side) - 10 + rng() * 40);
     if (z > -30 && Math.abs(x) < 88) continue; // the cliffs past the wings already have theirs
     groundNormal(x, z, gn);
     if (gn[1] > 0.93) continue; // only where it is steep

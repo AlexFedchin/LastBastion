@@ -177,7 +177,7 @@ with thanks). Sounds were edited, layered and processed for the game.
 | [torturedscream](https://freesound.org/people/mr-str4nger.d4nger/sounds/863442/) | mr-str4nger.d4nger | burn |
 | [Anguished Zombie Moans 02](https://freesound.org/people/MalikArsYasakani/sounds/876576/) | MalikArsYasakani | burn |
 
-"50cal.mp3" (the M2HB take-two report, hmg2), "incoming_shell.mp3" (the artillery shell coming in,
+"50cal-v2.mp3" (the M2HB take-two report, hmg2), "50cal-reload.mp3" (hmg_reload), "metal-ricochet.mp3" (ricochet), "incoming_shell.mp3" (the artillery shell coming in,
 shell_in) and "helicopter.mp3" (the extraction's rotors, heli_a and heli_b) were supplied by the developer.
 
 ## Radio voice-over

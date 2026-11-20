@@ -93,7 +93,7 @@ export function buildFar(env) {
     tries++;
     const x = (rng() - 0.5) * 2900, z = rng() < 0.16 ? 90 + rng() * 700 : -150 - rng() * 1400;
     if (z > 0) continue; // the country behind the base is dressed in rear.js
-    const inField = Math.abs(x) < valleyEdge(z) + 8 && z > -430;
+    const inField = Math.abs(x) < valleyEdge(z, x) + 8 && z > -430;
     if (inField) continue;
     if (z < -930 && Math.abs(x) < 820) continue; // the city
     if (Math.abs(x - roadX(z)) < 14) continue;

@@ -273,7 +273,7 @@ def write_credits():
         m = meta.get(sid, {})
         lines.append(f'| [{m.get("title", sid)}]({m.get("url", "https://freesound.org/s/" + sid)}) | {m.get("user", "?")} | '
                      f'{", ".join(sorted(used[sid]))} |')
-    lines += ['', '"50cal.mp3" (the M2HB take-two report, hmg2), "incoming_shell.mp3" (the artillery shell coming in,',
+    lines += ['', '"50cal-v2.mp3" (the M2HB take-two report, hmg2), "50cal-reload.mp3" (hmg_reload), "metal-ricochet.mp3" (ricochet), "incoming_shell.mp3" (the artillery shell coming in,',
               'shell_in) and "helicopter.mp3" (the extraction\'s rotors, heli_a and heli_b) were supplied by the developer.']
     lines += [''] + ['## Radio voice-over', '', 'Every radio line is performed by [Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS-12Hz-1.7B-VoiceDesign)', '(Qwen team, Alibaba Cloud; 1.7B VoiceDesign model and 12 Hz tokenizer), released under the', '[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0), each line directed from a written', 'character description and delivery note. Some takes were re-voiced onto one reference voice per', 'character with the voice-conversion model of [Chatterbox](https://github.com/resemble-ai/chatterbox)', '(Resemble AI, MIT). The takes were processed into radio transmissions for the game by', '`scripts/audio/build_voice.py`.']
     open(os.path.join(OUT, 'CREDITS.md'), 'w', encoding='utf8').write('\n'.join(lines) + '\n')
@@ -312,7 +312,7 @@ clip('sfx/hmg_tail_2', M2, 1.80, 0.9, ch=2, fi=0.03, fo=0.5, lp=1800, target=-20
 # compressor lets the first 12 ms through and clamps the bloom behind it, the chest thump at 70 Hz and
 # the bark at 2.6 kHz come up, and a sliver of the close BMG crack puts back the snap the recording
 # lost above 12 kHz. The game switches between hmg_* and hmg2_* (Settings → MACHINE GUN).
-U50 = os.path.join(HERE, 'user', '50cal.mp3')
+U50 = os.path.join(HERE, 'user', '50cal-v2.mp3')  # (2026-11-20: resent as 50cal-v2.mp3; the same take)
 PUNCH = ['acompressor=threshold=0.025:ratio=8:attack=9:release=70:makeup=1.6:knee=2',
          'equalizer=f=70:t=q:w=0.9:g=3.5', 'equalizer=f=2600:t=q:w=1.3:g=3', 'equalizer=f=400:t=q:w=1.5:g=-2']
 for k, (rate, fo) in enumerate([(1.0, 0.35), (0.965, 0.3), (1.035, 0.38), (0.985, 0.28)]):
@@ -322,6 +322,10 @@ for k, (rate, fo) in enumerate([(1.0, 0.35), (0.965, 0.3), (1.035, 0.38), (0.985
     ], sr=44100, ch=2, target=-11, limit=5, q=6)
 clip('sfx/hmg2_tail_1', U50, 0.3, 3.0, ch=2, fi=0.04, fo=1.6, hp=70, target=-24, sr=32000)
 clip('sfx/hmg2_tail_2', U50, 0.42, 2.8, ch=2, fi=0.04, fo=1.5, hp=70, lp=2500, rate=0.94, target=-24, sr=32000)
+
+# the developer's own (2026-11-20, SFX/): the M2 being charged, and a round ringing off steel
+clip('sfx/hmg_reload', os.path.join(HERE, 'user', '50cal-reload.mp3'), 0.0, 1.896, fi=0.003, fo=0.15, hp=40, target=-13)
+clip('sfx/ricochet', os.path.join(HERE, 'user', 'metal-ricochet.mp3'), 0.0, 0.816, fi=0.002, fo=0.2, hp=200, target=-14)
 
 # ── M240 wall gunners ────────────────────────────────────────────────────────
 for k, (ss, t) in enumerate([(0.5509, 0.2), (0.7789, 0.2), (1.4728, 0.2), (1.6979, 0.25), (2.0968, 0.5)]):

@@ -41,8 +41,15 @@ export function roadX(z) {
   return -52 * S(-110, -470, z) + 96 * S(-540, -930, z);
 }
 /** Inner edge (|x|) of the valley walls at depth z. */
-export function valleyEdge(z) {
-  return 92 + Math.max(0, -z - 40) * 0.46;
+export function valleyEdge(z, x = 1) {
+  // the valley widening up the field, its edge wandering on each side on its own (bays where the
+  // hills fall back, spurs where they come in): from above it is no ruled line. Straight at the
+  // wall, where the cliffs carry the wall's own line on.
+  const run = Math.max(0, -z - 40), s = x < 0 ? 1 : 0;
+  // (long bays, spurs some tens of metres across, and smaller knuckles on those)
+  const w = (vnoise(z * 0.009 + s * 17.3, s * 4.1 + 2.7) - 0.5) * 44 + (vnoise(z * 0.032 + s * 9.1, 5.3 + s) - 0.5) * 30
+    + (vnoise(z * 0.085 + s * 3.7, 11.2 + s) - 0.5) * 12;
+  return 92 + run * 0.46 + w * Math.min(1, run / 60);
 }
 /** Forward trench line. */
 export function trenchZ(x) {
@@ -126,7 +133,7 @@ const CCELL = 24;
   const tryAdd = (x, z, r, d) => {
     const wd = wallDist(x, z);
     if (wd < 16 + r) return;
-    if (Math.abs(x) > valleyEdge(z) - 6) return;
+    if (Math.abs(x) > valleyEdge(z, x) - 6) return;
     CRATERS.push({ x, z, r, d });
   };
   for (let i = 0; i < 150; i++) {
@@ -209,7 +216,7 @@ export function heightParts(x, z, out = _parts) {
     }
   }
   // valley walls
-  const side = ax - valleyEdge(z);
+  const side = ax - valleyEdge(z, x);
   if (side > -12 && rearFade > 0) {
     const s = Math.max(0, side + 12);
     const n = fbm(x * 0.012 + 5, z * 0.012, 4);

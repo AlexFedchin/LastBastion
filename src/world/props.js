@@ -32,7 +32,8 @@ function plant(obj, x, z, ry = 0, sink = 0, tiltK = 1, extra = null) {
 /** Register a vehicle's footprint (its local +x is its length; `off` = centre offset along it). */
 function solid(x, z, ry, off, halfLen, halfWid) {
   const ax = Math.cos(ry), az = -Math.sin(ry);
-  return addObstacle(x + ax * off, z + az * off, ry, halfLen, halfWid);
+  // (all of them steel: the cars, the trucks, the tank, the helicopter; trucks and up stand taller)
+  return addObstacle(x + ax * off, z + az * off, ry, halfLen, halfWid, halfLen > 3 ? 2.6 : 1.4);
 }
 
 function instanced(geo, mat, mats, { cast = true, receive = true } = {}) {
@@ -100,7 +101,7 @@ export function buildProps(env) {
     o.position.set(x, groundH(x, zz) - 0.05, zz);
     placeModel(env, 'hedgehog', o);
     // solid: walkers go round it (2.1 m across, its legs reach nearly to the corners of a square)
-    addObstacle(x, zz, o.rotation.y, 0.85, 0.85);
+    addObstacle(x, zz, o.rotation.y, 0.85, 0.85, 1.3);
   }
 
   // ── wire fence lines in the field (broken, sagging) ──────────────────────
@@ -152,7 +153,7 @@ export function buildProps(env) {
   for (let i = 0; i < 60; i++) {
     const x = (rng() - 0.5) * 420, zz = -50 - rng() * 300;
     if (wallDist(x, zz) < 30 || Math.abs(x - roadX(zz)) < 6) continue;
-    if (Math.abs(x) > valleyEdge(zz) + 30) continue;
+    if (Math.abs(x) > valleyEdge(zz, x) + 30) continue;
     const s = 0.9 + rng() * 1.1;
     _q.setFromEuler(new THREE.Euler((rng() - 0.5) * 0.15, rng() * 6.28, (rng() - 0.5) * 0.15));
     _m.compose(_v.set(x, groundH(x, zz), zz), _q, _s.set(s, s * (0.9 + rng() * 0.3), s));
@@ -300,7 +301,7 @@ export function buildProps(env) {
   const rock = (x, zz, a, b) => { const r = (a + b) * 0.5 * 0.8; addObstacle(x, zz, 0, r, r); };
   for (const side of [-1, 1]) {
     for (let zz = -20; zz > -420; zz -= 4) {
-      const x = side * (valleyEdge(zz) - 6 + rng() * 22);
+      const x = side * (valleyEdge(zz, side) - 6 + rng() * 22);
       const s = 1.5 + rng() * 4.5;
       _q.setFromEuler(new THREE.Euler(rng() * 3, rng() * 3, rng() * 3));
       _m.compose(_v.set(x, groundH(x, zz) + s * 0.1, zz), _q, _s.set(s * 1.3, s * 0.8, s));
@@ -336,7 +337,7 @@ export function buildProps(env) {
     for (let i = 0; i < 260; i++) {
       const x = (r() - 0.5) * 2 * 150, zz = -34 - r() * 300;
       const ry = r() * 6.28, s0 = r(), kind = r();
-      if (wallDist(x, zz) < 22 || Math.abs(x - roadX(zz)) < 8 || Math.abs(x) > valleyEdge(zz) - 4) continue;
+      if (wallDist(x, zz) < 22 || Math.abs(x - roadX(zz)) < 8 || Math.abs(x) > valleyEdge(zz, x) - 4) continue;
       _q.setFromEuler(new THREE.Euler(0, ry, 0));
       if (kind < 0.62) {
         const s = 0.7 + s0 * 1.1;

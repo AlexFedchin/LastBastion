@@ -11,8 +11,9 @@ const boxes = [];
 let grid = null;
 
 /** x, z: centre; yaw: the object's rotation about y (its local +x is its length). */
-export function addObstacle(x, z, yaw, halfLen, halfWid) {
-  const b = { x, z, ax: Math.cos(yaw), az: -Math.sin(yaw), hl: halfLen, hw: halfWid };
+export function addObstacle(x, z, yaw, halfLen, halfWid, metal = 0) {
+  // metal: its height in metres if it is steel a round rings off (wrecks, hedgehogs), else 0
+  const b = { x, z, ax: Math.cos(yaw), az: -Math.sin(yaw), hl: halfLen, hw: halfWid, metal };
   boxes.push(b);
   grid = null;
   return b;
@@ -24,6 +25,33 @@ export function removeObstacle(b) {
 }
 
 export function obstacles() { return boxes; }
+
+/**
+ * A ray against the steel on the field (the metal obstacles as boxes standing on the ground at
+ * their footprint, `metal` metres tall): the nearest t in (0, maxT), or -1. groundAt(x, z) gives
+ * the ground under each.
+ */
+export function rayMetal(o, d, maxT, groundAt) {
+  let best = -1;
+  for (const b of boxes) {
+    if (!b.metal) continue;
+    // into the box's frame: u along its length, v across it, y up from the ground under it
+    const ox = o.x - b.x, oz = o.z - b.z, gy = groundAt(b.x, b.z);
+    const ou = ox * b.ax + oz * b.az, ov = -ox * b.az + oz * b.ax, oy = o.y - gy;
+    const du = d.x * b.ax + d.z * b.az, dv = -d.x * b.az + d.z * b.ax, dy = d.y;
+    let t0 = 0, t1 = best >= 0 ? best : maxT;
+    for (const [p, q, lo, hi] of [[ou, du, -b.hl, b.hl], [ov, dv, -b.hw, b.hw], [oy, dy, -0.3, b.metal]]) {
+      if (Math.abs(q) < 1e-9) { if (p < lo || p > hi) { t0 = 1; t1 = 0; break; } continue; }
+      let a = (lo - p) / q, c = (hi - p) / q;
+      if (a > c) [a, c] = [c, a];
+      if (a > t0) t0 = a;
+      if (c < t1) t1 = c;
+      if (t0 > t1) break;
+    }
+    if (t0 <= t1 && t0 > 0) best = t0;
+  }
+  return best;
+}
 
 function build() {
   grid = new Array(GW * GZ);

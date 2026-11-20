@@ -1,6 +1,7 @@
 // The gunner: camera, the M2HB model, recoil, heat and every bullet.
 import * as THREE from 'three';
-import { raycastGround } from '../world/terrain.js';
+import { raycastGround, groundH } from '../world/terrain.js';
+import { rayMetal } from '../world/obstacles.js';
 import { WORLD, HEADSHOT_FRAC, HEADSHOT_MULT } from '../config.js';
 import { clamp, damp, rand, fitFov } from '../core/util.js';
 import { cloneModel } from '../world/models.js';
@@ -88,7 +89,7 @@ export class Player {
    * Take up the gun: it comes up into view from below the frame, muzzle last, over
    * `dur` seconds (the night's opening move ends on it). Driven by poseGun.
    */
-  takeUp(dur = 1.25) { this.raise = 0; this.raiseDur = dur; this.raising = true; this.gun.visible = true; }
+  takeUp(dur = 1.25) { this.raise = 0; this.raiseDur = dur; this.raising = true; this.gun.visible = true; this.audio.gunReload(dur * 0.55); }
 
   /** The gun's place in view: kickback, and how far through being taken up it is. */
   poseGun(dt, rdt) {
@@ -171,7 +172,8 @@ export class Player {
     this.camera.position.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z);
     this.camera.updateMatrixWorld(true);
 
-    if (this.overheatT > 0) this.overheatT -= dt;
+    // the lock off an overheat ends with the gunner charging it again (the reload, timed to finish as it clears)
+    if (this.overheatT > 0) { const was = this.overheatT; this.overheatT -= dt; if (was > 1.6 && this.overheatT <= 1.6) this.audio.gunReload(0); }
 
     // firing
     const canFire = controlsActive && this.overheatT <= 0 && this.raise > 0.85; // (not while still taking it up)
@@ -239,6 +241,10 @@ export class Player {
       const t = sh.test(o, _d, endT);
       if (t >= 0 && t < endT) { endT = t; solid = sh; }
     }
+    // the steel on the field (wrecks, hedgehogs): a round that finds it rings off it
+    let metal = false;
+    const mt = rayMetal(o, _d, endT, groundH);
+    if (mt >= 0 && mt < endT) { endT = mt; metal = true; solid = null; }
     const cnt = horde.raycast(o.x, o.y, o.z, _d.x, _d.y, _d.z, endT, maxHits);
     let stopped = false;
     let dmg = stats.hmgDamage;
@@ -271,7 +277,15 @@ export class Player {
       if (k === maxHits - 1) { endT = t; stopped = true; }
     }
     if (anyHit) this.hits++;
-    if (solid && !stopped) { solid.hit(new THREE.Vector3(o.x + _d.x * endT, o.y + _d.y * endT, o.z + _d.z * endT)); stopped = true; }
+    // the round got through to steel (a wreck, a hedgehog, the tanker): it rings off it
+    let ring = false;
+    if (solid && !stopped) { solid.hit(new THREE.Vector3(o.x + _d.x * endT, o.y + _d.y * endT, o.z + _d.z * endT)); stopped = true; ring = true; }
+    else if (metal && !stopped) { stopped = true; ring = true; }
+    if (ring) {
+      const hx = o.x + _d.x * endT, hy = o.y + _d.y * endT, hz = o.z + _d.z * endT;
+      for (let q = 0; q < 5; q++) fx.spark(hx, hy, hz, -_d.x * 5 + (Math.random() - 0.5) * 7, Math.random() * 5, -_d.z * 5 + (Math.random() - 0.5) * 7, 9, 7, 4, rand(0.12, 0.3));
+      this.audio.ricochet(hx, hy, hz);
+    }
 
     // visuals
     this.muzzle.getWorldPosition(_m);

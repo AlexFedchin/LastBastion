@@ -17,6 +17,8 @@ import { makePunch, makeSizzle, makeTick, makeBlastSub, makeCrack, makeRotor, ma
 import { GUNSHIP, WORLD } from '../config.js';
 
 // name -> [variants (0 = single file), decode rate]
+/** The new take is in use (its tails are the developer's own valley). */
+const set2 = (a) => a.gunSet() === 'hmg2';
 const SFX = {
   hmg: [4, 44100], hmg_tail: [2, 32000], hmg2: [4, 44100], hmg2_tail: [2, 32000], mg: [5, 32000], casing: [6, 44100],
   boom: [5, 44100], boom_far: [3, 22050], boom_sub: [0, 22050], mortar: [3, 44100], incoming: [5, 32000], shell_in: [0, 44100],
@@ -35,6 +37,8 @@ const SFX = {
   rifle: [5, 44100], wire: [3, 44100], arty: [3, 32000], crate: [3, 44100],
   // the extraction's B-2s: their jets, and the bomb-bay doors opening
   b2_jet: [0, 32000], bay_doors: [0, 44100],
+  // the developer's own (2026-11-20): the M2 charged / reloaded, and a round ringing off steel
+  hmg_reload: [0, 44100], ricochet: [0, 44100],
 };
 const BEDS = {
   rain_far: 32000, rain_near: 32000, wind: 32000, wind_howl: 32000, fire_roar: 32000, fire_crackle: 32000, fire_pool: 32000,
@@ -640,6 +644,17 @@ export class AudioEngine {
     if (Math.random() < 0.55) {
       this.play(this.pickVar('casing'), { gain: 0.07, rate: rand(0.88, 1.15), pan: rand(0.25, 0.6), delay: rand(0.28, 0.55), key: 'casing', max: 5 });
     }
+  }
+
+  /** The M2 being charged (the developer's reload recording), after `delay` s. */
+  gunReload(delay = 0) {
+    const b = this.B.hmg_reload && this.B.hmg_reload[0];
+    if (b) this.play(b, { gain: 0.75, rate: rand(0.98, 1.02), pan: 0.08, delay, reverb: 0.25, force: true });
+  }
+  /** A round ringing off steel out on the field (a wreck, a hedgehog), from where it struck. */
+  ricochet(x, y, z) {
+    const b = this.B.ricochet && this.B.ricochet[0];
+    if (b) this.play(b, { x, y, z, gain: 1.1, rate: rand(0.85, 1.2), ref: 45, sos: true, reverb: 0.45, key: 'rico', max: 3 });
   }
 
   overheat() {
@@ -1267,7 +1282,13 @@ export class AudioEngine {
     // the valley throws the end of a burst back at you
     if (this._hmgCount > 0 && now - this._hmgLast > 0.13) {
       const k = Math.min(1, this._hmgCount / 12);
-      this.play(this.pickVar(this.gunSet() + '_tail'), { gain: 0.24 + 0.32 * k, rate: rand(0.86, 0.94), reverb: 0.35, bus: 'hmg', force: true });
+      const tail = this.gunSet() + '_tail';
+      this.play(this.pickVar(tail), { gain: 0.34 + 0.4 * k, rate: rand(0.86, 0.94), reverb: 0.45, bus: 'hmg', force: true });
+      // and down the valley: the report coming back off the hills, from one side then the other,
+      // later each time, darker and fainter (the far ridge, then the hills beyond it)
+      if (set2(this)) for (const [d, g, lp, pan] of [[0.62, 0.42, 2600, -0.45], [1.35, 0.26, 1500, 0.5], [2.2, 0.14, 900, -0.2]]) {
+        this.play(this.pickVar(tail), { gain: g * (0.5 + 0.5 * k), rate: rand(0.84, 0.92), delay: d + rand(-0.05, 0.05), lowpass: lp, pan, reverb: 0.7, force: true });
+      }
       // a long burst comes back off the hills like distant thunder
       if (this._hmgCount >= 5) this.play(this.pickVar('boom_far'), { gain: 0.12 + 0.2 * k, rate: rand(0.5, 0.6), pan: rand(-0.4, 0.4), lowpass: 900, delay: rand(0.15, 0.3), reverb: 0.8, force: true });
       this._hmgCount = 0;
