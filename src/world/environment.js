@@ -84,7 +84,7 @@ export class Environment {
     this.kit = {}; // kit props asked for by the builders (addKit), placed in dressWithModels
     this.placed = new Map(); // whole models asked for by the builders (addModel): vehicles, wrecks, containers, bales
     this.sandbagMat = weather(new THREE.MeshStandardMaterial({ map: this.tex.burlap, roughness: 1, color: 0x8a7d62 }), { soot: 0.45, key: 'bags' });
-    this.rockMat = weather(new THREE.MeshStandardMaterial({ map: this.tex.rock.map, normalMap: this.tex.rock.normalMap, color: 0x857f77, roughness: 0.95 }), { soot: 0.3, key: 'rock' });
+    this.rockMat = weather(new THREE.MeshStandardMaterial({ map: this.tex.rock.map, normalMap: this.tex.rock.normalMap, normalScale: new THREE.Vector2(1.8, 1.8), color: 0x857f77, roughness: 1, envMapIntensity: 0.6 }), { soot: 0.3, wet: 0, key: 'rock' });
     this.wireMat = new THREE.MeshStandardMaterial({ color: 0x6b665e, metalness: 0.85, roughness: 0.42 });
     this.darkMetal = this.mats.darkSteel;
 
@@ -201,7 +201,7 @@ export class Environment {
       });
     }
     // whole models: one instanced mesh per mesh of the model (vehicles keep their part nodes)
-    for (const { name, skip, tint, swap, node, cast, list } of this.placed.values()) {
+    for (const { name, skip, tint, swap, node, cast, matte, list } of this.placed.values()) {
       const src = modelScene(name);
       src.updateMatrixWorld(true);
       src.traverse((o) => {
@@ -210,6 +210,8 @@ export class Environment {
         if (node) { let p = o; while (p && p.name !== node) p = p.parent; if (!p) return; }
         let mat = (swap && swap[o.material.name]) || o.material;
         if (tint != null) { mat = mat.clone(); mat.color.multiply(new THREE.Color(tint)); }
+        // matte: bare stone, no sheen (the pack's rocks come in with a gloss)
+        if (matte) { if (mat === o.material) mat = mat.clone(); mat.roughness = 1; mat.roughnessMap = null; mat.metalness = 0; mat.metalnessMap = null; mat.envMapIntensity = 0.6; }
         const im = new THREE.InstancedMesh(o.geometry, mat, list.length);
         list.forEach((mm, j) => im.setMatrixAt(j, m.multiplyMatrices(mm, o.matrixWorld)));
         im.castShadow = cast; im.receiveShadow = true;
@@ -226,11 +228,11 @@ export class Environment {
    * tint: a colour the materials are multiplied by; swap: material name -> a material of the
    * game's to use instead (the tower's 'concrete' gets the wall's).
    */
-  addModel(name, matrix, { skip = null, tint = null, swap = null, node = null, cast = true, group = '' } = {}) {
+  addModel(name, matrix, { skip = null, tint = null, swap = null, node = null, cast = true, group = '', matte = false } = {}) {
     // node: only that node's meshes (one variant of a pack: 'trees' / 'tree_3');
     // group: instances kept in a mesh of their own (so each part of the world culls apart)
-    const key = `${name}|${skip || ''}|${tint ?? ''}|${node || ''}|${group}|${cast}`;
-    if (!this.placed.has(key)) this.placed.set(key, { name, skip, tint, swap, node, cast, list: [] });
+    const key = `${name}|${skip || ''}|${tint ?? ''}|${node || ''}|${group}|${cast}|${matte}`;
+    if (!this.placed.has(key)) this.placed.set(key, { name, skip, tint, swap, node, cast, matte, list: [] });
     this.placed.get(key).list.push(matrix.clone());
   }
 

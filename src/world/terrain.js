@@ -782,10 +782,11 @@ ${T_COMMON}
   float roughnessFactor = ntSample(tMudR, ntMud).${mud.file ? 'a' : 'g'};
   roughnessFactor = mix(roughnessFactor, 0.93, tGrass);
   roughnessFactor = mix(roughnessFactor, mix(mix(0.7, 0.88, rdCrack), mix(0.8, 0.04, rdWater), rdHole), tRoad);
-  roughnessFactor = mix(roughnessFactor, 0.78, tRock);
   roughnessFactor = mix(roughnessFactor, roughnessFactor * 0.72, tTrample);
   roughnessFactor = max(roughnessFactor, 0.55) * mix(1.0, 0.86, uRain);
   roughnessFactor = mix(roughnessFactor, 0.35, tWet * 0.6);
+  // bare rock stays matte: weathered stone doesn't sheen in the rain the way mud does
+  roughnessFactor = mix(roughnessFactor, 0.96, tRock);
   roughnessFactor = mix(roughnessFactor, 0.035, puddle);
   roughnessFactor = mix(roughnessFactor, 0.4, rRut * 0.7);
 `)

@@ -270,18 +270,26 @@ export function buildProps(env) {
   scene.add(instanced(rubbleGeo, env.rockMat, rubbleMs, { cast: false }));
 
   // boulders along the valley walls and the cliffs past the wings
-  const boulderGeo = new THREE.DodecahedronGeometry(1, 1);
+  const boulderGeo = new THREE.DodecahedronGeometry(1, 2);
   {
     const p = boulderGeo.attributes.position;
     // the polyhedron is non-indexed (every triangle has its own corners), so the
     // jitter is keyed by corner position: copies of a shared corner move together
-    // and the rock stays closed instead of splitting into loose triangles
+    // and the rock stays closed instead of splitting into loose triangles.
+    // Two scales: broad lumps give the mass its shape, a fine crag on every corner
+    // breaks the faces into chipped, faceted stone.
     const r2 = makeRng(808), jit = new Map();
     for (let i = 0; i < p.count; i++) {
-      const key = `${Math.round(p.getX(i) * 1e4)},${Math.round(p.getY(i) * 1e4)},${Math.round(p.getZ(i) * 1e4)}`;
+      const x = p.getX(i), y = p.getY(i), z = p.getZ(i);
+      const key = `${Math.round(x * 1e4)},${Math.round(y * 1e4)},${Math.round(z * 1e4)}`;
       let k = jit.get(key);
-      if (k === undefined) { k = 0.78 + r2() * 0.44; jit.set(key, k); }
-      p.setXYZ(i, p.getX(i) * k, p.getY(i) * k, p.getZ(i) * k);
+      if (k === undefined) {
+        const lump = Math.sin(x * 2.1 + 1.3) * Math.sin(y * 1.7 + 0.4) * Math.sin(z * 2.4 + 2.2);
+        k = 0.9 + lump * 0.22 + (r2() - 0.5) * 0.2;
+        if (y > 0.55) k *= 0.93; // flatter, broken tops rather than domes
+        jit.set(key, k);
+      }
+      p.setXYZ(i, x * k, y * k, z * k);
     }
     boulderGeo.computeVertexNormals();
   }
@@ -317,8 +325,8 @@ export function buildProps(env) {
     bMs.push(_m.clone());
     rock(x, zz, s * 1.4, s);
   }
-  for (const m of bMs) placeRock(env, m, { group: 'field' });
-  void boulderGeo;
+  // (the game's own boulders: the tree pack's rocks are only the small stones in the grass below)
+  scene.add(instanced(boulderGeo, env.rockMat, bMs));
 
   // the killing field's undergrowth: bushes and loose rocks between the craters (none on the
   // road, none at the foot of the wall); walked through, not round. Its own RNG, so nothing

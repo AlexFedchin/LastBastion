@@ -11,7 +11,7 @@ import {
 import { box, cylY, merge, makeHouseGeo, makeRuin, sagWire, weather } from './kit.js';
 import { placeModel } from './vehicles.js';
 import { makeDeadPineGeo } from './far.js';
-import { placeTree, placeBush, placeRock } from './flora.js';
+import { placeTree, placeBush } from './flora.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -186,8 +186,8 @@ export function buildRear(env) {
   }
   // the hedgerows' bushes and the hills' rocks, from the same pack
   for (const m of bushes) placeBush(env, m, 'rear');
-  for (const m of rocks) placeRock(env, m, { group: 'rear', cast: false });
-  void leafMat; void lumpGeo;
+  instanced(scene, lumpGeo(2, 77, 0.8, 1.2), env.rockMat, rocks);
+  void leafMat;
 
   // ── farmsteads along the track ────────────────────────────────────────────
   const houses = [], roofs = [], barns = [];

@@ -77,7 +77,7 @@ export function placeRock(env, m, { group = '', cast = true } = {}) {
   q.setFromEuler(new THREE.Euler((hash(serial, 47) - 0.5) * 0.25, yaw, (hash(serial, 53) - 0.5) * 0.25));
   p.y -= high * 0.18; // bedded in
   // (the pack's rock is a pale limestone: darkened to the valley's wet, sooty stone)
-  env.addModel('trees', new THREE.Matrix4().compose(p, q, s.set(k, ky, k)), { node: 'rock_' + v, cast, group, tint: 0x7a7368 });
+  env.addModel('trees', new THREE.Matrix4().compose(p, q, s.set(k, ky, k)), { node: 'rock_' + v, cast, group, tint: 0x6f685e, matte: true });
 }
 
 /** A dead tree in the field for one of the old branching trees' matrices (about 7.5 m at scale 1). */
