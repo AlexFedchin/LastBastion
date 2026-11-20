@@ -43,6 +43,8 @@ SETS = {
     'hgPlate': ('DiamondPlate008C', (1024, 512), 0.8),         # tread plate for the stands
     'hgRubber': ('Rubber004', (1024, 512), 0.5),               # the mats under the kit
     'hgWood': ('Wood089', (1024, 512), 0.5),                   # bench tops, boards
+    # the boulders on the hills and the field (the model pack's own stone was untextured): weathered rock
+    'boulder': ('Rock030', (1024, 512), 0.9),
 }
 
 # The valley: name: (ambientCG id, target mean sRGB, saturation kept, hue pull, sizes)

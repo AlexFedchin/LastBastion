@@ -203,14 +203,14 @@ export class Environment {
       });
     }
     // whole models: one instanced mesh per mesh of the model (vehicles keep their part nodes)
-    for (const { name, skip, tint, swap, node, cast, matte, list } of this.placed.values()) {
+    for (const { name, skip, tint, swap, node, cast, matte, list, mat: own } of this.placed.values()) {
       const src = modelScene(name);
       src.updateMatrixWorld(true);
       src.traverse((o) => {
         if (!o.isMesh) return;
         for (let p = o; p; p = p.parent) if (skip && p.name === skip) return;
         if (node) { let p = o; while (p && p.name !== node) p = p.parent; if (!p) return; }
-        let mat = (swap && swap[o.material.name]) || o.material;
+        let mat = own || (swap && swap[o.material.name]) || o.material;
         if (tint != null) { mat = mat.clone(); mat.color.multiply(new THREE.Color(tint)); }
         // matte: bare stone, no sheen (the pack's rocks come in with a gloss)
         if (matte) { if (mat === o.material) mat = mat.clone(); mat.roughness = 1; mat.roughnessMap = null; mat.metalness = 0; mat.metalnessMap = null; mat.envMapIntensity = 0.6; }
@@ -230,11 +230,12 @@ export class Environment {
    * tint: a colour the materials are multiplied by; swap: material name -> a material of the
    * game's to use instead (the tower's 'concrete' gets the wall's).
    */
-  addModel(name, matrix, { skip = null, tint = null, swap = null, node = null, cast = true, group = '', matte = false } = {}) {
+  addModel(name, matrix, { skip = null, tint = null, swap = null, node = null, cast = true, group = '', mat = null, matte = false } = {}) {
+    // mat: one material of the game's for every mesh of it; matte: the model's own, without its gloss
     // node: only that node's meshes (one variant of a pack: 'trees' / 'tree_3');
     // group: instances kept in a mesh of their own (so each part of the world culls apart)
-    const key = `${name}|${skip || ''}|${tint ?? ''}|${node || ''}|${group}|${cast}|${matte}`;
-    if (!this.placed.has(key)) this.placed.set(key, { name, skip, tint, swap, node, cast, matte, list: [] });
+    const key = `${name}|${skip || ''}|${tint ?? ''}|${node || ''}|${group}|${cast}|${mat ? mat.uuid : ''}|${matte}`;
+    if (!this.placed.has(key)) this.placed.set(key, { name, skip, tint, swap, node, cast, mat, matte, list: [] });
     this.placed.get(key).list.push(matrix.clone());
   }
 
