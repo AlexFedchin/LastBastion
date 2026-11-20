@@ -404,7 +404,7 @@ export class ExtractionScene {
       // the bomb bays: the doors swing down ahead of the first release and shut after the last
       const open = smoother((t - r.tDoors) / 2.3) * (1 - smoother((t - r.tShut) / 2.6));
       if (Math.abs(open - B.open) > 1e-4) B.setDoors(open);
-      if (!r.heard && t >= r.tDoors) { r.heard = true; g.audio.bayDoors(x, y - 2, z, r === lead ? 2.2 : 0.8); }
+      if (!r.heard && t >= r.tDoors) { r.heard = true; g.audio.bayDoors(x, y - 2, z, r === lead ? 4.5 : 1.2); }
       // position lights and the beacon: how you see them coming in the dark
       B.nav.update(t, g.camera);
       // landing lights in the leading edge either side of the nose, burning straight ahead:
@@ -432,7 +432,8 @@ export class ExtractionScene {
         const grp = d.run.b.group;
         grp.updateMatrixWorld();
         const bay = d.run.b.bays[d.bay];
-        d.p0 = _v.set(bay.x, bay.y - 0.35, bay.z + rand(-2.2, 2.2)).applyMatrix4(grp.matrixWorld).clone();
+        // (from inside the airframe, above the bay's ceiling: they come down out of the dark, never pop into the air)
+        d.p0 = _v.set(bay.x, bay.y + 1.6, bay.z + rand(-2.2, 2.2)).applyMatrix4(grp.matrixWorld).clone();
       }
       if (!d.mesh) { d.mesh = this.bombPool.find((m) => !m.visible) || null; if (d.mesh) d.mesh.visible = true; }
       const s = Math.min(t - d.trel, d.fall), u = s / d.fall;

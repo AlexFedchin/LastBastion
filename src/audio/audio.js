@@ -277,6 +277,8 @@ export class AudioEngine {
     // in the cutscenes the whole world mix steps back under a voice line (see speakDuck)
     this.cineDuck = ctx.createGain();
     this.sfx.connect(this.cineDuck); this.cineDuck.connect(this.snap);
+    // a cutscene beat that must be heard whatever the radio is doing (the bay doors): not ducked
+    this.sfxKeep = ctx.createGain(); this.sfxKeep.gain.value = this.settings.sfx; this.sfxKeep.connect(this.snap);
     // the radio is in your ear, not out in the valley: past the world mix and its glue
     // compressor (a bomb going off must not pump the voice down with it), still deafened by blasts
     this.voiceBus = ctx.createGain(); this.voiceBus.gain.value = this.settings.sfx * VOICE_TRIM;
@@ -363,6 +365,7 @@ export class AudioEngine {
     this.master.gain.setTargetAtTime(this.settings.master * OUTPUT_TRIM, t, 0.05);
     this.music.gain.setTargetAtTime(this.settings.music * MUSIC_TRIM, t, 0.05);
     this.sfx.gain.setTargetAtTime(this.settings.sfx, t, 0.05);
+    this.sfxKeep.gain.setTargetAtTime(this.settings.sfx, t, 0.05);
     this.voiceBus.gain.setTargetAtTime(this.settings.sfx * VOICE_TRIM * (this._cine ? 2.4 : 1), t, 0.05);
   }
 
@@ -459,7 +462,7 @@ export class AudioEngine {
     const p = ctx.createStereoPanner();
     p.pan.value = pan;
     g.connect(p);
-    p.connect(o.bus === 'amb' ? this.ambBus : o.bus === 'hmg' ? this.hmgIn : this.sfx);
+    p.connect(o.bus === 'amb' ? this.ambBus : o.bus === 'hmg' ? this.hmgIn : o.bus === 'keep' ? this.sfxKeep : this.sfx);
     if (o.reverb) {
       const rs = ctx.createGain(); rs.gain.value = o.reverb;
       p.connect(rs); rs.connect(this.reverbSend);
@@ -928,7 +931,7 @@ export class AudioEngine {
   /** A B-2's bomb-bay doors swinging open at (x, y, z): the hydraulics running, the clunk as they lock. */
   bayDoors(x, y, z, gain = 1) {
     const b = this.B.bay_doors[0];
-    if (b) this.play(b, { x, y, z, gain, rate: rand(0.96, 1.04), ref: 90, reverb: 0.45, force: true });
+    if (b) this.play(b, { x, y, z, gain, rate: rand(0.96, 1.04), ref: 90, reverb: 0.45, force: true, bus: 'keep', lowpass: 20000 });
   }
 
   /** The bombers' engines (the recording, or the synthesized roar until it loads). */

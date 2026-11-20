@@ -432,12 +432,12 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
   }
 
   // ── B-2 Spirit: the extraction's bombers. Metres (52.4 m span), nose +z, port +x, centred
-  // on its bounds. The landing gear and its open doors are dropped (it is only ever seen in
-  // flight); the four bomb-bay doors (two bays, a pair of doors each) are nodes of their own,
+  // on its bounds. The landing gear is dropped (it is only ever seen in flight) and its doors,
+  // modelled hanging open, are swung shut over the wheel wells; the four bomb-bay doors (two bays, a pair of doors each) are nodes of their own,
   // 'door_0'..'door_3', pivoted on their hinge lines (the outer and the centre keel edges) so
   // the game can swing them down. Anchors: the four engine exhausts, the lamps, the bays.
   async function b2() {
-    const GEAR = new Set(['Object_8', 'Object_11', 'Object_14', 'Object_17', 'Object_20']);
+    const GEAR = new Set(['Object_20', 'Object_11', 'Object_14']); // wheels, struts, the nose's open front doors (Object_8 lies shut; 17 is swung shut below)
     const DOORS = ['Object_32', 'Object_35', 'Object_38', 'Object_41'];
     const doc = await readRigid(V('B-2-Spirit.glb'), (n) => !GEAR.has(n));
     // source: nose -z, port -x, span 110.2 units
@@ -445,10 +445,57 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     let b = getBounds(scene(doc));
     const s = 52.4 / (b.max[0] - b.min[0]);
     xformAll(doc, new THREE.Matrix4().makeScale(s, s, s));
+    // the gear doors, shut (before centring: open, they hang below the airframe). The main gear's
+    // doors hang off their outboard hinges and swing inboard, flat under the wells; the nose
+    // gear's front doors hang off the front of its well and swing back along the skin
+    const swing = (name, side, axis, angle) => {
+      const n = meshNodes(doc).find((x) => x.getName() === name);
+      if (!n) return;
+      for (const p of n.getMesh().listPrimitives()) {
+        const P = p.getAttribute('POSITION'), N = p.getAttribute('NORMAL'), v = [], bb = new THREE.Box3();
+        const on = (i) => { P.getElement(i, v); return side(v[0]); };
+        for (let i = 0; i < P.getCount(); i++) if (on(i)) bb.expandByPoint(new THREE.Vector3(...v));
+        if (bb.isEmpty()) continue;
+        const piv = axis === 'z' ? new THREE.Vector3((bb.min.x + bb.max.x) / 2, bb.max.y, 0) : new THREE.Vector3(0, bb.max.y, (bb.min.z + bb.max.z) / 2);
+        const q = new THREE.Quaternion().setFromAxisAngle(axis === 'z' ? new THREE.Vector3(0, 0, 1) : new THREE.Vector3(1, 0, 0), angle);
+        for (let i = 0; i < P.getCount(); i++) {
+          if (!on(i)) continue;
+          P.setElement(i, new THREE.Vector3(...v).sub(piv).applyQuaternion(q).add(piv).toArray());
+          if (N) { const w = []; N.getElement(i, w); N.setElement(i, new THREE.Vector3(...w).applyQuaternion(q).toArray()); }
+        }
+      }
+    };
+    swing('Object_17', (x) => x > 0, 'z', -Math.PI / 2);
+    swing('Object_17', (x) => x < 0, 'z', Math.PI / 2);
     b = getBounds(scene(doc));
     xformAll(doc, new THREE.Matrix4().makeTranslation(-(b.min[0] + b.max[0]) / 2, -(b.min[1] + b.max[1]) / 2, -(b.min[2] + b.max[2]) / 2));
     b = getBounds(scene(doc));
+    // the nose gear's front door, hanging open, is part of the airframe mesh itself: cut it out
+    for (const n of meshNodes(doc)) for (const p of n.getMesh().listPrimitives()) {
+      const P = p.getAttribute('POSITION'), I = p.getIndices(), keep = [], v = [];
+      for (let t = 0; t < I.getCount(); t += 3) {
+        let cx = 0, cy = 0, cz = 0;
+        for (let j = 0; j < 3; j++) { P.getElement(I.getScalar(t + j), v); cx += v[0] / 3; cy += v[1] / 3; cz += v[2] / 3; }
+        // (anything under the nose well's cap: below the line of the skin there, -1.0 at z 8.42 to -0.47 at 9.95)
+        if (Math.abs(cx) < 0.7 && cz > 8.9 && cy < -1.0 + (cz - 8.42) * 0.346 - 0.06) continue;
+        keep.push(I.getScalar(t), I.getScalar(t + 1), I.getScalar(t + 2));
+      }
+      if (keep.length < I.getCount()) p.setIndices(doc.createAccessor().setType('SCALAR').setBuffer(doc.getRoot().listBuffers()[0]).setArray(new Uint32Array(keep)));
+    }
     const root = rootNode(doc, 'b2');
+    // the nose wheel well, behind its (shut) front doors: capped by a panel in the line of the skin
+    {
+      const skin = doc.getRoot().listMaterials()[0], buf = doc.getRoot().listBuffers()[0];
+      const cap = doc.createMaterial('wellCap').setBaseColorFactor([0.1, 0.105, 0.115, 1]).setMetallicFactor(0.2).setRoughnessFactor(0.8);
+      void skin;
+      const yb = -1.0, yf = -0.47, za = 8.42, zb = 9.95, w = 0.68;
+      const pos = [-w, yb, za, w, yb, za, w, yf, zb, -w, yb, za, w, yf, zb, -w, yf, zb];
+      const ny = -(zb - za), nz = (yf - yb), l = Math.hypot(ny, nz);
+      const nrm = []; for (let i = 0; i < 6; i++) nrm.push(0, ny / l, nz / l);
+      const acc = (a, t) => doc.createAccessor().setType(t).setBuffer(buf).setArray(new Float32Array(a));
+      const prim = doc.createPrimitive().setMaterial(cap).setAttribute('POSITION', acc(pos, 'VEC3')).setAttribute('NORMAL', acc(nrm, 'VEC3'));
+      root.addChild(doc.createNode('noseWellCap').setMesh(doc.createMesh('noseWellCap').addPrimitive(prim)));
+    }
     const box = (n) => { const vs = verts(doc, (x) => x === n.getName()); const bb = new THREE.Box3(); for (const v of vs) bb.expandByPoint(v); return bb; };
     // the bay doors: each hinged on its outboard edge if it is the outer door of its bay, else on the keel
     const doorOpen = [];
