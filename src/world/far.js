@@ -249,106 +249,366 @@ export function buildFar(env) {
   }
 
   // ── far mountains beyond everything ──────────────────────────────────────
-  {
-    const pos = [], idx = [];
-    const segs = 220;
-    for (let i = 0; i <= segs; i++) {
-      const a = lerp(-1.75, 1.75, i / segs);
-      const r = 2350 + Math.sin(i * 0.37) * 120;
-      const h = 140 + 170 * Math.pow(vnoise(i * 0.06, 3) * 0.7 + vnoise(i * 0.21, 7) * 0.3, 1.4) * (0.6 + 0.4 * Math.abs(Math.sin(a * 1.3)));
-      const x = Math.sin(a) * r, z = -Math.cos(a) * r;
-      pos.push(x, -60, z, x, h, z);
-      if (i < segs) { const b = i * 2; idx.push(b, b + 2, b + 1, b + 1, b + 2, b + 3); }
+  buildRanges(env, rng);
+
+  buildCity(env, rng);
+}
+
+// ── the far ranges ──────────────────────────────────────────────────────────
+// Three ridgelines one behind the other, each the hazier for its distance: a real slope
+// up to a crest (so the evening light grades across it) with a crest that is jagged at
+// every scale, from the long shoulders down to single crags. In the prologue's long lens
+// the sun goes down behind them, so the crests carry what stands on them: woods of
+// pines in silhouette, bare snags, a line of pylons and a mast with its red lights.
+const RANGES = [
+  { r: 2000, h0: 55, h1: 150, fog: 0.36, tone: 0.8, trees: 1, seed: 1, pass: 0.72 },
+  { r: 2300, h0: 100, h1: 230, fog: 0.42, tone: 1.0, trees: 0.6, seed: 2, pass: 0.68 },
+  { r: 2650, h0: 160, h1: 330, fog: 0.5, tone: 1.15, trees: 0, seed: 3, pass: 0.76 },
+];
+// where the valley runs out through the ranges, past the city: the gap the sun goes down in
+// (the prologue's long lens looks straight down it)
+const PASS_A = -0.29, PASS_W = 0.14;
+const A0 = -1.75, A1 = 1.75;
+const FACE = 520; // how far the face runs out from the crest to its foot
+
+/** The crest of range L at angle a (metres above the valley floor). */
+function crest(L, a) {
+  const s = a * L.r, o = L.seed * 31.7;
+  const ridged = (f, oo) => 1 - Math.abs(2 * vnoise(s / f + oo, o + oo) - 1);
+  const big = vnoise(s / 1500 + o, o) * 0.65 + vnoise(s / 640 + o, o + 5) * 0.35;
+  let h = L.h0 + L.h1 * Math.pow(big, 1.35) * (0.62 + 0.38 * Math.abs(Math.sin(a * 1.3 + L.seed)));
+  h += L.h1 * (0.16 * ridged(260, 3) + 0.07 * ridged(85, 7) + 0.025 * ridged(27, 11));
+  h += (vnoise(s / 9 + o, o + 13) - 0.5) * L.h1 * 0.012; // crags
+  return h * (1 - L.pass * Math.exp(-(((a - PASS_A) / PASS_W) ** 2)));
+}
+/** A point on range L's face: angle a, t from its foot (0) to the crest (1). */
+function onFace(L, a, t, out = new THREE.Vector3()) {
+  const top = crest(L, a), rr = L.r - FACE * (1 - t);
+  return out.set(Math.sin(a) * rr, -50 + (top + 50) * (1 - Math.pow(1 - t, 1.7)), -Math.cos(a) * rr);
+}
+
+function buildRanges(env, rng) {
+  const { scene } = env;
+  const SEG = 1500, ROWS = [0, 0.18, 0.36, 0.52, 0.66, 0.78, 0.88, 0.95, 1, 1.12];
+  const treeMs = [], snagMs = [];
+  const col = new THREE.Color();
+  for (const L of RANGES) {
+    const pos = [], cols = [], idx = [];
+    const nr = ROWS.length;
+    for (let i = 0; i <= SEG; i++) {
+      const a = lerp(A0, A1, i / SEG);
+      const sa = Math.sin(a), ca = -Math.cos(a);
+      const top = crest(L, a), s = a * L.r;
+      for (let j = 0; j < nr; j++) {
+        const t = ROWS[j];
+        // up the face from its foot to the crest (t = 1), and a little way down the far side
+        const back = t > 1;
+        const rr = back ? L.r + 180 : L.r - FACE * (1 - t);
+        const rise = back ? top - 70 : -50 + (top + 50) * (1 - Math.pow(1 - t, 1.7));
+        const bump = back || t === 1 ? 0 : (vnoise(s / 70 + j * 1.7, L.seed * 9 + j) - 0.5) * 26 * (1 - t * 0.7);
+        pos.push(sa * rr, rise + bump, ca * rr);
+        // woods (dark, a little green) and bare rock and scree (greyer) in patches, the crests barest
+        const wood = vnoise(s / 160 + j * 0.3, L.seed * 4) > 0.48 + t * 0.12;
+        const k = L.tone * (0.85 + vnoise(s / 40, j + L.seed) * 0.3);
+        if (wood) col.setRGB(0.0052 * k, 0.0062 * k, 0.0048 * k); else col.setRGB(0.0095 * k, 0.0092 * k, 0.0095 * k);
+        cols.push(col.r, col.g, col.b);
+      }
+      if (i < SEG) for (let j = 0; j < nr - 1; j++) {
+        const b = i * nr + j;
+        idx.push(b, b + nr, b + 1, b + 1, b + nr, b + nr + 1);
+      }
     }
     const g = new THREE.BufferGeometry();
     g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    g.setAttribute('color', new THREE.Float32BufferAttribute(cols, 3));
     g.setIndex(idx);
     g.computeVertexNormals();
-    const mm = new THREE.MeshStandardMaterial({ color: 0x15161a, roughness: 1, side: THREE.DoubleSide });
-    mm.defines = { LB_FOG_SCALE: '0.42' };
+    const mm = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 1, side: THREE.DoubleSide });
+    farFog(mm, L.fog);
     const mtn = new THREE.Mesh(g, mm);
     mtn.frustumCulled = false;
     scene.add(mtn);
+
+    // the woods on the crest and the top of the face: pines, and the odd dead snag
+    if (L.trees > 0) {
+      for (let i = 0; i < 9000; i++) {
+        const a = lerp(A0, A1, rng());
+        if (vnoise(a * L.r / 210, L.seed * 17) < 0.42 + (1 - L.trees) * 0.25) continue;
+        const t = 1 - Math.pow(rng(), 2.2) * 0.3; // mostly along the crest itself
+        onFace(L, a, t, _v);
+        _v.y -= 1.5;
+        const sc = (0.75 + rng() * 0.7) * (L.r / 2000);
+        _q.setFromEuler(new THREE.Euler((rng() - 0.5) * 0.1, rng() * 6.28, (rng() - 0.5) * 0.1));
+        _m.compose(_v, _q, _s.set(sc, sc * (0.8 + rng() * 0.5), sc));
+        (rng() < 0.12 ? snagMs : treeMs).push([_m.clone(), L]);
+      }
+    }
+  }
+  // (one mesh per range, so each takes its range's haze)
+  const pine = merge([
+    xf(new THREE.CylinderGeometry(0, 3.4, 9, 6), 0, 7.5, 0),
+    xf(new THREE.CylinderGeometry(0, 2.6, 8, 6), 0, 12, 0),
+    xf(new THREE.CylinderGeometry(0, 1.6, 6, 6), 0, 16.5, 0),
+    xf(new THREE.CylinderGeometry(0.25, 0.4, 4, 5), 0, 2, 0),
+  ]);
+  const snag = makeDeadPineGeo();
+  for (const L of RANGES) {
+    for (const [geo, list, c] of [[pine, treeMs, 0x050604], [snag, snagMs, 0x070605]]) {
+      const ms = list.filter((e) => e[1] === L).map((e) => e[0]);
+      if (!ms.length) continue;
+      const mat = new THREE.MeshStandardMaterial({ color: c, roughness: 1 });
+      farFog(mat, L.fog);
+      const im = new THREE.InstancedMesh(geo, mat, ms.length);
+      ms.forEach((m, i) => im.setMatrixAt(i, m));
+      im.frustumCulled = false;
+      scene.add(im);
+    }
   }
 
-  buildCity(env, rng);
+  const steel = (L) => { const m = new THREE.MeshStandardMaterial({ color: 0x060606, roughness: 1, metalness: 0 }); farFog(m, L.fog); return m; };
+  // a power line strung along the nearest crest (one pylon down), and a mast on the second
+  {
+    const L = RANGES[0], pyl = makePylonGeo(30), ms = [], tops = [];
+    for (let k = 0; k < 14; k++) {
+      const a = -0.62 + k * 0.042;
+      onFace(L, a, 0.97, _v);
+      _v.y -= 1;
+      _q.setFromEuler(new THREE.Euler(0, -a, k === 8 ? 0.3 : 0));
+      _m.compose(_v, _q, _s.set(1.5, 1.5, 1.5));
+      ms.push(_m.clone());
+      tops.push(k === 8 ? null : [-5.6, 5.6].map((dx) => new THREE.Vector3(dx, 26, 0).applyMatrix4(_m)));
+    }
+    const mat = steel(L);
+    const pm = new THREE.InstancedMesh(pyl, mat, ms.length);
+    ms.forEach((m, i) => pm.setMatrixAt(i, m));
+    pm.frustumCulled = false;
+    scene.add(pm);
+    const C = [];
+    for (let k = 0; k + 1 < tops.length; k++) {
+      const a = tops[k], b = tops[k + 1];
+      if (a && b) for (let c = 0; c < 2; c++) C.push(sagWire(a[c], b[c], 14, 0.25, 18));
+    }
+    if (C.length) { const w = new THREE.Mesh(merge(C), mat); w.frustumCulled = false; scene.add(w); }
+  }
+  {
+    const L = RANGES[1], a = -0.12;
+    const p = onFace(L, a, 0.99);
+    const G = [];
+    for (let k = 0; k < 16; k++) {
+      const hy = k * 6;
+      G.push(box(0.35, 6, 0.35, -1.2, hy + 3, -1.2), box(0.35, 6, 0.35, 1.2, hy + 3, -1.2), box(0.35, 6, 0.35, 0, hy + 3, 1.2));
+      G.push(box(2.6, 0.2, 0.2, 0, hy + 1, -1.2, 0, 0, 0.7));
+    }
+    const mast = new THREE.Mesh(merge(G), steel(L));
+    mast.position.set(p.x, p.y - 3, p.z);
+    mast.frustumCulled = false;
+    scene.add(mast);
+    for (const hy of [32, 64, 96]) {
+      const sp = env.makeGlowSprite(0xff1a0a, hy === 96 ? 16 : 11, 2.2, true);
+      sp.position.set(p.x, p.y - 3 + hy, p.z);
+      scene.add(sp);
+      env.blinkers.push({ sprite: sp, ph: rng() * 6, rate: 0.9 });
+    }
+  }
+}
+
+/** The atmosphere's haze on a far material, thinned by `scale` (the far things would be lost in it). */
+function farFog(mat, scale) {
+  mat.defines = { ...(mat.defines || {}), LB_FOG_SCALE: String(scale) };
 }
 
 // ── the burning city ────────────────────────────────────────────────────────
 function buildCity(env, rng) {
   const { scene, fire } = env;
+  // Every part of a building is built about its own footing and then set in place with the
+  // building's lean and turn; each carries the building's id (the windows are hashed on it)
+  // and its colour: concrete, brick, sandstone, dark glass.
   const parts = [];
   const tall = [];
   let bid = 0;
-  const addBox = (w, h, d, x, y, z, ry = 0, rz = 0, id = bid) => {
-    const g = new THREE.BoxGeometry(w, h, d);
-    g.translate(0, h / 2, 0);
-    g.rotateZ(rz);
-    g.rotateY(ry);
-    g.translate(x, y, z);
-    const n = g.attributes.position.count;
-    g.setAttribute('aBld', new THREE.Float32BufferAttribute(new Float32Array(n).fill(id), 1));
-    parts.push(g.toNonIndexed());
-  };
+  const PALETTE = [
+    [0.030, 0.029, 0.027], [0.040, 0.037, 0.032], [0.036, 0.021, 0.015], [0.044, 0.035, 0.024],
+    [0.020, 0.022, 0.026], [0.026, 0.026, 0.026], [0.033, 0.026, 0.020],
+  ];
   const cityGround = (x, z) => heightFn(x, z) - 1.5;
-  const building = (x, z, w, d, h, opts = {}) => {
+  let B = []; // the building being put up: [geometry, colour]
+  const put = (g, c) => B.push([g, c]);
+  const bx = (w, h, d, x, y, z, c, ry = 0) => { const g = new THREE.BoxGeometry(w, h, d); g.translate(0, h / 2, 0); if (ry) g.rotateY(ry); g.translate(x, y, z); put(g, c); };
+  const cyl = (r0, r1, h, x, y, z, c, seg = 8) => { const g = new THREE.CylinderGeometry(r0, r1, h, seg); g.translate(x, y + h / 2, z); put(g, c); };
+  const gable = (w, h, d, x, y, z, c) => { // a pitched roof along x
+    const g = new THREE.CylinderGeometry(1, 1, 1, 3, 1);
+    g.rotateZ(Math.PI / 2); g.rotateX(Math.PI / 6);
+    g.scale(w, h / 1.5, d / 1.732); g.translate(x, y + h / 3, z); put(g, c);
+  };
+  const shade = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+  const finish = (x, y, z, ry, rz) => {
     bid++;
+    for (const [g, c] of B) {
+      if (rz) g.rotateZ(rz);
+      if (ry) g.rotateY(ry);
+      g.translate(x, y, z);
+      const n = (g.index ? g.toNonIndexed() : g);
+      n.deleteAttribute('uv');
+      const cnt = n.attributes.position.count;
+      n.setAttribute('aBld', new THREE.Float32BufferAttribute(new Float32Array(cnt).fill(bid), 1));
+      const C = new Float32Array(cnt * 3);
+      for (let i = 0; i < cnt; i++) C.set(c, i * 3);
+      n.setAttribute('color', new THREE.Float32BufferAttribute(C, 3));
+      parts.push(n);
+    }
+    B = [];
+  };
+  // rooftop clutter: plant rooms, vents, water tanks on legs, aerials, the odd billboard
+  const roof = (w, d, top, c, big) => {
+    const n = big ? 2 + ((rng() * 3) | 0) : (rng() < 0.6 ? 1 : 0);
+    for (let k = 0; k < n; k++) bx(2 + rng() * w * 0.25, 1.5 + rng() * 3.5, 2 + rng() * d * 0.25, (rng() - 0.5) * w * 0.6, top, (rng() - 0.5) * d * 0.6, shade(c, 0.85));
+    if (rng() < 0.45) {
+      const tx = (rng() - 0.5) * w * 0.5, tz = (rng() - 0.5) * d * 0.5, r = 1.6 + rng() * 1.4, lh = 2.5 + rng() * 2;
+      for (const [dx, dz] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) bx(0.25, lh, 0.25, tx + dx * r * 0.7, top, tz + dz * r * 0.7, [0.02, 0.018, 0.016]);
+      cyl(r, r, r * 1.8, tx, top + lh, tz, [0.035, 0.026, 0.02]);
+      cyl(0, r * 1.05, r * 0.6, tx, top + lh + r * 1.8, tz, [0.03, 0.022, 0.017]);
+    }
+    if (rng() < 0.35) for (let k = 0; k < 1 + ((rng() * 3) | 0); k++) bx(0.2, 4 + rng() * 9, 0.2, (rng() - 0.5) * w * 0.7, top, (rng() - 0.5) * d * 0.7, [0.02, 0.02, 0.02]);
+    if (rng() < 0.12 && w > 14) {
+      const bw = Math.min(w * 0.8, 10 + rng() * 8), ry = rng() < 0.5 ? 0 : Math.PI / 2;
+      bx(0.3, 3, 0.3, -bw * 0.4, top, 0, [0.02, 0.02, 0.02], ry); bx(0.3, 3, 0.3, bw * 0.4, top, 0, [0.02, 0.02, 0.02], ry);
+      bx(bw, bw * 0.35, 0.4, 0, top + 3, 0, [0.05, 0.045, 0.04], ry);
+    }
+  };
+  const building = (x, z, w, d, h, opts = {}) => {
     const y = cityGround(x, z);
-    const ry = opts.ry || 0;
-    const rz = opts.tilt || 0;
+    const ry = opts.ry || 0, rz = opts.tilt || 0;
+    const c0 = PALETTE[(rng() * PALETTE.length) | 0], c = shade(c0, 0.8 + rng() * 0.4);
     if (opts.broken) {
-      // jagged stump: main block cut short, a few columns sticking up
-      addBox(w, h * 0.6, d, x, y, z, ry, rz);
-      for (let k = 0; k < 5; k++) addBox(w * 0.12, h * (0.62 + rng() * 0.3), d * 0.12, x + (rng() - 0.5) * w * 0.8, y, z + (rng() - 0.5) * d * 0.8, ry, rz);
+      // gutted: a stump of the block, then the bare frame of the floors above it, slabs
+      // hanging off at angles and the columns standing up out of them
+      const sh = h * (0.35 + rng() * 0.25);
+      bx(w, sh, d, 0, 0, 0, c);
+      const fl = Math.floor((h - sh) / 3.8);
+      for (let k = 1; k <= fl; k++) {
+        const kw = w * (1 - k / (fl + 2)) * (0.6 + rng() * 0.4), kd = d * (0.5 + rng() * 0.5);
+        const g = new THREE.BoxGeometry(kw, 0.5, kd);
+        g.rotateZ((rng() - 0.5) * 0.25 * (k / fl));
+        g.translate((rng() - 0.5) * (w - kw), sh + k * 3.8, (rng() - 0.5) * (d - kd));
+        put(g, shade(c, 0.8));
+      }
+      for (let k = 0; k < 6; k++) bx(0.7, sh + (h - sh) * (0.3 + rng() * 0.7), 0.7, (rng() - 0.5) * w * 0.9, 0, (rng() - 0.5) * d * 0.9, shade(c, 0.7));
+      finish(x, y, z, ry, rz);
       return;
     }
-    addBox(w, h, d, x, y, z, ry, rz);
+    bx(w, h, d, 0, 0, 0, c);
     let top = h;
-    if (h > 70) {
+    if (h < 22) {
+      // low-rise: a parapet round the flat roof, or a pitched roof
+      if (rng() < 0.4 && w < 26) gable(w + 0.6, 3 + rng() * 3, d + 0.6, 0, h, 0, [0.03, 0.017, 0.013]);
+      else { bx(w, 1.1, 0.4, 0, h, d / 2 - 0.2, c); bx(w, 1.1, 0.4, 0, h, -d / 2 + 0.2, c); bx(0.4, 1.1, d, w / 2 - 0.2, h, 0, c); bx(0.4, 1.1, d, -w / 2 + 0.2, h, 0, c); roof(w, d, h, c, false); }
+      finish(x, y, z, ry, rz);
+      return;
+    }
+    // cornices every few floors and a heavier one at the top (the older blocks); towers
+    // instead get vertical fins up their faces
+    const tower = h > 70;
+    if (!tower || rng() < 0.3) {
+      const every = (3 + ((rng() * 4) | 0)) * 3.8;
+      for (let yy = every; yy < h - 2; yy += every) bx(w + 0.5, 0.45, d + 0.5, 0, yy, 0, shade(c, 1.15));
+      bx(w + 1.2, 1.4, d + 1.2, 0, h - 1.4, 0, shade(c, 1.2));
+    } else {
+      const nf = 4 + ((rng() * 5) | 0);
+      for (let k = 0; k <= nf; k++) {
+        const u = -0.5 + k / nf;
+        bx(0.5, h, 0.9, u * w, 0, d / 2 + 0.4, shade(c, 1.25)); bx(0.5, h, 0.9, u * w, 0, -d / 2 - 0.4, shade(c, 1.25));
+        bx(0.9, h, 0.5, w / 2 + 0.4, 0, u * d, shade(c, 1.25)); bx(0.9, h, 0.5, -w / 2 - 0.4, 0, u * d, shade(c, 1.25));
+      }
+    }
+    if (tower) {
+      // setbacks, and a crown: a spire, a mast or a plain plant floor
       const tiers = 1 + ((rng() * 2.5) | 0);
       let tw = w, td = d;
       for (let k = 0; k < tiers; k++) {
         tw *= 0.62 + rng() * 0.2; td *= 0.62 + rng() * 0.2;
         const th = h * (0.12 + rng() * 0.15);
-        addBox(tw, th, td, x, y + top, z, ry, rz);
+        bx(tw, th, td, 0, top, 0, shade(c, 0.95));
+        bx(tw + 0.8, 0.6, td + 0.8, 0, top + th - 0.6, 0, shade(c, 1.2));
         top += th;
       }
-      tall.push([x, y + top, z, rz]);
-    }
-    // roof clutter
-    const nr = h > 30 ? 2 + ((rng() * 3) | 0) : 1;
-    for (let k = 0; k < nr; k++) addBox(2 + rng() * 6, 1.5 + rng() * 4, 2 + rng() * 6, x + (rng() - 0.5) * w * 0.5, y + top, z + (rng() - 0.5) * d * 0.5, ry, rz);
-    if (h > 120) addBox(0.8, 25 + rng() * 25, 0.8, x, y + top, z, ry, rz);
+      const crown = rng();
+      if (crown < 0.3) { cyl(0, Math.min(tw, td) * 0.45, 18 + rng() * 22, 0, top, 0, shade(c, 1.1), 4); }
+      else if (crown < 0.65) { bx(1, 30 + rng() * 30, 1, 0, top, 0, [0.02, 0.02, 0.02]); for (let k = 0; k < 3; k++) bx(0.3, 8 + rng() * 10, 0.3, (rng() - 0.5) * tw * 0.6, top, (rng() - 0.5) * td * 0.6, [0.02, 0.02, 0.02]); }
+      else roof(tw, td, top, c, true);
+      const T = new THREE.Vector3(0, top, 0).applyAxisAngle(new THREE.Vector3(0, 0, 1), rz);
+      tall.push([x + T.x, y + T.y, z, rz]);
+    } else roof(w, d, top, c, true);
+    finish(x, y, z, ry, rz);
   };
-  // blocks on a rough grid, downtown in the middle
-  for (let gx = -16; gx <= 16; gx++) {
-    for (let gz = 0; gz < 6; gz++) {
-      if (rng() < 0.18) continue;
-      const x = gx * 48 + (rng() - 0.5) * 16, z = -1000 - gz * 52 - (rng() - 0.5) * 14;
-      const down = Math.exp(-Math.pow((x - 60) / 230, 2)) * Math.exp(-Math.pow((z + 1140) / 120, 2));
-      const h = 12 + Math.pow(rng(), 1.8) * 34 + down * (30 + rng() * 115) * (rng() < 0.75 ? 1 : 0.4);
-      const w = 18 + rng() * 22, d = 16 + rng() * 22;
-      const tilt = rng() < 0.1 ? (rng() - 0.5) * 0.4 : 0;
-      building(x, z, w, d, h, { broken: rng() < 0.09 && h > 40, tilt, ry: (rng() - 0.5) * 0.12 });
+  // the blocks on a rough grid, cut up by the streets; downtown's towers in the middle
+  for (let gx = -19; gx <= 19; gx++) {
+    for (let gz = 0; gz < 9; gz++) {
+      if (rng() < 0.08) continue; // a burnt-out lot
+      const bxc = gx * 44 + (rng() - 0.5) * 8, bzc = -990 - gz * 46 - (rng() - 0.5) * 8;
+      // (downtown stands just right of the pass: in the long lens the towers frame the setting sun)
+      const down = Math.exp(-Math.pow((bxc + 70) / 210, 2)) * Math.exp(-Math.pow((bzc + 1150) / 130, 2));
+      const big = down > 0.35 && rng() < 0.75;
+      // a block is one big building downtown, two or four smaller ones out of it
+      const split = big ? 1 : rng() < 0.45 ? 2 : 4;
+      for (let k = 0; k < split; k++) {
+        const ox = split === 1 ? 0 : (k % 2 - 0.5) * 17, oz = split === 4 ? ((k >> 1) - 0.5) * 17 : 0;
+        const lw = split === 1 ? 32 : 15, ld = split === 4 ? 15 : 32;
+        if (split > 1 && rng() < 0.12) continue;
+        const x = bxc + ox, z = bzc + oz;
+        // (and a midtown of older blocks in the pass's line, tall enough to stand over the viaduct
+        // in the long lens: the sun goes down behind their ragged roofline)
+        const mid = Math.exp(-Math.pow((x + 340) / 150, 2)) * Math.exp(-Math.pow((z + 1170) / 150, 2));
+        const h = 9 + Math.pow(rng(), 1.8) * (split === 4 ? 18 : 34) + down * (30 + rng() * 120) * (big ? 1 : 0.35) + mid * (22 + rng() * 38);
+        const w = lw * (0.7 + rng() * 0.3), d = ld * (0.7 + rng() * 0.3);
+        const tilt = rng() < 0.06 ? (rng() - 0.5) * 0.35 : 0;
+        building(x, z, w, d, h, { broken: rng() < 0.08 && h > 30, tilt, ry: (rng() - 0.5) * 0.08 });
+      }
     }
+  }
+  // the outskirts in front: rows of small houses and sheds with pitched roofs
+  for (let i = 0; i < 260; i++) {
+    const x = (rng() - 0.5) * 1640, z = -948 - rng() * 36;
+    if (Math.abs(x - roadX(z)) < 16) continue;
+    const y = cityGround(x, z);
+    const w = 7 + rng() * 7, d = 6 + rng() * 5, h = 3 + rng() * 4;
+    const c = PALETTE[(rng() * PALETTE.length) | 0];
+    bx(w, h, d, 0, 0, 0, c);
+    if (rng() < 0.75) gable(w + 0.6, 2 + rng() * 2, d + 0.6, 0, h, 0, [0.028, 0.016, 0.012]);
+    finish(x, y, z, (rng() - 0.5) * 0.3, 0);
+  }
+  // an industrial quarter: smokestacks and a gasholder's frame
+  for (const [x, z, h] of [[330, -975, 95], [352, -982, 80], [372, -970, 70], [-470, -985, 85]]) {
+    const y = cityGround(x, z);
+    cyl(2.6, 4, h, 0, 0, 0, [0.04, 0.026, 0.02], 10);
+    for (const yy of [h - 8, h - 14]) cyl(4.1, 4.1, 2.2, 0, yy, 0, [0.06, 0.02, 0.015], 10);
+    finish(x, y, z, 0, 0);
+  }
+  {
+    const x = 420, z = -995, y = cityGround(x, z);
+    cyl(26, 26, 22, 0, 0, 0, [0.03, 0.03, 0.03], 20);
+    for (let k = 0; k < 12; k++) { const a = k / 12 * Math.PI * 2; bx(0.9, 40, 0.9, Math.cos(a) * 27, 0, Math.sin(a) * 27, [0.025, 0.025, 0.025]); }
+    for (const yy of [14, 27, 39]) cyl(27.5, 27.5, 0.9, 0, yy, 0, [0.025, 0.025, 0.025], 20);
+    finish(x, y, z, 0, 0);
   }
   // merge keeps aBld only if we do it by hand
   const total = parts.reduce((a, g) => a + g.attributes.position.count, 0);
-  const P = new Float32Array(total * 3), N = new Float32Array(total * 3), B = new Float32Array(total);
+  const P = new Float32Array(total * 3), N = new Float32Array(total * 3), Bd = new Float32Array(total), Cl = new Float32Array(total * 3);
   let o = 0;
   for (const g of parts) {
     g.computeVertexNormals();
     P.set(g.attributes.position.array, o * 3);
     N.set(g.attributes.normal.array, o * 3);
-    B.set(g.attributes.aBld.array, o);
+    Bd.set(g.attributes.aBld.array, o);
+    Cl.set(g.attributes.color.array, o * 3);
     o += g.attributes.position.count;
   }
   const cg = new THREE.BufferGeometry();
   cg.setAttribute('position', new THREE.BufferAttribute(P, 3));
   cg.setAttribute('normal', new THREE.BufferAttribute(N, 3));
-  cg.setAttribute('aBld', new THREE.BufferAttribute(B, 1));
+  cg.setAttribute('aBld', new THREE.BufferAttribute(Bd, 1));
+  cg.setAttribute('color', new THREE.BufferAttribute(Cl, 3));
   cg.computeBoundingSphere();
-  const mat = new THREE.MeshStandardMaterial({ color: 0x24221f, roughness: 0.9, metalness: 0.1, emissive: 0xffffff });
+  const mat = new THREE.MeshStandardMaterial({ color: 0xffffff, vertexColors: true, roughness: 0.9, metalness: 0.1, emissive: 0xffffff });
   mat.defines = { LB_FOG_SCALE: '0.5' };
   env.cityUniforms = { uTime: { value: 0 }, uDawn: { value: 0 }, uBurn: { value: 1 } };
   mat.onBeforeCompile = (sh) => {
