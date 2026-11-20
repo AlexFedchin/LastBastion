@@ -43,6 +43,18 @@ export function buildGunship() {
  */
 export function buildBomber() {
   const g = cloneModel('b36');
+  // a dark night finish rather than bare metal: the paint (its markings kept) and the metal parts
+  // darkened to a gunmetal grey, and duller, so the sky doesn't silver them again
+  g.traverse((o) => {
+    if (!o.isMesh) return;
+    const m = o.material;
+    if (m.userData.night || !/Fuselage|Metal/.test(m.name)) return;
+    m.userData.night = true;
+    m.color.setRGB(0.15, 0.155, 0.165);
+    m.metalness = Math.min(m.metalness, 0.45);
+    m.roughness = Math.max(m.roughness, 0.55);
+    m.envMapIntensity = 0.6;
+  });
   tint(g, 0x08090b);
   return {
     group: g,
