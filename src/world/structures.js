@@ -278,7 +278,8 @@ export function buildFortification(env) {
       glassGeos.push(glass);
       wingMatrix(w, u, deckY + 2.75, -0.85, _m);
       _v.setFromMatrixPosition(_m);
-      // (no halo sprite: the lamp's own glass burns, and its light is on the wall below)
+      // (no glow sprite round the glass: the lamp is a real light now, and the bloom off the lit
+      // glass is all the halo it needs)
       (env.wallLamps || (env.wallLamps = [])).push(_v.clone());
       // its light: thrown down and out over the foot of the wall (src/world/lamplight.js)
       (env.wallLampAims || (env.wallLampAims = [])).push(new THREE.Vector3(-w.nx * 4.5, -(_v.y - groundH(_v.x - w.nx * 4.5, _v.z - w.nz * 4.5)), -w.nz * 4.5).normalize());
