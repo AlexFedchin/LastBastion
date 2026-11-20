@@ -392,7 +392,9 @@ export class Prologue {
 
     // the shot
     const s = this.shots.find((x) => t >= x.from && t < x.to) || this.shots[this.shots.length - 1];
-    const st = t - s.from, k = clamp(st / Math.max(0.01, s.to - s.from), 0, 1);
+    // (the last shot runs on past its end for the odd frame before night 1 takes over: its move
+    // is carried on, so it mustn't stop short)
+    const st = t - s.from, kr = Math.max(0, st / Math.max(0.01, s.to - s.from)), k = s.name === 'nest' ? kr : Math.min(1, kr);
     const p = SHOTS[s.name](k, st, this);
     if (p.ground !== undefined) p.pos.y = groundH(p.pos.x, p.pos.z) + p.ground;
     if (p.lookGround !== undefined) p.look.y = groundH(p.look.x, p.look.z) + p.lookGround;
@@ -443,7 +445,7 @@ export class Prologue {
     // ended (or skipped) in the last shot: night 1's move into the gun carries on from it at its speed
     const s = this.shot;
     if (s && s.name === 'nest') {
-      const dur = Math.max(0.5, s.to - s.from), u = NEST_F * clamp((this.t - s.from) / dur, 0, 1), N = this.nestPath();
+      const dur = Math.max(0.5, s.to - s.from), u = NEST_F * Math.max(0, (this.t - s.from) / dur), N = this.nestPath();
       const len = 2.8;
       this.g.introCarry = { len, fov: lerp(N.from.fov, N.to.fov, u), slope: Math.min(2.5, (NEST_F / dur) * len / Math.max(0.05, 1 - u)) };
     }
