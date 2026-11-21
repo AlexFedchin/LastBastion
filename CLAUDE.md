@@ -9,3 +9,4 @@
 - If user asks to plan something to do later - put it into a suitable .md file or create a new one and commit to the repo.
 - All the new textures that need to be added should be downloaded from AmbientCG instead of generating them with code unless explicitly stated otherwise.
 - All the new sounds have to be downloaded from FreeSound instead of synthesizing them in code.
+- New models that user provides are always in the folder called "3D Models" next to this repository. The attributions are in the same folder in the "Attributions.txt"
