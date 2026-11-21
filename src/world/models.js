@@ -11,6 +11,7 @@ const FILES = {
   ch47: 'models/ch47.glb', apache: 'models/apache.glb', ural: 'models/ural.glb', ural_burnt: 'models/ural_burnt.glb',
   heliwreck: 'models/heliwreck.glb', b2: 'models/b2.glb', container: 'models/container.glb', bale: 'models/bale.glb', bomb: 'models/bomb.glb',
   house: 'models/house.glb', mcrate: 'models/mcrate.glb', church: 'models/church.glb', hedgehog: 'models/hedgehog.glb',
+  fueltruck: 'models/fueltruck.glb', fueltruck_burnt: 'models/fueltruck_burnt.glb', leopard_wreck: 'models/leopard_wreck.glb',
   tower: 'models/tower.glb', // the central tower (the user's own model)
   // the field, the hills and the crews (scripts/models/build_field.mjs)
   trees: 'models/trees.glb', deadtrees: 'models/deadtrees.glb', mg4: 'models/mg4.glb', crow: 'models/crow.glb',

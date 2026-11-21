@@ -34,6 +34,8 @@ meshopt-compressed.
 | `mcrate.glb` | Weapons crate: what each man of the recovery team carries home, the supply drop's load, the stacks on the nest roof | [Sketchfab: Weapons Crate](https://sketchfab.com/3d-models/weapons-crate-6597d3858df94da698ece8e0038f50b7) | Sousinho | CC BY 4.0 |
 | `church.glb` | The village church and its bell tower, on the far hills | [Sketchfab: Church](https://sketchfab.com/3d-models/church-867a847b67364484bf44912e1af190af) | Tiago Lopes | CC BY 4.0 |
 | `hedgehog.glb` | Czech hedgehogs in the killing field | [Sketchfab: Rusted Czech Hedgehog](https://sketchfab.com/3d-models/rusted-czech-hedgehog-cfa712e8851a4881989ea890bfc6910e) | GrostyBoi | CC BY 4.0 |
+| `fueltruck.glb`, `fueltruck_burnt.glb` | GAZ-51 fuel truck: the tanker stalled on the road (the night event); the burnt wreck is derived from it | [Sketchfab: Fuel Truck Gaz51](https://skfb.ly/owsGB) | emelyarules | CC BY 4.0 |
+| `leopard_wreck.glb` | The knocked-out tank in the field, made from an intact Leopard 2 | [Sketchfab: Leopard 2 MBT Revolution](https://skfb.ly/pvqLY) | Muhamad Mirza Arrafi | CC BY 4.0 |
 | `mg4.glb` | HK MG4 machine gun, standing in for the M240: the wall crews' guns, bay 3 of the hangar | [Sketchfab: HK MG4 machine gun](https://sketchfab.com/3d-models/hk-mg4-machine-gun-ee1c36acc61749f787be7e4a694e3b1f) | Ivan008 | CC BY 4.0 |
 | `trees.glb` | Spruce, pine and birch for the hills; bushes and rocks for the field and the farmland | [Sketchfab: Low Poly Forest Tree Pack](https://sketchfab.com/3d-models/low-poly-forest-tree-pack-5ff5a51e74324845a4e4905f182dfb2b) | 99.Miles | CC BY 4.0 |
 | `deadtrees.glb` | The dead trees standing in the killing field | [Sketchfab: Trees](https://sketchfab.com/3d-models/trees-eed7470843504aa592514554a6100fbc) | DJMaesen | CC BY 4.0 |
@@ -95,6 +97,14 @@ meshopt-compressed.
   - Czech hedgehog: scaled to 2.1 m across, simplified to ~1.8k triangles, a light night grade and rust.
   - CH-47 (second pass): the whole rear ramp is now a node hinged at the cabin floor, so it lowers to the ground and
     shuts; its treadway boards are a child node that slides back up it.
+  - Fuel truck: turned nose +x, 5.8 m. Its orange paint is desaturated to an oxide brown, the white stencils faded
+    into it, and road mud from ambientCG's CC0 [Ground051](https://ambientcg.com/a/Ground051) laid on by height on
+    the model (thick on the wheels and sills, streaked up the tank), with rust and grime; the gloss map and
+    the lamps' glow are dropped. The burnt wreck is repainted to soot and rust.
+  - Leopard 2 (wrecked in the build): the duplicate hull copy and the antennas dropped; the turret and the gun cut
+    out into nodes and posed blown askew (slewed, lifted on one side, the gun dropped); the port track's upper run
+    and front curve removed, its front wheels and idler gone, a length of track laid on the ground in front;
+    a black disc for the open turret ring; every texture repainted to soot and rust. ~28k triangles.
   - Night grade: every colour texture is darkened and desaturated in the build so the models sit in the night
     scene. The car wrecks, the burnt Ural, the crashed helicopter and the containers also get rust laid over
     them from ambientCG's CC0 [Rust009](https://ambientcg.com/a/Rust009) (colour), with

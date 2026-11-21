@@ -178,7 +178,7 @@ export function makeMaterials(tex) {
   return M;
 }
 
-// ── vehicles (the tank; the rest are downloaded models, see vehicles.js) ──────
+// ── merged builds (the ruins; the vehicles are downloaded models, see vehicles.js) ──
 /** Group meshes by material and merge per material. */
 function assemble(list) {
   const byMat = new Map();
@@ -190,49 +190,6 @@ function assemble(list) {
     grp.add(mesh);
   }
   return grp;
-}
-
-export function makeTank(mats, { body = mats.burnt, seed = 3 } = {}) {
-  const rng = makeRng(seed);
-  const L = [];
-  const W = 3.5;
-  // hull side profile: sloped glacis and rear
-  L.push([extrude([[-3.4, 0.55], [-3.6, 1.35], [-3.2, 1.75], [2.4, 1.75], [3.8, 1.2], [3.6, 0.55]], 2.3, 0.05), body]);
-  // sponsons over the tracks
-  for (const s of [-1, 1]) {
-    L.push([box(7.2, 0.12, 0.65, 0.1, 1.55, s * 1.48), body]);
-    // side skirts with panels
-    for (let k = 0; k < 6; k++) {
-      if (rng() < 0.25) continue;
-      L.push([box(1.12, 0.55, 0.05, -2.75 + k * 1.15, 1.25, s * 1.82, 0, 0, (rng() - 0.5) * 0.06), body]);
-    }
-    // track run: belt as a flattened loop of boxes + road wheels
-    L.push([box(6.4, 0.08, 0.6, 0.1, 0.06, s * 1.48), mats.darkSteel]);
-    L.push([box(6.1, 0.08, 0.6, 0.0, 1.05, s * 1.48), mats.darkSteel]);
-    for (let k = 0; k < 7; k++) L.push([cylZ(0.36, 0.5, 14, -2.6 + k * 0.85, 0.42, s * 1.48), mats.darkSteel]);
-    L.push([cylZ(0.38, 0.55, 12, 3.3, 0.75, s * 1.48), mats.darkSteel]);
-    L.push([cylZ(0.34, 0.55, 12, -3.35, 0.72, s * 1.48), mats.darkSteel]);
-    for (let k = 0; k < 40; k++) {
-      const t = k / 40;
-      L.push([box(0.12, 0.06, 0.62, -3.2 + t * 6.5, 0.04, s * 1.48), mats.steel]);
-    }
-  }
-  // turret: low faceted block
-  L.push([extrude([[-1.6, 1.75], [-1.75, 2.35], [-1.3, 2.75], [1.3, 2.75], [2.0, 2.2], [1.8, 1.75]], 2.7, 0.06).translate(-0.3, 0, 0), body]);
-  L.push([cylY(0.5, 0.35, 12, -0.6, 2.9, 0.55), body]);
-  L.push([cylY(0.42, 0.12, 12, -0.6, 3.1, 0.55), mats.darkSteel]);
-  L.push([cylY(0.38, 0.25, 12, -0.4, 2.85, -0.7), body]);
-  // gun: drooping barrel with fume extractor
-  const droop = -0.08 - rng() * 0.12;
-  const gun = merge([cylX(0.11, 4.6, 12, 2.3 + 1.6, 0, 0), cylX(0.17, 0.9, 12, 2.8 + 1.0, 0, 0), cylX(0.24, 0.6, 12, 1.65 + 0.3, 0, 0)]);
-  xf(gun, 0, 2.3, 0, 0, 0, droop);
-  L.push([gun, mats.darkSteel]);
-  // stowage bins, smoke dischargers
-  L.push([box(1.2, 0.5, 2.9, -2.2, 2.2, 0), body]);
-  for (const s of [-1, 1]) for (let k = 0; k < 3; k++) L.push([cylX(0.06, 0.3, 6, 1.6, 2.5 + k * 0.1, s * (1.25 + k * 0.05)), mats.darkSteel]);
-  // engine deck grilles
-  for (let k = 0; k < 6; k++) L.push([box(0.06, 0.04, 1.8, -1.4 - k * 0.3, 1.78, 0), mats.darkSteel]);
-  return assemble(L);
 }
 
 /** A ruined two-storey house: walls with holes, broken roof beams. */
