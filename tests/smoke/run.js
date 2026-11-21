@@ -58,6 +58,13 @@ function makeContext(consoleErrors) {
       fs.writeFileSync(path.join(OUT, name + '.png'), img.toPNG());
       await js('__LB.test.freeze(true)');
     },
+    /** The presented frame as pixels (BGRA, top-down): renderer-agnostic readback. */
+    capture: async () => {
+      await sleep(150);
+      const img = await win.webContents.capturePage();
+      const { width, height } = img.getSize();
+      return { w: width, h: height, px: img.toBitmap() };
+    },
     assert: (cond, msg) => { if (!cond) throw new AssertionError(msg); },
     eq: (a, b, msg) => { if (JSON.stringify(a) !== JSON.stringify(b)) throw new AssertionError(`${msg}: expected ${JSON.stringify(b)}, got ${JSON.stringify(a)}`); },
     log: (...a) => console.log('    ·', ...a),

@@ -1,12 +1,12 @@
-# The WebGPU renderer (branch `webgpu`)
+# The WebGPU renderer
 
-The game on three.js's `WebGPURenderer`, kept on its own branch so it can be compared with the
-WebGL build on `main`:
+Since 2026-11-21 the game runs on three.js's `WebGPURenderer` on `main` (it was developed on the
+`webgpu` branch, kept for history). The last WebGL build is the commit before the merge, tagged
+`last-webgl`:
 
 ```
-git checkout webgpu   # WebGPU
-git checkout main     # WebGL
-npm start             # builds src/ and runs the game, either branch
+npm start                 # builds src/ and runs the game (WebGPU)
+git checkout last-webgl   # the old WebGL build, for comparison
 ```
 
 ## How it is put together
