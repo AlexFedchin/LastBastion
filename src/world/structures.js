@@ -14,6 +14,7 @@ import {
 } from './kit.js';
 import { placeModel } from './vehicles.js';
 import { lampLit } from './lamplight.js';
+import { fogMaterial } from '../render/atmosphere.js';
 
 const _m = new THREE.Matrix4();
 const _q = new THREE.Quaternion();
@@ -429,7 +430,7 @@ function buildBunker(env) {
     const haze = env.makeGlowSprite(0xff2010, 3.2, 0);
     haze.position.copy(glass.position);
     const glint = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.glow, color: 0x000000, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: false }));
-    glint.material.defines = { LB_FOG_ADD: '' };
+    fogMaterial(glint.material, { add: true });
     glint.scale.setScalar(0.01);
     glint.position.copy(glass.position);
     glint.renderOrder = 7;
