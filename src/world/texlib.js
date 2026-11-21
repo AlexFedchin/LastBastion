@@ -15,7 +15,6 @@ const SETS = {
   // the hangar (ambientCG CC0, scripts/textures/build_ambientcg.py; the asphalt above comes from there too)
   hgFloor: ['c', 'n', 'r'], hgWall: ['c', 'n', 'r'], hgSteel: ['c', 'n', 'r'], hgHazard: ['c', 'n', 'r'],
   hgPlate: ['c', 'n', 'r'], hgRubber: ['c', 'n', 'r'], hgWood: ['c', 'n', 'r'],
-  boulder: ['c', 'n', 'r'], // the boulders (ambientCG Rock030; world/stone.js)
 };
 
 const loaded = {};

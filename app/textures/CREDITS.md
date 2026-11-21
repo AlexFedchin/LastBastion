@@ -45,6 +45,5 @@ and metalness packed, the road's brightness matched to the valley like the Poly 
 | `hgPlate` | [DiamondPlate008C](https://ambientcg.com/view?id=DiamondPlate008C) | CC0 1.0 |
 | `hgRubber` | [Rubber004](https://ambientcg.com/view?id=Rubber004) | CC0 1.0 |
 | `hgWood` | [Wood089](https://ambientcg.com/view?id=Wood089) | CC0 1.0 |
-| `boulder` | [Rock030](https://ambientcg.com/view?id=Rock030) | CC0 1.0 |
 
 <!-- /ambientcg -->

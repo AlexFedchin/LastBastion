@@ -1115,13 +1115,12 @@ class Game {
     // (more contrast in the valley: a stronger S-curve, so the fires, beams and lit faces stand out
     // of the dark. uBlack, a black point, is there to crush the darks further, but even 0.0025 lost
     // the ground at night)
-    u.uCurve.value = inHangar ? 0.3 : 0.55; u.uBlack.value = 0; u.uTint.value = inHangar ? 0.75 : 1;
+    u.uCurve.value = inHangar ? 0.12 : 0.55; u.uBlack.value = 0; u.uTint.value = inHangar ? 0.35 : 1;
     u.uFlare.value = inHangar ? 0.008 : 0.035; u.uStreak.value = inHangar ? 0.004 : 0.025; u.uDirt.value = inHangar ? 0.015 : 0.07;
     this.post.bloom.strength = inHangar ? 0.2 : 0.42;
     if (inHangar) {
       u.uHeatN.value = 0; u.uShockN.value = 0;
-      // graded grim: drained, contrasty, cold in the shadows (the dawn is outside, not in here)
-      u.uDesat.value = 0.4; u.uExposure.value = 1.0; u.uWarm.value = 0.04; u.uCA.value = 0.0015;
+      u.uDesat.value = 0.28; u.uExposure.value = 1.0; u.uWarm.value = 0.1; u.uCA.value = 0.0015;
     } else this.post.updateDistortion(this.env.fire.heatSources, this.fx.shocks);
     // pixel size for eye billboards
     const h = this.renderer.getDrawingBufferSize(this._sz || (this._sz = new THREE.Vector2())).y;
