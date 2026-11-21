@@ -11,7 +11,7 @@ app.whenReady().then(async () => {
   if (views) q.set('views', views);
   if (zoom) q.set('zoom', zoom);
   if (process.env.DEBUG) q.set('debug', process.env.DEBUG);
-  for (const k of ['ramp', 'cy', 'cz']) if (process.env['P_' + k]) q.set(k, process.env['P_' + k]);
+  for (const k of ['ramp', 'door', 'cy', 'cz']) if (process.env['P_' + k]) q.set(k, process.env['P_' + k]);
   win.webContents.on('console-message', (e) => console.log('[page]', e.message));
   await win.loadURL('file:///' + path.join(__dirname, 'preview.html').replace(/\\/g, '/') + '?' + q);
   let info = null;

@@ -155,12 +155,15 @@ export class Bolts {
     this.t = 0;
   }
 
-  /** Strike somewhere out on the horizon; returns the direction for the sky glow. */
-  strike(cam) {
+  /**
+   * Strike somewhere out on the horizon (or at `at`, a ground point {x, z}); returns the
+   * direction for the sky glow.
+   */
+  strike(cam, at = null) {
     const r = this.rng;
-    const az = (r() - 0.5) * 2.4;
-    const dist = 650 + r() * 700;
-    this.lastDist = dist; this.lastAz = az; // (the thunder: how long it takes, where it comes from)
+    let az = (r() - 0.5) * 2.4, dist = 650 + r() * 700;
+    if (at) { az = Math.atan2(at.x, -at.z); dist = Math.hypot(at.x, at.z); }
+    this.lastDist = at ? Math.hypot(at.x - cam.x, at.z - cam.z) : dist; this.lastAz = az; // (the thunder: how long it takes, where it comes from)
     const gx = Math.sin(az) * dist, gz = -Math.cos(az) * dist;
     const top = new THREE.Vector3(gx + (r() - 0.5) * 120, 330 + r() * 100, gz + (r() - 0.5) * 60);
     const bottom = new THREE.Vector3(gx, groundH(gx, gz), gz);

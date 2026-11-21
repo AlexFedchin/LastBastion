@@ -325,6 +325,21 @@ export class Environment {
     this.scene.add(this.horizonFlash);
   }
 
+  /**
+   * A lightning strike: a bolt out on the horizon (or at `at`, a ground point {x, z}, seen from
+   * `cam`), the cloud deck lit up, and its thunder on the way.
+   */
+  strike(at = null, cam = null) {
+    this.nextLightning = 20 + Math.random() * 38;
+    this.flash = 1;
+    const from = cam || _dir.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z);
+    const dir = this.bolts.strike(from, at);
+    this.skyUniforms.uFlashDir.value.copy(dir).setY(Math.max(0.3, dir.y)).normalize();
+    // sound takes its time over the distance; it comes from where the bolt came down
+    const B = this.bolts, d = B.lastDist || 1000;
+    if (this.onThunder) this.onThunder(d / 343, d, Math.sin(B.lastAz || 0) * 0.8);
+  }
+
   // ── Per-frame ─────────────────────────────────────────────────────────────
   update(dt, time, horde, fx, audio) {
     if (this.crows) this.crows.update(dt, this.dawn);
@@ -345,15 +360,7 @@ export class Environment {
 
     // lightning: a bolt out on the horizon, the cloud deck lights up
     this.nextLightning -= dt;
-    if (this.nextLightning <= 0) {
-      this.nextLightning = 20 + Math.random() * 38;
-      this.flash = 1;
-      const dir = this.bolts.strike(_dir.set(WORLD.CAM.x, WORLD.CAM.y, WORLD.CAM.z));
-      su.uFlashDir.value.copy(dir).setY(Math.max(0.3, dir.y)).normalize();
-      // sound takes its time over the distance; it comes from where the bolt came down
-      const B = this.bolts, d = B.lastDist || 1000;
-      if (this.onThunder) this.onThunder(d / 343, d, Math.sin(B.lastAz || 0) * 0.8);
-    }
+    if (this.nextLightning <= 0) this.strike();
     if (this.roofMen) for (const s of this.roofMen) s.idle(); // the spotter and loader by the nest
     this.bolts.update(dt, time);
     if (this.flash > 0) {
@@ -390,7 +397,16 @@ export class Environment {
     }
     for (const b of this.blinkers) b.sprite.visible = clear > 0.5 && Math.sin(time * b.rate * 3.1 + b.ph) > 0.55;
     for (const w of this.flickerWindows) w.material.color.setRGB(2.2, 1.2, 0.45).multiplyScalar(0.7 + 0.3 * Math.sin(time * 7 + w.id) * Math.sin(time * 3.3));
-    this.beacon.material.opacity = Math.sin(time * 3) > 0.6 ? 1 : 0.05;
+    // the mast's aviation light: a slow soft pulse, fading up and away (every 1.6 s), never quite out
+    {
+      const u = (time / 1.6) % 1, on = 0.06 + 0.94 * Math.pow(0.5 - 0.5 * Math.cos(u * Math.PI * 2), 2);
+      const b = this.beacon;
+      // (deep red: pushed much past ~3 the tone curve bleaches it to pink)
+      b.glass.material.color.setRGB(0.06 + 3.4 * on, 0.004 + 0.06 * on, 0.003 + 0.03 * on);
+      b.halo.material.color.setRGB(1, 0.05, 0.02).multiplyScalar(0.9 * on * clear);
+      b.haze.material.color.setRGB(1, 0.06, 0.03).multiplyScalar(0.16 * on * clear);
+      b.glint.material.color.setRGB(1, 0.06, 0.025).multiplyScalar(3 * on * clear);
+    }
 
     // burning wreck
     this.wreckFire.intensity = (90 + Math.random() * 45) * (1 - d * 0.5);

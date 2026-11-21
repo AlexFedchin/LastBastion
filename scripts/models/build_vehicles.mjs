@@ -249,9 +249,39 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     const RAMP_SHUT = Math.atan(0.19) + Math.atan(0.444);
     const hinge = P(0.25, 12.05, -43.3), boardsAt = P(0.25, 1.3, -76.4);
     const inRamp = (c) => c.z < -42.6 && Math.abs(c.x - 0.25) < 25 && c.y < rampTop(c.z) + 1.0 && c.y > rampTop(c.z) - 6.5;
+    // The rear landing gear stands right beside the hinge, inside that box: its wheels, struts,
+    // hubs and the fairings over them would go up with the ramp (the wheels torn in half when it
+    // shut). They are islands of their own in the mesh, wholly outboard of |x| 14 by the hinge:
+    // left on the airframe.
+    const gearTris = new Set();
+    {
+      const key = (v) => v.map((c) => c.toFixed(3)).join(',');
+      for (const mesh of doc.getRoot().listMeshes()) for (const p of mesh.listPrimitives()) {
+        const pos = p.getAttribute('POSITION'), idx = p.getIndices(), n = idx ? idx.getCount() : pos.getCount(), I = (k) => (idx ? idx.getScalar(k) : k);
+        const par = new Map(), find = (a) => { while (par.get(a) !== a) { par.set(a, par.get(par.get(a))); a = par.get(a); } return a; };
+        const tris = [];
+        for (let t = 0; t < n; t += 3) {
+          const tri = [0, 1, 2].map((j) => pos.getElement(I(t + j), []));
+          const c = centre3(tri).applyMatrix4(Minv);
+          if (!inRamp(c)) continue;
+          const ks = tri.map(key);
+          for (const k of ks) if (!par.has(k)) par.set(k, k);
+          par.set(find(ks[1]), find(ks[0])); par.set(find(ks[2]), find(ks[0]));
+          tris.push([ks[0], key(centre3(tri).toArray()), c]);
+        }
+        const isl = new Map();
+        for (const [k, ck, c] of tris) { const r = find(k); if (!isl.has(r)) isl.set(r, { box: new THREE.Box3(), keys: [] }); const s = isl.get(r); s.box.expandByPoint(c); s.keys.push(ck); }
+        for (const { box, keys } of isl.values()) {
+          const inner = box.min.x > 0 ? box.min.x : box.max.x < 0 ? -box.max.x : 0;
+          if (inner >= 14 && box.min.z >= -56.5 && box.max.z <= -42) for (const k of keys) gearTris.add(k);
+        }
+      }
+      console.log('ch47 gear tris kept off the ramp', gearTris.size);
+    }
+    const onRamp = (tri) => { const c = centre3(tri); return inRamp(c.clone().applyMatrix4(Minv)) && !gearTris.has(c.toArray().map((v) => v.toFixed(3)).join(',')); };
     // the treadway boards first (they slide into the ramp as it comes up), then the ramp
-    splitByTriangles(doc, (tri) => { const c = centre3(tri).applyMatrix4(Minv); return inRamp(c) && c.z < -76.4 && Math.abs(c.x - 0.25) < 12 ? 0 : -1; }, [{ name: 'boards', pivot: boardsAt.toArray() }], root);
-    splitByTriangles(doc, (tri) => inRamp(centre3(tri).applyMatrix4(Minv)) ? 0 : -1, [{ name: 'ramp', pivot: hinge.toArray() }], root);
+    splitByTriangles(doc, (tri) => { const c = centre3(tri).applyMatrix4(Minv); return onRamp(tri) && c.z < -76.4 && Math.abs(c.x - 0.25) < 12 ? 0 : -1; }, [{ name: 'boards', pivot: boardsAt.toArray() }], root);
+    splitByTriangles(doc, (tri) => onRamp(tri) ? 0 : -1, [{ name: 'ramp', pivot: hinge.toArray() }], root);
     const nodes = doc.getRoot().listNodes(), rampN = nodes.find((n) => n.getName() === 'ramp'), boardsN = nodes.find((n) => n.getName() === 'boards');
     root.removeChild(boardsN);
     rampN.addChild(boardsN.setTranslation(boardsAt.clone().sub(hinge).toArray()));
@@ -259,11 +289,14 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     const slide = P(0.25, rampTop(-43.4 + 21), -43.4 + 21).sub(P(0.25, rampTop(-43.4), -43.4));
     // The upper ramp door: on the real aircraft a panel stows up under the aft pylon and
     // swings down to close the opening above the shut ramp. The model has none, so it is
-    // built here: a trapezoid hinged at the pylon's lower rear edge (source z -91, y 33),
-    // reaching down to where the shut ramp's end lies, skinned with the belly's paint.
+    // built here: a trapezoid hinged at the pylon's lower rear edge, reaching down to where the
+    // shut ramp's end lies, skinned with the belly's paint. It has to fit inside the opening's
+    // arch: at the hinge (z -90.6) the arch's crown is at y 32.7 and ±9.9 wide; by the ramp's
+    // end (z -73..-78) the walls are ±14.4 apart at y 26. (Hinged at y 33.4 and ±11 at the top,
+    // ±16 at the foot, its corners came out through the roof and the sides.)
     let doorOpen = 0;
     {
-      const top = P(0.25, 33.4, -90.6);
+      const top = P(0.25, 31.7, -87.2);
       const L = 33.6; // the ramp's tread length, along its plane
       const endZ = -43.4 - L * Math.cos(Math.atan(0.444)), endY = 12.1 + L * Math.sin(Math.atan(0.444));
       const bot = P(0.25, endY + 0.6, endZ + 1.2);
@@ -287,7 +320,7 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
         }
       }
       const s3 = s; // source units to metres
-      const wTop = 11 * s3, wBot = 16 * s3, th = 0.06;
+      const wTop = 8.3 * s3, wBot = 13.6 * s3, th = 0.06;
       // in the door's frame: hinge at the origin, the panel running from it to `bot`
       const d = bot.clone().sub(top);
       const pts = [[-wTop, 0, 0], [wTop, 0, 0], [wBot + 0, d.y, d.z], [-wBot, d.y, d.z]];
@@ -313,7 +346,7 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     pivotGroup(doc, root, 'rotor_fore', (n) => n === 'Object_6' || n === 'Object_9');
     pivotGroup(doc, root, 'rotor_aft', (n) => n === 'Object_7' || n === 'Object_8');
     anchors(doc, {
-      rampFoot: P(0.25, 1.0, -98), inside: P(0.25, 6, -40), boardsSlide: slide, angles: [RAMP_SHUT, doorOpen, 0],
+      rampFoot: P(0.25, 1.0, -98), inside: P(0.25, 12.1, -40), boardsSlide: slide, angles: [RAMP_SHUT, doorOpen, 0],
       lightPort: P(26, 12, 4), lightStbd: P(-25, 12, 4), lightTail: P(0.4, 72, -86), hold: P(0.25, 20, -70),
     });
     await grade(doc, { dark: 0.68, sat: 0.7 });
