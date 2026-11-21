@@ -406,9 +406,36 @@ function buildBunker(env) {
   ]), mats.darkSteel);
   mast.position.set(6.5, top, 3.5);
   scene.add(mast);
-  env.beacon = env.makeGlowSprite(0xff2010, 1.6, 2.5);
-  env.beacon.position.set(6.5, top + 11.1, 3.5);
-  scene.add(env.beacon);
+  // the aviation light on the mast's tip: a red lamp in a little housing. The glass itself
+  // burns (far over 1: the bloom takes it), there is a halo in the wet air round it sized in
+  // metres, and a glint of fixed size on screen so from far off it is still a point of light.
+  // It fades up and down in a slow pulse (environment.js), never quite dark.
+  {
+    const x = 6.5, y = top + 11.0, z = 3.5;
+    const housing = new THREE.Mesh(merge([
+      xf(new THREE.CylinderGeometry(0.035, 0.05, 0.1, 10), 0, -0.05, 0),
+      xf(new THREE.CylinderGeometry(0.06, 0.06, 0.018, 12), 0, 0.0, 0),
+    ]), mats.darkSteel);
+    housing.position.set(x, y, z);
+    scene.add(housing);
+    // the glass: a red globe on the housing, seen whole from below as well as above
+    const glass = new THREE.Mesh(new THREE.SphereGeometry(0.075, 16, 12), new THREE.MeshBasicMaterial({ color: 0x1a0202 }));
+    glass.position.set(x, y + 0.075, z);
+    glass.scale.y = 1.2;
+    scene.add(glass);
+    // a tight glow round the glass, and a wide faint one: its light in the wet air
+    const halo = env.makeGlowSprite(0xff2010, 0.75, 0);
+    halo.position.copy(glass.position);
+    const haze = env.makeGlowSprite(0xff2010, 3.2, 0);
+    haze.position.copy(glass.position);
+    const glint = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex.glow, color: 0x000000, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, sizeAttenuation: false }));
+    glint.material.defines = { LB_FOG_ADD: '' };
+    glint.scale.setScalar(0.01);
+    glint.position.copy(glass.position);
+    glint.renderOrder = 7;
+    scene.add(halo, haze, glint);
+    env.beacon = { glass, halo, haze, glint };
+  }
 
   // sandbagged shelter at the back of the roof with a lit doorway
   const S = [];

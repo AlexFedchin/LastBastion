@@ -7,6 +7,7 @@ import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { modelScene, modelClips } from '../world/models.js';
 import { lampify, soldierClock } from './soldier.js';
+import { seatRest } from './seat.js';
 
 export const ADULTS = ['man', 'woman', 'man2'];
 export const WALKS = ['walk_sad', 'walk_arm', 'walk_leg'];
@@ -58,6 +59,7 @@ export class Survivor {
     this.body.add(m);
     this.bones = {};
     m.traverse((o) => { if (o.isBone) this.bones[o.name.replace('mixamorig', '')] = o; });
+    seatRest(this, m); // (the legs' rest pose, for sitting: seat.js)
     this.off = (this.id * 5.17) % 20;
     this.gait = 'walk_sad';
     this.runClip = this.id % 2 ? 'run_2' : 'run_1';

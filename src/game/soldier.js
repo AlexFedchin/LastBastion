@@ -8,6 +8,7 @@
 import * as THREE from 'three';
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
 import { modelScene, modelClips, cloneModel } from '../world/models.js';
+import { seatRest } from './seat.js';
 
 const REST_ELEV = 25 * Math.PI / 180;     // the rifle's elevation in the model's own pose
 const MUZZLE = new THREE.Vector3(0.053, 1.59, 0.96); // printed by build_models.mjs soldier
@@ -64,6 +65,7 @@ export class Soldier {
     this.body.add(m);
     this.bones = {};
     m.traverse((o) => { if (o.isBone) this.bones[o.name.replace('mixamorig', '')] = o; });
+    seatRest(this, m); // (the legs' rest pose, for sitting: seat.js)
     // rest: each bone's local rotation and its rotation in model space
     m.updateMatrixWorld(true);
     const inv = new THREE.Matrix4().copy(m.matrixWorld).invert();

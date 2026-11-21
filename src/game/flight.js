@@ -14,13 +14,14 @@ const H = 0.18; // seconds either side for the finite differences
 const wrap = (a) => Math.atan2(Math.sin(a), Math.cos(a));
 
 export class FlightPath {
-  constructor() { this.keys = []; }
+  /** smooth: seconds either side the flown curve is averaged over (0: through the keys exactly). */
+  constructor(smooth = 0) { this.keys = []; this.smooth = smooth; }
 
   /** A key at time t: position (x, y, z); face: the heading wanted when slow (rad, 0 = +z), or null. */
   add(t, x, y, z, face = null) {
     this.keys.push({ t, p: new THREE.Vector3(x, y, z), face });
     this.keys.sort((a, b) => a.t - b.t);
-    this.tan = null;
+    this.tan = null; this.holds = null;
     return this;
   }
 
@@ -28,6 +29,7 @@ export class FlightPath {
   hold(t, x, y, z, face = null) {
     this.add(t, x, y, z, face);
     this.keys.find((k) => k.t === t).hold = true;
+    this.holds = null;
     return this;
   }
 
@@ -67,6 +69,31 @@ export class FlightPath {
     );
   }
 
+  /**
+   * The position the airframe flies at t: the curve averaged over a moving window of
+   * `this.smooth` seconds either side (a Gaussian), so the acceleration, and with it the
+   * bank and pitch, never steps where one key hands over to the next. The window closes up
+   * toward a hold (the airframe still arrives exactly on a touchdown or a hover).
+   */
+  at(t, out) {
+    const S = this.smooth || 0;
+    if (S <= 0) return this.pos(t, out);
+    if (!this.holds) this.holds = this.keys.filter((k) => k.hold).map((k) => k.t);
+    let w = S;
+    for (const h of this.holds) w = Math.min(w, Math.abs(t - h) * 0.5);
+    if (w < 1e-3) return this.pos(t, out);
+    const N = 6; // samples either side; the weights are a Gaussian of sigma w / 2
+    out.set(0, 0, 0);
+    let sum = 0;
+    for (let i = -N; i <= N; i++) {
+      const u = i / N, k = Math.exp(-2 * u * u);
+      this.pos(t + u * w, _p);
+      out.addScaledVector(_p, k);
+      sum += k;
+    }
+    return out.multiplyScalar(1 / sum);
+  }
+
   /** The heading the keys ask for at t (the last key at or before t that has one), or null. */
   face(t) {
     let f = null;
@@ -75,7 +102,7 @@ export class FlightPath {
   }
 }
 
-const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3();
+const _a = new THREE.Vector3(), _b = new THREE.Vector3(), _c = new THREE.Vector3(), _p = new THREE.Vector3();
 
 /** The airframe's attitude as it flies a path: yaw, pitch (+ nose down), roll (+ port side up). */
 export class Attitude {
@@ -95,7 +122,7 @@ export class Attitude {
   /** Place the airframe at time t on the path (call every frame with the frame's dt). */
   update(path, t, dt) {
     const o = this.o;
-    path.pos(t - H, _a); path.pos(t, this.pos); path.pos(t + H, _b);
+    path.at(t - H, _a); path.at(t, this.pos); path.at(t + H, _b);
     this.vel.subVectors(_b, _a).multiplyScalar(1 / (2 * H));
     this.acc.copy(_b).add(_a).addScaledVector(this.pos, -2).multiplyScalar(1 / (H * H));
     const sp = Math.hypot(this.vel.x, this.vel.z);

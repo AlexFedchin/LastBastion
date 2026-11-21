@@ -22,6 +22,7 @@ import { buildStealthBomber, buildBomb } from './air.js';
 import { NavLights } from '../fx/navlights.js';
 import { Exhaust } from '../fx/exhaust.js';
 import { makeAttackHeli, makeLifter, spinRotors, makeBeam, aimBeam } from './helis.js';
+import { seat } from './seat.js';
 import { FlightPath, Attitude, racetrack } from './flight.js';
 
 const $ = (id) => document.getElementById(id);
@@ -257,14 +258,14 @@ export class ExtractionScene {
     this.helos = [0, 1].map((k) => {
       const h = makeAttackHeli(); h.group.visible = false; scene.add(h.group);
       h.beam = makeBeam(); h.beam.visible = false; scene.add(h.beam);
-      h.k = k; h.att = new Attitude({ drag: 0.0011, turn: 2.8, yawTurn: 1.8, maxBank: 0.8 });
+      h.k = k; h.att = new Attitude({ drag: 0.0011, turn: 2.2, yawTurn: 1.5, maxBank: 0.8 });
       h.nav = new NavLights(h, { lens: 0.07, pool, phase: k * 0.4 });
       return h;
     });
     this.lifters = LZ.map((lz, k) => {
       const l = makeLifter(); l.group.visible = false; scene.add(l.group);
       l.nav = new NavLights(l, { lens: 0.08, pool, phase: k * 0.27 });
-      l.k = k; l.lz = lz; l.att = new Attitude({ drag: 0.0007, turn: 1.6, yawTurn: 0.9, maxBank: 0.5, maxPitch: 0.3, pitch0: -0.02 });
+      l.k = k; l.lz = lz; l.att = new Attitude({ drag: 0.0007, turn: 1.3, yawTurn: 0.8, maxBank: 0.5, maxPitch: 0.3, pitch0: -0.02 });
       return l;
     });
     // 2.75 in rockets: a dark tube with the motor burning at its tail
@@ -336,6 +337,14 @@ export class ExtractionScene {
     });
     this.stageLifters();
     this.stagePeople();
+    // the storm: no strike of its own until the bombers are close enough to stand black against
+    // one (late in the first shot, the lead in the camera's eye: lightning beyond it)
+    g.env.nextLightning = 1e9;
+    this.later(this.T.bombersClose - 0.8, () => {
+      const cam = g.camera.position, lead = this.bomberRuns[1].b.group.position;
+      const dx = lead.x - cam.x, dz = lead.z - cam.z, d = Math.hypot(dx, dz) || 1, far = d + 900;
+      g.env.strike({ x: cam.x + dx / d * far, z: cam.z + dz / d * far }, cam.clone());
+    });
     for (const r of this.rockets) { r.on = false; r.m.visible = false; }
     this.intrudeAcc = 0; this.chaseAcc = 0; this.fieldAcc = 0; this.darkDone = false; this.bassDone = false;
     $('cine-sub').classList.remove('on');
@@ -469,7 +478,7 @@ export class ExtractionScene {
     const T = this.T, tA = T.helosIn, IN = 1.5;
     this.helos.forEach((h) => {
       const k = h.k, s = k ? 1 : -1;
-      const P = h.path = new FlightPath();
+      const P = h.path = new FlightPath(1.0); // (flown through a 1 s window: no jolts where the keys hand over)
       // in from behind the base, low and fast, under the camera on the nest roof
       // (IN: they come in a beat after the shot opens, so the run the camera rides is the start of
       // their first pass, not its end)
@@ -668,7 +677,7 @@ export class ExtractionScene {
       const gy = groundH(X, Z), base = gy + L.gear;
       const Td = L.touch = T.landing + 4.4 + k * 2.1;
       const Tl = L.leave = T.liftoff + 0.6 + k * 1.5;
-      const P = L.path = new FlightPath();
+      const P = L.path = new FlightPath(1.4);
       // up the left side of the valley, high, in trail
       P.add(Td - 36, -150 - k * 12, 125, 540 + k * 30).add(Td - 26.5, -112 - k * 6, 86, 200).add(Td - 21, -96, 62, 40);
       // round to the right over the far side of the field, losing height
@@ -810,20 +819,65 @@ export class ExtractionScene {
   }
 
   /**
-   * Into the hold: they stay there, standing packed in two files from the front of the cabin
-   * back toward the ramp (carried on the lifter, so they fly out with it).
+   * Into the hold (carried on the lifter from here, so they fly out with it): up the aisle to
+   * a seat on the troop benches along the walls, filled from the middle of the cabin forward
+   * of the ramp, the two sides in turn; a step across, a turn with the back to the wall, and
+   * down onto the seat. Anyone put aboard in a hurry (the ramp already shutting on them) is
+   * simply there in their seat.
    */
-  board(u) {
+  board(u, hurry = false) {
     const L = this.lifters[u.L], k = L.aboard++, f = u.f;
-    const row = k >> 1, side = k % 2 ? 1 : -1;
-    // (cabin floor at y -2.04 in the lifter's frame, the ramp's hinge near z -3.6)
-    const z = Math.max(-3.1, 1.3 - row * 0.72) + rand(-0.08, 0.08), x = row * 0.72 > 4.4 ? rand(-0.15, 0.15) : side * rand(0.42, 0.55);
+    // the cabin (the lifter's frame): floor y -1.6, the seat pans 0.47 above it, the benches
+    // along the walls at x ±0.73 from z -3.4 (by the ramp's hinge) to 3.5; the first in take the
+    // seats a little forward of the middle (they have seconds before the ramp comes up)
+    const side = k % 2 ? 1 : -1, row = k >> 1;
+    const z = 0.7 - (row % 7) * 0.6 + rand(-0.04, 0.04);
+    L.group.updateMatrixWorld();
+    const p = _v.copy(f.root.position);
+    L.group.worldToLocal(p);
     L.group.add(f.root);
-    f.root.position.set(x, -2.04, z);
-    f.root.rotation.set(0, Math.PI + side * rand(0.3, 0.7), 0); // turned in, half facing the ramp
-    f.root.visible = true;
+    u.seat = { side, z, x: side * (row < 7 ? 0.74 : 0.3) };
     u.state = 'aboard';
-    f.idle();
+    u.lx = clamp(p.x, -0.3, 0.3); u.lz = Math.min(Math.max(p.z, -4.6), z);
+    u.phase = hurry ? 'seated' : 'aisle'; u.pt = 0;
+    u.yaw = hurry ? -side * Math.PI / 2 : 0;
+    if (hurry) { u.lx = u.seat.x; u.lz = z; }
+    f.root.visible = true;
+    this.seatStep(u, 0);
+  }
+
+  /** One aboard: walking up the aisle, stepping across and turning, sitting down; then seated. */
+  seatStep(u, dt) {
+    const f = u.f, S = u.seat, FLOOR = -1.6, aisle = S.side * 0.24;
+    const face = -S.side * Math.PI / 2; // (their back to the wall)
+    if (u.phase === 'aisle') {
+      const dx = aisle - u.lx, dz = S.z - u.lz, d = Math.hypot(dx, dz);
+      const step = Math.min(d, 1.4 * dt);
+      if (d > 1e-4) { u.lx += dx / d * step; u.lz += dz / d * step; }
+      u.ph += step;
+      let dy = Math.atan2(dx, dz) - u.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      if (d > 0.05) u.yaw += dy * Math.min(1, dt * 8);
+      f.walk(u.ph);
+      seat(f, 0);
+      if (d < 0.03) { u.phase = 'turn'; u.pt = 0; u.x0 = u.lx; u.yaw0 = u.yaw; }
+    } else if (u.phase === 'turn') {
+      u.pt += dt;
+      const k = smoother(u.pt / 0.7);
+      u.lx = lerp(u.x0, S.x, k);
+      let dy = face - u.yaw0; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+      u.yaw = u.yaw0 + dy * k;
+      u.ph += Math.abs(S.x - u.x0) / 0.7 * dt;
+      if (k < 1) { f.walk(u.ph); seat(f, 0); } else { u.phase = 'sit'; u.pt = 0; }
+    }
+    if (u.phase === 'sit' || u.phase === 'seated') {
+      u.pt += dt;
+      const w = u.phase === 'seated' ? 1 : smoother(u.pt / 0.75);
+      if (w >= 1) u.phase = 'seated';
+      f.idle();
+      seat(f, w);
+    }
+    f.root.position.set(u.lx, FLOOR, u.lz);
+    f.root.rotation.set(0, u.yaw, 0);
   }
 
   /** The run shot's camera z at scene time t (before the shot: where it will start). */
@@ -837,12 +891,12 @@ export class ExtractionScene {
   updatePeople(dt) {
     const t = this.t;
     for (const u of this.runners) {
-      if (u.state === 'aboard') { u.f.idle(); continue; }
+      if (u.state === 'aboard') { this.seatStep(u, dt); continue; }
       if (u.state === 'gone') continue;
       if (t < u.go) continue;
       const f = u.f, L = this.lifters[u.L];
       // anyone still out when the ramp starts up is already on it, out of sight: in with the rest
-      if (t > this.T.doorClose + 0.6) { this.board(u); continue; }
+      if (t > this.T.doorClose + 0.6) { this.board(u, true); continue; }
       if (u.state === 'wait') { u.state = 'run'; f.root.visible = true; }
       // the track out of the yard, then the ramp foot, then inside
       L.group.updateMatrixWorld();
@@ -1113,6 +1167,7 @@ export class ExtractionScene {
     g.audio.stopVoice();
     g.audio.setCine(false);
     this.timers = [];
+    if (g.env.nextLightning > 1e8) g.env.nextLightning = 14; // (skipped before its strike: the storm goes on)
     for (const r of this.bomberRuns || []) { r.b.group.visible = false; r.b.setDoors(0); if (r.loop) r.loop.stop(1); r.loop = null; }
     for (const m of this.bombPool || []) m.visible = false;
     for (const r of this.rockets || []) { r.on = false; r.m.visible = false; }
