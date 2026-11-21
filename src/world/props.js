@@ -1,12 +1,12 @@
 // Dressing the killing ground: a column of abandoned cars on the road out,
-// burnt-out trucks, a tank hulk, a downed helicopter, hedgehogs, wire,
+// burnt-out trucks, a Leopard hulk, a downed helicopter, hedgehogs, wire,
 // dead trees, poles, the old forward trench, rubble and the farm ruins.
 import * as THREE from 'three';
 import { WORLD, wallZ, wallDist } from '../config.js';
 import { makeRng } from '../core/util.js';
 import { groundH, groundNormal, roadX, trenchZ, valleyEdge, NAPALM_OFFSET, craterList } from './terrain.js';
-import { box, cylY, merge, sandbagGeo, concertinaGeo, sagWire, makeTank, makeRuin } from './kit.js';
-import { CAR_SIZE, TRUCK_SIZE, placeModel } from './vehicles.js';
+import { box, cylY, merge, sandbagGeo, concertinaGeo, sagWire, makeRuin } from './kit.js';
+import { CAR_SIZE, TRUCK_SIZE, TANK_SIZE, placeModel } from './vehicles.js';
 import { addObstacle } from './obstacles.js';
 import { placeRock, placeBush, placeDeadTree } from './flora.js';
 
@@ -63,9 +63,9 @@ export function buildProps(env) {
 
   placeModel(env, 'ural_burnt', plant(at(), 52, -150, -1.2, 0.1)); solid(52, -150, -1.2, 0, TRUCK_SIZE[0], TRUCK_SIZE[1]);
   placeModel(env, 'ural', plant(at(), -90, -186, 2.1, 0.05, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.04, 0, -0.1)))); solid(-90, -186, 2.1, 0, TRUCK_SIZE[0], TRUCK_SIZE[1]);
-  const tank = makeTank(mats, { body: mats.burnt, seed: 14 });
-  scene.add(plant(tank, 26, -72, -0.45, 0.25, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, 0, 0.04)))); solid(26, -72, -0.45, 0.1, 3.75, 1.85);
-  fire.add(25.6, groundH(26, -72) + 2.2, -72.4, 1.2, 1.8, 1.6, { smoke: 1.2, embers: 1, fadeIn: 0 });
+  // the knocked-out Leopard (its turret blown askew, a track thrown), still smouldering in the open ring
+  placeModel(env, 'leopard_wreck', plant(at(), 26, -72, -0.45, 0.2, 1, new THREE.Quaternion().setFromEuler(new THREE.Euler(0.05, 0, 0.04)))); solid(26, -72, -0.45, 0, TANK_SIZE[0], TANK_SIZE[1]);
+  fire.add(25.9, groundH(26, -72) + 2.3, -71.8, 1.0, 1.6, 1.4, { smoke: 1.2, embers: 1, fadeIn: 0 });
   // the downed helicopter: the airframe lies along its x, the debris thrown round it
   placeModel(env, 'heliwreck', plant(at(), -118, -258, 0.9, 0.05, 1)); solid(-118, -258, 0.9, 0, 5.6, 1.6);
   fire.add(-118, groundH(-118, -258) + 1.6, -258, 2.4, 3.6, 2.6, { smoke: 2.4, embers: 3 });

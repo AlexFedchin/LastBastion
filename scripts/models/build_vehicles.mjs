@@ -718,5 +718,266 @@ export function make({ io, SRC, finish, splitByTriangles, bakeNodes }) {
     await finish(doc, 'tower.glb');
   }
 
-  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, b2, house, mcrate, church, hedgehog, tower, helpers: { grade, texWebp, anchors, triCount, repaint } };
+
+  // ── per-texel model positions: what each texel of a texture covers on the model ──
+  /**
+   * For one texture, the model-space position under each of its R x R texels, rasterised
+   * from every triangle drawn with it (UVs wrapped into 0..1). Texels no triangle covers
+   * are filled from their neighbours (a few passes), the rest read null.
+   */
+  function texelPositions(doc, tex, R = 512) {
+    const P = new Float32Array(R * R * 3).fill(NaN);
+    for (const mesh of doc.getRoot().listMeshes()) for (const p of mesh.listPrimitives()) {
+      const m = p.getMaterial(); if (!m || m.getBaseColorTexture() !== tex) continue;
+      const pos = p.getAttribute('POSITION'), tc = p.getAttribute('TEXCOORD_0'); if (!tc) continue;
+      const idx = p.getIndices(), n = idx ? idx.getCount() : pos.getCount(), I = (k) => (idx ? idx.getScalar(k) : k);
+      const v = [[], [], []], t = [[], [], []];
+      for (let k = 0; k < n; k += 3) {
+        for (let j = 0; j < 3; j++) { pos.getElement(I(k + j), v[j]); tc.getElement(I(k + j), t[j]); }
+        // wrap the triangle as a whole (by its first corner's tile)
+        const ou = Math.floor(t[0][0]), ov = Math.floor(t[0][1]);
+        const x = t.map((q) => (q[0] - ou) * R), y = t.map((q) => (q[1] - ov) * R);
+        const d = (x[1] - x[0]) * (y[2] - y[0]) - (x[2] - x[0]) * (y[1] - y[0]); if (Math.abs(d) < 1e-9) continue;
+        const x0 = Math.max(0, Math.floor(Math.min(...x))), x1 = Math.min(R - 1, Math.ceil(Math.max(...x)));
+        const y0 = Math.max(0, Math.floor(Math.min(...y))), y1 = Math.min(R - 1, Math.ceil(Math.max(...y)));
+        for (let py = y0; py <= y1; py++) for (let px = x0; px <= x1; px++) {
+          const cx = px + 0.5, cy = py + 0.5;
+          const b1 = ((cx - x[0]) * (y[2] - y[0]) - (x[2] - x[0]) * (cy - y[0])) / d;
+          const b2 = ((x[1] - x[0]) * (cy - y[0]) - (cx - x[0]) * (y[1] - y[0])) / d;
+          const b0 = 1 - b1 - b2; if (b0 < -0.02 || b1 < -0.02 || b2 < -0.02) continue;
+          const o = (py * R + px) * 3;
+          for (let a = 0; a < 3; a++) P[o + a] = b0 * v[0][a] + b1 * v[1][a] + b2 * v[2][a];
+        }
+      }
+    }
+    for (let pass = 0; pass < 4; pass++) {
+      const Q = P.slice();
+      for (let py = 0; py < R; py++) for (let px = 0; px < R; px++) {
+        const o = (py * R + px) * 3; if (!Number.isNaN(P[o])) continue;
+        for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+          const qx = px + dx, qy = py + dy; if (qx < 0 || qy < 0 || qx >= R || qy >= R) continue;
+          const q = (qy * R + qx) * 3; if (Number.isNaN(P[q])) continue;
+          Q[o] = P[q]; Q[o + 1] = P[q + 1]; Q[o + 2] = P[q + 2]; break;
+        }
+      }
+      P.set(Q);
+    }
+    return { R, at: (u, v) => { const px = Math.min(R - 1, Math.floor(u * R)), py = Math.min(R - 1, Math.floor(v * R)), o = (py * R + px) * 3; return Number.isNaN(P[o]) ? null : [P[o], P[o + 1], P[o + 2]]; } };
+  }
+  /** An ambientCG colour map as a sampler (wrapping coordinates -> [r, g, b] 0..1). */
+  async function acgSampler(asset, R = 512) {
+    const px = await sharp(ACG(asset, 'Color')).resize(R, R).removeAlpha().raw().toBuffer();
+    return (u, v) => { const x = Math.floor((((u % 1) + 1) % 1) * R), y = Math.floor((((v % 1) + 1) % 1) * R), o = (y * R + x) * 3; return [px[o] / 255, px[o + 1] / 255, px[o + 2] / 255]; };
+  }
+  const ckey = (c) => c.toArray().map((v) => v.toFixed(4)).join(',');
+  /** Keep only the triangles `keep(centre, tri)` accepts, in the mesh nodes `test` names. */
+  function cullTris(doc, test, keep) {
+    for (const n of meshNodes(doc)) {
+      if (!test(n.getName())) continue;
+      for (const p of n.getMesh().listPrimitives()) {
+        const pos = p.getAttribute('POSITION'), idx = p.getIndices(), cnt = idx.getCount(), out = [];
+        for (let k = 0; k < cnt; k += 3) {
+          const tri = [0, 1, 2].map((j) => pos.getElement(idx.getScalar(k + j), []));
+          if (keep(centre3(tri), tri)) out.push(idx.getScalar(k), idx.getScalar(k + 1), idx.getScalar(k + 2));
+        }
+        if (out.length < cnt) p.setIndices(doc.createAccessor().setType('SCALAR').setBuffer(doc.getRoot().listBuffers()[0]).setArray(new Uint32Array(out)));
+      }
+    }
+  }
+  /** Connected pieces (by shared vertex positions) of the mesh nodes `test` names: [{ box, tris: Set of centre keys, node }]. */
+  function islands(doc, test) {
+    const key = (v) => v.map((c) => c.toFixed(4)).join(',');
+    const out = [];
+    for (const n of meshNodes(doc)) {
+      if (!test(n.getName())) continue;
+      for (const p of n.getMesh().listPrimitives()) {
+        const pos = p.getAttribute('POSITION'), idx = p.getIndices(), cnt = idx.getCount();
+        const par = new Map(), find = (a) => { while (par.get(a) !== a) { par.set(a, par.get(par.get(a))); a = par.get(a); } return a; };
+        const tris = [];
+        for (let k = 0; k < cnt; k += 3) {
+          const tri = [0, 1, 2].map((j) => pos.getElement(idx.getScalar(k + j), []));
+          const ks = tri.map(key);
+          for (const q of ks) if (!par.has(q)) par.set(q, q);
+          par.set(find(ks[1]), find(ks[0])); par.set(find(ks[2]), find(ks[0]));
+          tris.push([ks[0], tri]);
+        }
+        const m = new Map();
+        for (const [k0, tri] of tris) {
+          const r = find(k0); if (!m.has(r)) m.set(r, { box: new THREE.Box3(), tris: new Set(), node: n.getName() });
+          const s = m.get(r); for (const v of tri) s.box.expandByPoint(new THREE.Vector3(...v)); s.tris.add(ckey(centre3(tri)));
+        }
+        out.push(...m.values());
+      }
+    }
+    return out;
+  }
+  /** Burn every material: soot and rust over the texture's own shading (the burnt Ural's recipe), the soot heaviest high up. */
+  async function burnTextures(doc, { sootTop = 1.2, sootK = 0.75 } = {}) {
+    for (const m of doc.getRoot().listMaterials()) {
+      m.setMetallicFactor(0.15).setRoughnessFactor(0.95);
+      if (m.getMetallicRoughnessTexture()) m.setMetallicRoughnessTexture(null);
+      if (m.getEmissiveTexture()) m.setEmissiveTexture(null).setEmissiveFactor([0, 0, 0]);
+      const t = m.getBaseColorTexture();
+      if (!t) { m.setBaseColorFactor([0.03, 0.03, 0.03, 1]); continue; }
+      const tp = texelPositions(doc, t);
+      await repaint(t, (r, g, b, u, v) => {
+        const l = (0.3 * r + 0.59 * g + 0.11 * b) / 255;
+        const P = tp.at(u, v) || [0, 0, 0];
+        const soot = THREE.MathUtils.smoothstep(fbm(P[0] * 1.1 + 5, P[1] * 1.1 + P[2] * 0.9), 0.35, 0.65);
+        const up = THREE.MathUtils.smoothstep(P[1], sootTop - 0.8, sootTop + 0.6);
+        const rust = [0.36 * l + 0.1, 0.2 * l + 0.05, 0.12 * l + 0.03];
+        const k = Math.min(1, 0.2 + sootK * soot * 0.7 + 0.45 * up);
+        return rust.map((c, i) => Math.round(255 * (c * (1 - k) + [0.035, 0.032, 0.03][i] * k)));
+      });
+    }
+    await doc.transform(prune());
+  }
+
+  // ── GAZ-51 fuel truck: the tanker stalled on the road (the night event). Nose +x, 5.8 m,
+  // base at 0. Its factory orange is buried under road mud (ambientCG Ground051, thick on the
+  // wheels and sills, splashed up the tank in streaks), rust (Rust009 through Metal041B's
+  // spots) and grime, and darkened for the night; the white stencils fade into the paint.
+  // fueltruck_burnt.glb is what is left once it goes up. Source: nose +z, metres.
+  async function fuelDoc() {
+    const doc = await readRigid(V('Fuel-Truck.glb'));
+    xformAll(doc, new THREE.Matrix4().makeRotationY(Math.PI / 2));
+    fit(doc, 0, 5.8);
+    rootNode(doc, 'fueltruck');
+    return doc;
+  }
+  async function fueltruck() {
+    let doc = await fuelDoc();
+    const mud = await acgSampler('Ground051');
+    const L = await rustLayers();
+    const OXIDE = [0.6, 0.33, 0.16];
+    for (const m of doc.getRoot().listMaterials()) {
+      // (dull all over: the source's gloss map and its glowing lamps go)
+      m.setMetallicRoughnessTexture(null).setMetallicFactor(0.25).setRoughnessFactor(0.88).setEmissiveTexture(null).setEmissiveFactor([0, 0, 0]);
+      const t = m.getBaseColorTexture(); if (!t) continue;
+      const tp = texelPositions(doc, t);
+      const body = /Body/.test(m.getName());
+      await repaint(t, (r, g, b, u, v) => {
+        let c = [r / 255, g / 255, b / 255];
+        const P = tp.at(u, v) || [0, 1.5, 0];
+        // the stencils (white on the tank, the plate): pulled down to the paint around them
+        const white = body ? Math.min(1, Math.max(0, (Math.min(c[0], c[1], c[2]) - 0.42) / 0.2)) : 0;
+        if (white > 0) c = c.map((x, i) => x * (1 - 0.85 * white) + OXIDE[i] * 0.85 * white);
+        // the orange taken down to a dull oxide brown, most of its colour gone
+        const l = 0.3 * c[0] + 0.59 * c[1] + 0.11 * c[2];
+        c = c.map((x) => l + (x - l) * 0.42);
+        // rust where Metal041B's spots fall, gathered in patches (laid by model position, so it runs across seams)
+        const tu = P[0] * 0.35 + P[2] * 0.21, tv = P[1] * 0.35 - P[2] * 0.13;
+        const j = Math.floor((((tv % 1) + 1) % 1) * L.R) * L.R + Math.floor((((tu % 1) + 1) % 1) * L.R);
+        const kr = Math.min(1, L.mask[j] * (0.5 + 0.9 * fbm(P[0] * 0.9 + 3, P[1] * 0.9 + P[2] * 0.7))) * 0.9;
+        c = c.map((x, i) => x * (1 - kr) + (L.col[j * 3 + i] / 255) * 0.55 * kr);
+        // road mud: thick below the axles and on the sills, thrown up in streaks, a film of dust over everything
+        const h = P[1], streak = fbm(P[0] * 2.5 + P[2] * 0.7, h * 0.6 + 4) * 0.8 + fbm(P[0] * 9 + P[2] * 3, h * 1.8) * 0.4;
+        const km = Math.min(1, THREE.MathUtils.smoothstep(1.45 + 0.6 * streak - h, 0, 0.55) * (0.6 + 0.5 * streak)) * 0.82 + 0.18;
+        const mc = mud(P[0] * 0.45 + P[2] * 0.3, h * 0.45 + P[2] * 0.2).map((x) => x * 0.55);
+        c = c.map((x, i) => x * (1 - km) + mc[i] * km);
+        // grime in blotches
+        const s = THREE.MathUtils.smoothstep(fbm(P[0] * 1.3 + 7, P[1] * 1.3 + P[2]), 0.42, 0.8) * 0.55;
+        return c.map((x) => Math.round(255 * Math.min(1, x * (1 - 0.75 * s) * 0.55)));
+      });
+    }
+    await texWebp(doc, 1024, { normalSize: 1024 });
+    const b = getBounds(scene(doc));
+    console.log('fueltruck size', b.max.map((v, i) => (v - b.min[i]).toFixed(2)).join(' x '), 'tris', triCount(doc));
+    await finish(doc, 'fueltruck.glb', { ratio: Math.min(1, 16000 / triCount(doc)), error: 0.002 });
+
+    // what is left once it has gone up: the paint burnt off to soot and rust, the glass gone
+    doc = await fuelDoc();
+    await burnTextures(doc);
+    await grade(doc, { dark: 0.85, sat: 0.8, rust: 0.45 });
+    await texWebp(doc, 1024, { normalSize: 1024 });
+    await finish(doc, 'fueltruck_burnt.glb', { ratio: Math.min(1, 16000 / triCount(doc)), error: 0.002 });
+  }
+
+  // ── Leopard 2: the knocked-out tank in the field. The source is intact; this makes it a
+  // burnt-out hulk: the turret blown askew on its ring (slewed round, lifted on one side), the
+  // gun dropped, the antennas gone, the port track snapped (its upper run and front curve gone,
+  // a length of it lying out in front), the front wheels on that side lost, the turret ring open
+  // and black, everything scorched to soot and rust. Nose +x, hull centred, tracks on y = 0.
+  // Source: metres, nose +x, track bottoms at y -1.1.
+  async function leopard() {
+    // (Object_5 is a second copy of the hull, Object_4)
+    const doc = await readRigid(V('Leopard.glb'), (n) => n !== 'Object_5');
+    const G = 1.108; // the source's ground under the tracks
+    const isl = islands(doc, () => true);
+    const drop = new Set();
+    // the antennas: tall thin pieces
+    for (const s of isl) { const d = s.box.getSize(new THREE.Vector3()); if ((d.y > 0.7 && d.x < 0.3 && d.z < 0.3) || (s.node === 'Object_4' && s.box.min.y > 1.5)) for (const k of s.tris) drop.add(k); }
+    // the port (+z) side's front road wheels and idler, off with the track
+    for (const s of isl) if (s.node === 'Object_3' && s.box.min.z > 1 && s.box.min.x > 1.7) for (const k of s.tris) drop.add(k);
+    cullTris(doc, () => true, (c) => !drop.has(ckey(c)));
+    // the port track: its upper run and front curve forward of x 0.6 gone (the bottom run still
+    // lies where it was); a length of the upper run is kept to lie in front of the hull
+    const thrown = [];
+    cullTris(doc, (n) => n === 'Object_6', (c, tri) => {
+      if (!(c.z > 1 && c.x > 0.6)) return true;
+      if (c.y < -0.85) return true;
+      if (c.y > 0.0 && c.x < 3.0) thrown.push(tri);
+      return false;
+    });
+    {
+      const src = meshNodes(doc).find((n) => n.getName() === 'Object_6').getMesh().listPrimitives()[0];
+      const m = new THREE.Matrix4().makeTranslation(4.2, 0, 2.6).multiply(new THREE.Matrix4().makeRotationY(-1.1)).multiply(new THREE.Matrix4().makeTranslation(-1.8, -G + 0.02, -1.44));
+      const pos = src.getAttribute('POSITION'), nrm = src.getAttribute('NORMAL'), tc = src.getAttribute('TEXCOORD_0');
+      const at = new Map(); for (let i = 0; i < pos.getCount(); i++) at.set(pos.getElement(i, []).map((c) => c.toFixed(5)).join(','), i);
+      const posA = [], nrmA = [], uvA = [];
+      for (const tri of thrown) for (const v of tri) {
+        const i = at.get(v.map((c) => c.toFixed(5)).join(','));
+        posA.push(...new THREE.Vector3(...v).applyMatrix4(m).toArray());
+        nrmA.push(...(i !== undefined && nrm ? new THREE.Vector3(...nrm.getElement(i, [])).transformDirection(m).toArray() : [0, 1, 0]));
+        uvA.push(...(i !== undefined && tc ? tc.getElement(i, []) : [0, 0]));
+      }
+      const buf = doc.getRoot().listBuffers()[0], acc = (a, t) => doc.createAccessor().setType(t).setBuffer(buf).setArray(new Float32Array(a));
+      const pr = doc.createPrimitive().setMaterial(src.getMaterial()).setAttribute('POSITION', acc(posA, 'VEC3')).setAttribute('NORMAL', acc(nrmA, 'VEC3')).setAttribute('TEXCOORD_0', acc(uvA, 'VEC2'))
+        .setIndices(doc.createAccessor().setType('SCALAR').setBuffer(buf).setArray(new Uint32Array(posA.length / 3).map((_, i) => i)));
+      scene(doc).addChild(doc.createNode('thrown').setMesh(doc.createMesh('thrown').addPrimitive(pr)));
+      console.log('leopard thrown track tris', thrown.length);
+    }
+    // the turret (Object_8 and the commander's sight, Object_2) and its gun, each on its own pivot
+    const ring = new THREE.Vector3(-0.6, 0.76, 0), trunnion = new THREE.Vector3(1.3, 0.94, 0);
+    const barrel = isl.find((s) => s.node === 'Object_8' && s.box.min.x > 1 && s.box.max.x > 5.5);
+    const onGun = (c) => (barrel && barrel.tris.has(ckey(c))) || (c.x > 2.18 && Math.abs(c.z) < 0.3 && c.y > 0.7 && c.y < 1.2);
+    const turretTris = new Set();
+    for (const n of meshNodes(doc)) if (n.getName() === 'Object_8' || n.getName() === 'Object_2') for (const p of n.getMesh().listPrimitives()) {
+      const pos = p.getAttribute('POSITION'), idx = p.getIndices();
+      for (let k = 0; k < idx.getCount(); k += 3) turretTris.add(ckey(centre3([0, 1, 2].map((j) => pos.getElement(idx.getScalar(k + j), [])))));
+    }
+    // (Object_8 also carries a copy of the hull's slat-armour cage, reaching down the hull sides: it stays)
+    for (const s of isl) if (s.node === 'Object_8' && s.box.min.y < 0.5) for (const k of s.tris) turretTris.delete(k);
+    const root = rootNode(doc, 'leopard');
+    splitByTriangles(doc, (tri) => { const c = centre3(tri); if (!turretTris.has(ckey(c))) return -1; return onGun(c) ? 1 : 0; },
+      [{ name: 'turret', pivot: ring.toArray() }, { name: 'gun', pivot: trunnion.toArray() }], root);
+    const nodes = doc.getRoot().listNodes(), turretN = nodes.find((n) => n.getName() === 'turret'), gunN = nodes.find((n) => n.getName() === 'gun');
+    root.removeChild(gunN); turretN.addChild(gunN.setTranslation(trunnion.clone().sub(ring).toArray()));
+    // the blast: slewed round to starboard, the port side lifted off the ring and dropped back on the deck
+    turretN.setTranslation(ring.clone().add(new THREE.Vector3(-0.25, 0.14, 0.1)).toArray())
+      .setRotation(new THREE.Quaternion().setFromEuler(new THREE.Euler(-0.15, -0.66, 0.05, 'YXZ')).toArray());
+    gunN.setRotation(new THREE.Quaternion().setFromEuler(new THREE.Euler(0, 0, -0.3)).toArray());
+    // the open turret ring: a black disc on the deck
+    {
+      const buf = doc.getRoot().listBuffers()[0], seg = 28, r = 1.05, pos = [ring.x, ring.y + 0.02, ring.z], ind = [];
+      for (let i = 0; i < seg; i++) { const a = (i / seg) * Math.PI * 2; pos.push(ring.x + Math.cos(a) * r, ring.y + 0.02, ring.z + Math.sin(a) * r); ind.push(0, 1 + ((i + 1) % seg), 1 + i); }
+      const black = doc.createMaterial('hole').setBaseColorFactor([0.008, 0.007, 0.006, 1]).setRoughnessFactor(1).setMetallicFactor(0);
+      const pr = doc.createPrimitive().setMaterial(black)
+        .setAttribute('POSITION', doc.createAccessor().setType('VEC3').setBuffer(buf).setArray(new Float32Array(pos)))
+        .setAttribute('NORMAL', doc.createAccessor().setType('VEC3').setBuffer(buf).setArray(new Float32Array(pos.length).map((_, i) => (i % 3 === 1 ? 1 : 0))))
+        .setIndices(doc.createAccessor().setType('SCALAR').setBuffer(buf).setArray(new Uint16Array(ind)));
+      root.addChild(doc.createNode('ring').setMesh(doc.createMesh('ring').addPrimitive(pr)));
+    }
+    // to the game's frame: hull centred on x/z, tracks on y = 0
+    const hull = new THREE.Box3(); for (const v of verts(doc, (n) => n === 'Object_4')) hull.expandByPoint(v);
+    const off = [-(hull.min.x + hull.max.x) / 2, G, -(hull.min.z + hull.max.z) / 2];
+    root.setTranslation(off);
+    await burnTextures(doc, { sootTop: 1.3, sootK: 0.9 });
+    await grade(doc, { dark: 0.8, sat: 0.75, rust: 0.4 });
+    await texWebp(doc, 1024, { normalSize: 1024 });
+    console.log('leopard hull', hull.min.toArray().map((v) => v.toFixed(2)), hull.max.toArray().map((v) => v.toFixed(2)), 'offset', off.map((v) => v.toFixed(2)), 'tris', triCount(doc));
+    await finish(doc, 'leopard_wreck.glb', { ratio: Math.min(1, 16000 / triCount(doc)), error: 0.002 });
+  }
+
+  return { cars, ural, ch47, apache, heliwreck, container, bale, bomb, b2, house, mcrate, church, hedgehog, tower, fueltruck, leopard, helpers: { grade, texWebp, anchors, triCount, repaint } };
 }

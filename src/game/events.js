@@ -12,8 +12,7 @@ import { PF } from '../world/textures.js';
 import { groundH } from '../world/terrain.js';
 import { buildGunship } from './air.js';
 import { NavLights } from '../fx/navlights.js';
-import { cylX } from '../world/kit.js';
-import { makeUral, URAL_BED, URAL_LAMPS, TRUCK_SIZE } from '../world/vehicles.js';
+import { makeUral, URAL_LAMPS, FUEL_SIZE } from '../world/vehicles.js';
 import { cloneModel } from '../world/models.js';
 import { Soldier } from './soldier.js';
 import { Survivor } from './survivor.js';
@@ -910,7 +909,7 @@ class Tanker {
     T.updateMatrixWorld(true);
     this.box = new THREE.Box3().setFromObject(T);
     if (E.tankerSolid) removeObstacle(E.tankerSolid);
-    E.tankerSolid = addObstacle(this.x, this.z, this.yaw, TRUCK_SIZE[0], TRUCK_SIZE[1]);
+    E.tankerSolid = addObstacle(this.x, this.z, this.yaw, FUEL_SIZE[0], FUEL_SIZE[1]);
     this.hp = P.hp; this.t = 0; this.state = 'wait'; this.leak = 0;
     // the crowd that will walk past it
     this.ids = new Set();
@@ -1356,13 +1355,9 @@ export class NightEvents {
     this.chute.visible = false;
     scene.add(this.chute);
     // the fuel tanker (and what is left of it) and the survivors' truck
-    const mats = game.env.mats;
     const tankerParts = (burnt) => {
-      // a Ural with its canvas off and a fuel tank on the bed (burnt: the wreck, the tank scorched)
-      const t = makeUral({ burnt, covered: false });
-      const B = URAL_BED, r = 1.0, y = B.y + r;
-      t.add(new THREE.Mesh(cylX(r, B.len - 0.1, 18, B.x, y, 0), burnt ? mats.burnt : (mats.steel || mats.darkSteel)));
-      for (const x of [B.x - B.len / 2 + 0.1, B.x + B.len / 2 - 0.1]) t.add(new THREE.Mesh(cylX(r + 0.03, 0.12, 18, x, y, 0), mats.darkSteel));
+      // the GAZ-51 fuel truck, mud and rust over its orange (burnt: what is left once it goes up)
+      const t = cloneModel(burnt ? 'fueltruck_burnt' : 'fueltruck');
       t.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
       t.visible = false;
       scene.add(t);

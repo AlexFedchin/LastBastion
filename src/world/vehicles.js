@@ -1,5 +1,6 @@
 // The downloaded vehicles in the world (app/models, built by scripts/models/build_vehicles.mjs):
-// the wrecked cars, the Ural trucks (covered, open, burnt out), the crashed helicopter.
+// the wrecked cars, the Ural trucks (covered, open, burnt out), the crashed helicopter,
+// the fuel truck and the knocked-out Leopard.
 // All have their length along local +x and their base at y = 0.
 import { cloneModel } from './models.js';
 
@@ -9,6 +10,10 @@ export const CAR_SIZE = {
 };
 /** The Ural-4320's half length and half width. */
 export const TRUCK_SIZE = [3.7, 1.3];
+/** The GAZ-51 fuel truck's (the tanker on the road). */
+export const FUEL_SIZE = [2.9, 1.25];
+/** The knocked-out Leopard 2's hull (its slewed gun hangs out past it). */
+export const TANK_SIZE = [4.3, 1.95];
 
 /**
  * A static model at an object's transform, instanced with the others like it once the
